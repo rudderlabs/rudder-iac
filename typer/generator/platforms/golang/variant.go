@@ -283,8 +283,20 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 		if err != nil {
 			return nil, fmt.Errorf("naming property %q of %s: %w", f.wireKey, name, err)
 		}
+		first := len(*ctx.out)
 		if hoisted[f.wireKey], err = addNested(ctx, registry, propertyTypes, name, field, f); err != nil {
 			return nil, err
+		}
+		// addNested documents the type as the one in name.Field, a field the
+		// interface does not have.
+		in := strings.NewReplacer(" in "+name+"."+field, " in the "+field+" field of each struct implementing "+name)
+		for _, d := range (*ctx.out)[first:] {
+			if d.Union != nil {
+				d.Union.Doc = in.Replace(d.Union.Doc)
+			}
+			if d.Struct != nil {
+				d.Struct.Doc = in.Replace(d.Struct.Doc)
+			}
 		}
 	}
 	var (

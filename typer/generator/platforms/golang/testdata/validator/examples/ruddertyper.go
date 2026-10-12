@@ -1414,7 +1414,7 @@ type TrackSomeOpenVariantEventProperties interface {
 	isTrackSomeOpenVariantEventProperties()
 }
 
-// TrackSomeOpenVariantEventPropertiesMeta is the object in TrackSomeOpenVariantEventProperties.Meta.
+// TrackSomeOpenVariantEventPropertiesMeta is the object in the Meta field of each struct implementing TrackSomeOpenVariantEventProperties.
 type TrackSomeOpenVariantEventPropertiesMeta struct {
 	Source PropertySource // required
 }
