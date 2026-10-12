@@ -160,6 +160,24 @@ func TestVariantsWire(t *testing.T) {
 			want: trackJSON(exMeta, "Some Variant Event", `{"shipping": {"method": "express", "address": {"city": "Pune"}, "deadline": "today"}}`),
 		},
 		{
+			name: "variant: SomeVariantType Case2A sends its own match value",
+			call: func() error {
+				p := someVariant
+				p.SomeVariantType = examples.CustomTypeSomeVariantTypeCaseCase2A{SomeNumber: 3.5}
+				return ex.TrackSomeVariantEvent(id, p)
+			},
+			want: someVariantSent(`, "someVariantType": {"someString": "case_2_a", "someNumber": 3.5}`),
+		},
+		{
+			name: "variant: SomeVariantType Case2B, the same case's other match value, sends case_2_b",
+			call: func() error {
+				p := someVariant
+				p.SomeVariantType = examples.CustomTypeSomeVariantTypeCaseCase2B{SomeNumber: 1.5, SomeInteger: examples.Ptr[int64](2)}
+				return ex.TrackSomeVariantEvent(id, p)
+			},
+			want: someVariantSent(`, "someVariantType": {"someString": "case_2_b", "someNumber": 1.5, "someInteger": 2}`),
+		},
+		{
 			name: "default: Event With Variants Default sends the enum value it holds",
 			call: func() error {
 				return ref.TrackEventWithVariants(refID, ruddertyper.TrackEventWithVariantsPropertiesDefault{
