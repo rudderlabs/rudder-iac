@@ -1,18 +1,10 @@
 # Breaking Changes
 
-This document lists breaking changes between releases of `rudder-cli`. It is separate from [CHANGELOG.md](CHANGELOG.md) and covers changes that require users to update their YAML spec files or workflows.
+This document lists breaking changes between releases of `rudder-cli`. It is separate from [CHANGELOG.md](CHANGELOG.md) and covers changes that require users to update their YAML spec files or workflows. Breaking changes to destination `config` are in [cli/internal/providers/destination/definitions/BREAKING_CHANGES.md](cli/internal/providers/destination/definitions/BREAKING_CHANGES.md).
 
 ---
 
 ## Upcoming (unreleased)
-
-### Re-import destinations that already have an rETL connection
-
-**Scope:** spec
-
-**Why:** the CLI now maps `connectionMode.warehouse` and `consentManagement.warehouse` on active_campaign, am, attentive_tag, braze, bqstream, customerio, facebook_conversions, facebook_pixel, ga4, gcs, hs, iterable, mp, posthog, s3, tiktok_ads and webhook destinations. Before, it dropped them. The webapp writes these keys when you connect a warehouse source, so specs imported earlier don't have them.
-
-For those destinations, `plan` now shows an update that removes the keys, and `apply` strips them along with any warehouse consent settings. To avoid this, re-import the affected destinations with `rudder-cli import workspace` before your next `apply`.
 
 ### Secret references in imported specs are single-quoted
 
