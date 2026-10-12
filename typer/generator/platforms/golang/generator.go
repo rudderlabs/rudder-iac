@@ -65,9 +65,8 @@ type trackRule struct {
 // properties with the same name and different types.
 type propertyKey struct{ name, signature string }
 
-func keyOf(p plan.Property) (propertyKey, error) {
-	signature, err := typeSignature(p)
-	return propertyKey{p.Name, signature}, err
+func keyOf(p plan.Property) propertyKey {
+	return propertyKey{p.Name, typeSignature(p)}
 }
 
 type propertyType struct {
@@ -180,6 +179,11 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, error) {
 				core.Warn(fmt.Sprintf("skipping property %q (%s) of track event %q: Go generation does not support %s yet", wireKey, declaredTypes(ps.Property), event.Name, reason))
 				continue
 			}
+			// An invalid enum fails generation here, so typeSignature and
+			// addPropertyType resolve a kept field's enum with no error to handle.
+			if _, err := resolveEnum(ps.Property); err != nil {
+				return nil, fmt.Errorf("mapping property %q: %w", ps.Property.Name, err)
+			}
 			r.fields = append(r.fields, wireKey)
 		}
 		rules = append(rules, r)
@@ -276,16 +280,12 @@ func declaredTypes(p plan.Property) string {
 
 // typeSignature is a property's canonical type signature: its sorted types,
 // its sorted item types and its effective enum values in tracking plan order.
-func typeSignature(p plan.Property) (string, error) {
-	e, err := resolveEnum(p)
-	if err != nil {
-		return "", err
-	}
+func typeSignature(p plan.Property) string {
 	signature := typeList(p.Types) + ";items:" + typeList(p.ItemTypes) + ";enum:"
-	if e != nil {
+	if e, _ := resolveEnum(p); e != nil {
 		signature += e.signature
 	}
-	return signature, nil
+	return signature
 }
 
 func typeList(types []plan.PropertyType) string {
@@ -308,11 +308,7 @@ func typeList(types []plan.PropertyType) string {
 // holds it. It reports whether the type can hold nil (slice, map or interface).
 func addPropertyType(ctx *GoContext, registry *core.NameRegistry, name string, prop plan.Property) (bool, error) {
 	lead := fmt.Sprintf("%s represents the property %s", name, strconv.Quote(prop.Name))
-	e, err := resolveEnum(prop)
-	if err != nil {
-		return false, err
-	}
-	if e != nil {
+	if e, _ := resolveEnum(prop); e != nil {
 		return false, addEnum(ctx, registry, name, lead, prop, e)
 	}
 	if isUnion(prop.Types) {
@@ -505,10 +501,7 @@ func addPropertyTypes(ctx *GoContext, rules []trackRule, registry *core.NameRegi
 	for _, r := range rules {
 		for _, wireKey := range r.fields {
 			prop := r.rule.Schema.Properties[wireKey].Property
-			k, err := keyOf(prop)
-			if err != nil {
-				return nil, fmt.Errorf("mapping property %q: %w", prop.Name, err)
-			}
+			k := keyOf(prop)
 			if _, seen := first[k]; !seen {
 				first[k] = prop
 			}
@@ -640,11 +633,7 @@ func structFields(r trackRule, payload *GoPayload, propertyTypes map[propertyKey
 			return nil, fmt.Errorf("registering property %q of track event %q: %w", wireKey, r.rule.Event.Name, err)
 		}
 
-		k, err := keyOf(ps.Property)
-		if err != nil {
-			return nil, err
-		}
-		pt := propertyTypes[k]
+		pt := propertyTypes[keyOf(ps.Property)]
 		field := GoField{Name: name, Key: wireKey, Type: pt.name, Required: ps.Required}
 		// Optional fields need an absent state; slices, maps and interfaces
 		// already have one in nil.
