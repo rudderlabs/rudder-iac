@@ -117,7 +117,7 @@ func TestRecursiveCustomTypesTerminate(t *testing.T) {
 				select {
 				case <-done:
 				case <-time.After(5 * time.Second):
-					t.Fatal("generation did not return")
+					require.FailNow(t, "generation did not return")
 				}
 			})
 		}
