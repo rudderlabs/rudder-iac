@@ -911,7 +911,10 @@ func addPayload(ctx *GoContext, r trackRule, base string, propertyTypes map[prop
 	}
 	if r.variant != nil {
 		v, err := addVariant(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the properties of %s", name, strconv.Quote(event.Name)), "", r.variant, true)
-		return &GoStruct{Name: name, Variant: v}, err
+		if err != nil {
+			return nil, err
+		}
+		return &GoStruct{Name: name, Variant: v}, nil
 	}
 	if len(schema.Properties) > 0 {
 		return addStruct(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the properties of %s.", name, strconv.Quote(event.Name)), r.schema, true)
