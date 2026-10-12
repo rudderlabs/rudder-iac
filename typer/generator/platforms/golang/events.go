@@ -61,13 +61,13 @@ func eventMethod(packageName string, r eventRule, name string, payload *GoStruct
 	var (
 		event = r.rule.Event
 		track = event.EventType == plan.EventTypeTrack
-		nouns = strings.ToLower(payloadNoun(event.EventType))
+		noun  = strings.ToLower(payloadNoun(event.EventType))
 		m     = GoMethod{Name: name, Type: event.EventType, Payload: payload, Param: "props", Var: "p"}
 		// args are the send helper's arguments before the payload.
 		args  = []string{"identity"}
 		notes []string
 	)
-	if nouns == "traits" {
+	if noun == "traits" {
 		m.Param, m.Var = "traits", "t"
 	}
 	switch event.EventType {
@@ -99,7 +99,7 @@ func eventMethod(packageName string, r eventRule, name string, payload *GoStruct
 	summary := fmt.Sprintf("%s sends %s", name, eventLabel(event))
 	switch {
 	case payload == nil:
-		summary += ", which has no " + nouns
+		summary += ", which has no " + noun
 	case payload.MapAlias:
 		notes = append(notes, m.Param+" may be nil; it is copied, so it can be reused after the call.")
 	case payload.Variant != nil && track:
@@ -109,10 +109,10 @@ func eventMethod(packageName string, r eventRule, name string, payload *GoStruct
 		if m.CategoryMode != "" {
 			m.Send = send(m.Var, m.Param+".categoryMode()")
 		}
-		notes = append(notes, fmt.Sprintf("%s may be nil, including a nil pointer, which sends no %s.", m.Param, nouns))
+		notes = append(notes, fmt.Sprintf("%s may be nil, including a nil pointer, which sends no %s.", m.Param, noun))
 	case !track:
 		m.Pointer = true
-		notes = append(notes, fmt.Sprintf("%s may be nil, which sends no %s.", m.Param, nouns))
+		notes = append(notes, fmt.Sprintf("%s may be nil, which sends no %s.", m.Param, noun))
 	}
 	if payload != nil && r.rule.Section == plan.IdentitySectionContextTraits && event.EventType == plan.EventTypeIdentify {
 		notes = append(notes, "The traits are sent as context.traits, where they win over the traits WithAnalyticsContext sets.")

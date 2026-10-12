@@ -908,15 +908,15 @@ func addPayload(ctx *GoContext, r eventRule, name, payload string, propertyTypes
 	var (
 		event  = r.rule.Event
 		schema = r.rule.Schema
-		// A track payload's doc names the event alone, as it always has a name.
-		of    = eventLabel(event)
-		nouns = strings.ToLower(payload)
+		label  = eventLabel(event)
+		noun   = strings.ToLower(payload)
 	)
 	if len(schema.Properties) == 0 && !schema.AdditionalProperties {
 		return nil, nil
 	}
+	// A track payload's doc names the event alone, as it always has a name.
 	if event.EventType == plan.EventTypeTrack {
-		of = strconv.Quote(event.Name)
+		label = strconv.Quote(event.Name)
 	}
 
 	name, err := registry.RegisterName("payload:"+r.key, packageScope, name)
@@ -924,18 +924,18 @@ func addPayload(ctx *GoContext, r eventRule, name, payload string, propertyTypes
 		return nil, fmt.Errorf("registering the payload of %s event %q: %w", event.EventType, event.Name, err)
 	}
 	if r.variant != nil {
-		v, err := addVariant(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the %s of %s", name, nouns, of), "", r.variant, payload)
+		v, err := addVariant(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the %s of %s", name, noun, label), "", r.variant, payload)
 		if err != nil {
 			return nil, err
 		}
 		return &GoStruct{Name: name, Payload: payload, Variant: v}, nil
 	}
 	if len(schema.Properties) > 0 {
-		return addStruct(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the %s of %s.", name, nouns, of), r.schema, payload)
+		return addStruct(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the %s of %s.", name, noun, label), r.schema, payload)
 	}
 	st := &GoStruct{
 		Name:     name,
-		Doc:      fmt.Sprintf("%s holds the %s of %s. The tracking plan declares no %s and allows any.", name, nouns, of, nouns),
+		Doc:      fmt.Sprintf("%s holds the %s of %s. The tracking plan declares no %s and allows any.", name, noun, label, noun),
 		MapAlias: true,
 		Payload:  payload,
 	}
