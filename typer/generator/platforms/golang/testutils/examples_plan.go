@@ -143,12 +143,10 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 	}}
 
 	// The spec's page and screen rules declare the same properties.
-	product := func() map[string]plan.PropertySchema {
-		return map[string]plan.PropertySchema{
-			"productId":   required(property("productId", "", plan.PrimitiveTypeString)),
-			"productName": optional(property("productName", "", plan.PrimitiveTypeString)),
-			"price":       optional(property("price", "", plan.PrimitiveTypeNumber)),
-		}
+	product := map[string]plan.PropertySchema{
+		"productId":   required(property("productId", "", plan.PrimitiveTypeString)),
+		"productName": optional(property("productName", "", plan.PrimitiveTypeString)),
+		"price":       optional(property("price", "", plan.PrimitiveTypeNumber)),
 	}
 	// The catalog rejects names on the other event types, but a plan can carry
 	// them: these fixtures give each Event Types row and categoryMode a rule of
@@ -336,8 +334,8 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"industry":      optional(property("industry", "", plan.PrimitiveTypeString)),
 				"employeeCount": optional(property("employeeCount", "", plan.PrimitiveTypeInteger)),
 			}), "Associates user with their company."),
-			described(event(plan.EventTypePage, "", plan.IdentitySectionProperties, true, product()), "User viewed a product page."),
-			described(event(plan.EventTypeScreen, "", plan.IdentitySectionProperties, false, product()), "User viewed a product screen."),
+			described(event(plan.EventTypePage, "", plan.IdentitySectionProperties, true, product), "User viewed a product page."),
+			described(event(plan.EventTypeScreen, "", plan.IdentitySectionProperties, false, product), "User viewed a product screen."),
 			identifyVariant,
 			event(plan.EventTypeIdentify, "Open", plan.IdentitySectionTraits, true, nil),
 			groupVariant,
