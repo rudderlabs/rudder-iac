@@ -885,7 +885,7 @@ func addRule(ctx *GoContext, r eventRule, propertyTypes map[propertyKey]property
 	}
 
 	name := prefix + base
-	if payload == "Traits" {
+	if event.EventType == plan.EventTypeIdentify || event.EventType == plan.EventTypeGroup {
 		name = prefix
 	}
 	method, err := registry.RegisterName("method:"+r.key, methodScope, name)
@@ -937,6 +937,7 @@ func addPayload(ctx *GoContext, r eventRule, name, payload string, propertyTypes
 		Name:     name,
 		Doc:      fmt.Sprintf("%s holds the %s of %s. The tracking plan declares no %s and allows any.", name, nouns, of, nouns),
 		MapAlias: true,
+		Payload:  payload,
 	}
 	ctx.add(GoDecl{Struct: st})
 	return st, nil

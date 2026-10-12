@@ -56,8 +56,8 @@ type GoVariant struct {
 	// (value T, ok bool) when the discriminator is optional.
 	Result           string
 	DiscriminatorDoc string
-	// Payload is set on payload interfaces, which also list To{Payload}, as
-	// GoStruct.Payload.
+	// Payload is set on event payload interfaces, which also list
+	// To{Payload}: Properties, or Traits for identify and group.
 	Payload string
 	// Category is set on page and screen payload interfaces, which also list
 	// categoryMode.
