@@ -9,11 +9,12 @@ import (
 	ruddertyper "github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang/testdata/validator/examples"
 )
 
-// Each Example is one fenced caller example of the Go Generation
-// Specification, named after its section, compiled against the examples
-// golden. None has an Output comment, so go test compiles them but never runs
-// them: they exist so that every sample the Go README quotes compiles. Lines
-// before a spec example declare what it leaves undeclared.
+// Each Example compiles one fenced caller example of the Go Generation
+// Specification against the examples golden and is named after its section,
+// so the spec's caller examples, and the README samples quoted from them, are
+// known to compile. None has an Output comment, so go test compiles them but
+// never runs them. Lines before a spec example declare what it leaves
+// undeclared; `_ =` lines after it use what it leaves unused.
 
 func Example_requiredAndOptionalFields() {
 	props := ruddertyper.TrackSomeTrackEventProperties{
@@ -80,6 +81,8 @@ func Example_eventRuleWithVariants() {
 }
 
 // handleVariant is the Type Narrowing Usage example, which is a function.
+// Example_typeNarrowingUsage calls it so the function is exercised by name,
+// under an Example named after its section like the rest.
 func handleVariant(data ruddertyper.CustomTypeSomeVariantType) {
 	switch v := data.(type) {
 	case ruddertyper.CustomTypeSomeVariantTypeCaseCase1:
@@ -136,6 +139,7 @@ func Example_identifyEventsNoTraitCarryOver() {
 			ruddertyper.WithAnalyticsContext(analytics.Context{Traits: traits}),
 		)
 	}
+	_ = err
 }
 
 func Example_pageEvents() {
