@@ -1,5 +1,7 @@
 package golang
 
+import "github.com/rudderlabs/rudder-iac/typer/plan"
+
 // GoContext holds every name, type expression and comment of the generated
 // file; the templates only lay them out.
 type GoContext struct {
@@ -179,8 +181,8 @@ type GoField struct {
 type GoMethod struct {
 	Name string
 	Doc  string
-	// Type is the event type, which names the send helper.
-	Type string
+	// Type is the event type; the quick start prefers a track method.
+	Type plan.EventType
 	// Payload is nil when the rule's schema is empty and closed.
 	Payload *GoStruct
 	// Params are the parameters between identity and opts, as declared.

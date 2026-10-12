@@ -192,7 +192,7 @@ func quickStart(methods []GoMethod) *GoMethod {
 		return nil
 	}
 	if i := slices.IndexFunc(methods, func(m GoMethod) bool {
-		return m.Type == string(plan.EventTypeTrack) && m.Payload != nil && !m.Payload.MapAlias
+		return m.Type == plan.EventTypeTrack && m.Payload != nil && !m.Payload.MapAlias
 	}); i >= 0 {
 		return &methods[i]
 	}

@@ -62,7 +62,7 @@ func eventMethod(packageName string, r eventRule, name string, payload *GoStruct
 		event = r.rule.Event
 		track = event.EventType == plan.EventTypeTrack
 		nouns = strings.ToLower(payloadNoun(event.EventType))
-		m     = GoMethod{Name: name, Type: string(event.EventType), Payload: payload, Param: "props", Var: "p"}
+		m     = GoMethod{Name: name, Type: event.EventType, Payload: payload, Param: "props", Var: "p"}
 		// args are the send helper's arguments before the payload.
 		args  = []string{"identity"}
 		notes []string
