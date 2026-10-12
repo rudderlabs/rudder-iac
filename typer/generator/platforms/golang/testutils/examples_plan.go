@@ -142,6 +142,69 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 		}},
 	}}
 
+	// The spec's page and screen rules declare the same properties.
+	product := func() map[string]plan.PropertySchema {
+		return map[string]plan.PropertySchema{
+			"productId":   required(property("productId", "", plan.PrimitiveTypeString)),
+			"productName": optional(property("productName", "", plan.PrimitiveTypeString)),
+			"price":       optional(property("price", "", plan.PrimitiveTypeNumber)),
+		}
+	}
+	// The catalog rejects names on the other event types, but a plan can carry
+	// them: these fixtures give each Event Types row and categoryMode a rule of
+	// its own. Identify and group methods keep their names, so the named ones
+	// take suffixes.
+	var (
+		identifyVariant = event(plan.EventTypeIdentify, "Variant", plan.IdentitySectionContextTraits, false, map[string]plan.PropertySchema{
+			"accountType": required(property("accountType", "", plan.PrimitiveTypeString)),
+			// ToTraits is reserved in every traits struct.
+			"toTraits": optional(property("toTraits", "", plan.PrimitiveTypeString)),
+		})
+		groupVariant = event(plan.EventTypeGroup, "Variant", plan.IdentitySectionContextTraits, false, map[string]plan.PropertySchema{
+			"tier": required(property("tier", "", plan.PrimitiveTypeString)),
+		})
+		// Every struct declares category, as the discriminator.
+		pageCategoryVariant = event(plan.EventTypePage, "Category Variant", plan.IdentitySectionProperties, false, map[string]plan.PropertySchema{
+			"category": required(property("category", "", plan.PrimitiveTypeString)),
+		})
+		// An open base whose closed case and Default each have a mode of their
+		// own: a branch is open only when its base and its own schema are.
+		pageKindVariant = event(plan.EventTypePage, "Kind Variant", plan.IdentitySectionProperties, true, map[string]plan.PropertySchema{
+			"kind": required(property("kind", "", plan.PrimitiveTypeString)),
+		})
+		screenVariant = event(plan.EventTypeScreen, "Variant", plan.IdentitySectionProperties, false, map[string]plan.PropertySchema{
+			"screenType": required(property("screenType", "", plan.PrimitiveTypeString)),
+		})
+	)
+	identifyVariant.Variants = []plan.Variant{{Type: "discriminator", Discriminator: "accountType", Cases: []plan.VariantCase{
+		{Match: []any{"business"}, Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+			"companyName": required(property("companyName", "", plan.PrimitiveTypeString)),
+		}}},
+	}}}
+	groupVariant.Variants = []plan.Variant{{Type: "discriminator", Discriminator: "tier", Cases: []plan.VariantCase{
+		{Match: []any{"enterprise"}, Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+			"employeeCount": required(property("employeeCount", "", plan.PrimitiveTypeInteger)),
+		}}},
+	}}}
+	pageCategoryVariant.Variants = []plan.Variant{{Type: "discriminator", Discriminator: "category", Cases: []plan.VariantCase{
+		{Match: []any{"news"}, Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+			"headline": required(property("headline", "", plan.PrimitiveTypeString)),
+		}}},
+	}}}
+	pageKindVariant.Variants = []plan.Variant{{Type: "discriminator", Discriminator: "kind", Cases: []plan.VariantCase{
+		{Match: []any{"article"}, Schema: plan.ObjectSchema{AdditionalProperties: true, Properties: map[string]plan.PropertySchema{
+			"author": optional(property("author", "", plan.PrimitiveTypeString)),
+		}}},
+		{Match: []any{"gallery"}, Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+			"images": optional(property("images", "", plan.PrimitiveTypeInteger)),
+		}}},
+	}}}
+	screenVariant.Variants = []plan.Variant{{Type: "discriminator", Discriminator: "screenType", Cases: []plan.VariantCase{
+		{Match: []any{"product"}, Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+			"productId": required(property("productId", "", plan.PrimitiveTypeString)),
+		}}},
+	}}}
+
 	return &plan.TrackingPlan{
 		Name: "Examples Plan",
 		// No URL and version 0, as for a plan generated with --local.
@@ -261,8 +324,49 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"shipping":        required(property("shipping", "", shipping)),
 				"releases":        optional(items(property("releases", "", plan.PrimitiveTypeArray), release)),
 			}),
+			// The spec's identify, group, page and screen rules. The page rule is
+			// open, so WithCategory may add a category; the screen rule is closed.
+			described(event(plan.EventTypeIdentify, "", plan.IdentitySectionTraits, false, map[string]plan.PropertySchema{
+				"userName": optional(property("userName", "", plan.PrimitiveTypeString)),
+				"email":    required(property("email", "", plan.PrimitiveTypeString)),
+				"plan":     optional(property("plan", "", plan.PrimitiveTypeString)),
+			}), "Identifies a user with their traits."),
+			described(event(plan.EventTypeGroup, "", plan.IdentitySectionTraits, false, map[string]plan.PropertySchema{
+				"companyName":   required(property("companyName", "", plan.PrimitiveTypeString)),
+				"industry":      optional(property("industry", "", plan.PrimitiveTypeString)),
+				"employeeCount": optional(property("employeeCount", "", plan.PrimitiveTypeInteger)),
+			}), "Associates user with their company."),
+			described(event(plan.EventTypePage, "", plan.IdentitySectionProperties, true, product()), "User viewed a product page."),
+			described(event(plan.EventTypeScreen, "", plan.IdentitySectionProperties, false, product()), "User viewed a product screen."),
+			identifyVariant,
+			event(plan.EventTypeIdentify, "Open", plan.IdentitySectionTraits, true, nil),
+			groupVariant,
+			event(plan.EventTypeGroup, "Open", plan.IdentitySectionTraits, true, nil),
+			event(plan.EventTypePage, "Category", plan.IdentitySectionProperties, false, map[string]plan.PropertySchema{
+				"category": optional(property("category", "", plan.PrimitiveTypeString)),
+			}),
+			pageCategoryVariant,
+			pageKindVariant,
+			event(plan.EventTypePage, "Open", plan.IdentitySectionProperties, true, nil),
+			event(plan.EventTypePage, "Empty", plan.IdentitySectionProperties, false, nil),
+			screenVariant,
+			event(plan.EventTypeScreen, "Open", plan.IdentitySectionProperties, true, nil),
+			event(plan.EventTypeScreen, "Empty", plan.IdentitySectionProperties, false, nil),
 		},
 	}
+}
+
+func event(eventType plan.EventType, name string, section plan.IdentitySection, allowUnplanned bool, properties map[string]plan.PropertySchema) plan.EventRule {
+	return plan.EventRule{
+		Event:   plan.Event{EventType: eventType, Name: name},
+		Section: section,
+		Schema:  plan.ObjectSchema{Properties: properties, AdditionalProperties: allowUnplanned},
+	}
+}
+
+func described(r plan.EventRule, description string) plan.EventRule {
+	r.Event.Description = description
+	return r
 }
 
 // nested gives ps a nested object schema.
@@ -272,11 +376,7 @@ func nested(ps plan.PropertySchema, open bool, properties map[string]plan.Proper
 }
 
 func track(name, description string, allowUnplanned bool, properties map[string]plan.PropertySchema) plan.EventRule {
-	return plan.EventRule{
-		Event:   plan.Event{EventType: plan.EventTypeTrack, Name: name, Description: description},
-		Section: plan.IdentitySectionProperties,
-		Schema:  plan.ObjectSchema{Properties: properties, AdditionalProperties: allowUnplanned},
-	}
+	return described(event(plan.EventTypeTrack, name, plan.IdentitySectionProperties, allowUnplanned, properties), description)
 }
 
 func property(name, description string, types ...plan.PropertyType) plan.Property {
