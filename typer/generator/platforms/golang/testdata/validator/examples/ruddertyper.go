@@ -143,6 +143,75 @@ func (n Nullable[T]) wireValue() (any, error) {
 // MarshalJSON implements json.Marshaler.
 func (n Nullable[T]) MarshalJSON() ([]byte, error) { return marshal(n) }
 
+// --- Custom types ---
+
+// CustomTypeRow represents the custom type "Row".
+type CustomTypeRow = []string
+
+// CustomTypeSomeObjectType represents the custom type "SomeObjectType".
+//
+// some object custom type
+type CustomTypeSomeObjectType struct {
+	SomeCustomString     PropertySomeCustomString // required
+	SomeInteger          *PropertySomeInteger     // optional
+	AdditionalProperties map[string]any           // optional; undeclared keys only
+}
+
+func (v CustomTypeSomeObjectType) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "someCustomString", "someInteger")
+	m["someCustomString"] = v.SomeCustomString
+	if v.SomeInteger != nil {
+		m["someInteger"] = *v.SomeInteger
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeSomeObjectType) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeSomeStringType represents the custom type "SomeStringType".
+//
+// some string custom type
+type CustomTypeSomeStringType = string
+
+// CustomTypeUserProfile represents the custom type "UserProfile".
+type CustomTypeUserProfile struct {
+	Address              *CustomTypeUserProfileAddress // optional
+	AdditionalProperties map[string]any                // optional; undeclared keys only
+}
+
+func (v CustomTypeUserProfile) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "address")
+	if v.Address != nil {
+		m["address"] = *v.Address
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeUserProfile) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeUserProfileAddress is the object in CustomTypeUserProfile.Address.
+type CustomTypeUserProfileAddress struct {
+	Street               PropertyStreet // required
+	AdditionalProperties map[string]any // optional; undeclared keys only
+}
+
+func (v CustomTypeUserProfileAddress) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "street")
+	m["street"] = v.Street
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeUserProfileAddress) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
 // --- Property types ---
 
 // Property1stPlace represents the property "1st_place".
@@ -150,6 +219,9 @@ type Property1stPlace = int64
 
 // PropertyAdditionalProperties represents the property "additionalProperties".
 type PropertyAdditionalProperties = string
+
+// PropertyAddress represents the property "address".
+type PropertyAddress = map[string]any
 
 // PropertyAmount represents the property "amount".
 //
@@ -173,8 +245,17 @@ type PropertyBoolean = bool
 // PropertyCleared represents the property "cleared".
 type PropertyCleared = Null
 
+// PropertyEmail represents the property "email".
+type PropertyEmail = string
+
+// PropertyGrid represents the property "grid".
+type PropertyGrid = []CustomTypeRow
+
 // PropertyInteger represents the property "integer".
 type PropertyInteger = int64
+
+// PropertyLat represents the property "lat".
+type PropertyLat = float64
 
 // PropertyMatrix represents the property "matrix".
 type PropertyMatrix = [][]any
@@ -277,6 +358,9 @@ type PropertySomeArrayOrNull = Nullable[[]string]
 // some boolean property
 type PropertySomeBoolean = bool
 
+// PropertySomeCustomString represents the property "someCustomString".
+type PropertySomeCustomString = CustomTypeSomeStringType
+
 // PropertySomeInteger represents the property "someInteger".
 //
 // some integer property
@@ -327,6 +411,9 @@ func (u PropertySomeMultiType) wireValue() (any, error) { return u.value, nil }
 
 // MarshalJSON implements json.Marshaler.
 func (u PropertySomeMultiType) MarshalJSON() ([]byte, error) { return marshal(u) }
+
+// PropertySomeObject represents the property "someObject".
+type PropertySomeObject = CustomTypeSomeObjectType
 
 // PropertySomeObjectOrNull represents the property "someObjectOrNull".
 type PropertySomeObjectOrNull = Nullable[map[string]any]
@@ -396,6 +483,9 @@ func (v PropertyStatus) IsValid() bool {
 // PropertyStatusActive represents the property "statusActive".
 type PropertyStatusActive = bool
 
+// PropertyStreet represents the property "street".
+type PropertyStreet = string
+
 // PropertyString represents the property "string".
 type PropertyString = string
 
@@ -439,6 +529,9 @@ type PropertyUser = string
 
 // PropertyUserID represents the property "userId".
 type PropertyUserID = string
+
+// PropertyUserProfile represents the property "userProfile".
+type PropertyUserProfile = CustomTypeUserProfile
 
 // PropertyUserID1 represents the property "user_id".
 type PropertyUserID1 = string
@@ -548,6 +641,40 @@ func (v TrackNameCollisionsProperties) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 
+// TrackSomeCustomTypeEventProperties holds the properties of "Some Custom Type Event".
+type TrackSomeCustomTypeEventProperties struct {
+	Address     PropertyAddress      // optional
+	Grid        PropertyGrid         // optional
+	SomeObject  PropertySomeObject   // required
+	UserProfile *PropertyUserProfile // optional
+}
+
+func (v TrackSomeCustomTypeEventProperties) toMap() map[string]any {
+	m := map[string]any{
+		"someObject": v.SomeObject,
+	}
+	if v.Address != nil {
+		m["address"] = v.Address
+	}
+	if v.Grid != nil {
+		m["grid"] = v.Grid
+	}
+	if v.UserProfile != nil {
+		m["userProfile"] = *v.UserProfile
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackSomeCustomTypeEventProperties) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeCustomTypeEventProperties) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
 // TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties holds the properties of "Some Empty Track Event With Additional Properties". The tracking plan declares no properties and allows any.
 type TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties = map[string]any
 
@@ -625,6 +752,188 @@ func (v TrackSomeMultiTypeEventProperties) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 
+// TrackSomeNestedObjectEventProperties holds the properties of "Some Nested Object Event".
+type TrackSomeNestedObjectEventProperties struct {
+	Address  *TrackSomeNestedObjectEventPropertiesAddress           // optional
+	Contact  *TrackSomeNestedObjectEventPropertiesContact           // optional
+	Foo      *TrackSomeNestedObjectEventPropertiesFoo               // optional
+	FooBar   *TrackSomeNestedObjectEventPropertiesFooBar            // optional
+	Location Nullable[TrackSomeNestedObjectEventPropertiesLocation] // required
+}
+
+func (v TrackSomeNestedObjectEventProperties) toMap() map[string]any {
+	m := map[string]any{
+		"location": v.Location,
+	}
+	if v.Address != nil {
+		m["address"] = *v.Address
+	}
+	if v.Contact != nil {
+		m["contact"] = *v.Contact
+	}
+	if v.Foo != nil {
+		m["foo"] = *v.Foo
+	}
+	if v.FooBar != nil {
+		m["fooBar"] = *v.FooBar
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackSomeNestedObjectEventProperties) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeNestedObjectEventProperties) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeNestedObjectEventPropertiesAddress is the object in TrackSomeNestedObjectEventProperties.Address.
+type TrackSomeNestedObjectEventPropertiesAddress struct {
+	Street PropertyStreet // required
+}
+
+func (v TrackSomeNestedObjectEventPropertiesAddress) toMap() map[string]any {
+	m := map[string]any{
+		"street": v.Street,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeNestedObjectEventPropertiesAddress) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeNestedObjectEventPropertiesContact is the value in TrackSomeNestedObjectEventProperties.Contact: a string or object.
+// Build it with one of the NewTrackSomeNestedObjectEventPropertiesContact* functions.
+// Null is not a member, so the zero value cannot be sent.
+type TrackSomeNestedObjectEventPropertiesContact struct{ value any }
+
+// NewTrackSomeNestedObjectEventPropertiesContactString returns a string value.
+func NewTrackSomeNestedObjectEventPropertiesContactString(v string) TrackSomeNestedObjectEventPropertiesContact {
+	return TrackSomeNestedObjectEventPropertiesContact{value: v}
+}
+
+// NewTrackSomeNestedObjectEventPropertiesContactObject returns an object value.
+func NewTrackSomeNestedObjectEventPropertiesContactObject(v TrackSomeNestedObjectEventPropertiesContactObject) TrackSomeNestedObjectEventPropertiesContact {
+	return TrackSomeNestedObjectEventPropertiesContact{value: v}
+}
+
+// Value returns the held value.
+func (u TrackSomeNestedObjectEventPropertiesContact) Value() any { return u.value }
+
+func (u TrackSomeNestedObjectEventPropertiesContact) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: TrackSomeNestedObjectEventPropertiesContact is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u TrackSomeNestedObjectEventPropertiesContact) MarshalJSON() ([]byte, error) { return marshal(u) }
+
+// TrackSomeNestedObjectEventPropertiesContactObject is the object in TrackSomeNestedObjectEventProperties.Contact.
+type TrackSomeNestedObjectEventPropertiesContactObject struct {
+	Email                PropertyEmail  // required
+	AdditionalProperties map[string]any // optional; undeclared keys only
+}
+
+func (v TrackSomeNestedObjectEventPropertiesContactObject) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "email")
+	m["email"] = v.Email
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeNestedObjectEventPropertiesContactObject) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeNestedObjectEventPropertiesFoo is the object in TrackSomeNestedObjectEventProperties.Foo.
+type TrackSomeNestedObjectEventPropertiesFoo struct {
+	BarBaz               *TrackSomeNestedObjectEventPropertiesFooBarBaz // optional
+	AdditionalProperties map[string]any                                 // optional; undeclared keys only
+}
+
+func (v TrackSomeNestedObjectEventPropertiesFoo) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "barBaz")
+	if v.BarBaz != nil {
+		m["barBaz"] = *v.BarBaz
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeNestedObjectEventPropertiesFoo) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeNestedObjectEventPropertiesFooBarBaz is the object in TrackSomeNestedObjectEventPropertiesFoo.BarBaz.
+type TrackSomeNestedObjectEventPropertiesFooBarBaz struct{}
+
+func (v TrackSomeNestedObjectEventPropertiesFooBarBaz) toMap() map[string]any {
+	m := map[string]any{}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeNestedObjectEventPropertiesFooBarBaz) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeNestedObjectEventPropertiesFooBar is the object in TrackSomeNestedObjectEventProperties.FooBar.
+type TrackSomeNestedObjectEventPropertiesFooBar struct {
+	Baz                  *TrackSomeNestedObjectEventPropertiesFooBarBaz1 // optional
+	AdditionalProperties map[string]any                                  // optional; undeclared keys only
+}
+
+func (v TrackSomeNestedObjectEventPropertiesFooBar) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "baz")
+	if v.Baz != nil {
+		m["baz"] = *v.Baz
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeNestedObjectEventPropertiesFooBar) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeNestedObjectEventPropertiesFooBarBaz1 is the object in TrackSomeNestedObjectEventPropertiesFooBar.Baz.
+type TrackSomeNestedObjectEventPropertiesFooBarBaz1 struct{}
+
+func (v TrackSomeNestedObjectEventPropertiesFooBarBaz1) toMap() map[string]any {
+	m := map[string]any{}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeNestedObjectEventPropertiesFooBarBaz1) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeNestedObjectEventPropertiesLocation is the object in TrackSomeNestedObjectEventProperties.Location.
+type TrackSomeNestedObjectEventPropertiesLocation struct {
+	Lat                  PropertyLat    // required
+	AdditionalProperties map[string]any // optional; undeclared keys only
+}
+
+func (v TrackSomeNestedObjectEventPropertiesLocation) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "lat")
+	m["lat"] = v.Lat
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeNestedObjectEventPropertiesLocation) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
 // TrackSomeOpenTrackEventProperties holds the properties of "Some Open Track Event".
 type TrackSomeOpenTrackEventProperties struct {
 	AdditionalProperties1 *PropertyAdditionalProperties // optional
@@ -665,9 +974,10 @@ func (v TrackSomeOpenTrackEventProperties) MarshalJSON() ([]byte, error) {
 
 // TrackSomeTrackEventProperties holds the properties of "Some Track Event".
 type TrackSomeTrackEventProperties struct {
-	SomeBoolean *PropertySomeBoolean // optional
-	SomeInteger PropertySomeInteger  // required
-	SomeString  PropertySomeString   // required
+	SomeBoolean      *PropertySomeBoolean                           // optional
+	SomeInteger      PropertySomeInteger                            // required
+	SomeNestedObject *TrackSomeTrackEventPropertiesSomeNestedObject // optional
+	SomeString       PropertySomeString                             // required
 }
 
 func (v TrackSomeTrackEventProperties) toMap() map[string]any {
@@ -677,6 +987,9 @@ func (v TrackSomeTrackEventProperties) toMap() map[string]any {
 	}
 	if v.SomeBoolean != nil {
 		m["someBoolean"] = *v.SomeBoolean
+	}
+	if v.SomeNestedObject != nil {
+		m["someNestedObject"] = *v.SomeNestedObject
 	}
 	return m
 }
@@ -688,6 +1001,67 @@ func (v TrackSomeTrackEventProperties) ToProperties() (analytics.Properties, err
 
 // MarshalJSON implements json.Marshaler using the tracking plan's keys.
 func (v TrackSomeTrackEventProperties) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeTrackEventPropertiesSomeNestedObject is the object in TrackSomeTrackEventProperties.SomeNestedObject.
+type TrackSomeTrackEventPropertiesSomeNestedObject struct {
+	SomeNestedLevel1     *TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1 // optional
+	AdditionalProperties map[string]any                                                 // optional; undeclared keys only
+}
+
+func (v TrackSomeTrackEventPropertiesSomeNestedObject) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "someNestedLevel1")
+	if v.SomeNestedLevel1 != nil {
+		m["someNestedLevel1"] = *v.SomeNestedLevel1
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeTrackEventPropertiesSomeNestedObject) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1 is the object in TrackSomeTrackEventPropertiesSomeNestedObject.SomeNestedLevel1.
+type TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1 struct {
+	SomeNestedLevel2     *TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1SomeNestedLevel2 // optional
+	AdditionalProperties map[string]any                                                                 // optional; undeclared keys only
+}
+
+func (v TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "someNestedLevel2")
+	if v.SomeNestedLevel2 != nil {
+		m["someNestedLevel2"] = *v.SomeNestedLevel2
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1SomeNestedLevel2 is the object in TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1.SomeNestedLevel2.
+type TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1SomeNestedLevel2 struct {
+	SomeInteger          *PropertySomeInteger // optional
+	SomeString           *PropertySomeString  // optional
+	AdditionalProperties map[string]any       // optional; undeclared keys only
+}
+
+func (v TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1SomeNestedLevel2) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "someInteger", "someString")
+	if v.SomeInteger != nil {
+		m["someInteger"] = *v.SomeInteger
+	}
+	if v.SomeString != nil {
+		m["someString"] = *v.SomeString
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1SomeNestedLevel2) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 
@@ -766,6 +1140,15 @@ func (r *RudderTyperAnalytics) TrackNameCollisions(identity Identity, props Trac
 	return r.track(identity, "Name Collisions", p, opts)
 }
 
+// TrackSomeCustomTypeEvent sends the track event "Some Custom Type Event".
+func (r *RudderTyperAnalytics) TrackSomeCustomTypeEvent(identity Identity, props TrackSomeCustomTypeEventProperties, opts ...Option) error {
+	p, err := props.ToProperties()
+	if err != nil {
+		return err
+	}
+	return r.track(identity, "Some Custom Type Event", p, opts)
+}
+
 // TrackSomeEmptyTrackEventWithAdditionalProperties sends the track event "Some Empty Track Event With Additional Properties". props may be nil; it is copied, so it can be reused after the call.
 func (r *RudderTyperAnalytics) TrackSomeEmptyTrackEventWithAdditionalProperties(identity Identity, props TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties, opts ...Option) error {
 	p, err := snapshot(props)
@@ -796,6 +1179,15 @@ func (r *RudderTyperAnalytics) TrackSomeMultiTypeEvent(identity Identity, props 
 		return err
 	}
 	return r.track(identity, "Some Multi Type Event", p, opts)
+}
+
+// TrackSomeNestedObjectEvent sends the track event "Some Nested Object Event".
+func (r *RudderTyperAnalytics) TrackSomeNestedObjectEvent(identity Identity, props TrackSomeNestedObjectEventProperties, opts ...Option) error {
+	p, err := props.ToProperties()
+	if err != nil {
+		return err
+	}
+	return r.track(identity, "Some Nested Object Event", p, opts)
 }
 
 // TrackSomeOpenTrackEvent sends the track event "Some Open Track Event".

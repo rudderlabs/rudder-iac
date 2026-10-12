@@ -6,6 +6,32 @@ import "github.com/rudderlabs/rudder-iac/typer/plan"
 // the shapes the shared reference plan lacks, so the examples golden pins how
 // each of them is generated.
 func GetExamplesTrackingPlan() *plan.TrackingPlan {
+	var (
+		object = plan.PrimitiveTypeObject
+		// A primitive custom type, and an open object one whose field takes it.
+		someStringType = &plan.CustomType{Name: "SomeStringType", Description: "some string custom type", Type: plan.PrimitiveTypeString}
+		someObjectType = &plan.CustomType{
+			Name:        "SomeObjectType",
+			Description: "some object custom type",
+			Type:        object,
+			Schema: &plan.ObjectSchema{AdditionalProperties: true, Properties: map[string]plan.PropertySchema{
+				"someCustomString": required(property("someCustomString", "", someStringType)),
+				"someInteger":      optional(property("someInteger", "some integer property", plan.PrimitiveTypeInteger)),
+			}},
+		}
+		// A custom type with an inline object, which Go hoists as well.
+		userProfile = &plan.CustomType{
+			Name: "UserProfile",
+			Type: object,
+			Schema: &plan.ObjectSchema{AdditionalProperties: true, Properties: map[string]plan.PropertySchema{
+				"address": nested(optional(property("address", "", object)), true, map[string]plan.PropertySchema{
+					"street": required(property("street", "", plan.PrimitiveTypeString)),
+				}),
+			}},
+		}
+		row = &plan.CustomType{Name: "Row", Type: plan.PrimitiveTypeArray, ItemType: plan.PrimitiveTypeString}
+	)
+
 	return &plan.TrackingPlan{
 		Name: "Examples Plan",
 		// No URL and version 0, as for a plan generated with --local.
@@ -15,6 +41,15 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"someString":  required(property("someString", "some string property", plan.PrimitiveTypeString)),
 				"someInteger": required(property("someInteger", "some integer property", plan.PrimitiveTypeInteger)),
 				"someBoolean": optional(property("someBoolean", "some boolean property", plan.PrimitiveTypeBoolean)),
+				// Nested rule objects are open unless the plan says otherwise.
+				"someNestedObject": nested(optional(property("someNestedObject", "", object)), true, map[string]plan.PropertySchema{
+					"someNestedLevel1": nested(optional(property("someNestedLevel1", "", object)), true, map[string]plan.PropertySchema{
+						"someNestedLevel2": nested(optional(property("someNestedLevel2", "", object)), true, map[string]plan.PropertySchema{
+							"someString":  optional(property("someString", "some string property", plan.PrimitiveTypeString)),
+							"someInteger": optional(property("someInteger", "some integer property", plan.PrimitiveTypeInteger)),
+						}),
+					}),
+				}),
 			}),
 			track("Some Empty Track Event", "", false, nil),
 			track("Some Empty Track Event With Additional Properties", "", true, nil),
@@ -76,8 +111,43 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"status":       required(enum(property("status", "", plan.PrimitiveTypeString), "active", "inactive")),
 				"statusActive": optional(property("statusActive", "", plan.PrimitiveTypeBoolean)),
 			}),
+			// Custom type shapes the reference plan lacks. grid's items are a
+			// custom array type, whose alias resolves through another alias.
+			track("Some Custom Type Event", "", false, map[string]plan.PropertySchema{
+				"someObject":  required(property("someObject", "", someObjectType)),
+				"userProfile": optional(property("userProfile", "", userProfile)),
+				"grid":        optional(items(property("grid", "", plan.PrimitiveTypeArray), row)),
+				// Without a nested schema here, address keeps its Property type.
+				"address": optional(property("address", "", object)),
+			}),
+			// Nested object shapes the reference plan lacks. The providers keep
+			// a nested schema only when object is listed first. foo.barBaz and
+			// fooBar.baz both concatenate to ...FooBarBaz.
+			track("Some Nested Object Event", "", false, map[string]plan.PropertySchema{
+				"address": nested(optional(property("address", "", object)), false, map[string]plan.PropertySchema{
+					"street": required(property("street", "", plan.PrimitiveTypeString)),
+				}),
+				"location": nested(required(property("location", "", object, plan.PrimitiveTypeNull)), true, map[string]plan.PropertySchema{
+					"lat": required(property("lat", "", plan.PrimitiveTypeNumber)),
+				}),
+				"contact": nested(optional(property("contact", "", object, plan.PrimitiveTypeString)), true, map[string]plan.PropertySchema{
+					"email": required(property("email", "", plan.PrimitiveTypeString)),
+				}),
+				"foo": nested(optional(property("foo", "", object)), true, map[string]plan.PropertySchema{
+					"barBaz": nested(optional(property("barBaz", "", object)), false, nil),
+				}),
+				"fooBar": nested(optional(property("fooBar", "", object)), true, map[string]plan.PropertySchema{
+					"baz": nested(optional(property("baz", "", object)), false, nil),
+				}),
+			}),
 		},
 	}
+}
+
+// nested gives ps a nested object schema.
+func nested(ps plan.PropertySchema, open bool, properties map[string]plan.PropertySchema) plan.PropertySchema {
+	ps.Schema = &plan.ObjectSchema{Properties: properties, AdditionalProperties: open}
+	return ps
 }
 
 func track(name, description string, allowUnplanned bool, properties map[string]plan.PropertySchema) plan.EventRule {
