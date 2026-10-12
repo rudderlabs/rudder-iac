@@ -32,6 +32,10 @@ func discriminate(matches ...[]any) plan.Variant {
 
 func typed(types ...plan.PropertyType) plan.Property { return plan.Property{Types: types} }
 
+func nullable(types ...plan.PropertyType) []plan.PropertyType {
+	return append(types, plan.PrimitiveTypeNull)
+}
+
 // someEventVariant generates p and returns the variant interface of "Some
 // Event" and the structs that implement it, in file order.
 func someEventVariant(t *testing.T, p *plan.TrackingPlan) (*GoVariant, []*GoStruct) {
@@ -72,7 +76,6 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			"meta": object(map[string]plan.PropertySchema{"b": {Property: plan.Property{Name: "b", Types: onlyString}}}),
 		}}))
 		defaultConflict = variantPlan(typed(onlyString...), discriminate([]any{"a"}))
-		openCase        = variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{AdditionalProperties: true}))
 	)
 	nestedConflict.Rules[0].Schema.Properties["meta"] = object(map[string]plan.PropertySchema{"a": {Property: plan.Property{Name: "a", Types: onlyString}}})
 	defaultConflict.Rules[0].Variants[0].DefaultSchema = &plan.ObjectSchema{Properties: redefine(typed(onlyInteger...)).Properties}
@@ -160,7 +163,7 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 		},
 		{
 			name:         "an open case under a closed base",
-			plan:         openCase,
+			plan:         variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{AdditionalProperties: true})),
 			wantWarnings: []string{`generating case ["a"] of the variants of track event "Some Event" closed: its base schema does not allow additional properties`},
 		},
 	}
@@ -190,8 +193,6 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 // Default is left out only when the cases match every value the
 // discriminator can take, which a nullable one never allows.
 func TestGenerateVariantDefault(t *testing.T) {
-	nullable := func(t plan.PropertyType) []plan.PropertyType { return []plan.PropertyType{t, plan.PrimitiveTypeNull} }
-
 	tests := []struct {
 		name    string
 		kind    plan.Property
@@ -236,10 +237,7 @@ func TestGenerateVariantDefault(t *testing.T) {
 // One row per row of the spec's Discriminator Values table: what a case's
 // Discriminator returns for each resolved discriminator type.
 func TestGenerateVariantDiscriminatorValues(t *testing.T) {
-	var (
-		nullable = func(types ...plan.PropertyType) []plan.PropertyType { return append(types, plan.PrimitiveTypeNull) }
-		status   = plan.CustomType{Name: "status", Type: plan.PrimitiveTypeString, Config: &plan.PropertyConfig{Enum: []any{"a", "b"}}}
-	)
+	status := plan.CustomType{Name: "status", Type: plan.PrimitiveTypeString, Config: &plan.PropertyConfig{Enum: []any{"a", "b"}}}
 
 	tests := []struct {
 		name  string
