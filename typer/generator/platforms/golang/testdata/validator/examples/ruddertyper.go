@@ -176,6 +176,39 @@ type PropertyInteger = int64
 // PropertyMatrix represents the property "matrix".
 type PropertyMatrix = [][]any
 
+// PropertyMode represents the property "mode".
+type PropertyMode string
+
+// Allowed values of PropertyMode.
+const (
+	PropertyModeActive  PropertyMode = "Active"
+	PropertyModeActive1 PropertyMode = "active"
+	PropertyModeValues1 PropertyMode = "values"
+	PropertyModeEmpty   PropertyMode = ""
+)
+
+// PropertyModeValues returns every allowed value, in tracking plan order.
+func PropertyModeValues() []PropertyMode {
+	return []PropertyMode{
+		PropertyModeActive,
+		PropertyModeActive1,
+		PropertyModeValues1,
+		PropertyModeEmpty,
+	}
+}
+
+// IsValid reports whether v is an allowed value.
+func (v PropertyMode) IsValid() bool {
+	switch v {
+	case PropertyModeActive,
+		PropertyModeActive1,
+		PropertyModeValues1,
+		PropertyModeEmpty:
+		return true
+	}
+	return false
+}
+
 // PropertyNumber represents the property "number".
 type PropertyNumber = float64
 
@@ -299,6 +332,66 @@ type PropertySomeObjectOrNull = Nullable[map[string]any]
 //
 // some string property
 type PropertySomeString = string
+
+// PropertyStageValue is the enum type of the property "stage".
+type PropertyStageValue string
+
+// Allowed non-null values of PropertyStageValue.
+const (
+	PropertyStageValueDraft PropertyStageValue = "draft"
+	PropertyStageValueLive  PropertyStageValue = "live"
+)
+
+// PropertyStageValueValues returns every allowed value, in tracking plan order.
+func PropertyStageValueValues() []PropertyStageValue {
+	return []PropertyStageValue{
+		PropertyStageValueDraft,
+		PropertyStageValueLive,
+	}
+}
+
+// IsValid reports whether v is an allowed value.
+func (v PropertyStageValue) IsValid() bool {
+	switch v {
+	case PropertyStageValueDraft,
+		PropertyStageValueLive:
+		return true
+	}
+	return false
+}
+
+// PropertyStage represents the property "stage": "draft", "live" or null.
+type PropertyStage = Nullable[PropertyStageValue]
+
+// PropertyStatus represents the property "status".
+type PropertyStatus string
+
+// Allowed values of PropertyStatus.
+const (
+	PropertyStatusActive1  PropertyStatus = "active"
+	PropertyStatusInactive PropertyStatus = "inactive"
+)
+
+// PropertyStatusValues returns every allowed value, in tracking plan order.
+func PropertyStatusValues() []PropertyStatus {
+	return []PropertyStatus{
+		PropertyStatusActive1,
+		PropertyStatusInactive,
+	}
+}
+
+// IsValid reports whether v is an allowed value.
+func (v PropertyStatus) IsValid() bool {
+	switch v {
+	case PropertyStatusActive1,
+		PropertyStatusInactive:
+		return true
+	}
+	return false
+}
+
+// PropertyStatusActive represents the property "statusActive".
+type PropertyStatusActive = bool
 
 // PropertyString represents the property "string".
 type PropertyString = string
@@ -454,6 +547,38 @@ func (v TrackNameCollisionsProperties) MarshalJSON() ([]byte, error) {
 
 // TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties holds the properties of "Some Empty Track Event With Additional Properties". The tracking plan declares no properties and allows any.
 type TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties = map[string]any
+
+// TrackSomeEnumEventProperties holds the properties of "Some Enum Event".
+type TrackSomeEnumEventProperties struct {
+	Mode         PropertyMode          // required
+	Stage        *PropertyStage        // optional
+	Status       PropertyStatus        // required
+	StatusActive *PropertyStatusActive // optional
+}
+
+func (v TrackSomeEnumEventProperties) toMap() map[string]any {
+	m := map[string]any{
+		"mode":   v.Mode,
+		"status": v.Status,
+	}
+	if v.Stage != nil {
+		m["stage"] = *v.Stage
+	}
+	if v.StatusActive != nil {
+		m["statusActive"] = *v.StatusActive
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackSomeEnumEventProperties) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeEnumEventProperties) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
 
 // TrackSomeMultiTypeEventProperties holds the properties of "Some Multi Type Event".
 type TrackSomeMultiTypeEventProperties struct {
@@ -646,6 +771,15 @@ func (r *RudderTyperAnalytics) TrackSomeEmptyTrackEventWithAdditionalProperties(
 // TrackSomeEmptyTrackEvent sends the track event "Some Empty Track Event", which has no properties.
 func (r *RudderTyperAnalytics) TrackSomeEmptyTrackEvent(identity Identity, opts ...Option) error {
 	return r.track(identity, "Some Empty Track Event", nil, opts)
+}
+
+// TrackSomeEnumEvent sends the track event "Some Enum Event".
+func (r *RudderTyperAnalytics) TrackSomeEnumEvent(identity Identity, props TrackSomeEnumEventProperties, opts ...Option) error {
+	p, err := props.ToProperties()
+	if err != nil {
+		return err
+	}
+	return r.track(identity, "Some Enum Event", p, opts)
 }
 
 // TrackSomeMultiTypeEvent sends the track event "Some Multi Type Event".
