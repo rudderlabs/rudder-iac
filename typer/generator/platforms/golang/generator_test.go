@@ -59,8 +59,8 @@ func TestGenerateGoldens(t *testing.T) {
 	}
 }
 
-// Names are checked before the skip check, so rules and fields the generator
-// leaves out for now fail on them too.
+// Names are checked first, so rules the generator leaves out for now fail on
+// them too.
 func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 	rule := func(eventType plan.EventType, event string, section plan.IdentitySection, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
 		return &plan.TrackingPlan{Rules: []plan.EventRule{{
@@ -250,8 +250,8 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 
 // A custom type that refers to itself, through any path, fails generation
 // with an error naming the cycle, found by the first reference in rule-key and
-// wire-key order. Cycles are checked before the skip check, so one that only
-// a rule or field left out for now reaches fails too.
+// wire-key order. Cycles are checked first, so one that only a rule left out
+// for now reaches fails too.
 func TestGenerateRejectsRecursiveCustomTypes(t *testing.T) {
 	object := func(name string) *plan.CustomType {
 		return &plan.CustomType{Name: name, Type: plan.PrimitiveTypeObject, Schema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}}}

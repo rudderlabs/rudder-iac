@@ -129,7 +129,8 @@ type GoStruct struct {
 	// Open structs carry undeclared keys in AdditionalProperties.
 	Open bool
 	// DeclaredKeys are the wire keys the schema declares, which
-	// AdditionalProperties can never supply, including those of skipped fields.
+	// AdditionalProperties can never supply, including a variant case's
+	// discriminator.
 	DeclaredKeys []string
 	Fields       []GoField
 	// Variant is the interface that a case, Absent or Default struct

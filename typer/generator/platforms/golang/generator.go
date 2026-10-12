@@ -62,17 +62,18 @@ type trackRule struct {
 	variant *variantSchema
 }
 
-// objectSchema is an object schema with the fields that pass the skip check,
-// in byte order of their wire keys.
+// objectSchema is an object schema with its fields in byte order of their wire
+// keys.
 type objectSchema struct {
 	open bool
-	// declared holds every wire key of the schema, including those of skipped
-	// fields, which AdditionalProperties can never supply either.
+	// declared holds every wire key of the schema, including the discriminator
+	// a variant case leaves out of its fields, which AdditionalProperties can
+	// never supply either.
 	declared []string
 	fields   []ruleField
 }
 
-// ruleField is a field kept for generation, with the effective enum of its
+// ruleField is a field of an object schema, with the effective enum of its
 // property, resolved once by the resolver, which rejects an invalid one.
 type ruleField struct {
 	wireKey string
@@ -86,7 +87,7 @@ type ruleField struct {
 	hoisted string
 }
 
-// customType is a custom type that a kept field references.
+// customType is a custom type that a field references.
 type customType struct {
 	ct   *plan.CustomType
 	name string
@@ -94,9 +95,6 @@ type customType struct {
 	schema *objectSchema
 	// variant is set for a custom type with variants instead.
 	variant *variantSchema
-	// reason names the construct the custom type needs that the generator
-	// does not support yet; empty when it can be generated.
-	reason string
 }
 
 // propertyKey identifies one Property{Name} type: the catalog allows two
@@ -199,9 +197,8 @@ func quickStart(methods []GoMethod) *GoMethod {
 }
 
 // trackRules returns the plan's track rules in rule-key order, and the custom
-// types their kept fields reference, sorted by name. Rules, variants and
-// fields that need constructs the generator does not support yet are left out
-// with a warning, never silently.
+// types their fields reference, sorted by name. Rules the generator does not
+// support yet are left out with a warning, never silently.
 func trackRules(p *plan.TrackingPlan) ([]trackRule, []*customType, error) {
 	all := make([]trackRule, len(p.Rules))
 	for i := range p.Rules {
@@ -219,9 +216,9 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, []*customType, error) {
 		rules  []trackRule
 	)
 	for _, r := range all {
-		// Names and cycles are checked before the skip check, so a rule or
-		// field left out for now still fails generation on a name no Go
-		// identifier can carry or on a custom type that refers to itself.
+		// Names and cycles are checked first, so a rule left out for now still
+		// fails generation on a name no Go identifier can carry or on a custom
+		// type that refers to itself.
 		if err := validateNames(r.rule); err != nil {
 			return nil, nil, err
 		}
@@ -253,22 +250,20 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, []*customType, error) {
 	// generated.
 	var customTypes []*customType
 	for _, name := range slices.Sorted(maps.Keys(res.customTypes)) {
-		if c := res.customTypes[name]; c.reason == "" {
-			customTypes = append(customTypes, c)
-		}
+		customTypes = append(customTypes, res.customTypes[name])
 	}
 	return rules, customTypes, nil
 }
 
-// resolver applies the skip check to the fields of track rules and of the
-// custom types they reference, resolving each custom type once per name.
+// resolver resolves the fields of track rules and of the custom types they
+// reference, resolving each custom type once per name.
 type resolver struct {
 	customTypes map[string]*customType
 }
 
-// schema returns the fields of s that pass the skip check, resolving the
-// custom types and nested schemas they need. where names the event or custom
-// type that s belongs to, and path is the wire-key path to s within it.
+// schema returns the fields of s, resolving the custom types and nested
+// schemas they need. where names the event or custom type that s belongs to,
+// and path is the wire-key path to s within it.
 func (res *resolver) schema(s *plan.ObjectSchema, where, path string) (*objectSchema, error) {
 	out := &objectSchema{open: s.AdditionalProperties, declared: slices.Sorted(maps.Keys(s.Properties))}
 	for _, wireKey := range out.declared {
@@ -280,13 +275,9 @@ func (res *resolver) schema(s *plan.ObjectSchema, where, path string) (*objectSc
 		if ct := cmp.Or(unionCustomType(p.Types), unionCustomType(p.ItemTypes)); ct != nil {
 			return nil, fmt.Errorf("mapping property %q of %s: custom type %q cannot be a member of a multi-type union", name, where, ct.Name)
 		}
-		reason, err := res.unsupportedReason(p)
+		err := res.resolveCustomTypes(p)
 		if err != nil {
 			return nil, err
-		}
-		if reason != "" {
-			core.Warn(fmt.Sprintf("skipping property %q (%s) of %s: Go generation does not support %s yet", name, declaredTypes(p), where, reason))
-			continue
 		}
 
 		f := ruleField{wireKey: wireKey, ps: ps}
@@ -304,22 +295,18 @@ func (res *resolver) schema(s *plan.ObjectSchema, where, path string) (*objectSc
 	return out, nil
 }
 
-// unsupportedReason names the construct p needs that the generator does not
-// support yet, or returns "" when p can be generated.
-func (res *resolver) unsupportedReason(p plan.Property) (string, error) {
-	var reason string
+// resolveCustomTypes resolves the custom types p references.
+func (res *resolver) resolveCustomTypes(p plan.Property) error {
 	for _, t := range slices.Concat(p.Types, p.ItemTypes) {
 		ct := plan.AsCustomType(t)
 		if ct == nil {
 			continue
 		}
-		c, err := res.customType(ct)
-		if err != nil {
-			return "", err
+		if _, err := res.customType(ct); err != nil {
+			return err
 		}
-		reason = cmp.Or(reason, c.reason)
 	}
-	return reason, nil
+	return nil
 }
 
 // customType resolves ct, or returns the custom type of that name already
@@ -348,12 +335,12 @@ func (res *resolver) customType(ct *plan.CustomType) (*customType, error) {
 			return nil, err
 		}
 	case ct.Type == plan.PrimitiveTypeArray:
-		if c.reason, err = res.unsupportedReason(plan.Property{ItemTypes: []plan.PropertyType{ct.ItemType}}); err != nil {
+		if err = res.resolveCustomTypes(plan.Property{ItemTypes: []plan.PropertyType{ct.ItemType}}); err != nil {
 			return nil, err
 		}
 	case ct.Type == plan.PrimitiveTypeObject && isStruct(ct.Schema):
 		where := fmt.Sprintf("custom type %q", ct.Name)
-		// Names are checked before the skip check, as in rules.
+		// Names are checked first, as in rules.
 		if err := validateSchemaNames(*ct.Schema, where); err != nil {
 			return nil, err
 		}
