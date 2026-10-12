@@ -168,9 +168,9 @@ func TestNonTrackWire(t *testing.T) {
 			errIs: examples.ErrCategoryConflict,
 		},
 		{
-			name: "examples: WithCategory different from the discriminator returns ErrCategoryConflict",
+			name: "examples: WithCategory never replaces a case's fixed discriminator, so a different value returns ErrCategoryConflict",
 			call: func() error {
-				return ex.PageCategoryVariant(id, "", examples.PageCategoryVariantPropertiesDefault{Category: "sports"}, examples.WithCategory("news"))
+				return ex.PageCategoryVariant(id, "", examples.PageCategoryVariantPropertiesCaseNews{Headline: "h"}, examples.WithCategory("sports"))
 			},
 			errIs: examples.ErrCategoryConflict,
 		},
@@ -272,6 +272,11 @@ func TestNonTrackWire(t *testing.T) {
 				return ex.ScreenVariant(id, "", (*examples.ScreenVariantPropertiesCaseProduct)(nil))
 			},
 			want: messageJSON(exMeta, "screen", ""),
+		},
+		{
+			name:  "examples: a nil screen variant payload is checked against the closed base, so WithCategory returns ErrCategoryConflict",
+			call:  func() error { return ex.ScreenVariant(id, "", nil, examples.WithCategory("news")) },
+			errIs: examples.ErrCategoryConflict,
 		},
 		{
 			name: "examples: an identify variant case on context.traits sends context.traits",
