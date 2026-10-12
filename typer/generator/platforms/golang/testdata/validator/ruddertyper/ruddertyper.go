@@ -1253,6 +1253,58 @@ type Property用户名 = string
 
 // --- Event payloads ---
 
+// GroupTraits holds the traits of the group event.
+type GroupTraits struct {
+	Active PropertyActive  // required
+	Status *PropertyStatus // optional
+}
+
+func (v GroupTraits) toMap() map[string]any {
+	m := map[string]any{
+		"active": v.Active,
+	}
+	if v.Status != nil {
+		m["status"] = *v.Status
+	}
+	return m
+}
+
+// ToTraits returns a deep copy of the traits as sent on the wire.
+func (v GroupTraits) ToTraits() (analytics.Traits, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v GroupTraits) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// IdentifyTraits holds the traits of the identify event.
+type IdentifyTraits struct {
+	Active *PropertyActive // optional
+	Email  PropertyEmail   // required
+}
+
+func (v IdentifyTraits) toMap() map[string]any {
+	m := map[string]any{
+		"email": v.Email,
+	}
+	if v.Active != nil {
+		m["active"] = *v.Active
+	}
+	return m
+}
+
+// ToTraits returns a deep copy of the traits as sent on the wire.
+func (v IdentifyTraits) ToTraits() (analytics.Traits, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v IdentifyTraits) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
 // TrackVariableStringProperties holds the properties of "$Variable$String".
 type TrackVariableStringProperties struct {
 	DollarField PropertyDollarField // required
@@ -1710,6 +1762,34 @@ func (v TrackEventWithNameCamelCaseProperties1) MarshalJSON() ([]byte, error) {
 
 // --- Events ---
 
+// Group sends the group event. traits may be nil, which sends no traits.
+//
+// Group association event
+func (r *RudderTyperAnalytics) Group(identity Identity, groupID string, traits *GroupTraits, opts ...Option) error {
+	var t analytics.Traits
+	if traits != nil {
+		var err error
+		if t, err = traits.ToTraits(); err != nil {
+			return err
+		}
+	}
+	return r.group(identity, groupID, t, opts)
+}
+
+// Identify sends the identify event. traits may be nil, which sends no traits.
+//
+// User identification event
+func (r *RudderTyperAnalytics) Identify(identity Identity, traits *IdentifyTraits, opts ...Option) error {
+	var t analytics.Traits
+	if traits != nil {
+		var err error
+		if t, err = traits.ToTraits(); err != nil {
+			return err
+		}
+	}
+	return r.identify(identity, t, false, opts)
+}
+
 // TrackVariableString sends the track event "$Variable$String".
 //
 // Event with dollar signs to test string interpolation escaping
@@ -1809,6 +1889,48 @@ func (r *RudderTyperAnalytics) track(identity Identity, event string, properties
 		AnonymousId:       identity.AnonymousID,
 		Event:             event,
 		Properties:        properties,
+		Context:           o.analyticsContext(nil),
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	})
+}
+
+// identify sends traits as the message's traits, or as context.traits when
+// the rule's identity section is context.traits.
+func (r *RudderTyperAnalytics) identify(identity Identity, traits analytics.Traits, inContext bool, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	msg := analytics.Identify{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	}
+	if inContext {
+		msg.Context = o.analyticsContext(traits)
+	} else {
+		msg.Context = o.analyticsContext(nil)
+		msg.Traits = traits
+	}
+	return r.client.Enqueue(msg)
+}
+
+// group always sends traits as the message's traits: context.traits holds the
+// user's traits, not the group's.
+func (r *RudderTyperAnalytics) group(identity Identity, groupID string, traits analytics.Traits, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	return r.client.Enqueue(analytics.Group{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		GroupId:           groupID,
+		Traits:            traits,
 		Context:           o.analyticsContext(nil),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,

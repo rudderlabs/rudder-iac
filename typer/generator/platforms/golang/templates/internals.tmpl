@@ -1,4 +1,4 @@
-{{- if .Methods }}
+{{- if .Helpers.track }}
 func (r *RudderTyperAnalytics) track(identity Identity, event string, properties analytics.Properties, opts []Option) error {
 	o, err := applyOptions(opts)
 	if err != nil {
@@ -9,6 +9,52 @@ func (r *RudderTyperAnalytics) track(identity Identity, event string, properties
 		AnonymousId:       identity.AnonymousID,
 		Event:             event,
 		Properties:        properties,
+		Context:           o.analyticsContext(nil),
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	})
+}
+{{- end }}
+{{- if .Helpers.identify }}
+
+// identify sends traits as the message's traits, or as context.traits when
+// the rule's identity section is context.traits.
+func (r *RudderTyperAnalytics) identify(identity Identity, traits analytics.Traits, inContext bool, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	msg := analytics.Identify{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	}
+	if inContext {
+		msg.Context = o.analyticsContext(traits)
+	} else {
+		msg.Context = o.analyticsContext(nil)
+		msg.Traits = traits
+	}
+	return r.client.Enqueue(msg)
+}
+{{- end }}
+{{- if .Helpers.group }}
+
+// group always sends traits as the message's traits: context.traits holds the
+// user's traits, not the group's.
+func (r *RudderTyperAnalytics) group(identity Identity, groupID string, traits analytics.Traits, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	return r.client.Enqueue(analytics.Group{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		GroupId:           groupID,
+		Traits:            traits,
 		Context:           o.analyticsContext(nil),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,

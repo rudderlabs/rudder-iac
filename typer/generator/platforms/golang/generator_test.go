@@ -19,8 +19,6 @@ import (
 // The reference plan uses constructs the generator does not support yet; each
 // one it leaves out must be reported.
 var referenceWarnings = []string{
-	`skipping the group rule (section "context.traits"): Go generation does not support group events yet`,
-	`skipping the identify rule (section "traits"): Go generation does not support identify events yet`,
 	`skipping the page rule (section "properties"): Go generation does not support page events yet`,
 	`skipping the screen rule (section "properties"): Go generation does not support screen events yet`,
 }
@@ -154,6 +152,11 @@ func TestGenerateQuickStart(t *testing.T) {
 	}
 	variantRule := rule("A", map[string]plan.PropertySchema{"name": {Property: stringProperty.Property, Required: true}})
 	variantRule.Variants = []plan.Variant{{Discriminator: "name", Cases: []plan.VariantCase{{Match: []any{"on"}}}}}
+	groupRule := plan.EventRule{
+		Event:   plan.Event{EventType: plan.EventTypeGroup},
+		Section: plan.IdentitySectionTraits,
+		Schema:  plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"name": stringProperty}},
+	}
 
 	tests := []struct {
 		name  string
@@ -174,6 +177,16 @@ func TestGenerateQuickStart(t *testing.T) {
 			"first method when no payload declares a property",
 			[]plan.EventRule{rule("A", nil), rule("B", nil)},
 			"//\terr := rt.TrackA(\n",
+		},
+		{
+			"track payload that declares a property after a group payload that does",
+			[]plan.EventRule{groupRule, rule("B", map[string]plan.PropertySchema{"name": stringProperty})},
+			"//\terr := rt.TrackB(\n",
+		},
+		{
+			"first method without a track payload that declares a property, with its other arguments",
+			[]plan.EventRule{groupRule, rule("A", nil)},
+			"//\terr := rt.Group(\n//\t\truddertyper.Identity{UserID: \"user-123\"},\n//\t\t\"group-123\",\n//\t\t&ruddertyper.GroupTraits{ /* ... */ },\n//\t)\n",
 		},
 	}
 

@@ -17,6 +17,8 @@ type GoContext struct {
 	UsesRequired bool
 	// QuickStart is the method the package doc calls; nil when there is none.
 	QuickStart *GoMethod
+	// Helpers are the event types whose send helper a method calls.
+	Helpers map[string]bool
 	// The type sections, in file order. Each type is followed by the types it
 	// hoists.
 	CustomTypes   []GoDecl
@@ -172,6 +174,19 @@ type GoMethod struct {
 	Name  string
 	Doc   string
 	Event string
+	// Type is the event type, which names the send helper.
+	Type string
 	// Payload is nil when the rule's schema is empty and closed.
 	Payload *GoStruct
+	// Params are the parameters between identity and opts, as declared.
+	Params []string
+	// Param names the payload parameter, and Var the map it converts to.
+	Param, Var string
+	// Pointer is set for an optional payload struct, passed by pointer.
+	Pointer bool
+	// Send is the send helper's call with Var, and OnNil what the method
+	// returns when there is no payload, or for a nil variant payload.
+	Send, OnNil string
+	// Example holds the arguments after identity that the quick start passes.
+	Example []string
 }
