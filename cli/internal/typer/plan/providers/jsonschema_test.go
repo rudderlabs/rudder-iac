@@ -981,7 +981,7 @@ func (r apiResponses) Do(req *http.Request) (*http.Response, error) {
 
 // The catalog client decodes event schemas with UseNumber, so enum values that
 // the same float64 would represent reach the plan as written.
-func TestRemoteEnumNumbersKeepTheirPrecision(t *testing.T) {
+func TestJSONSchemaPlanProvider_EnumNumberPrecision(t *testing.T) {
 	apiClient, err := client.New("token", client.WithHTTPClient(apiResponses{
 		"/v2/catalog/tracking-plans/tp":        `{"id": "tp", "name": "Precision", "version": 1}`,
 		"/v2/catalog/tracking-plans/tp/events": `{"data": [{"id": "ev"}], "total": 1, "currentPage": 1, "pageSize": 50}`,
