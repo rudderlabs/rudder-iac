@@ -1,14 +1,8 @@
 # Breaking Changes
 
-This document lists breaking changes between releases of `rudder-cli`. It is separate from [CHANGELOG.md](CHANGELOG.md) and covers changes that require users to update their YAML spec files or workflows.
+This document lists breaking changes between releases of `rudder-cli`. It is separate from [CHANGELOG.md](CHANGELOG.md) and covers changes that require users to update their YAML spec files or workflows. Breaking changes to destination `config` are in [cli/internal/providers/destination/definitions/BREAKING_CHANGES.md](cli/internal/providers/destination/definitions/BREAKING_CHANGES.md).
 
 ---
-
-## Destination config
-
-Breaking changes to destination `config`, by release:
-
-- **v0.26.0:** [Key removal: ActiveCampaign `use_native_sdk`](cli/internal/providers/destination/definitions/BREAKING_CHANGES.md#key-removal-activecampaign-use_native_sdk).
 
 ## Upcoming (unreleased)
 
