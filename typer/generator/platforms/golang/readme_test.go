@@ -22,12 +22,9 @@ func TestREADMESamplesAreQuotedFromExamples(t *testing.T) {
 	samples := regexp.MustCompile("(?s)```go\n(.*?)```").FindAllStringSubmatch(string(readme), -1)
 	require.NotEmpty(t, samples)
 	indent := regexp.MustCompile(`(?m)^(.)`)
+	ex := string(examples)
 	for _, s := range samples {
-		var (
-			sample   = s[1]
-			indented = indent.ReplaceAllString(sample, "\t$1")
-		)
-		assert.Truef(t, strings.Contains(string(examples), sample) || strings.Contains(string(examples), indented),
-			"README sample is not quoted from examples_test.go:\n%s", sample)
+		assert.Truef(t, strings.Contains(ex, s[1]) || strings.Contains(ex, indent.ReplaceAllString(s[1], "\t$1")),
+			"README sample is not quoted from examples_test.go:\n%s", s[1])
 	}
 }
