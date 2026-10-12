@@ -178,14 +178,14 @@ func TestVariantsWire(t *testing.T) {
 			want: someVariantSent(`, "someVariantType": {"someString": "case_2_b", "someNumber": 1.5, "someInteger": 2}`),
 		},
 		{
-			name: "variant: Coded Case1 sends the mixed enum's integer",
+			name: "variant: Coded 1 sends the mixed enum's integer",
 			call: func() error {
 				return ex.TrackCodedEvent(id, examples.TrackCodedEventProperties{Coded: examples.CustomTypeCodedCase1{}})
 			},
 			want: trackJSON(exMeta, "Coded Event", `{"coded": {"code": 1}}`),
 		},
 		{
-			name: "variant: Coded CaseA sends the mixed enum's string",
+			name: "variant: Coded A sends the mixed enum's string",
 			call: func() error {
 				return ex.TrackCodedEvent(id, examples.TrackCodedEventProperties{Coded: examples.CustomTypeCodedCaseA{}})
 			},
@@ -329,7 +329,7 @@ func TestVariantsWire(t *testing.T) {
 			want: trackJSON(exMeta, "Some Variant Event", `{"shipping": {"address": {"city": "Pune"}, "coupon": "SAVE"}}`),
 		},
 		{
-			name: "empty: an empty optional slice is sent as []",
+			name: "empty: an empty optional slice sends []",
 			call: func() error {
 				p := mobile
 				p.Tags = []string{}
@@ -338,7 +338,7 @@ func TestVariantsWire(t *testing.T) {
 			want: mobileSent(`, "tags": []`),
 		},
 		{
-			name: "empty: an empty optional map is sent as {}",
+			name: "empty: an empty optional map sends {}",
 			call: func() error {
 				p := mobile
 				p.PageContext = ruddertyper.CustomTypePageContextDefault{PageType: "other", PageData: map[string]any{}}
