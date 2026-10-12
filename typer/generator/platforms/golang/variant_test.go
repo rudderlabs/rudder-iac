@@ -137,6 +137,11 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			wantErr: `mapping the variants of track event "Some Event": case [1.5]: match value 1.5 is not a string, integer or boolean`,
 		},
 		{
+			name:    "an integral match value outside int64",
+			plan:    variantPlan(typed(onlyInteger...), discriminate([]any{json.Number("1e20")})),
+			wantErr: `mapping the variants of track event "Some Event": case [1e20]: match value 1e20 does not fit in int64`,
+		},
+		{
 			name:    "a discriminator typed only number",
 			plan:    variantPlan(typed(onlyNumber...), discriminate([]any{1})),
 			wantErr: `mapping the variants of track event "Some Event": discriminator "kind" (number) allows none of string, integer and boolean`,

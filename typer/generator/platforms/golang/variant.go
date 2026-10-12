@@ -146,10 +146,10 @@ func (res *resolver) mergeVariant(s *plan.ObjectSchema, base *objectSchema, vari
 		// toMap sends the discriminator a case fixes.
 		schema.fields = withoutField(schema.fields, v.key)
 		for _, m := range vc.Match {
-			value, text, name, err := matchValue(m)
+			value, text, name, err := matchValue(m, label)
 			switch {
 			case err != nil:
-				return nil, fmt.Errorf("%s: %w", label, err)
+				return nil, err
 			case !d.allows(value, text):
 				return nil, fmt.Errorf("%s: match value %s is not a value of discriminator %q", label, text, v.key)
 			case matched[text]:
@@ -211,26 +211,28 @@ func withoutField(fields []ruleField, key string) []ruleField {
 	return slices.DeleteFunc(slices.Clone(fields), func(f ruleField) bool { return f.wireKey == key })
 }
 
-// matchValue normalizes a match value as enum values are, so 1 and 1.0 match
-// alike, and returns it with its Go literal and its name, which Enum Constant
-// Names would give it as an enum value.
-func matchValue(m any) (value any, text, name string, err error) {
-	n, err := normalizeEnumValue(m)
-	if err == nil {
-		switch n := n.(type) {
-		case string:
-			return n, strconv.Quote(n), valueName(n), nil
-		case bool:
-			text = strconv.FormatBool(n)
-			return n, text, valueName(text), nil
-		case *big.Rat:
-			if n.IsInt() && n.Num().IsInt64() {
-				text = n.Num().String()
-				return n, text, strings.Replace(text, "-", "Neg", 1), nil
-			}
+// matchValue normalizes a match value of the case label as enum values are,
+// so 1 and 1.0 match alike, and returns it with its Go literal and its name,
+// which Enum Constant Names would give it as an enum value.
+func matchValue(m any, label string) (value any, text, name string, err error) {
+	n, _ := normalizeEnumValue(m) // nil, which no case matches, when m is no enum value either
+	switch n := n.(type) {
+	case string:
+		return n, strconv.Quote(n), valueName(n), nil
+	case bool:
+		text = strconv.FormatBool(n)
+		return n, text, valueName(text), nil
+	case *big.Rat:
+		if !n.IsInt() {
+			break
 		}
+		if !n.Num().IsInt64() {
+			return nil, "", "", fmt.Errorf("%s: match value %s does not fit in int64", label, jsonText(m))
+		}
+		text = n.Num().String()
+		return n, text, strings.Replace(text, "-", "Neg", 1), nil
 	}
-	return nil, "", "", fmt.Errorf("match value %s is not a string, integer or boolean", jsonText(m))
+	return nil, "", "", fmt.Errorf("%s: match value %s is not a string, integer or boolean", label, jsonText(m))
 }
 
 // isVariant reports whether a property's type is a custom type with variants,
