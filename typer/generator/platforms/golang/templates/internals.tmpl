@@ -43,47 +43,11 @@ func (r *RudderTyperAnalytics) identify(identity Identity, traits analytics.Trai
 {{- end }}
 {{- if .Helpers.page }}
 
-func (r *RudderTyperAnalytics) page(identity Identity, name string, properties analytics.Properties, mode categoryMode, opts []Option) error {
-	o, err := applyOptions(opts)
-	if err != nil {
-		return err
-	}
-	if properties, err = o.withCategory(properties, mode); err != nil {
-		return err
-	}
-	return r.client.Enqueue(analytics.Page{
-		UserId:            identity.UserID,
-		AnonymousId:       identity.AnonymousID,
-		Name:              name,
-		Properties:        properties,
-		Context:           o.analyticsContext(nil),
-		Integrations:      o.integrations,
-		OriginalTimestamp: o.timestamp,
-		MessageId:         o.messageID,
-	})
-}
+{{ template "view.tmpl" "Page" }}
 {{- end }}
 {{- if .Helpers.screen }}
 
-func (r *RudderTyperAnalytics) screen(identity Identity, name string, properties analytics.Properties, mode categoryMode, opts []Option) error {
-	o, err := applyOptions(opts)
-	if err != nil {
-		return err
-	}
-	if properties, err = o.withCategory(properties, mode); err != nil {
-		return err
-	}
-	return r.client.Enqueue(analytics.Screen{
-		UserId:            identity.UserID,
-		AnonymousId:       identity.AnonymousID,
-		Name:              name,
-		Properties:        properties,
-		Context:           o.analyticsContext(nil),
-		Integrations:      o.integrations,
-		OriginalTimestamp: o.timestamp,
-		MessageId:         o.messageID,
-	})
-}
+{{ template "view.tmpl" "Screen" }}
 {{- end }}
 {{- if .Helpers.group }}
 
