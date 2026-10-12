@@ -52,10 +52,11 @@ func pascalCase(name string) (string, error) {
 	return b.String(), nil
 }
 
-// stringValueName returns a string enum value's part of its constant name:
-// Empty for "", and, for a value without letters or digits, U and the
-// upper-case hex code point of each rune ("🎯" → U1F3AF), as Swift spells it.
-func stringValueName(s string) string {
+// valueName returns a string or boolean enum value's part of its constant
+// name, from the string or "true"/"false": Empty for "", and, for a value
+// without letters or digits, U and the upper-case hex code point of each rune
+// ("🎯" → U1F3AF), as Swift spells it.
+func valueName(s string) string {
 	if s == "" {
 		return "Empty"
 	}

@@ -71,10 +71,10 @@ func resolveEnum(p plan.Property) (*effectiveEnum, error) {
 			texts = append(texts, "null")
 			continue
 		case string:
-			v = GoEnumValue{Name: stringValueName(n), Text: strconv.Quote(n)}
+			v = GoEnumValue{Name: valueName(n), Text: strconv.Quote(n)}
 		case bool:
 			text := strconv.FormatBool(n)
-			v = GoEnumValue{Name: stringValueName(text), Text: text}
+			v = GoEnumValue{Name: valueName(text), Text: text}
 		case *big.Rat:
 			var err error
 			if v, err = numberValue(n, raw[i], e.base, literals); err != nil {
