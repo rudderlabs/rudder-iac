@@ -126,7 +126,7 @@ if err == nil {
 
 - `testdata/validator/` holds one golden per plan, each in its own package: `ruddertyper/` (reference), `identitysections/`, `emptyidentity/`, `examples/` (`testutils/examples_plan.go`); `generator_test.go` diffs against them ([Testing][appendix]).
 - `make typer-go-update-testdata` regenerates every golden after a generator or plan change ([Testing][appendix]).
-- `make typer-go-validate` runs vet, gofmt and `go test -race` in the `testdata/validator` module (analytics-go v4.2.2), compiling the goldens and `examples_test.go`; `readme_test.go` checks the README's samples are quoted from `examples_test.go` ([Testing][appendix]).
+- `make typer-go-validate` runs vet, gofmt and `go test -race` in the `testdata/validator` module (analytics-go v4.2.2), compiling the goldens and `examples_test.go` ([Testing][appendix]). It also checks that this README's samples are quoted from `examples_test.go`.
 - CI (`.github/workflows/typer-go-validate.yml`) regenerates the goldens and fails when one is stale, then runs `make typer-go-validate` with Go 1.21.0, against v4.2.2 and against the latest analytics-go v4 ([Testing][appendix]).
 
 [spec]: https://app.notion.com/p/3eaf2b415dd081e2b067dac4a180e40d
