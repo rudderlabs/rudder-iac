@@ -193,15 +193,41 @@ func TestHoistedNameCollision(t *testing.T) {
 	ctx, err := newContext(p, "", "ruddertyper")
 	require.NoError(t, err)
 
-	var names []string
-	for _, d := range ctx.Payloads {
-		names = append(names, d.Struct.Name)
-	}
-	assert.Equal(t, []string{
-		"TrackSomeEventProperties",
-		"TrackSomeEventPropertiesFoo",
-		"TrackSomeEventPropertiesFooBarBaz",
-		"TrackSomeEventPropertiesFooBar",
-		"TrackSomeEventPropertiesFooBarBaz1",
-	}, names)
+	x := []GoField{{Name: "X", Key: "x", Type: "*PropertyX", Pointer: true}}
+	assert.Equal(t, []GoDecl{
+		{Struct: &GoStruct{
+			Name:         "TrackSomeEventProperties",
+			Doc:          "TrackSomeEventProperties holds the properties of \"Some Event\".",
+			Payload:      true,
+			DeclaredKeys: []string{"foo", "fooBar"},
+			Fields: []GoField{
+				{Name: "Foo", Key: "foo", Type: "*TrackSomeEventPropertiesFoo", Pointer: true},
+				{Name: "FooBar", Key: "fooBar", Type: "*TrackSomeEventPropertiesFooBar", Pointer: true},
+			},
+		}},
+		{Struct: &GoStruct{
+			Name:         "TrackSomeEventPropertiesFoo",
+			Doc:          "TrackSomeEventPropertiesFoo is the object in TrackSomeEventProperties.Foo.",
+			DeclaredKeys: []string{"barBaz"},
+			Fields:       []GoField{{Name: "BarBaz", Key: "barBaz", Type: "*TrackSomeEventPropertiesFooBarBaz", Pointer: true}},
+		}},
+		{Struct: &GoStruct{
+			Name:         "TrackSomeEventPropertiesFooBarBaz",
+			Doc:          "TrackSomeEventPropertiesFooBarBaz is the object in TrackSomeEventPropertiesFoo.BarBaz.",
+			DeclaredKeys: []string{"x"},
+			Fields:       x,
+		}},
+		{Struct: &GoStruct{
+			Name:         "TrackSomeEventPropertiesFooBar",
+			Doc:          "TrackSomeEventPropertiesFooBar is the object in TrackSomeEventProperties.FooBar.",
+			DeclaredKeys: []string{"baz"},
+			Fields:       []GoField{{Name: "Baz", Key: "baz", Type: "*TrackSomeEventPropertiesFooBarBaz1", Pointer: true}},
+		}},
+		{Struct: &GoStruct{
+			Name:         "TrackSomeEventPropertiesFooBarBaz1",
+			Doc:          "TrackSomeEventPropertiesFooBarBaz1 is the object in TrackSomeEventPropertiesFooBar.Baz.",
+			DeclaredKeys: []string{"x"},
+			Fields:       x,
+		}},
+	}, ctx.Payloads)
 }
