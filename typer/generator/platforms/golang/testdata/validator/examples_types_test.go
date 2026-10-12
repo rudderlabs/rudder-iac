@@ -39,7 +39,7 @@ func assertWireRows(t *testing.T, start func(analytics.Client), rows []wireRow) 
 			}
 		}
 	})
-	require.Len(t, wire, sent, "a failed call sent a message, or a call sent none")
+	require.Len(t, wire, sent, "a failed call sent a message, or a call sent none; errors: %v", errs)
 
 	for i, row := range rows {
 		// Taking the row's message here, not in the subtest, keeps rows and
@@ -71,13 +71,18 @@ func TestExamplesTypesWire(t *testing.T) {
 		id = examples.Identity{UserID: "user-123"}
 
 		// One valid payload per event; each row changes one field of a copy.
-		enum   = examples.TrackSomeEnumEventProperties{Mode: examples.PropertyModeActive, Status: examples.PropertyStatusActive1}
-		multi  = examples.TrackSomeMultiTypeEventProperties{Matrix: [][]any{}, StringOrStrings: examples.NewPropertyStringOrStringsString("s")}
-		prim   = examples.TrackEveryPrimitiveTypeProperties{Any: "x", Array: []any{}, Number: 1.5, String: "s"}
-		custom = examples.TrackSomeCustomTypeEventProperties{SomeObject: examples.CustomTypeSomeObjectType{SomeCustomString: "c"}}
-		nested = examples.TrackSomeNestedObjectEventProperties{Location: examples.NewNullable(examples.TrackSomeNestedObjectEventPropertiesLocation{Lat: 1.5})}
-		track  = examples.TrackSomeTrackEventProperties{SomeString: "s", SomeInteger: 1}
+		enum       = examples.TrackSomeEnumEventProperties{Mode: examples.PropertyModeActive, Status: examples.PropertyStatusActive1}
+		multi      = examples.TrackSomeMultiTypeEventProperties{Matrix: [][]any{}, StringOrStrings: examples.NewPropertyStringOrStringsString("s")}
+		primitives = examples.TrackEveryPrimitiveTypeProperties{Any: "x", Array: []any{}, Number: 1.5, String: "s"}
+		custom     = examples.TrackSomeCustomTypeEventProperties{SomeObject: examples.CustomTypeSomeObjectType{SomeCustomString: "c"}}
+		nested     = examples.TrackSomeNestedObjectEventProperties{Location: examples.NewNullable(examples.TrackSomeNestedObjectEventPropertiesLocation{Lat: 1.5})}
+		someTrack  = examples.TrackSomeTrackEventProperties{SomeString: "s", SomeInteger: 1}
 	)
+	// multiSent is the message multi sends, with extra, the changed field's
+	// key and value, appended to its properties.
+	multiSent := func(extra string) string {
+		return trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s"`+extra+`}`)
+	}
 
 	rows := []wireRow{
 		{
@@ -124,7 +129,7 @@ func TestExamplesTypesWire(t *testing.T) {
 				p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeObject(nil))
 				return ex.TrackSomeMultiTypeEvent(id, p)
 			},
-			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s", "someMultiType": {}}`),
+			want: multiSent(`, "someMultiType": {}`),
 		},
 		{
 			name: "nil through a wrapper: a union Array member built from nil sends []",
@@ -133,7 +138,7 @@ func TestExamplesTypesWire(t *testing.T) {
 				p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeArray(nil))
 				return ex.TrackSomeMultiTypeEvent(id, p)
 			},
-			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s", "someMultiType": []}`),
+			want: multiSent(`, "someMultiType": []`),
 		},
 		{
 			name: "nil through a wrapper: a valid Nullable holding a nil slice sends []",
@@ -142,7 +147,7 @@ func TestExamplesTypesWire(t *testing.T) {
 				p.SomeArrayOrNull = examples.Ptr(examples.NewNullable[[]string](nil))
 				return ex.TrackSomeMultiTypeEvent(id, p)
 			},
-			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s", "someArrayOrNull": []}`),
+			want: multiSent(`, "someArrayOrNull": []`),
 		},
 		{
 			name: "union: the String constructor sends a string",
@@ -151,7 +156,7 @@ func TestExamplesTypesWire(t *testing.T) {
 				p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeString("v"))
 				return ex.TrackSomeMultiTypeEvent(id, p)
 			},
-			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s", "someMultiType": "v"}`),
+			want: multiSent(`, "someMultiType": "v"`),
 		},
 		{
 			name: "union: the Integer constructor sends an integer",
@@ -161,7 +166,7 @@ func TestExamplesTypesWire(t *testing.T) {
 				p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeInteger(9007199254740993))
 				return ex.TrackSomeMultiTypeEvent(id, p)
 			},
-			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s", "someMultiType": 9007199254740993}`),
+			want: multiSent(`, "someMultiType": 9007199254740993`),
 		},
 		{
 			name: "union: the Number constructor sends a number",
@@ -170,7 +175,7 @@ func TestExamplesTypesWire(t *testing.T) {
 				p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeNumber(2.5))
 				return ex.TrackSomeMultiTypeEvent(id, p)
 			},
-			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s", "someMultiType": 2.5}`),
+			want: multiSent(`, "someMultiType": 2.5`),
 		},
 		{
 			name: "union: the Boolean constructor sends a boolean, even false",
@@ -179,7 +184,7 @@ func TestExamplesTypesWire(t *testing.T) {
 				p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeBoolean(false))
 				return ex.TrackSomeMultiTypeEvent(id, p)
 			},
-			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s", "someMultiType": false}`),
+			want: multiSent(`, "someMultiType": false`),
 		},
 		{
 			name: "union: the Object constructor sends an object",
@@ -188,7 +193,7 @@ func TestExamplesTypesWire(t *testing.T) {
 				p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeObject(map[string]any{"k": "v"}))
 				return ex.TrackSomeMultiTypeEvent(id, p)
 			},
-			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s", "someMultiType": {"k": "v"}}`),
+			want: multiSent(`, "someMultiType": {"k": "v"}`),
 		},
 		{
 			name: "union: the Array constructor sends an array",
@@ -197,7 +202,7 @@ func TestExamplesTypesWire(t *testing.T) {
 				p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeArray([]any{"a", 1}))
 				return ex.TrackSomeMultiTypeEvent(id, p)
 			},
-			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s", "someMultiType": ["a", 1]}`),
+			want: multiSent(`, "someMultiType": ["a", 1]`),
 		},
 		{
 			name: "union: the Null constructor sends null",
@@ -206,7 +211,7 @@ func TestExamplesTypesWire(t *testing.T) {
 				p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeNull())
 				return ex.TrackSomeMultiTypeEvent(id, p)
 			},
-			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s", "someMultiType": null}`),
+			want: multiSent(`, "someMultiType": null`),
 		},
 		{
 			name: "union: array items send one value per member",
@@ -220,7 +225,7 @@ func TestExamplesTypesWire(t *testing.T) {
 				}
 				return ex.TrackSomeMultiTypeEvent(id, p)
 			},
-			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": null, "stringOrStrings": "s", "someArrayOfMultipleTypes": ["a", 1, 1.5, true]}`),
+			want: multiSent(`, "someArrayOfMultipleTypes": ["a", 1, 1.5, true]`),
 		},
 		{
 			name: "union: a hoisted Object member sends plan keys",
@@ -236,7 +241,7 @@ func TestExamplesTypesWire(t *testing.T) {
 		{
 			name: "any: a required nil sends null",
 			call: func() error {
-				p := prim
+				p := primitives
 				p.Any = nil
 				return ex.TrackEveryPrimitiveType(id, p)
 			},
@@ -245,7 +250,7 @@ func TestExamplesTypesWire(t *testing.T) {
 		{
 			name: "any: Null{} sends null",
 			call: func() error {
-				p := prim
+				p := primitives
 				p.Any = examples.Null{}
 				return ex.TrackEveryPrimitiveType(id, p)
 			},
@@ -282,7 +287,7 @@ func TestExamplesTypesWire(t *testing.T) {
 		{
 			name: "nested object: three levels deep send plan keys at every level",
 			call: func() error {
-				p := track
+				p := someTrack
 				p.SomeNestedObject = &examples.TrackSomeTrackEventPropertiesSomeNestedObject{
 					SomeNestedLevel1: &examples.TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1{
 						SomeNestedLevel2: &examples.TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1SomeNestedLevel2{
