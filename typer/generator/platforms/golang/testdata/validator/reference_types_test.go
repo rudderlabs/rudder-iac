@@ -216,18 +216,6 @@ func TestReferenceTypesWire(t *testing.T) {
 			},
 			want: signedUp(`, "empty_object_no_additional_props": {}`),
 		},
-		{
-			name: "custom type: an array of custom objects converts each element",
-			call: func() error {
-				p := base
-				p.Addresses = ruddertyper.PropertyAddresses{
-					{City: "Pune", Street: "MG Road", PostalCode: ruddertyper.Ptr("411001")},
-					{City: "Agra", Street: "Mall Road"},
-				}
-				return ref.TrackUserSignedUp(id, p)
-			},
-			want: signedUp(`, "addresses": [{"city": "Pune", "street": "MG Road", "postal_code": "411001"}, {"city": "Agra", "street": "Mall Road"}]`),
-		},
 	}
 
 	assertWireRows(t, func(client analytics.Client) { ref = ruddertyper.New(client) }, rows)

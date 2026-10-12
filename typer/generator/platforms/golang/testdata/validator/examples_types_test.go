@@ -26,20 +26,19 @@ type wireRow struct {
 // wrapper the calls use, and checks each row against the message it sent.
 func assertWireRows(t *testing.T, start func(analytics.Client), rows []wireRow) {
 	t.Helper()
-	errs := make([]error, len(rows))
+	var (
+		errs = make([]error, len(rows))
+		sent int
+	)
 	wire, _ := capture(t, func(client analytics.Client) {
 		start(client)
 		for i, row := range rows {
 			errs[i] = row.call()
+			if row.want != "" {
+				sent++
+			}
 		}
 	})
-
-	var sent int
-	for _, row := range rows {
-		if row.want != "" {
-			sent++
-		}
-	}
 	require.Len(t, wire, sent, "a failed call sent a message, or a call sent none")
 
 	for i, row := range rows {
