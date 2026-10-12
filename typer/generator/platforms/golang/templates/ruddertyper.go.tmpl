@@ -81,32 +81,20 @@ func (n Nullable[T]) wireValue() (any, error) {
 // MarshalJSON implements json.Marshaler.
 func (n Nullable[T]) MarshalJSON() ([]byte, error) { return marshal(n) }
 {{- end }}
+{{- if .CustomTypes }}
+
+// --- Custom types ---
+{{- template "decls.tmpl" .CustomTypes }}
+{{- end }}
 {{- if .PropertyTypes }}
 
 // --- Property types ---
-{{- range .PropertyTypes }}
-{{- with .Alias }}
-
-{{ comment .Doc }}
-type {{ .Name }} = {{ .Type }}
-{{- end }}
-{{- with .Union }}
-
-{{ template "union.tmpl" . }}
-{{- end }}
-{{- with .Enum }}
-
-{{ template "enum.tmpl" . }}
-{{- end }}
-{{- end }}
+{{- template "decls.tmpl" .PropertyTypes }}
 {{- end }}
 {{- if .Payloads }}
 
 // --- Event payloads ---
-{{- range .Payloads }}
-
-{{ template "payload.tmpl" . }}
-{{- end }}
+{{- template "decls.tmpl" .Payloads }}
 {{- end }}
 {{- if .Methods }}
 

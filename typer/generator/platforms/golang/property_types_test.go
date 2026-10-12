@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/typer/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -78,15 +77,12 @@ func TestPropertyTypeOrder(t *testing.T) {
 		rule("C Event", property("amount", "described later", plan.PrimitiveTypeNumber)),
 	}}
 
-	rules, err := trackRules(p)
-	require.NoError(t, err)
-	ctx := &GoContext{}
-	_, err = addPropertyTypes(ctx, rules, core.NewNameRegistry(core.DefaultCollisionHandler))
+	ctx, err := newContext(p, "", "ruddertyper")
 	require.NoError(t, err)
 
 	// Ordered by name, then signature ("number" < "string"); one type per
 	// (name, signature), described by the first rule in rule-key order.
-	assert.Equal(t, []GoPropertyType{
+	assert.Equal(t, []GoDecl{
 		{Alias: &GoTypeAlias{Name: "PropertyAmount", Doc: "PropertyAmount represents the property \"amount\".\n\namount as a number", Type: "float64"}},
 		{Alias: &GoTypeAlias{Name: "PropertyAmount1", Doc: "PropertyAmount1 represents the property \"amount\".\n\namount as text", Type: "string"}},
 		{Alias: &GoTypeAlias{Name: "PropertyUserID", Doc: "PropertyUserID represents the property \"userId\".", Type: "string"}},
@@ -111,13 +107,10 @@ func TestItemUnionNameOrder(t *testing.T) {
 		}},
 	}}}
 
-	rules, err := trackRules(p)
-	require.NoError(t, err)
-	ctx := &GoContext{}
-	_, err = addPropertyTypes(ctx, rules, core.NewNameRegistry(core.DefaultCollisionHandler))
+	ctx, err := newContext(p, "", "ruddertyper")
 	require.NoError(t, err)
 
-	assert.Equal(t, []GoPropertyType{
+	assert.Equal(t, []GoDecl{
 		{Union: &GoUnion{
 			Name: "PropertyFooItem",
 			Doc: "PropertyFooItem is one item of PropertyFoo: a string or integer.\n" +

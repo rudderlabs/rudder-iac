@@ -53,20 +53,42 @@ func resolveOptions(defaults GoOptions, platformOptions any) (GoOptions, error) 
 	return opts, nil
 }
 
-// trackRule is a track rule kept for generation, with the fields that pass the
-// skip check, in byte order of their wire keys.
+// trackRule is a track rule kept for generation.
 type trackRule struct {
 	key    string
 	rule   *plan.EventRule
-	fields []ruleField
+	schema *objectSchema
 }
 
-// ruleField is a field of a track rule with the effective enum of its
-// property, resolved once by trackRules, which rejects an invalid one.
+// objectSchema is an object schema with the fields that pass the skip check,
+// in byte order of their wire keys.
+type objectSchema struct {
+	open bool
+	// declared holds every wire key of the schema, including those of skipped
+	// fields, which AdditionalProperties can never supply either.
+	declared []string
+	fields   []ruleField
+}
+
+// ruleField is a field kept for generation, with the effective enum of its
+// property, resolved once by the resolver, which rejects an invalid one.
 type ruleField struct {
 	wireKey string
 	ps      plan.PropertySchema
 	enum    *effectiveEnum
+	// nested is the field's object schema when it is hoisted into a struct of
+	// its own; nil when the field takes its Property{Name} type.
+	nested *objectSchema
+}
+
+// customType is a custom type that a kept field references.
+type customType struct {
+	ct *plan.CustomType
+	// schema is set for an object custom type generated as a struct.
+	schema *objectSchema
+	// reason names the construct the custom type needs that the generator
+	// does not support yet; empty when it can be generated.
+	reason string
 }
 
 // propertyKey identifies one Property{Name} type: the catalog allows two
@@ -103,18 +125,38 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 		return nil, fmt.Errorf("reserving Alias: %w", err)
 	}
 
-	rules, err := trackRules(p)
+	rules, customTypes, err := trackRules(p)
 	if err != nil {
 		return nil, err
 	}
 
-	// Property types register before payloads and methods, so the order in
-	// which names take collision suffixes matches the other generators.
-	propertyTypes, err := addPropertyTypes(ctx, rules, registry)
+	// Custom types register before property types, and those before payloads
+	// and methods, so the order in which names take collision suffixes matches
+	// the other generators. A custom type's declaration needs the property
+	// types of its fields, so it is added after them, and so are the structs
+	// it hoists, whose CustomType-prefixed names no property name can take.
+	schemas := make([]*objectSchema, 0, len(customTypes)+len(rules))
+	for _, c := range customTypes {
+		if _, err := customTypeName(registry, c.ct.Name); err != nil {
+			return nil, err
+		}
+		if c.schema != nil {
+			schemas = append(schemas, c.schema)
+		}
+	}
+	for _, r := range rules {
+		schemas = append(schemas, r.schema)
+	}
+
+	propertyTypes, err := addPropertyTypes(ctx, schemas, registry)
 	if err != nil {
 		return nil, err
 	}
+	if err := addCustomTypes(ctx, customTypes, propertyTypes, registry); err != nil {
+		return nil, err
+	}
 
+	ctx.out = &ctx.Payloads
 	for _, r := range rules {
 		if err := addTrackRule(ctx, r, propertyTypes, registry); err != nil {
 			return nil, err
@@ -123,11 +165,6 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 
 	if err := registerValueNames(ctx, registry); err != nil {
 		return nil, err
-	}
-
-	for _, payload := range ctx.Payloads {
-		ctx.UsesWithAdditional = ctx.UsesWithAdditional || payload.Open
-		ctx.UsesPtr = ctx.UsesPtr || slices.ContainsFunc(payload.Fields, func(f GoField) bool { return f.Pointer })
 	}
 
 	ctx.QuickStart = quickStart(ctx.Methods)
@@ -146,10 +183,11 @@ func quickStart(methods []GoMethod) *GoMethod {
 	return &methods[0]
 }
 
-// trackRules returns the plan's track rules in rule-key order. Rules, variants
-// and fields that need constructs the generator does not support yet are left
-// out with a warning, never silently.
-func trackRules(p *plan.TrackingPlan) ([]trackRule, error) {
+// trackRules returns the plan's track rules in rule-key order, and the custom
+// types their kept fields reference, sorted by name. Rules, variants and
+// fields that need constructs the generator does not support yet are left out
+// with a warning, never silently.
+func trackRules(p *plan.TrackingPlan) ([]trackRule, []*customType, error) {
 	all := make([]trackRule, len(p.Rules))
 	for i := range p.Rules {
 		rule := &p.Rules[i]
@@ -160,12 +198,15 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, error) {
 	}
 	slices.SortStableFunc(all, func(a, b trackRule) int { return strings.Compare(a.key, b.key) })
 
-	var rules []trackRule
+	var (
+		res   = &resolver{customTypes: map[string]*customType{}}
+		rules []trackRule
+	)
 	for _, r := range all {
 		// Names are checked before the skip check, so a rule or field left out
 		// for now still fails generation on a name no Go identifier can carry.
 		if err := validateNames(r.rule); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		event := r.rule.Event
@@ -181,21 +222,122 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, error) {
 			core.Warn(fmt.Sprintf("ignoring the variants of track event %q: Go generation does not support variants yet", event.Name))
 		}
 
-		for _, wireKey := range slices.Sorted(maps.Keys(r.rule.Schema.Properties)) {
-			ps := r.rule.Schema.Properties[wireKey]
-			if reason := unsupportedReason(ps); reason != "" {
-				core.Warn(fmt.Sprintf("skipping property %q (%s) of track event %q: Go generation does not support %s yet", wireKey, declaredTypes(ps.Property), event.Name, reason))
-				continue
-			}
-			enum, err := resolveEnum(ps.Property)
-			if err != nil {
-				return nil, fmt.Errorf("mapping property %q of track event %q: %w", wireKey, event.Name, err)
-			}
-			r.fields = append(r.fields, ruleField{wireKey: wireKey, ps: ps, enum: enum})
+		var err error
+		if r.schema, err = res.schema(&r.rule.Schema, fmt.Sprintf("track event %q", event.Name), ""); err != nil {
+			return nil, nil, err
 		}
 		rules = append(rules, r)
 	}
-	return rules, nil
+
+	// Like property types, only the custom types an emitted field needs are
+	// generated.
+	var customTypes []*customType
+	for _, name := range slices.Sorted(maps.Keys(res.customTypes)) {
+		if c := res.customTypes[name]; c.reason == "" {
+			customTypes = append(customTypes, c)
+		}
+	}
+	return rules, customTypes, nil
+}
+
+// resolver applies the skip check to the fields of track rules and of the
+// custom types they reference, resolving each custom type once per name.
+type resolver struct {
+	customTypes map[string]*customType
+	// resolving holds the custom types being resolved, outermost first.
+	resolving []string
+}
+
+// schema returns the fields of s that pass the skip check, resolving the
+// custom types and nested schemas they need. where names the event or custom
+// type that s belongs to, and path is the wire-key path to s within it.
+func (res *resolver) schema(s *plan.ObjectSchema, where, path string) (*objectSchema, error) {
+	out := &objectSchema{open: s.AdditionalProperties, declared: slices.Sorted(maps.Keys(s.Properties))}
+	for _, wireKey := range out.declared {
+		var (
+			ps   = s.Properties[wireKey]
+			p    = ps.Property
+			name = path + wireKey
+		)
+		if ct := cmp.Or(unionCustomType(p.Types), unionCustomType(p.ItemTypes)); ct != nil {
+			return nil, fmt.Errorf("mapping property %q of %s: custom type %q cannot be a member of a multi-type union", name, where, ct.Name)
+		}
+		reason, err := res.unsupportedReason(p)
+		if err != nil {
+			return nil, err
+		}
+		if reason != "" {
+			core.Warn(fmt.Sprintf("skipping property %q (%s) of %s: Go generation does not support %s yet", name, declaredTypes(p), where, reason))
+			continue
+		}
+
+		f := ruleField{wireKey: wireKey, ps: ps}
+		if f.enum, err = resolveEnum(p); err != nil {
+			return nil, fmt.Errorf("mapping property %q of %s: %w", name, where, err)
+		}
+		// The enum beats the declared types, object included.
+		if f.enum == nil && declares(p.Types, plan.PrimitiveTypeObject) && isStruct(ps.Schema) {
+			if f.nested, err = res.schema(ps.Schema, where, name+"."); err != nil {
+				return nil, err
+			}
+		}
+		out.fields = append(out.fields, f)
+	}
+	return out, nil
+}
+
+// unsupportedReason names the construct p needs that the generator does not
+// support yet, or returns "" when p can be generated.
+func (res *resolver) unsupportedReason(p plan.Property) (string, error) {
+	var reason string
+	for _, t := range slices.Concat(p.Types, p.ItemTypes) {
+		ct := plan.AsCustomType(t)
+		if ct == nil {
+			continue
+		}
+		c, err := res.customType(ct)
+		if err != nil {
+			return "", err
+		}
+		reason = cmp.Or(reason, c.reason)
+	}
+	return reason, nil
+}
+
+// customType resolves ct, or returns the custom type of that name already
+// resolved. A custom type that refers to itself fails, naming the cycle.
+func (res *resolver) customType(ct *plan.CustomType) (*customType, error) {
+	if c, ok := res.customTypes[ct.Name]; ok {
+		return c, nil
+	}
+	if i := slices.Index(res.resolving, ct.Name); i >= 0 {
+		return nil, fmt.Errorf("custom type %q refers to itself: %s → %s", ct.Name, strings.Join(res.resolving[i:], " → "), ct.Name)
+	}
+	res.resolving = append(res.resolving, ct.Name)
+	defer func() { res.resolving = res.resolving[:len(res.resolving)-1] }()
+
+	var (
+		c   = &customType{ct: ct}
+		err error
+	)
+	switch {
+	case len(ct.Variants) > 0:
+		c.reason = "variants"
+	case ct.Type == plan.PrimitiveTypeArray:
+		c.reason, err = res.unsupportedReason(plan.Property{ItemTypes: []plan.PropertyType{ct.ItemType}})
+	case ct.Type == plan.PrimitiveTypeObject && isStruct(ct.Schema):
+		where := fmt.Sprintf("custom type %q", ct.Name)
+		// Names are checked before the skip check, as in rules.
+		if err = validateSchemaNames(*ct.Schema, where); err != nil {
+			break
+		}
+		c.schema, err = res.schema(ct.Schema, where, "")
+	}
+	if err != nil {
+		return nil, err
+	}
+	res.customTypes[ct.Name] = c
+	return c, nil
 }
 
 // validateNames rejects a rule whose supplied event, property or custom-type
@@ -211,17 +353,17 @@ func validateNames(rule *plan.EventRule) error {
 			return fmt.Errorf("naming %s event %q: %w", event.EventType, event.Name, err)
 		}
 	}
-	return validateSchemaNames(rule.Schema, event)
+	return validateSchemaNames(rule.Schema, fmt.Sprintf("%s event %q", event.EventType, event.Name))
 }
 
-// validateSchemaNames checks the properties of schema and of its nested object
-// schemas, and the custom types they reference.
-func validateSchemaNames(schema plan.ObjectSchema, event plan.Event) error {
+// validateSchemaNames checks the properties of schema, which belongs to where,
+// and of its nested object schemas, and the custom types they reference.
+func validateSchemaNames(schema plan.ObjectSchema, where string) error {
 	for _, wireKey := range slices.Sorted(maps.Keys(schema.Properties)) {
 		ps := schema.Properties[wireKey]
 		for _, name := range []string{wireKey, ps.Property.Name} {
 			if _, err := pascalCase(name); err != nil {
-				return fmt.Errorf("naming property %q of %s event %q: %w", name, event.EventType, event.Name, err)
+				return fmt.Errorf("naming property %q of %s: %w", name, where, err)
 			}
 		}
 		for _, t := range slices.Concat(ps.Property.Types, ps.Property.ItemTypes) {
@@ -236,35 +378,11 @@ func validateSchemaNames(schema plan.ObjectSchema, event plan.Event) error {
 		if ps.Schema == nil {
 			continue
 		}
-		if err := validateSchemaNames(*ps.Schema, event); err != nil {
+		if err := validateSchemaNames(*ps.Schema, where); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-// unsupportedReason names the construct a field needs that a later version of
-// the generator adds, or returns "" when the field can be generated.
-func unsupportedReason(ps plan.PropertySchema) string {
-	p := ps.Property
-	switch {
-	case ps.Schema != nil:
-		return "nested object schemas"
-	// With an enum, a union with a custom member waits for custom types: the
-	// enum beats the declared types, so addUnion would not reject the member,
-	// and the effective enum would drop the values only the custom type allows.
-	case customUnion(p.Types) && p.Config != nil && len(p.Config.Enum) > 0:
-		return "custom types"
-	// A union with a custom member, of the property's types or of its item
-	// types, fails generation instead (addUnion).
-	case customUnion(p.Types), customUnion(p.ItemTypes):
-		return ""
-	case slices.ContainsFunc(p.ItemTypes, plan.IsCustomType):
-		return "arrays of custom types"
-	case slices.ContainsFunc(p.Types, plan.IsCustomType):
-		return "custom types"
-	}
-	return ""
 }
 
 // isUnion reports whether types has two or more non-null types, which Go
@@ -273,9 +391,27 @@ func isUnion(types []plan.PropertyType) bool {
 	return len(nonNull(types)) > 1
 }
 
-// customUnion reports whether types is a union with a custom type as a member.
-func customUnion(types []plan.PropertyType) bool {
-	return isUnion(types) && slices.ContainsFunc(types, plan.IsCustomType)
+// unionCustomType returns the first custom type of types when they form a
+// union: a custom type cannot be a union member, as in Kotlin and Swift, even
+// when an enum beats the union, since the enum would drop the values only the
+// custom type allows.
+func unionCustomType(types []plan.PropertyType) *plan.CustomType {
+	if !isUnion(types) {
+		return nil
+	}
+	for _, t := range types {
+		if ct := plan.AsCustomType(t); ct != nil {
+			return ct
+		}
+	}
+	return nil
+}
+
+// isStruct reports whether an object with schema s is generated as a struct:
+// one that declares properties or is closed. Without a schema, or with an open
+// one that declares none, an object is a map[string]any.
+func isStruct(s *plan.ObjectSchema) bool {
+	return s != nil && (len(s.Properties) > 0 || !s.AdditionalProperties)
 }
 
 func nonNull(types []plan.PropertyType) []plan.PropertyType {
@@ -314,19 +450,18 @@ func typeList(types []plan.PropertyType) string {
 	return strings.Join(names, "|")
 }
 
-// addPropertyType adds the type of prop under its registered name: its
-// effective enum e when it has one, which beats its declared types, else a
-// union for two or more non-null types, else an alias. A union or alias
-// follows the union its array items need, so the file declares an item type
-// before the type that holds it. It reports whether the type can hold nil
-// (slice, map or interface).
-func addPropertyType(ctx *GoContext, registry *core.NameRegistry, name string, prop plan.Property, e *effectiveEnum) (bool, error) {
-	lead := fmt.Sprintf("%s represents the property %s", name, strconv.Quote(prop.Name))
+// addPropertyType adds the type of prop under its registered name, with lead
+// starting its doc comment: its effective enum e when it has one, which beats
+// its declared types, else a union for two or more non-null types, else an
+// alias. A union or alias follows the union its array items need, so the file
+// declares an item type before the type that holds it. It reports whether the
+// type can hold nil (slice, map or interface).
+func addPropertyType(ctx *GoContext, registry *core.NameRegistry, name, lead string, prop plan.Property, e *effectiveEnum) (bool, error) {
 	if e != nil {
 		return false, addEnum(ctx, registry, name, lead, prop, e)
 	}
 	if isUnion(prop.Types) {
-		return false, addUnion(ctx, registry, name, lead, prop.Description, prop.Types, prop.ItemTypes)
+		return false, addUnion(ctx, registry, name, lead, prop.Description, prop.Types, prop.ItemTypes, "")
 	}
 	if len(prop.Types) == 0 {
 		// Callers send an explicit null in an any as Null{}.
@@ -336,7 +471,7 @@ func addPropertyType(ctx *GoContext, registry *core.NameRegistry, name string, p
 	if err != nil {
 		return false, err
 	}
-	ctx.PropertyTypes = append(ctx.PropertyTypes, GoPropertyType{Alias: &GoTypeAlias{
+	ctx.add(GoDecl{Alias: &GoTypeAlias{
 		Name: name,
 		Doc:  withDescription(lead+".", prop.Description),
 		Type: typ,
@@ -367,9 +502,15 @@ func goType(ctx *GoContext, registry *core.NameRegistry, owner string, types, it
 	return "Nullable[" + typ + "]", false, nil
 }
 
-// memberType maps one non-null JSON type to Go, and reports whether the Go
-// type can hold nil.
+// memberType maps one non-null JSON type or a custom type to Go, and reports
+// whether the Go type can hold nil.
 func memberType(ctx *GoContext, registry *core.NameRegistry, owner string, t plan.PropertyType, items []plan.PropertyType) (string, bool, error) {
+	if ct := plan.AsCustomType(t); ct != nil {
+		name, err := customTypeName(registry, ct.Name)
+		// Array custom types are slices, and object ones without a struct maps.
+		nilable := ct.Type == plan.PrimitiveTypeArray || ct.Type == plan.PrimitiveTypeObject && !isStruct(ct.Schema)
+		return name, nilable, err
+	}
 	switch t {
 	case plan.PrimitiveTypeString:
 		return "string", false, nil
@@ -400,7 +541,7 @@ func arrayType(ctx *GoContext, registry *core.NameRegistry, owner string, items 
 	if err != nil {
 		return "", fmt.Errorf("registering the item union of %s: %w", owner, err)
 	}
-	if err := addUnion(ctx, registry, name, fmt.Sprintf("%s is one item of %s", name, owner), "", items, nil); err != nil {
+	if err := addUnion(ctx, registry, name, fmt.Sprintf("%s is one item of %s", name, owner), "", items, nil, ""); err != nil {
 		return "", fmt.Errorf("mapping the item types of %s: %w", owner, err)
 	}
 	return "[]" + name, nil
@@ -423,15 +564,10 @@ var unionMembers = []struct {
 }
 
 // addUnion adds the union name of two or more non-null types, after any union
-// its array member's items need. lead starts its doc comment. Its constructor
-// names are registered later, by registerValueNames.
-func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, description string, types, items []plan.PropertyType) error {
-	for _, t := range types {
-		if ct := plan.AsCustomType(t); ct != nil {
-			return fmt.Errorf("custom type %q cannot be a member of a multi-type union", ct.Name)
-		}
-	}
-
+// its array member's items need. lead starts its doc comment, and object, when
+// set, is the hoisted struct its Object member takes instead of a map. Its
+// constructor names are registered later, by registerValueNames.
+func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, description string, types, items []plan.PropertyType, object string) error {
 	var (
 		union = &GoUnion{Name: name, HasNull: slices.Contains(types, plan.PropertyType(plan.PrimitiveTypeNull))}
 		// The doc lists the member types: "a string, integer or null".
@@ -445,16 +581,22 @@ func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, descripti
 		article = cmp.Or(article, m.article)
 		words = append(words, string(m.typ))
 
-		member := GoUnionMember{
-			Name: "New" + name + m.name,
-			Doc:  fmt.Sprintf("returns %s %s value%s.", m.article, m.typ, m.nilNote),
-		}
-		if m.typ != plan.PrimitiveTypeNull {
-			var err error
+		var (
+			member  = GoUnionMember{Name: "New" + name + m.name}
+			nilNote = m.nilNote
+			err     error
+		)
+		switch {
+		case m.typ == plan.PrimitiveTypeNull:
+		case m.typ == plan.PrimitiveTypeObject && object != "":
+			// A struct cannot be nil.
+			member.Type, nilNote = object, ""
+		default:
 			if member.Type, _, err = memberType(ctx, registry, name, m.typ, items); err != nil {
 				return err
 			}
 		}
+		member.Doc = fmt.Sprintf("returns %s %s value%s.", m.article, m.typ, nilNote)
 		union.Members = append(union.Members, member)
 	}
 
@@ -467,7 +609,7 @@ func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, descripti
 	}
 	union.Doc = withDescription(fmt.Sprintf("%s: %s %s or %s.\nBuild it with one of the New%s* functions.\n%s",
 		lead, article, strings.Join(words[:last], ", "), words[last], name, zero), description)
-	ctx.PropertyTypes = append(ctx.PropertyTypes, GoPropertyType{Union: union})
+	ctx.add(GoDecl{Union: union})
 	return nil
 }
 
@@ -485,22 +627,23 @@ func registerValueNames(ctx *GoContext, registry *core.NameRegistry) error {
 		*name = registered
 		return nil
 	}
-	for _, pt := range ctx.PropertyTypes {
-		if e := pt.Enum; e != nil {
+	decls := slices.Concat(ctx.CustomTypes, ctx.PropertyTypes, ctx.Payloads)
+	for _, d := range decls {
+		if e := d.Enum; e != nil {
 			if err := register("values:"+e.Name, &e.ValuesFunc); err != nil {
 				return err
 			}
 		}
 	}
-	for _, pt := range ctx.PropertyTypes {
-		if u := pt.Union; u != nil {
+	for _, d := range decls {
+		if u := d.Union; u != nil {
 			for i := range u.Members {
 				if err := register("constructor:"+u.Members[i].Name, &u.Members[i].Name); err != nil {
 					return err
 				}
 			}
 		}
-		if e := pt.Enum; e != nil {
+		if e := d.Enum; e != nil {
 			for i := range e.Values {
 				if err := register(fmt.Sprintf("value:%s:%d", e.Name, i), &e.Values[i].Name); err != nil {
 					return err
@@ -512,17 +655,15 @@ func registerValueNames(ctx *GoContext, registry *core.NameRegistry) error {
 }
 
 // addPropertyTypes adds one Property{Name} type per (name, type signature)
-// that an emitted field references, ordered and registered by name, then
-// signature. Descriptions come from the first field that references them.
-func addPropertyTypes(ctx *GoContext, rules []trackRule, registry *core.NameRegistry) (map[propertyKey]propertyType, error) {
+// that an emitted field of schemas references, ordered and registered by name,
+// then signature. A field whose nested schema is hoisted references none.
+// Descriptions come from the first field that references them, walking
+// schemas in order and each depth-first.
+func addPropertyTypes(ctx *GoContext, schemas []*objectSchema, registry *core.NameRegistry) (map[propertyKey]propertyType, error) {
+	ctx.out = &ctx.PropertyTypes
 	first := map[propertyKey]ruleField{}
-	for _, r := range rules {
-		for _, f := range r.fields {
-			k := keyOf(f)
-			if _, seen := first[k]; !seen {
-				first[k] = f
-			}
-		}
+	for _, s := range schemas {
+		firstFields(s, first)
 	}
 
 	keys := slices.SortedFunc(maps.Keys(first), func(a, b propertyKey) int {
@@ -541,13 +682,77 @@ func addPropertyTypes(ctx *GoContext, rules []trackRule, registry *core.NameRegi
 		if err != nil {
 			return nil, fmt.Errorf("registering property %q: %w", prop.Name, err)
 		}
-		nilable, err := addPropertyType(ctx, registry, name, prop, f.enum)
+		lead := fmt.Sprintf("%s represents the property %s", name, strconv.Quote(prop.Name))
+		nilable, err := addPropertyType(ctx, registry, name, lead, prop, f.enum)
 		if err != nil {
 			return nil, fmt.Errorf("mapping property %q: %w", prop.Name, err)
 		}
 		types[k] = propertyType{name: name, nilable: nilable}
 	}
 	return types, nil
+}
+
+// firstFields records in first, per property key, the first field of s or of
+// a schema it hoists that takes a Property{Name} type.
+func firstFields(s *objectSchema, first map[propertyKey]ruleField) {
+	for _, f := range s.fields {
+		if f.nested != nil {
+			firstFields(f.nested, first)
+			continue
+		}
+		k := keyOf(f)
+		if _, seen := first[k]; !seen {
+			first[k] = f
+		}
+	}
+}
+
+// customTypeName registers the type name of the custom type name, or returns
+// the one registered: every reference resolves to one CustomType{Name}.
+func customTypeName(registry *core.NameRegistry, name string) (string, error) {
+	base, err := pascalCase(name)
+	if err != nil {
+		return "", fmt.Errorf("naming custom type %q: %w", name, err)
+	}
+	registered, err := registry.RegisterName("customtype:"+name, packageScope, "CustomType"+base)
+	if err != nil {
+		return "", fmt.Errorf("registering custom type %q: %w", name, err)
+	}
+	return registered, nil
+}
+
+// addCustomTypes adds the custom types, sorted by name, each followed by the
+// types its hoisted fields need: a struct for an object that declares
+// properties or is closed, else, as for a property, an enum or an alias.
+func addCustomTypes(ctx *GoContext, customTypes []*customType, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) error {
+	ctx.out = &ctx.CustomTypes
+	for _, c := range customTypes {
+		ct := c.ct
+		name, err := customTypeName(registry, ct.Name)
+		if err != nil {
+			return err
+		}
+		lead := fmt.Sprintf("%s represents the custom type %s", name, strconv.Quote(ct.Name))
+		if c.schema != nil {
+			if _, err := addStruct(ctx, registry, propertyTypes, name, withDescription(lead+".", ct.Description), c.schema, false); err != nil {
+				return err
+			}
+			continue
+		}
+
+		prop := plan.Property{Name: ct.Name, Description: ct.Description, Types: []plan.PropertyType{ct.Type}, Config: ct.Config}
+		if ct.ItemType != nil {
+			prop.ItemTypes = []plan.PropertyType{ct.ItemType}
+		}
+		e, err := resolveEnum(prop)
+		if err != nil {
+			return fmt.Errorf("mapping custom type %q: %w", ct.Name, err)
+		}
+		if _, err := addPropertyType(ctx, registry, name, lead, prop, e); err != nil {
+			return fmt.Errorf("mapping custom type %q: %w", ct.Name, err)
+		}
+	}
+	return nil
 }
 
 // addTrackRule adds the payload type and method of one track rule.
@@ -558,12 +763,9 @@ func addTrackRule(ctx *GoContext, r trackRule, propertyTypes map[propertyKey]pro
 		return fmt.Errorf("naming track event %q: %w", event.Name, err)
 	}
 
-	payload, err := newPayload(r, base, propertyTypes, registry)
+	payload, err := addPayload(ctx, r, base, propertyTypes, registry)
 	if err != nil {
 		return err
-	}
-	if payload != nil {
-		ctx.Payloads = append(ctx.Payloads, payload)
 	}
 
 	method, err := registry.RegisterName("method:"+r.key, methodScope, "Track"+base)
@@ -586,10 +788,10 @@ func addTrackRule(ctx *GoContext, r trackRule, propertyTypes map[propertyKey]pro
 	return nil
 }
 
-// newPayload registers the payload type of a track rule whose event name
+// addPayload adds the payload type of a track rule whose event name
 // pascal-cases to base, or returns nil when the rule's schema is empty and
 // closed.
-func newPayload(r trackRule, base string, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) (*GoPayload, error) {
+func addPayload(ctx *GoContext, r trackRule, base string, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) (*GoStruct, error) {
 	var (
 		event  = r.rule.Event
 		schema = r.rule.Schema
@@ -602,65 +804,109 @@ func newPayload(r trackRule, base string, propertyTypes map[propertyKey]property
 	if err != nil {
 		return nil, fmt.Errorf("registering the payload of track event %q: %w", event.Name, err)
 	}
-	if len(schema.Properties) == 0 {
-		return &GoPayload{
-			Name:     name,
-			Doc:      fmt.Sprintf("%s holds the properties of %s. The tracking plan declares no properties and allows any.", name, strconv.Quote(event.Name)),
-			MapAlias: true,
-		}, nil
+	if len(schema.Properties) > 0 {
+		return addStruct(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the properties of %s.", name, strconv.Quote(event.Name)), r.schema, true)
 	}
-
-	payload := &GoPayload{
-		Name:         name,
-		Doc:          fmt.Sprintf("%s holds the properties of %s.", name, strconv.Quote(event.Name)),
-		Open:         schema.AdditionalProperties,
-		DeclaredKeys: slices.Sorted(maps.Keys(schema.Properties)),
+	payload := &GoStruct{
+		Name:     name,
+		Doc:      fmt.Sprintf("%s holds the properties of %s. The tracking plan declares no properties and allows any.", name, strconv.Quote(event.Name)),
+		MapAlias: true,
 	}
-	if payload.Fields, err = structFields(r, payload, propertyTypes, registry); err != nil {
-		return nil, err
-	}
+	ctx.add(GoDecl{Struct: payload})
 	return payload, nil
 }
 
-// structFields names the fields of a payload struct in byte order of their
-// wire keys, after the names the struct's own methods and its
-// AdditionalProperties field already hold.
-func structFields(r trackRule, payload *GoPayload, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) ([]GoField, error) {
+// addStruct adds the struct name of the fields of s, then the types its
+// hoisted fields need, depth-first in wire-key order, so each follows its
+// parent. Fields are named in byte order of their wire keys, after the names
+// the struct's own methods and its AdditionalProperties field already hold.
+// A payload struct also has ToProperties.
+func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, doc string, s *objectSchema, payload bool) (*GoStruct, error) {
+	st := &GoStruct{Name: name, Doc: doc, Payload: payload, Open: s.open, DeclaredKeys: s.declared}
+	ctx.add(GoDecl{Struct: st})
+	ctx.UsesWithAdditional = ctx.UsesWithAdditional || s.open
+
 	var (
-		scope    = "struct:" + payload.Name + ":fields"
-		reserved = []string{"MarshalJSON", "ToProperties"}
+		scope    = "struct:" + name + ":fields"
+		reserved = []string{"MarshalJSON"}
 	)
-	if payload.Open {
+	if payload {
+		reserved = append(reserved, "ToProperties")
+	}
+	if s.open {
 		reserved = append(reserved, "AdditionalProperties")
 	}
-	for _, name := range reserved {
-		if _, err := registry.RegisterName("reserved:"+name, scope, name); err != nil {
-			return nil, fmt.Errorf("reserving %s in %s: %w", name, payload.Name, err)
+	for _, r := range reserved {
+		if _, err := registry.RegisterName("reserved:"+r, scope, r); err != nil {
+			return nil, fmt.Errorf("reserving %s in %s: %w", r, name, err)
 		}
 	}
 
-	fields := make([]GoField, 0, len(r.fields))
-	for _, f := range r.fields {
+	for _, f := range s.fields {
 		base, err := fieldName(f.wireKey)
 		if err != nil {
-			return nil, fmt.Errorf("naming property %q of track event %q: %w", f.wireKey, r.rule.Event.Name, err)
+			return nil, fmt.Errorf("naming property %q of %s: %w", f.wireKey, name, err)
 		}
-		name, err := registry.RegisterName("key:"+f.wireKey, scope, base)
+		field, err := registry.RegisterName("key:"+f.wireKey, scope, base)
 		if err != nil {
-			return nil, fmt.Errorf("registering property %q of track event %q: %w", f.wireKey, r.rule.Event.Name, err)
+			return nil, fmt.Errorf("registering property %q of %s: %w", f.wireKey, name, err)
 		}
 
 		pt := propertyTypes[keyOf(f)]
-		field := GoField{Name: name, Key: f.wireKey, Type: pt.name, Required: f.ps.Required}
+		if f.nested != nil {
+			typ, err := addNested(ctx, registry, propertyTypes, name, field, f)
+			if err != nil {
+				return nil, err
+			}
+			// A hoisted struct, a Nullable of one and a union cannot be nil.
+			pt = propertyType{name: typ}
+		}
+		goField := GoField{Name: field, Key: f.wireKey, Type: pt.name, Required: f.ps.Required}
 		// Optional fields need an absent state; slices, maps and interfaces
 		// already have one in nil.
 		if !f.ps.Required && !pt.nilable {
-			field.Pointer = true
-			field.Type = "*" + pt.name
+			goField.Pointer, goField.Type = true, "*"+pt.name
+			ctx.UsesPtr = true
 		}
-		fields = append(fields, field)
+		st.Fields = append(st.Fields, goField)
 	}
-	return fields, nil
+	return st, nil
+}
+
+// addNested adds the types that field of parent hoists from f's nested schema
+// and returns the field's type: the struct {Parent}{Field}, a Nullable of it
+// for object or null, or for a union the union {Parent}{Field}, whose Object
+// member takes the struct {Parent}{Field}Object. Each hoisted name is
+// registered under its parent and wire key, so names that concatenate alike
+// (foo.barBaz and fooBar.baz) take a numeric suffix in registration order.
+func addNested(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, parent, field string, f ruleField) (string, error) {
+	name, err := registry.RegisterName("nested:"+parent+":"+f.wireKey, packageScope, parent+field)
+	if err != nil {
+		return "", fmt.Errorf("registering the type of %s.%s: %w", parent, field, err)
+	}
+
+	var (
+		types  = f.ps.Property.Types
+		object = name
+	)
+	if isUnion(types) {
+		if object, err = registry.RegisterName("object:"+name, packageScope, name+"Object"); err != nil {
+			return "", fmt.Errorf("registering the object member of %s: %w", name, err)
+		}
+		lead := fmt.Sprintf("%s is the value in %s.%s", name, parent, field)
+		if err := addUnion(ctx, registry, name, lead, "", types, f.ps.Property.ItemTypes, object); err != nil {
+			return "", fmt.Errorf("mapping %s.%s: %w", parent, field, err)
+		}
+	}
+	if _, err := addStruct(ctx, registry, propertyTypes, object, fmt.Sprintf("%s is the object in %s.%s.", object, parent, field), f.nested, false); err != nil {
+		return "", err
+	}
+
+	if isUnion(types) || !declares(types, plan.PrimitiveTypeNull) {
+		return name, nil
+	}
+	ctx.UsesNullable = true
+	return "Nullable[" + name + "]", nil
 }
 
 func withDescription(summary, description string) string {

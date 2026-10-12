@@ -224,14 +224,14 @@ func addEnum(ctx *GoContext, registry *core.NameRegistry, name, lead string, pro
 	switch {
 	case len(e.values) == 0:
 		ctx.UsesNull = true
-		ctx.PropertyTypes = append(ctx.PropertyTypes, GoPropertyType{Alias: &GoTypeAlias{
+		ctx.add(GoDecl{Alias: &GoTypeAlias{
 			Name: name,
 			Doc:  withDescription(lead+".", prop.Description),
 			Type: "Null",
 		}})
 		return nil
 	case !e.null:
-		ctx.PropertyTypes = append(ctx.PropertyTypes, GoPropertyType{Enum: newGoEnum(name, lead, prop.Description, e)})
+		ctx.add(GoDecl{Enum: newGoEnum(name, lead, prop.Description, e)})
 		return nil
 	}
 
@@ -245,14 +245,12 @@ func addEnum(ctx *GoContext, registry *core.NameRegistry, name, lead string, pro
 		texts[i] = v.Text
 	}
 	ctx.UsesNullable = true
-	ctx.PropertyTypes = append(ctx.PropertyTypes,
-		GoPropertyType{Enum: newGoEnum(enumName, fmt.Sprintf("%s is the enum type of the property %s", enumName, strconv.Quote(prop.Name)), "", e)},
-		GoPropertyType{Alias: &GoTypeAlias{
-			Name: name,
-			Doc:  withDescription(fmt.Sprintf("%s: %s or null.", lead, strings.Join(texts, ", ")), prop.Description),
-			Type: "Nullable[" + enumName + "]",
-		}},
-	)
+	ctx.add(GoDecl{Enum: newGoEnum(enumName, fmt.Sprintf("%s is the enum type of the property %s", enumName, strconv.Quote(prop.Name)), "", e)})
+	ctx.add(GoDecl{Alias: &GoTypeAlias{
+		Name: name,
+		Doc:  withDescription(fmt.Sprintf("%s: %s or null.", lead, strings.Join(texts, ", ")), prop.Description),
+		Type: "Nullable[" + enumName + "]",
+	}})
 	return nil
 }
 

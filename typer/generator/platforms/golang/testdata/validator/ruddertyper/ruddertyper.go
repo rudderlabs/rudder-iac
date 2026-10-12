@@ -144,7 +144,206 @@ func (n Nullable[T]) wireValue() (any, error) {
 // MarshalJSON implements json.Marshaler.
 func (n Nullable[T]) MarshalJSON() ([]byte, error) { return marshal(n) }
 
+// --- Custom types ---
+
+// CustomTypeActive represents the custom type "active".
+//
+// Whether user is active
+type CustomTypeActive = bool
+
+// CustomTypeAddressDetails represents the custom type "address_details".
+//
+// Address details object
+type CustomTypeAddressDetails struct {
+	City       PropertyCity        // required
+	PostalCode *PropertyPostalCode // optional
+	Street     PropertyStreet      // required
+}
+
+func (v CustomTypeAddressDetails) toMap() map[string]any {
+	m := map[string]any{
+		"city":   v.City,
+		"street": v.Street,
+	}
+	if v.PostalCode != nil {
+		m["postal_code"] = *v.PostalCode
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeAddressDetails) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeAddressList represents the custom type "address_list".
+//
+// List of addresses
+type CustomTypeAddressList = []CustomTypeAddressDetails
+
+// CustomTypeAge represents the custom type "age".
+//
+// User's age in years
+type CustomTypeAge = float64
+
+// CustomTypeColor represents the custom type "color".
+//
+// Custom type for Colors
+type CustomTypeColor = string
+
+// CustomTypeEmail represents the custom type "email".
+//
+// Custom type for email validation
+type CustomTypeEmail = string
+
+// CustomTypeEmailList represents the custom type "email_list".
+//
+// List of email addresses
+type CustomTypeEmailList = []CustomTypeEmail
+
+// CustomTypeEmptyObjectNoAdditionalProps represents the custom type "empty_object_no_additional_props".
+//
+// Empty object that does not allow additional properties
+type CustomTypeEmptyObjectNoAdditionalProps struct{}
+
+func (v CustomTypeEmptyObjectNoAdditionalProps) toMap() map[string]any {
+	m := map[string]any{}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeEmptyObjectNoAdditionalProps) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeEmptyObjectWithAdditionalProps represents the custom type "empty_object_with_additional_props".
+//
+// Empty object that allows additional properties
+type CustomTypeEmptyObjectWithAdditionalProps = map[string]any
+
+// CustomTypeNullType represents the custom type "null_type".
+//
+// Custom type representing a null value
+type CustomTypeNullType = Null
+
+// CustomTypePhoneNumber represents the custom type "phone_number".
+//
+// Custom type for phone numbers
+type CustomTypePhoneNumber = string
+
+// CustomTypeProfileList represents the custom type "profile_list".
+//
+// List of user profiles
+type CustomTypeProfileList = []CustomTypeUserProfile
+
+// CustomTypeStatus represents the custom type "status".
+//
+// User status enum
+type CustomTypeStatus string
+
+// Allowed values of CustomTypeStatus.
+const (
+	CustomTypeStatusPending   CustomTypeStatus = "pending"
+	CustomTypeStatusActive    CustomTypeStatus = "active"
+	CustomTypeStatusSuspended CustomTypeStatus = "suspended"
+	CustomTypeStatusDeleted   CustomTypeStatus = "deleted"
+)
+
+// CustomTypeStatusValues returns every allowed value, in tracking plan order.
+func CustomTypeStatusValues() []CustomTypeStatus {
+	return []CustomTypeStatus{
+		CustomTypeStatusPending,
+		CustomTypeStatusActive,
+		CustomTypeStatusSuspended,
+		CustomTypeStatusDeleted,
+	}
+}
+
+// IsValid reports whether v is an allowed value.
+func (v CustomTypeStatus) IsValid() bool {
+	switch v {
+	case CustomTypeStatusPending,
+		CustomTypeStatusActive,
+		CustomTypeStatusSuspended,
+		CustomTypeStatusDeleted:
+		return true
+	}
+	return false
+}
+
+// CustomTypeUserProfile represents the custom type "user_profile".
+//
+// User profile information
+type CustomTypeUserProfile struct {
+	Email     PropertyEmail     // required
+	FirstName PropertyFirstName // required
+	LastName  *PropertyLastName // optional
+}
+
+func (v CustomTypeUserProfile) toMap() map[string]any {
+	m := map[string]any{
+		"email":      v.Email,
+		"first_name": v.FirstName,
+	}
+	if v.LastName != nil {
+		m["last_name"] = *v.LastName
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeUserProfile) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeТипыДанных represents the custom type "типы_данных".
+//
+// Custom type with Cyrillic name
+type CustomTypeТипыДанных string
+
+// Allowed values of CustomTypeТипыДанных.
+const (
+	CustomTypeТипыДанныхАктивный   CustomTypeТипыДанных = "активный"
+	CustomTypeТипыДанныхНеактивный CustomTypeТипыДанных = "неактивный"
+	CustomTypeТипыДанныхPending    CustomTypeТипыДанных = "pending"
+)
+
+// CustomTypeТипыДанныхValues returns every allowed value, in tracking plan order.
+func CustomTypeТипыДанныхValues() []CustomTypeТипыДанных {
+	return []CustomTypeТипыДанных{
+		CustomTypeТипыДанныхАктивный,
+		CustomTypeТипыДанныхНеактивный,
+		CustomTypeТипыДанныхPending,
+	}
+}
+
+// IsValid reports whether v is an allowed value.
+func (v CustomTypeТипыДанных) IsValid() bool {
+	switch v {
+	case CustomTypeТипыДанныхАктивный,
+		CustomTypeТипыДанныхНеактивный,
+		CustomTypeТипыДанныхPending:
+		return true
+	}
+	return false
+}
+
 // --- Property types ---
+
+// PropertyActive represents the property "active".
+//
+// User active status
+type PropertyActive = CustomTypeActive
+
+// PropertyAddresses represents the property "addresses".
+//
+// User's addresses
+type PropertyAddresses = CustomTypeAddressList
+
+// PropertyAge represents the property "age".
+//
+// User's age
+type PropertyAge = CustomTypeAge
 
 // PropertyArrayOfAny represents the property "array_of_any".
 //
@@ -155,6 +354,21 @@ type PropertyArrayOfAny = []any
 //
 // Array with items that can be string or null
 type PropertyArrayWithNullItems = []Nullable[string]
+
+// PropertyCity represents the property "city".
+//
+// City name
+type PropertyCity = string
+
+// PropertyContacts represents the property "contacts".
+//
+// Array of user contacts
+type PropertyContacts = []CustomTypeEmail
+
+// PropertyCustomNullField represents the property "custom_null_field".
+//
+// Property using custom null type
+type PropertyCustomNullField = CustomTypeNullType
 
 // PropertyDeviceType represents the property "device_type".
 //
@@ -229,6 +443,26 @@ func (v PropertyDollarField) IsValid() bool {
 	return false
 }
 
+// PropertyEmail represents the property "email".
+//
+// User's email address
+type PropertyEmail = CustomTypeEmail
+
+// PropertyEmailList represents the property "email_list".
+//
+// User's email addresses
+type PropertyEmailList = CustomTypeEmailList
+
+// PropertyEmptyObjectNoAdditionalProps represents the property "empty_object_no_additional_props".
+//
+// Property with empty object not allowing additional properties
+type PropertyEmptyObjectNoAdditionalProps = CustomTypeEmptyObjectNoAdditionalProps
+
+// PropertyEmptyObjectWithAdditionalProps represents the property "empty_object_with_additional_props".
+//
+// Property with empty object allowing additional properties
+type PropertyEmptyObjectWithAdditionalProps = CustomTypeEmptyObjectWithAdditionalProps
+
 // PropertyEnabled represents the property "enabled".
 //
 // Feature enabled flag
@@ -257,6 +491,26 @@ func (v PropertyEnabled) IsValid() bool {
 	}
 	return false
 }
+
+// PropertyFavoriteColors represents the property "favorite_colors".
+//
+// Array of favorite colors using custom type
+type PropertyFavoriteColors = []CustomTypeColor
+
+// PropertyFirstName represents the property "first_name".
+//
+// User's first name
+type PropertyFirstName = string
+
+// PropertyIPAddress represents the property "ip_address".
+//
+// IP address of the user
+type PropertyIPAddress = string
+
+// PropertyLastName represents the property "last_name".
+//
+// User's last name
+type PropertyLastName = string
 
 // PropertyMixedUnicode represents the property "mixed_unicode".
 //
@@ -405,6 +659,11 @@ func (u PropertyMultiTypeWithNull) wireValue() (any, error) { return u.value, ni
 // MarshalJSON implements json.Marshaler.
 func (u PropertyMultiTypeWithNull) MarshalJSON() ([]byte, error) { return marshal(u) }
 
+// PropertyNestedEmptyObject represents the property "nested_empty_object".
+//
+// Nested property with empty object allowing additional properties
+type PropertyNestedEmptyObject = map[string]any
+
 // PropertyNullField represents the property "null_field".
 //
 // Property that is always null
@@ -419,6 +678,16 @@ type PropertyNumberOrNull = Nullable[float64]
 //
 // An object field with no defined structure
 type PropertyObjectProperty = map[string]any
+
+// PropertyPhoneNumbers represents the property "phone_numbers".
+//
+// Array of phone numbers using custom type
+type PropertyPhoneNumbers = []CustomTypePhoneNumber
+
+// PropertyPostalCode represents the property "postal_code".
+//
+// Postal code
+type PropertyPostalCode = string
 
 // PropertyPriority represents the property "priority".
 //
@@ -451,6 +720,16 @@ func (v PropertyPriority) IsValid() bool {
 	}
 	return false
 }
+
+// PropertyProfile represents the property "profile".
+//
+// User profile data
+type PropertyProfile = CustomTypeUserProfile
+
+// PropertyProfileList represents the property "profile_list".
+//
+// List of related user profiles
+type PropertyProfileList = CustomTypeProfileList
 
 // PropertyPropertyOfAny represents the property "property_of_any".
 //
@@ -500,6 +779,11 @@ func (v PropertyRating) IsValid() bool {
 // Field with special chars: "quotes", backslash\path, and /* comment */
 type PropertySpecialField = string
 
+// PropertyStatus represents the property "status".
+//
+// User account status
+type PropertyStatus = CustomTypeStatus
+
 // PropertyStatusCode represents the property "status_code".
 //
 // HTTP status with special characters
@@ -532,6 +816,11 @@ func (v PropertyStatusCode) IsValid() bool {
 	return false
 }
 
+// PropertyStreet represents the property "street".
+//
+// Street address
+type PropertyStreet = string
+
 // PropertyStringOrNull represents the property "string_or_null".
 //
 // Property that can be string or null
@@ -541,6 +830,11 @@ type PropertyStringOrNull = Nullable[string]
 //
 // User tags as array of strings
 type PropertyTags = []string
+
+// PropertyUnicodeCustomType represents the property "unicode_custom_type".
+//
+// Property using custom type with Unicode
+type PropertyUnicodeCustomType = CustomTypeТипыДанных
 
 // PropertyUnicodeEnumField represents the property "unicode_enum_field".
 //
@@ -626,10 +920,15 @@ func (v TrackVariableStringProperties) MarshalJSON() ([]byte, error) {
 }
 
 // TrackEventWithNameCamelCaseProperties holds the properties of "$eventWithNameCamelCase$!".
-type TrackEventWithNameCamelCaseProperties struct{}
+type TrackEventWithNameCamelCaseProperties struct {
+	Email *PropertyEmail // optional
+}
 
 func (v TrackEventWithNameCamelCaseProperties) toMap() map[string]any {
 	m := map[string]any{}
+	if v.Email != nil {
+		m["email"] = *v.Email
+	}
 	return m
 }
 
@@ -649,11 +948,13 @@ type TrackEmptyEventWithAdditionalPropsProperties = map[string]any
 // TrackEventWithVariantsProperties holds the properties of "Event With Variants".
 type TrackEventWithVariantsProperties struct {
 	DeviceType PropertyDeviceType // required
+	Profile    PropertyProfile    // required
 }
 
 func (v TrackEventWithVariantsProperties) toMap() map[string]any {
 	m := map[string]any{
 		"device_type": v.DeviceType,
+		"profile":     v.Profile,
 	}
 	return m
 }
@@ -696,39 +997,82 @@ func (v TrackProductPremiumClickedProperties) MarshalJSON() ([]byte, error) {
 
 // TrackUserSignedUpProperties holds the properties of "User Signed Up".
 type TrackUserSignedUpProperties struct {
-	ArrayOfAny         PropertyArrayOfAny         // optional
-	ArrayWithNullItems PropertyArrayWithNullItems // optional
-	DeviceType         *PropertyDeviceType        // optional
-	Enabled            *PropertyEnabled           // optional
-	MixedUnicode       *PropertyMixedUnicode      // optional
-	MixedValue         *PropertyMixedValue        // optional
-	MultiTypeArray     PropertyMultiTypeArray     // optional
-	MultiTypeField     *PropertyMultiTypeField    // optional
-	MultiTypeWithNull  *PropertyMultiTypeWithNull // optional
-	NullField          *PropertyNullField         // optional
-	NumberOrNull       *PropertyNumberOrNull      // optional
-	ObjectProperty     PropertyObjectProperty     // optional
-	Priority           *PropertyPriority          // optional
-	PropertyOfAny      PropertyPropertyOfAny      // optional
-	Rating             *PropertyRating            // optional
-	StringOrNull       *PropertyStringOrNull      // optional
-	Tags               PropertyTags               // optional
-	UnicodeEnumField   *PropertyUnicodeEnumField  // optional
-	UntypedArray       PropertyUntypedArray       // optional
-	UntypedField       PropertyUntypedField       // optional
-	X用户名               *Property用户名               // optional
+	Active                             PropertyActive                                                 // required
+	Addresses                          PropertyAddresses                                              // optional
+	Age                                *PropertyAge                                                   // optional
+	ArrayOfAny                         PropertyArrayOfAny                                             // optional
+	ArrayWithNullItems                 PropertyArrayWithNullItems                                     // optional
+	Contacts                           PropertyContacts                                               // optional
+	Context                            *TrackUserSignedUpPropertiesContext                            // optional
+	CustomNullField                    *PropertyCustomNullField                                       // optional
+	DeviceType                         *PropertyDeviceType                                            // optional
+	EmailList                          PropertyEmailList                                              // optional
+	EmptyObjectNoAdditionalProps       *PropertyEmptyObjectNoAdditionalProps                          // optional
+	EmptyObjectWithAdditionalProps     PropertyEmptyObjectWithAdditionalProps                         // optional
+	Enabled                            *PropertyEnabled                                               // optional
+	MixedUnicode                       *PropertyMixedUnicode                                          // optional
+	MixedValue                         *PropertyMixedValue                                            // optional
+	MultiTypeArray                     PropertyMultiTypeArray                                         // optional
+	MultiTypeField                     *PropertyMultiTypeField                                        // optional
+	MultiTypeWithNull                  *PropertyMultiTypeWithNull                                     // optional
+	NestedEmptyObject                  PropertyNestedEmptyObject                                      // optional
+	NestedEmptyObjectNoAdditionalProps *TrackUserSignedUpPropertiesNestedEmptyObjectNoAdditionalProps // optional
+	NullField                          *PropertyNullField                                             // optional
+	NumberOrNull                       *PropertyNumberOrNull                                          // optional
+	ObjectProperty                     PropertyObjectProperty                                         // optional
+	PhoneNumbers                       PropertyPhoneNumbers                                           // optional
+	Priority                           *PropertyPriority                                              // optional
+	Profile                            PropertyProfile                                                // required
+	ProfileList                        PropertyProfileList                                            // optional
+	PropertyOfAny                      PropertyPropertyOfAny                                          // optional
+	Rating                             *PropertyRating                                                // optional
+	Status                             *PropertyStatus                                                // optional
+	StringOrNull                       *PropertyStringOrNull                                          // optional
+	Tags                               PropertyTags                                                   // optional
+	UnicodeCustomType                  *PropertyUnicodeCustomType                                     // optional
+	UnicodeEnumField                   *PropertyUnicodeEnumField                                      // optional
+	UntypedArray                       PropertyUntypedArray                                           // optional
+	UntypedField                       PropertyUntypedField                                           // optional
+	X用户名                               *Property用户名                                                   // optional
 }
 
 func (v TrackUserSignedUpProperties) toMap() map[string]any {
-	m := map[string]any{}
+	m := map[string]any{
+		"active":  v.Active,
+		"profile": v.Profile,
+	}
+	if v.Addresses != nil {
+		m["addresses"] = v.Addresses
+	}
+	if v.Age != nil {
+		m["age"] = *v.Age
+	}
 	if v.ArrayOfAny != nil {
 		m["array_of_any"] = v.ArrayOfAny
 	}
 	if v.ArrayWithNullItems != nil {
 		m["array_with_null_items"] = v.ArrayWithNullItems
 	}
+	if v.Contacts != nil {
+		m["contacts"] = v.Contacts
+	}
+	if v.Context != nil {
+		m["context"] = *v.Context
+	}
+	if v.CustomNullField != nil {
+		m["custom_null_field"] = *v.CustomNullField
+	}
 	if v.DeviceType != nil {
 		m["device_type"] = *v.DeviceType
+	}
+	if v.EmailList != nil {
+		m["email_list"] = v.EmailList
+	}
+	if v.EmptyObjectNoAdditionalProps != nil {
+		m["empty_object_no_additional_props"] = *v.EmptyObjectNoAdditionalProps
+	}
+	if v.EmptyObjectWithAdditionalProps != nil {
+		m["empty_object_with_additional_props"] = v.EmptyObjectWithAdditionalProps
 	}
 	if v.Enabled != nil {
 		m["enabled"] = *v.Enabled
@@ -748,6 +1092,12 @@ func (v TrackUserSignedUpProperties) toMap() map[string]any {
 	if v.MultiTypeWithNull != nil {
 		m["multi_type_with_null"] = *v.MultiTypeWithNull
 	}
+	if v.NestedEmptyObject != nil {
+		m["nested_empty_object"] = v.NestedEmptyObject
+	}
+	if v.NestedEmptyObjectNoAdditionalProps != nil {
+		m["nested_empty_object_no_additional_props"] = *v.NestedEmptyObjectNoAdditionalProps
+	}
 	if v.NullField != nil {
 		m["null_field"] = *v.NullField
 	}
@@ -757,8 +1107,14 @@ func (v TrackUserSignedUpProperties) toMap() map[string]any {
 	if v.ObjectProperty != nil {
 		m["object_property"] = v.ObjectProperty
 	}
+	if v.PhoneNumbers != nil {
+		m["phone_numbers"] = v.PhoneNumbers
+	}
 	if v.Priority != nil {
 		m["priority"] = *v.Priority
+	}
+	if v.ProfileList != nil {
+		m["profile_list"] = v.ProfileList
 	}
 	if v.PropertyOfAny != nil {
 		m["property_of_any"] = v.PropertyOfAny
@@ -766,11 +1122,17 @@ func (v TrackUserSignedUpProperties) toMap() map[string]any {
 	if v.Rating != nil {
 		m["rating"] = *v.Rating
 	}
+	if v.Status != nil {
+		m["status"] = *v.Status
+	}
 	if v.StringOrNull != nil {
 		m["string_or_null"] = *v.StringOrNull
 	}
 	if v.Tags != nil {
 		m["tags"] = v.Tags
+	}
+	if v.UnicodeCustomType != nil {
+		m["unicode_custom_type"] = *v.UnicodeCustomType
 	}
 	if v.UnicodeEnumField != nil {
 		m["unicode_enum_field"] = *v.UnicodeEnumField
@@ -797,11 +1159,70 @@ func (v TrackUserSignedUpProperties) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 
+// TrackUserSignedUpPropertiesContext is the object in TrackUserSignedUpProperties.Context.
+type TrackUserSignedUpPropertiesContext struct {
+	IPAddress     PropertyIPAddress                               // required
+	NestedContext TrackUserSignedUpPropertiesContextNestedContext // required
+}
+
+func (v TrackUserSignedUpPropertiesContext) toMap() map[string]any {
+	m := map[string]any{
+		"ip_address":     v.IPAddress,
+		"nested_context": v.NestedContext,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackUserSignedUpPropertiesContext) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackUserSignedUpPropertiesContextNestedContext is the object in TrackUserSignedUpPropertiesContext.NestedContext.
+type TrackUserSignedUpPropertiesContextNestedContext struct {
+	FavoriteColors PropertyFavoriteColors // optional
+	Profile        *PropertyProfile       // optional
+}
+
+func (v TrackUserSignedUpPropertiesContextNestedContext) toMap() map[string]any {
+	m := map[string]any{}
+	if v.FavoriteColors != nil {
+		m["favorite_colors"] = v.FavoriteColors
+	}
+	if v.Profile != nil {
+		m["profile"] = *v.Profile
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackUserSignedUpPropertiesContextNestedContext) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackUserSignedUpPropertiesNestedEmptyObjectNoAdditionalProps is the object in TrackUserSignedUpProperties.NestedEmptyObjectNoAdditionalProps.
+type TrackUserSignedUpPropertiesNestedEmptyObjectNoAdditionalProps struct{}
+
+func (v TrackUserSignedUpPropertiesNestedEmptyObjectNoAdditionalProps) toMap() map[string]any {
+	m := map[string]any{}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackUserSignedUpPropertiesNestedEmptyObjectNoAdditionalProps) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
 // TrackEventWithNameCamelCaseProperties1 holds the properties of "eventWithNameCamelCase".
-type TrackEventWithNameCamelCaseProperties1 struct{}
+type TrackEventWithNameCamelCaseProperties1 struct {
+	Active *PropertyActive // optional
+}
 
 func (v TrackEventWithNameCamelCaseProperties1) toMap() map[string]any {
 	m := map[string]any{}
+	if v.Active != nil {
+		m["active"] = *v.Active
+	}
 	return m
 }
 

@@ -92,9 +92,11 @@ func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
 			UserId: "user-123",
 			Event:  "User Signed Up",
 			Properties: analytics.Properties{
+				"active":          false,
 				"array_of_any":    []any{"x", []any{"y"}},
 				"mixed_unicode":   "a",
 				"object_property": map[string]any{"nested": map[string]any{"k": "v"}},
+				"profile":         map[string]any{"email": "", "first_name": ""},
 				"property_of_any": []any{"z"},
 			},
 			Context:      context(),
@@ -119,9 +121,11 @@ func TestSDKSendsInputsAsPassed(t *testing.T) {
 	require.Len(t, wire, 2)
 	assertMessage(t, `{"type": "track", "channel": "server", "event": "User Signed Up", "userId": "user-123",
 		"properties": {
+			"active": false,
 			"array_of_any": ["x", ["y"]],
 			"mixed_unicode": "a",
 			"object_property": {"nested": {"k": "v"}},
+			"profile": {"email": "", "first_name": ""},
 			"property_of_any": ["z"]
 		},
 		"context": {"ip": "127.0.0.1", "custom": {"k": "v"}, "traits": {"plan": ["pro"]}, "ruddertyper": `+refMeta+`},
