@@ -30,7 +30,117 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 			}},
 		}
 		row = &plan.CustomType{Name: "Row", Type: plan.PrimitiveTypeArray, ItemType: plan.PrimitiveTypeString}
+
+		// The spec's variant custom type: two match values in one case, and a
+		// default schema.
+		someVariantType = &plan.CustomType{
+			Name: "SomeVariantType",
+			Type: object,
+			Schema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+				"someString":  required(property("someString", "some string property", plan.PrimitiveTypeString)),
+				"someInteger": optional(property("someInteger", "some integer property", plan.PrimitiveTypeInteger)),
+			}},
+			Variants: []plan.Variant{{
+				Type:          "discriminator",
+				Discriminator: "someString",
+				Cases: []plan.VariantCase{
+					{DisplayName: "Case 1", Match: []any{"case_1"}, Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+						"someInteger": required(property("someInteger", "some integer property", plan.PrimitiveTypeInteger)),
+					}}},
+					{DisplayName: "Case 2", Match: []any{"case_2_a", "case_2_b"}, Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+						"someNumber": required(property("someNumber", "", plan.PrimitiveTypeNumber)),
+					}}},
+				},
+				DefaultSchema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+					"someBoolean": optional(property("someBoolean", "some boolean property", plan.PrimitiveTypeBoolean)),
+				}},
+			}},
+		}
+		// A nullable enum discriminator: no case can match null, so Default
+		// stays although the cases match every other value.
+		release = &plan.CustomType{
+			Name: "release",
+			Type: object,
+			Schema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+				"stage": required(enum(property("stage", "", plan.PrimitiveTypeString, plan.PrimitiveTypeNull), "draft", "live", nil)),
+			}},
+			Variants: []plan.Variant{{
+				Type:          "discriminator",
+				Discriminator: "stage",
+				Cases: []plan.VariantCase{
+					{Match: []any{"draft"}},
+					{Match: []any{"live"}, Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+						"url": required(property("url", "", plan.PrimitiveTypeString)),
+					}}},
+				},
+			}},
+		}
+		// An optional discriminator on an open base, which adds an open Absent.
+		shipping = &plan.CustomType{
+			Name: "shipping",
+			Type: object,
+			Schema: &plan.ObjectSchema{AdditionalProperties: true, Properties: map[string]plan.PropertySchema{
+				"address": required(property("address", "", object)),
+				"method":  optional(property("method", "", plan.PrimitiveTypeString)),
+			}},
+			Variants: []plan.Variant{{
+				Type:          "discriminator",
+				Discriminator: "method",
+				Cases: []plan.VariantCase{
+					{DisplayName: "Express", Match: []any{"express"}, Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+						"deadline": required(property("deadline", "", plan.PrimitiveTypeString)),
+					}}},
+				},
+				DefaultSchema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+					"carrier": required(property("carrier", "", plan.PrimitiveTypeString)),
+				}},
+			}},
+		}
+		// The spec's variant rule.
+		deviceEvent = track("Device Event", "", false, map[string]plan.PropertySchema{
+			"deviceType": required(property("deviceType", "", plan.PrimitiveTypeString)),
+		})
+		// An open base with an open case and an open default schema. Both
+		// match values name the case OnLine, so the second takes a suffix, and
+		// a property named discriminator takes one from the method. Every
+		// branch shares the struct the base hoists for meta, while each case
+		// struct hoists its own for geo.
+		openVariantEvent = track("Some Open Variant Event", "", true, map[string]plan.PropertySchema{
+			"kind":          required(property("kind", "", plan.PrimitiveTypeString)),
+			"discriminator": optional(property("discriminator", "", plan.PrimitiveTypeString)),
+			"meta": nested(optional(property("meta", "", object)), false, map[string]plan.PropertySchema{
+				"source": required(property("source", "", plan.PrimitiveTypeString)),
+			}),
+		})
 	)
+	deviceEvent.Variants = []plan.Variant{{
+		Type:          "discriminator",
+		Discriminator: "deviceType",
+		Cases: []plan.VariantCase{
+			{DisplayName: "Mobile", Match: []any{"mobile"}, Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+				"osVersion":  required(property("osVersion", "", plan.PrimitiveTypeString)),
+				"appVersion": required(property("appVersion", "", plan.PrimitiveTypeString)),
+			}}},
+			{DisplayName: "Desktop", Match: []any{"desktop"}, Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+				"browser": required(property("browser", "", plan.PrimitiveTypeString)),
+			}}},
+		},
+	}}
+	openVariantEvent.Variants = []plan.Variant{{
+		Type:          "discriminator",
+		Discriminator: "kind",
+		Cases: []plan.VariantCase{
+			{DisplayName: "Online", Description: "Sold online.", Match: []any{"on-line", "on_line"}, Schema: plan.ObjectSchema{AdditionalProperties: true, Properties: map[string]plan.PropertySchema{
+				"url": required(property("url", "", plan.PrimitiveTypeString)),
+				"geo": nested(optional(property("geo", "", object)), false, map[string]plan.PropertySchema{
+					"lat": required(property("lat", "", plan.PrimitiveTypeNumber)),
+				}),
+			}}},
+		},
+		DefaultSchema: &plan.ObjectSchema{AdditionalProperties: true, Properties: map[string]plan.PropertySchema{
+			"note": optional(property("note", "", plan.PrimitiveTypeString)),
+		}},
+	}}
 
 	return &plan.TrackingPlan{
 		Name: "Examples Plan",
@@ -141,6 +251,15 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"fooBar": nested(optional(property("fooBar", "", object)), true, map[string]plan.PropertySchema{
 					"baz": nested(optional(property("baz", "", object)), false, nil),
 				}),
+			}),
+			deviceEvent,
+			openVariantEvent,
+			// Fields that hold variants: shipping is required, and releases
+			// an array of variant items.
+			track("Some Variant Event", "", false, map[string]plan.PropertySchema{
+				"someVariantType": optional(property("someVariantType", "", someVariantType)),
+				"shipping":        required(property("shipping", "", shipping)),
+				"releases":        optional(items(property("releases", "", plan.PrimitiveTypeArray), release)),
 			}),
 		},
 	}
