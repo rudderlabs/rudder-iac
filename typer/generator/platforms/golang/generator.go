@@ -227,12 +227,12 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, []*customType, error) {
 		}
 
 		event := r.rule.Event
-		if event.EventType != plan.EventTypeTrack {
-			core.Warn(fmt.Sprintf("skipping the %s rule (section %q): Go generation does not support %s events yet", event.EventType, r.rule.Section, event.EventType))
+		if !validSection(r.rule) {
+			core.Warn(sectionWarning(r.rule))
 			continue
 		}
-		if r.rule.Section != plan.IdentitySectionProperties {
-			core.Warn(fmt.Sprintf("skipping track event %q: section %q is not valid for track events", event.Name, r.rule.Section))
+		if event.EventType != plan.EventTypeTrack {
+			core.Warn(fmt.Sprintf("skipping the %s rule (section %q): Go generation does not support %s events yet", event.EventType, r.rule.Section, event.EventType))
 			continue
 		}
 
