@@ -179,8 +179,8 @@ func TestEnumConstantNames(t *testing.T) {
 // name, and every {Type}Values before any constant, so a colliding constant
 // takes the suffix.
 func TestEnumNameCollisions(t *testing.T) {
-	stringEnum := func(name, property string, values ...GoEnumValue) GoPropertyType {
-		return GoPropertyType{Enum: &GoEnum{
+	stringEnum := func(name, property string, values ...GoEnumValue) GoDecl {
+		return GoDecl{Enum: &GoEnum{
 			Name:       name,
 			Doc:        name + " represents the property " + strconv.Quote(property) + ".",
 			Base:       "string",
@@ -189,18 +189,18 @@ func TestEnumNameCollisions(t *testing.T) {
 			Values:     values,
 		}}
 	}
-	status := func(values ...GoEnumValue) GoPropertyType {
+	status := func(values ...GoEnumValue) GoDecl {
 		return stringEnum("PropertyStatus", "status", values...)
 	}
 	tests := []struct {
 		name       string
 		properties []plan.Property
-		want       []GoPropertyType
+		want       []GoDecl
 	}{
 		{
 			name:       "values with the same name",
 			properties: []plan.Property{enumProperty("status", onlyString, "Active", "active")},
-			want: []GoPropertyType{status(
+			want: []GoDecl{status(
 				GoEnumValue{Name: "PropertyStatusActive", Text: `"Active"`, Expr: `"Active"`},
 				GoEnumValue{Name: "PropertyStatusActive1", Text: `"active"`, Expr: `"active"`},
 			)},
@@ -208,7 +208,7 @@ func TestEnumNameCollisions(t *testing.T) {
 		{
 			name:       "a value named values",
 			properties: []plan.Property{enumProperty("status", onlyString, "values")},
-			want: []GoPropertyType{status(
+			want: []GoDecl{status(
 				GoEnumValue{Name: "PropertyStatusValues1", Text: `"values"`, Expr: `"values"`},
 			)},
 		},
@@ -218,7 +218,7 @@ func TestEnumNameCollisions(t *testing.T) {
 				enumProperty("status", onlyString, "active"),
 				{Name: "statusActive", Types: onlyString},
 			},
-			want: []GoPropertyType{
+			want: []GoDecl{
 				status(GoEnumValue{Name: "PropertyStatusActive1", Text: `"active"`, Expr: `"active"`}),
 				{Alias: &GoTypeAlias{
 					Name: "PropertyStatusActive",
@@ -233,7 +233,7 @@ func TestEnumNameCollisions(t *testing.T) {
 				enumProperty("a", onlyString, "bValues"),
 				enumProperty("aB", onlyString, "x"),
 			},
-			want: []GoPropertyType{
+			want: []GoDecl{
 				stringEnum("PropertyA", "a", GoEnumValue{Name: "PropertyABValues1", Text: `"bValues"`, Expr: `"bValues"`}),
 				stringEnum("PropertyAB", "aB", GoEnumValue{Name: "PropertyABX", Text: `"x"`, Expr: `"x"`}),
 			},

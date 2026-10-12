@@ -2,8 +2,10 @@ package generator
 
 import (
 	"encoding/json"
+	"runtime/debug"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/typer/plan"
@@ -61,5 +63,63 @@ func TestJSONNumbersRenderAsFloat64(t *testing.T) {
 
 			assert.Equal(t, want, got)
 		})
+	}
+}
+
+// Extracting a recursive custom type's references used to recurse forever on
+// every platform. Each generator only has to return here; Go's own tests pin
+// the error it returns.
+func TestRecursiveCustomTypesTerminate(t *testing.T) {
+	// Should the recursion come back, crash fast instead of growing the stack
+	// to 1 GB.
+	maxStack := debug.SetMaxStack(64 << 20)
+	t.Cleanup(func() { debug.SetMaxStack(maxStack) })
+
+	object := func(name string) *plan.CustomType {
+		return &plan.CustomType{Name: name, Type: plan.PrimitiveTypeObject, Schema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}}}
+	}
+	refer := func(from, to *plan.CustomType) {
+		from.Schema.Properties[to.Name] = plan.PropertySchema{Property: plan.Property{Name: to.Name, Types: []plan.PropertyType{to}}}
+	}
+	trackingPlan := func(ct *plan.CustomType) *plan.TrackingPlan {
+		return &plan.TrackingPlan{Name: "Recursive", Rules: []plan.EventRule{{
+			Event:   plan.Event{EventType: plan.EventTypeTrack, Name: "Recursive"},
+			Section: plan.IdentitySectionProperties,
+			Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+				"value": {Property: plan.Property{Name: "value", Types: []plan.PropertyType{ct}}},
+			}},
+		}}}
+	}
+	cycles := map[string]func() *plan.TrackingPlan{
+		"direct": func() *plan.TrackingPlan {
+			a := object("a")
+			refer(a, a)
+			return trackingPlan(a)
+		},
+		"indirect": func() *plan.TrackingPlan {
+			a, b := object("a"), object("b")
+			refer(a, b)
+			refer(b, a)
+			return trackingPlan(a)
+		},
+	}
+
+	for name, g := range platforms {
+		for cycle, cyclicPlan := range cycles {
+			t.Run(name+"/"+cycle, func(t *testing.T) {
+				// The stack limit cannot catch a loop that never grows the stack.
+				done := make(chan struct{})
+				go func() {
+					_, _ = g.Generate(cyclicPlan(), core.GenerateOptions{}, nil)
+					close(done)
+				}()
+
+				select {
+				case <-done:
+				case <-time.After(5 * time.Second):
+					require.FailNow(t, "generation did not return")
+				}
+			})
+		}
 	}
 }

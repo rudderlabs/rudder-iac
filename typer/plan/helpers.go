@@ -89,36 +89,22 @@ func (tp *TrackingPlan) ExtractAllProperties() map[string]*Property {
 	return properties
 }
 
-// extractCustomTypesFromSchema recursively extracts custom types from an ObjectSchema
-// The customTypes map is modified in place to accumulate results
+// extractCustomTypesFromSchema extracts the custom types an ObjectSchema and
+// its nested property schemas reference. It does not descend into the custom
+// types, so a recursive one terminates: ExtractAllCustomTypes visits each of
+// them once. The customTypes map is modified in place to accumulate results
 func extractCustomTypesFromSchema(schema *ObjectSchema, customTypes map[string]*CustomType) {
 	for _, propSchema := range schema.Properties {
 		for _, t := range propSchema.Property.Types {
-			if IsCustomType(t) {
-				customType := AsCustomType(t)
-				if customType != nil {
-					customTypes[customType.Name] = customType
-
-					// Recursively process referenced by object custom types
-					if customType.Schema != nil {
-						extractCustomTypesFromSchema(customType.Schema, customTypes)
-					}
-				}
+			if customType := AsCustomType(t); customType != nil {
+				customTypes[customType.Name] = customType
 			}
 		}
 
 		// Also extract custom types from array item types
 		for _, itemType := range propSchema.Property.ItemTypes {
-			if IsCustomType(itemType) {
-				customType := AsCustomType(itemType)
-				if customType != nil {
-					customTypes[customType.Name] = customType
-
-					// Recursively process referenced custom types
-					if customType.Schema != nil {
-						extractCustomTypesFromSchema(customType.Schema, customTypes)
-					}
-				}
+			if customType := AsCustomType(itemType); customType != nil {
+				customTypes[customType.Name] = customType
 			}
 		}
 

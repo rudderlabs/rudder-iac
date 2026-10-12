@@ -1,0 +1,19 @@
+{{- range . }}
+{{- with .Alias }}
+
+{{ comment .Doc }}
+type {{ .Name }} = {{ .Type }}
+{{- end }}
+{{- with .Union }}
+
+{{ template "union.tmpl" . }}
+{{- end }}
+{{- with .Enum }}
+
+{{ template "enum.tmpl" . }}
+{{- end }}
+{{- with .Struct }}
+
+{{ template "struct.tmpl" . }}
+{{- end }}
+{{- end }}
