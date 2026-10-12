@@ -371,6 +371,7 @@ func TestVariantsDiscriminator(t *testing.T) {
 	assert.Equal(t, examples.NewNullable(examples.PropertyStageValueDraft), examples.CustomTypeReleaseCaseDraft{}.Discriminator())
 	assert.Equal(t, examples.NewNullable(examples.PropertyStageValueLive), examples.CustomTypeReleaseCaseLive{}.Discriminator())
 	assert.Equal(t, examples.PropertyCode1(), examples.CustomTypeCodedCase1{}.Discriminator())
+	assert.Equal(t, examples.PropertyCodeA(), examples.CustomTypeCodedCaseA{}.Discriminator())
 	assert.Equal(t, methodOK("express", true), methodOK(examples.CustomTypeShippingCaseExpress{}.Discriminator()))
 	assert.Equal(t, methodOK("", false), methodOK(examples.CustomTypeShippingAbsent{}.Discriminator()))
 }
