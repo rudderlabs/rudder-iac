@@ -228,6 +228,39 @@ func TestGenerateReservesSkippedDeclaredKeys(t *testing.T) {
 	assert.Equal(t, []string{`skipping property "kind" (custom:kind) of track event "Some Event": Go generation does not support variants yet`}, *warnings)
 }
 
+// The skip check applies at every level, and the warning names where the
+// field lives. An array custom type needs what its items need.
+func TestGenerateSkipsUnsupportedFieldsAtEveryLevel(t *testing.T) {
+	warnings := captureWarnings(t)
+	var (
+		kind   = plan.PropertySchema{Property: plan.Property{Name: "kind", Types: []plan.PropertyType{variantType}}}
+		object = func(name string, properties map[string]plan.PropertySchema) plan.PropertySchema {
+			return plan.PropertySchema{
+				Property: plan.Property{Name: name, Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+				Schema:   &plan.ObjectSchema{Properties: properties},
+			}
+		}
+		profile = plan.CustomType{Name: "profile", Type: plan.PrimitiveTypeObject, Schema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"kind": kind}}}
+		kinds   = plan.CustomType{Name: "kinds", Type: plan.PrimitiveTypeArray, ItemType: variantType}
+	)
+	p := golang.TrackPlan(
+		plan.Property{Name: "profile", Types: []plan.PropertyType{profile}},
+		plan.Property{Name: "kinds", Types: []plan.PropertyType{kinds}},
+	)
+	p.Rules[0].Schema.Properties["context"] = object("context", map[string]plan.PropertySchema{
+		"inner": object("inner", map[string]plan.PropertySchema{"kind": kind}),
+	})
+
+	_, err := (&golang.Generator{}).Generate(p, core.GenerateOptions{}, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{
+		`skipping property "context.inner.kind" (custom:kind) of track event "Some Event": Go generation does not support variants yet`,
+		`skipping property "kinds" (custom:kinds) of track event "Some Event": Go generation does not support variants yet`,
+		`skipping property "kind" (custom:kind) of custom type "profile": Go generation does not support variants yet`,
+	}, *warnings)
+}
+
 func captureWarnings(t *testing.T) *[]string {
 	t.Helper()
 	var warnings []string
