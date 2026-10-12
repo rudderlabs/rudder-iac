@@ -325,10 +325,16 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 		st.Doc = withDescription(doc, c.vc.Description)
 		st.DiscriminatorDoc = "Discriminator returns " + c.text + "."
 		ctx.afterValueNames = append(ctx.afterValueNames, func(decls map[string]GoDecl) {
-			value, nullable := spell(decls, typ, c.value, c.text)
-			if nullable != "" {
+			value, inner := spell(decls, typ, c.value, c.text)
+			switch {
+			case inner != "":
 				// T must be spelled out: NewNullable(1) would be a Nullable[int].
-				value = "NewNullable[" + nullable + "](" + value + ")"
+				value = "NewNullable[" + inner + "](" + value + ")"
+			case v.domain.enum != nil:
+				// The doc names the constant or value function, as Default's
+				// note does; a Nullable's keeps the literal, which reads better
+				// than the call.
+				st.DiscriminatorDoc = "Discriminator returns " + value + "."
 			}
 			st.Returns, st.Sends = value+ok, "v.Discriminator()"
 			if v.optional {
@@ -419,8 +425,8 @@ func finishVariants(ctx *GoContext) {
 // spell writes a match value, whose Go literal is text, as a value of typ: the
 // literal for a primitive, the constant or value function of an enum, or the
 // member constructor of a union. For a Nullable[T] it spells the value for T
-// and returns T as nullable.
-func spell(decls map[string]GoDecl, typ string, value any, text string) (spelled, nullable string) {
+// and returns T as inner.
+func spell(decls map[string]GoDecl, typ string, value any, text string) (spelled, inner string) {
 	if t, ok := strings.CutPrefix(typ, "Nullable["); ok {
 		t = strings.TrimSuffix(t, "]")
 		spelled, _ = spell(decls, t, value, text)

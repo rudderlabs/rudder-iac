@@ -1323,7 +1323,7 @@ type TrackEventWithVariantsPropertiesCaseMobile struct {
 
 func (TrackEventWithVariantsPropertiesCaseMobile) isTrackEventWithVariantsProperties() {}
 
-// Discriminator returns "mobile".
+// Discriminator returns PropertyDeviceTypeMobile.
 func (v TrackEventWithVariantsPropertiesCaseMobile) Discriminator() PropertyDeviceType {
 	return PropertyDeviceTypeMobile
 }
@@ -1364,7 +1364,7 @@ type TrackEventWithVariantsPropertiesCaseDesktop struct {
 
 func (TrackEventWithVariantsPropertiesCaseDesktop) isTrackEventWithVariantsProperties() {}
 
-// Discriminator returns "desktop".
+// Discriminator returns PropertyDeviceTypeDesktop.
 func (v TrackEventWithVariantsPropertiesCaseDesktop) Discriminator() PropertyDeviceType {
 	return PropertyDeviceTypeDesktop
 }
