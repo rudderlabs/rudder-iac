@@ -2,7 +2,7 @@
 
 This document lists breaking changes to destination `config` between releases of `rudder-cli`: changes that require users to edit a destination spec when they upgrade. Breaking changes elsewhere in the CLI are in the root [BREAKING_CHANGES.md](../../../../../BREAKING_CHANGES.md).
 
-A destination type's history starts at the first release that made it available without an experimental flag, which can be earlier than the release the public Destination Types page lists. Changes from before that release aren't listed.
+A destination type's history starts at the first release that made it available without an experimental flag.
 
 ---
 
@@ -24,9 +24,9 @@ A destination type's history starts at the first release that made it available 
 
 **Types:** `customerio`
 
-**Why:** Rudder CLI now manages `sdk_version`, `write_key` and `anonymous_in_app`, which the dashboard writes for Customer.io's v2 web client. Earlier releases dropped these keys when reading a destination, so a spec imported by one of them lacks the keys but showed no diff. Now that same spec plans an update that removes them, and a destination on the v2 web client falls back to v1.
+**Why:** Rudder CLI now manages `sdk_version.web`, `write_key.web` and `anonymous_in_app.web`, which the dashboard writes for Customer.io's v2 web client. Earlier releases dropped these keys when reading a destination, so a spec imported by one of them lacks the keys but showed no diff. Now that same spec plans an update that removes them, and a destination on the v2 web client falls back to v1.
 
-**Migration:** Add the destination's `sdk_version`, `write_key` and `anonymous_in_app` values from the dashboard to its spec before your next `apply`. `apply --dry-run` shows the keys an update would remove.
+**Migration:** Add the destination's `sdk_version.web`, `write_key.web` and `anonymous_in_app.web` values from the dashboard to its spec before your next `apply`. `apply --dry-run` shows the keys an update would remove.
 
 ---
 
