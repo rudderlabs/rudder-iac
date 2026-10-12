@@ -34,14 +34,19 @@ func (m *mockTrackingPlanStore) GetTrackingPlanWithSchemas(ctx context.Context, 
 	return m.trackingPlanWithSchemas, nil
 }
 
-// helper function to parse JSON rules into map[string]interface{}
+// helper function to parse JSON rules into map[string]interface{}, with
+// numbers as json.Number, as the catalog client decodes them
 func parseRulesJSON(rulesJSON string) map[string]any {
 	if rulesJSON == "" {
 		return nil
 	}
 
-	var rules map[string]interface{}
-	if err := json.Unmarshal([]byte(rulesJSON), &rules); err != nil {
+	var (
+		rules map[string]interface{}
+		dec   = json.NewDecoder(strings.NewReader(rulesJSON))
+	)
+	dec.UseNumber()
+	if err := dec.Decode(&rules); err != nil {
 		panic("failed to parse rules JSON: " + err.Error())
 	}
 	return rules
@@ -556,6 +561,30 @@ func TestJSONSchemaPlanProvider_ErrorCases(t *testing.T) {
 			name:             "missing identity section in properties",
 			mockResponse:     mockInvalidRespone("track", "properties", `{}`),
 			expectedErrorMsg: "identity section 'properties' not found in properties",
+		},
+		{
+			name: "enum number beyond float64",
+			mockResponse: mockInvalidRespone("track", "properties", `{
+				"properties": {
+					"type": "object",
+					"properties": {"big": {"type": "number", "enum": [1, 1e400]}}
+				}
+			}`),
+			expectedErrorMsg: "parsing property 'big': enum value 1e400 does not fit in float64",
+		},
+		{
+			name: "match number beyond float64",
+			mockResponse: mockInvalidRespone("track", "properties", `{
+				"properties": {
+					"type": "object",
+					"properties": {"code": {"type": "number"}},
+					"allOf": [{"allOf": [{
+						"if": {"properties": {"code": {"enum": [-1e400]}}},
+						"then": {"properties": {}}
+					}]}]
+				}
+			}`),
+			expectedErrorMsg: "parsing variants: match value -1e400 of 'code' does not fit in float64",
 		},
 	}
 

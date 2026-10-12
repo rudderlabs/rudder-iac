@@ -7,8 +7,9 @@ import (
 )
 
 // Float64Numbers returns a copy of enum or match values with each json.Number
-// replaced by the float64 that decoding without UseNumber gives, which is what
-// the Kotlin, Swift and TypeScript generators format.
+// replaced by its nearest float64, for generators that write numbers as
+// float64. A number beyond the float64 range would become ±Inf; the remote
+// plan provider rejects one.
 func Float64Numbers(values []any) []any {
 	values = slices.Clone(values)
 	for i, v := range values {
