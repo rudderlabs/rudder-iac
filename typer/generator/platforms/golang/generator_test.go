@@ -179,8 +179,6 @@ func TestGenerateQuickStart(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			captureWarnings(t)
-
 			files, err := (&golang.Generator{}).Generate(&plan.TrackingPlan{Rules: tt.rules}, core.GenerateOptions{}, nil)
 			require.NoError(t, err)
 			require.Len(t, files, 1)
