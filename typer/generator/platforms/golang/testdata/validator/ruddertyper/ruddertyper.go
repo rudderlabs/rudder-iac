@@ -156,10 +156,156 @@ type PropertyArrayOfAny = []any
 // Array with items that can be string or null
 type PropertyArrayWithNullItems = []Nullable[string]
 
+// PropertyDeviceType represents the property "device_type".
+//
+// Type of device
+type PropertyDeviceType string
+
+// Allowed values of PropertyDeviceType.
+const (
+	PropertyDeviceTypeMobile    PropertyDeviceType = "mobile"
+	PropertyDeviceTypeTablet    PropertyDeviceType = "tablet"
+	PropertyDeviceTypeDesktop   PropertyDeviceType = "desktop"
+	PropertyDeviceTypeSmartTV   PropertyDeviceType = "smartTV"
+	PropertyDeviceTypeIoTDevice PropertyDeviceType = "IoT-Device"
+)
+
+// PropertyDeviceTypeValues returns every allowed value, in tracking plan order.
+func PropertyDeviceTypeValues() []PropertyDeviceType {
+	return []PropertyDeviceType{
+		PropertyDeviceTypeMobile,
+		PropertyDeviceTypeTablet,
+		PropertyDeviceTypeDesktop,
+		PropertyDeviceTypeSmartTV,
+		PropertyDeviceTypeIoTDevice,
+	}
+}
+
+// IsValid reports whether v is an allowed value.
+func (v PropertyDeviceType) IsValid() bool {
+	switch v {
+	case PropertyDeviceTypeMobile,
+		PropertyDeviceTypeTablet,
+		PropertyDeviceTypeDesktop,
+		PropertyDeviceTypeSmartTV,
+		PropertyDeviceTypeIoTDevice:
+		return true
+	}
+	return false
+}
+
+// PropertyDollarField represents the property "dollar_field".
+//
+// Field with $ for testing string interpolation: $variable and ${expression}
+type PropertyDollarField string
+
+// Allowed values of PropertyDollarField.
+const (
+	PropertyDollarFieldUSD          PropertyDollarField = "$USD"
+	PropertyDollarField100          PropertyDollarField = "$100"
+	PropertyDollarFieldPrice9999    PropertyDollarField = "Price: $99.99"
+	PropertyDollarFieldVariableName PropertyDollarField = "$variable_name"
+)
+
+// PropertyDollarFieldValues returns every allowed value, in tracking plan order.
+func PropertyDollarFieldValues() []PropertyDollarField {
+	return []PropertyDollarField{
+		PropertyDollarFieldUSD,
+		PropertyDollarField100,
+		PropertyDollarFieldPrice9999,
+		PropertyDollarFieldVariableName,
+	}
+}
+
+// IsValid reports whether v is an allowed value.
+func (v PropertyDollarField) IsValid() bool {
+	switch v {
+	case PropertyDollarFieldUSD,
+		PropertyDollarField100,
+		PropertyDollarFieldPrice9999,
+		PropertyDollarFieldVariableName:
+		return true
+	}
+	return false
+}
+
+// PropertyEnabled represents the property "enabled".
+//
+// Feature enabled flag
+type PropertyEnabled bool
+
+// Allowed values of PropertyEnabled.
+const (
+	PropertyEnabledTrue  PropertyEnabled = true
+	PropertyEnabledFalse PropertyEnabled = false
+)
+
+// PropertyEnabledValues returns every allowed value, in tracking plan order.
+func PropertyEnabledValues() []PropertyEnabled {
+	return []PropertyEnabled{
+		PropertyEnabledTrue,
+		PropertyEnabledFalse,
+	}
+}
+
+// IsValid reports whether v is an allowed value.
+func (v PropertyEnabled) IsValid() bool {
+	switch v {
+	case PropertyEnabledTrue,
+		PropertyEnabledFalse:
+		return true
+	}
+	return false
+}
+
 // PropertyMixedUnicode represents the property "mixed_unicode".
 //
 // Property with mixed unicode: café, naïve, 日本語
 type PropertyMixedUnicode = string
+
+// PropertyMixedValue represents the property "mixed_value", whose allowed values have different JSON types.
+// Values can only be obtained from the functions below; the zero value cannot be sent.
+//
+// Mixed type enum
+type PropertyMixedValue struct{ value any }
+
+// PropertyMixedValueActive returns the allowed value "active".
+func PropertyMixedValueActive() PropertyMixedValue { return PropertyMixedValue{value: "active"} }
+
+// PropertyMixedValue1 returns the allowed value 1.
+func PropertyMixedValue1() PropertyMixedValue { return PropertyMixedValue{value: int64(1)} }
+
+// PropertyMixedValueTrue returns the allowed value true.
+func PropertyMixedValueTrue() PropertyMixedValue { return PropertyMixedValue{value: true} }
+
+// PropertyMixedValue2_5 returns the allowed value 2.5.
+func PropertyMixedValue2_5() PropertyMixedValue { return PropertyMixedValue{value: 2.5} }
+
+// PropertyMixedValueValues returns every allowed value, in tracking plan order.
+func PropertyMixedValueValues() []PropertyMixedValue {
+	return []PropertyMixedValue{
+		PropertyMixedValueActive(),
+		PropertyMixedValue1(),
+		PropertyMixedValueTrue(),
+		PropertyMixedValue2_5(),
+	}
+}
+
+// Value returns the underlying JSON value.
+func (v PropertyMixedValue) Value() any { return v.value }
+
+// IsValid reports whether v is an allowed value. Only the zero value is not.
+func (v PropertyMixedValue) IsValid() bool { return v.value != nil }
+
+func (v PropertyMixedValue) wireValue() (any, error) {
+	if v.value == nil {
+		return nil, fmt.Errorf("%w: PropertyMixedValue is not set", ErrInvalidValue)
+	}
+	return v.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value.
+func (v PropertyMixedValue) MarshalJSON() ([]byte, error) { return marshal(v) }
 
 // PropertyMultiTypeArrayItem is one item of PropertyMultiTypeArray: a string or integer.
 // Build it with one of the NewPropertyMultiTypeArrayItem* functions.
@@ -274,15 +420,117 @@ type PropertyNumberOrNull = Nullable[float64]
 // An object field with no defined structure
 type PropertyObjectProperty = map[string]any
 
+// PropertyPriority represents the property "priority".
+//
+// Priority level
+type PropertyPriority int64
+
+// Allowed values of PropertyPriority.
+const (
+	PropertyPriority1 PropertyPriority = 1
+	PropertyPriority2 PropertyPriority = 2
+	PropertyPriority3 PropertyPriority = 3
+)
+
+// PropertyPriorityValues returns every allowed value, in tracking plan order.
+func PropertyPriorityValues() []PropertyPriority {
+	return []PropertyPriority{
+		PropertyPriority1,
+		PropertyPriority2,
+		PropertyPriority3,
+	}
+}
+
+// IsValid reports whether v is an allowed value.
+func (v PropertyPriority) IsValid() bool {
+	switch v {
+	case PropertyPriority1,
+		PropertyPriority2,
+		PropertyPriority3:
+		return true
+	}
+	return false
+}
+
 // PropertyPropertyOfAny represents the property "property_of_any".
 //
 // A field that can contain any type of value
 type PropertyPropertyOfAny = any
 
+// PropertyRating represents the property "rating".
+//
+// Rating value
+type PropertyRating float64
+
+// Allowed values of PropertyRating.
+const (
+	PropertyRating1_5 PropertyRating = 1.5
+	PropertyRating2_5 PropertyRating = 2.5
+	PropertyRating3_5 PropertyRating = 3.5
+	PropertyRating4_5 PropertyRating = 4.5
+	PropertyRating5   PropertyRating = 5
+)
+
+// PropertyRatingValues returns every allowed value, in tracking plan order.
+func PropertyRatingValues() []PropertyRating {
+	return []PropertyRating{
+		PropertyRating1_5,
+		PropertyRating2_5,
+		PropertyRating3_5,
+		PropertyRating4_5,
+		PropertyRating5,
+	}
+}
+
+// IsValid reports whether v is an allowed value.
+func (v PropertyRating) IsValid() bool {
+	switch v {
+	case PropertyRating1_5,
+		PropertyRating2_5,
+		PropertyRating3_5,
+		PropertyRating4_5,
+		PropertyRating5:
+		return true
+	}
+	return false
+}
+
 // PropertySpecialField represents the property "special_field".
 //
 // Field with special chars: "quotes", backslash\path, and /* comment */
 type PropertySpecialField = string
+
+// PropertyStatusCode represents the property "status_code".
+//
+// HTTP status with special characters
+type PropertyStatusCode string
+
+// Allowed values of PropertyStatusCode.
+const (
+	PropertyStatusCode200Ok                  PropertyStatusCode = "200: OK"
+	PropertyStatusCode404NotFound            PropertyStatusCode = "404: Not Found"
+	PropertyStatusCode500InternalServerError PropertyStatusCode = "500: Internal \"Server\" Error"
+)
+
+// PropertyStatusCodeValues returns every allowed value, in tracking plan order.
+func PropertyStatusCodeValues() []PropertyStatusCode {
+	return []PropertyStatusCode{
+		PropertyStatusCode200Ok,
+		PropertyStatusCode404NotFound,
+		PropertyStatusCode500InternalServerError,
+	}
+}
+
+// IsValid reports whether v is an allowed value.
+func (v PropertyStatusCode) IsValid() bool {
+	switch v {
+	case PropertyStatusCode200Ok,
+		PropertyStatusCode404NotFound,
+		PropertyStatusCode500InternalServerError:
+		return true
+	}
+	return false
+}
 
 // PropertyStringOrNull represents the property "string_or_null".
 //
@@ -293,6 +541,50 @@ type PropertyStringOrNull = Nullable[string]
 //
 // User tags as array of strings
 type PropertyTags = []string
+
+// PropertyUnicodeEnumField represents the property "unicode_enum_field".
+//
+// Field demonstrating various Unicode characters in enum values
+type PropertyUnicodeEnumField string
+
+// Allowed values of PropertyUnicodeEnumField.
+const (
+	PropertyUnicodeEnumFieldU1F3AF    PropertyUnicodeEnumField = "🎯"
+	PropertyUnicodeEnumFieldU2705     PropertyUnicodeEnumField = "✅"
+	PropertyUnicodeEnumFieldАктивный  PropertyUnicodeEnumField = "активный"
+	PropertyUnicodeEnumField已完成       PropertyUnicodeEnumField = "已完成"
+	PropertyUnicodeEnumFieldΕνεργός   PropertyUnicodeEnumField = "ενεργός"
+	PropertyUnicodeEnumFieldCafé      PropertyUnicodeEnumField = "café"
+	PropertyUnicodeEnumFieldU21U21U21 PropertyUnicodeEnumField = "!!!"
+)
+
+// PropertyUnicodeEnumFieldValues returns every allowed value, in tracking plan order.
+func PropertyUnicodeEnumFieldValues() []PropertyUnicodeEnumField {
+	return []PropertyUnicodeEnumField{
+		PropertyUnicodeEnumFieldU1F3AF,
+		PropertyUnicodeEnumFieldU2705,
+		PropertyUnicodeEnumFieldАктивный,
+		PropertyUnicodeEnumField已完成,
+		PropertyUnicodeEnumFieldΕνεργός,
+		PropertyUnicodeEnumFieldCafé,
+		PropertyUnicodeEnumFieldU21U21U21,
+	}
+}
+
+// IsValid reports whether v is an allowed value.
+func (v PropertyUnicodeEnumField) IsValid() bool {
+	switch v {
+	case PropertyUnicodeEnumFieldU1F3AF,
+		PropertyUnicodeEnumFieldU2705,
+		PropertyUnicodeEnumFieldАктивный,
+		PropertyUnicodeEnumField已完成,
+		PropertyUnicodeEnumFieldΕνεργός,
+		PropertyUnicodeEnumFieldCafé,
+		PropertyUnicodeEnumFieldU21U21U21:
+		return true
+	}
+	return false
+}
 
 // PropertyUntypedArray represents the property "untyped_array".
 //
@@ -312,10 +604,14 @@ type Property用户名 = string
 // --- Event payloads ---
 
 // TrackVariableStringProperties holds the properties of "$Variable$String".
-type TrackVariableStringProperties struct{}
+type TrackVariableStringProperties struct {
+	DollarField PropertyDollarField // required
+}
 
 func (v TrackVariableStringProperties) toMap() map[string]any {
-	m := map[string]any{}
+	m := map[string]any{
+		"dollar_field": v.DollarField,
+	}
 	return m
 }
 
@@ -351,10 +647,14 @@ func (v TrackEventWithNameCamelCaseProperties) MarshalJSON() ([]byte, error) {
 type TrackEmptyEventWithAdditionalPropsProperties = map[string]any
 
 // TrackEventWithVariantsProperties holds the properties of "Event With Variants".
-type TrackEventWithVariantsProperties struct{}
+type TrackEventWithVariantsProperties struct {
+	DeviceType PropertyDeviceType // required
+}
 
 func (v TrackEventWithVariantsProperties) toMap() map[string]any {
-	m := map[string]any{}
+	m := map[string]any{
+		"device_type": v.DeviceType,
+	}
 	return m
 }
 
@@ -371,11 +671,15 @@ func (v TrackEventWithVariantsProperties) MarshalJSON() ([]byte, error) {
 // TrackProductPremiumClickedProperties holds the properties of "Product \"Premium\" Clicked".
 type TrackProductPremiumClickedProperties struct {
 	SpecialField PropertySpecialField // required
+	StatusCode   *PropertyStatusCode  // optional
 }
 
 func (v TrackProductPremiumClickedProperties) toMap() map[string]any {
 	m := map[string]any{
 		"special_field": v.SpecialField,
+	}
+	if v.StatusCode != nil {
+		m["status_code"] = *v.StatusCode
 	}
 	return m
 }
@@ -394,16 +698,22 @@ func (v TrackProductPremiumClickedProperties) MarshalJSON() ([]byte, error) {
 type TrackUserSignedUpProperties struct {
 	ArrayOfAny         PropertyArrayOfAny         // optional
 	ArrayWithNullItems PropertyArrayWithNullItems // optional
+	DeviceType         *PropertyDeviceType        // optional
+	Enabled            *PropertyEnabled           // optional
 	MixedUnicode       *PropertyMixedUnicode      // optional
+	MixedValue         *PropertyMixedValue        // optional
 	MultiTypeArray     PropertyMultiTypeArray     // optional
 	MultiTypeField     *PropertyMultiTypeField    // optional
 	MultiTypeWithNull  *PropertyMultiTypeWithNull // optional
 	NullField          *PropertyNullField         // optional
 	NumberOrNull       *PropertyNumberOrNull      // optional
 	ObjectProperty     PropertyObjectProperty     // optional
+	Priority           *PropertyPriority          // optional
 	PropertyOfAny      PropertyPropertyOfAny      // optional
+	Rating             *PropertyRating            // optional
 	StringOrNull       *PropertyStringOrNull      // optional
 	Tags               PropertyTags               // optional
+	UnicodeEnumField   *PropertyUnicodeEnumField  // optional
 	UntypedArray       PropertyUntypedArray       // optional
 	UntypedField       PropertyUntypedField       // optional
 	X用户名               *Property用户名               // optional
@@ -417,8 +727,17 @@ func (v TrackUserSignedUpProperties) toMap() map[string]any {
 	if v.ArrayWithNullItems != nil {
 		m["array_with_null_items"] = v.ArrayWithNullItems
 	}
+	if v.DeviceType != nil {
+		m["device_type"] = *v.DeviceType
+	}
+	if v.Enabled != nil {
+		m["enabled"] = *v.Enabled
+	}
 	if v.MixedUnicode != nil {
 		m["mixed_unicode"] = *v.MixedUnicode
+	}
+	if v.MixedValue != nil {
+		m["mixed_value"] = *v.MixedValue
 	}
 	if v.MultiTypeArray != nil {
 		m["multi_type_array"] = v.MultiTypeArray
@@ -438,14 +757,23 @@ func (v TrackUserSignedUpProperties) toMap() map[string]any {
 	if v.ObjectProperty != nil {
 		m["object_property"] = v.ObjectProperty
 	}
+	if v.Priority != nil {
+		m["priority"] = *v.Priority
+	}
 	if v.PropertyOfAny != nil {
 		m["property_of_any"] = v.PropertyOfAny
+	}
+	if v.Rating != nil {
+		m["rating"] = *v.Rating
 	}
 	if v.StringOrNull != nil {
 		m["string_or_null"] = *v.StringOrNull
 	}
 	if v.Tags != nil {
 		m["tags"] = v.Tags
+	}
+	if v.UnicodeEnumField != nil {
+		m["unicode_enum_field"] = *v.UnicodeEnumField
 	}
 	if v.UntypedArray != nil {
 		m["untyped_array"] = v.UntypedArray

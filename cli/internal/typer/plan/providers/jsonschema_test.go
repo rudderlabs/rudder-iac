@@ -13,6 +13,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
+	"github.com/rudderlabs/rudder-iac/typer/generator/core"
+	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang"
 	"github.com/rudderlabs/rudder-iac/typer/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -976,4 +978,8 @@ func TestRemoteEnumNumbersKeepTheirPrecision(t *testing.T) {
 		&plan.PropertyConfig{Enum: []any{json.Number("9007199254740992"), json.Number("9007199254740993")}},
 		trackingPlan.Rules[0].Schema.Properties["id"].Property.Config,
 	)
+
+	// Go would generate both as one float64 constant, so it fails instead.
+	_, err = (&golang.Generator{}).Generate(trackingPlan, core.GenerateOptions{}, nil)
+	assert.EqualError(t, err, `mapping property "id": enum values 9007199254740992 and 9007199254740993 are the same float64`)
 }

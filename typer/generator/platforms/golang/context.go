@@ -20,11 +20,12 @@ type GoContext struct {
 	Methods       []GoMethod
 }
 
-// GoPropertyType is one declaration of the property types section: an alias
-// or a union.
+// GoPropertyType is one declaration of the property types section: an alias,
+// a union or an enum.
 type GoPropertyType struct {
 	Alias *GoTypeAlias
 	Union *GoUnion
+	Enum  *GoEnum
 }
 
 // GoTypeAlias is a `type Name = Type` declaration.
@@ -55,6 +56,33 @@ type GoUnionMember struct {
 	// Type is the parameter type; empty for the null member, whose
 	// constructor takes no argument.
 	Type string
+}
+
+// GoEnum is a defined enum type: typed constants over Base or, when the values
+// have different JSON types, a struct that only its value functions build.
+type GoEnum struct {
+	Name string
+	Doc  string
+	// Base is the underlying type; empty for values of different JSON types.
+	Base string
+	// ConstDoc heads the constants.
+	ConstDoc string
+	// ValuesFunc is the candidate {Name}Values until addConstructors replaces
+	// it with the registered name.
+	ValuesFunc string
+	Values     []GoEnumValue
+}
+
+// GoEnumValue is the constant, or the value function, of one enum value.
+type GoEnumValue struct {
+	// Name is the candidate {Enum}{Value} until addConstructors replaces it
+	// with the registered name.
+	Name string
+	// Text is the value as Go source writes it: "a", 1, 2.5 or true.
+	Text string
+	// Expr is the value a mixed enum's function holds, typed where Text alone
+	// would default to int: int64(1).
+	Expr string
 }
 
 // GoPayload is an event payload type: a struct, or a map alias for an open

@@ -23,36 +23,27 @@ var referenceWarnings = []string{
 	`skipping the identify rule (section "traits"): Go generation does not support identify events yet`,
 	`skipping the page rule (section "properties"): Go generation does not support page events yet`,
 	`skipping the screen rule (section "properties"): Go generation does not support screen events yet`,
-	`skipping property "dollar_field" (string) of track event "$Variable$String": Go generation does not support enums yet`,
 	`skipping property "email" (custom:email) of track event "$eventWithNameCamelCase$!": Go generation does not support custom types yet`,
 	`ignoring the variants of track event "Event With Variants": Go generation does not support variants yet`,
-	`skipping property "device_type" (string) of track event "Event With Variants": Go generation does not support enums yet`,
 	`skipping property "page_context" (custom:page_context) of track event "Event With Variants": Go generation does not support custom types yet`,
 	`skipping property "profile" (custom:user_profile) of track event "Event With Variants": Go generation does not support custom types yet`,
-	`skipping property "status_code" (string) of track event "Product \"Premium\" Clicked": Go generation does not support enums yet`,
 	`skipping property "active" (custom:active) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "addresses" (custom:address_list) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "age" (custom:age) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "contacts" (array of custom:email) of track event "User Signed Up": Go generation does not support arrays of custom types yet`,
 	`skipping property "context" (object) of track event "User Signed Up": Go generation does not support nested object schemas yet`,
 	`skipping property "custom_null_field" (custom:null_type) of track event "User Signed Up": Go generation does not support custom types yet`,
-	`skipping property "device_type" (string) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "email_list" (custom:email_list) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "empty_object_no_additional_props" (custom:empty_object_no_additional_props) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "empty_object_with_additional_props" (custom:empty_object_with_additional_props) of track event "User Signed Up": Go generation does not support custom types yet`,
-	`skipping property "enabled" (boolean) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "feature_config" (custom:feature_config) of track event "User Signed Up": Go generation does not support custom types yet`,
-	`skipping property "mixed_value" (any) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "nested_empty_object" (object) of track event "User Signed Up": Go generation does not support nested object schemas yet`,
 	`skipping property "nested_empty_object_no_additional_props" (object) of track event "User Signed Up": Go generation does not support nested object schemas yet`,
 	`skipping property "phone_numbers" (array of custom:phone_number) of track event "User Signed Up": Go generation does not support arrays of custom types yet`,
-	`skipping property "priority" (integer) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "profile" (custom:user_profile) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "profile_list" (custom:profile_list) of track event "User Signed Up": Go generation does not support custom types yet`,
-	`skipping property "rating" (number) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "status" (custom:status) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "unicode_custom_type" (custom:типы_данных) of track event "User Signed Up": Go generation does not support custom types yet`,
-	`skipping property "unicode_enum_field" (string) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "user_access" (custom:user_access) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "active" (custom:active) of track event "eventWithNameCamelCase": Go generation does not support custom types yet`,
 }
@@ -109,10 +100,10 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 		return map[string]plan.PropertySchema{name: p}
 	}
 	var (
-		stringSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
-		enumSchema   = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}, Config: &plan.PropertyConfig{Enum: []any{"a"}}}}
-		customSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.CustomType{Name: "!!!", Type: plan.PrimitiveTypeString}}}}
-		nestedSchema = plan.PropertySchema{
+		stringSchema  = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
+		skippedSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.CustomType{Name: "email", Type: plan.PrimitiveTypeString}}}}
+		customSchema  = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.CustomType{Name: "!!!", Type: plan.PrimitiveTypeString}}}}
+		nestedSchema  = plan.PropertySchema{
 			Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
 			Schema:   &plan.ObjectSchema{Properties: property("$$", stringSchema)},
 		}
@@ -148,7 +139,7 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 		},
 		{
 			"skipped property without words",
-			trackEvent("Some Event", property("$$", enumSchema)),
+			trackEvent("Some Event", property("$$", skippedSchema)),
 			`naming property "$$" of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
 		},
 		{
@@ -173,8 +164,8 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 
 func TestGenerateQuickStart(t *testing.T) {
 	var (
-		stringProperty = plan.PropertySchema{Property: plan.Property{Name: "name", Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
-		enumProperty   = plan.PropertySchema{Property: plan.Property{Name: "kind", Types: []plan.PropertyType{plan.PrimitiveTypeString}, Config: &plan.PropertyConfig{Enum: []any{"a"}}}}
+		stringProperty  = plan.PropertySchema{Property: plan.Property{Name: "name", Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
+		skippedProperty = plan.PropertySchema{Property: plan.Property{Name: "kind", Types: []plan.PropertyType{plan.CustomType{Name: "kind", Type: plan.PrimitiveTypeString}}}}
 	)
 	rule := func(event string, properties map[string]plan.PropertySchema) plan.EventRule {
 		return plan.EventRule{
@@ -191,12 +182,12 @@ func TestGenerateQuickStart(t *testing.T) {
 	}{
 		{
 			"payload that declares only skipped properties before one with an emitted field",
-			[]plan.EventRule{rule("A", map[string]plan.PropertySchema{"kind": enumProperty}), rule("B", map[string]plan.PropertySchema{"name": stringProperty})},
+			[]plan.EventRule{rule("A", map[string]plan.PropertySchema{"kind": skippedProperty}), rule("B", map[string]plan.PropertySchema{"name": stringProperty})},
 			"//\terr := rt.TrackA(\n",
 		},
 		{
 			"payload that declares a property before one without properties",
-			[]plan.EventRule{rule("A", nil), rule("B", map[string]plan.PropertySchema{"kind": enumProperty})},
+			[]plan.EventRule{rule("A", nil), rule("B", map[string]plan.PropertySchema{"kind": skippedProperty})},
 			"//\terr := rt.TrackB(\n",
 		},
 		{
@@ -229,7 +220,7 @@ func TestGenerateReservesSkippedDeclaredKeys(t *testing.T) {
 			AdditionalProperties: true,
 			Properties: map[string]plan.PropertySchema{
 				"name": {Property: plan.Property{Name: "name", Types: []plan.PropertyType{plan.PrimitiveTypeString}}},
-				"kind": {Property: plan.Property{Name: "kind", Types: []plan.PropertyType{plan.PrimitiveTypeString}, Config: &plan.PropertyConfig{Enum: []any{"a"}}}},
+				"kind": {Property: plan.Property{Name: "kind", Types: []plan.PropertyType{plan.CustomType{Name: "kind", Type: plan.PrimitiveTypeString}}}},
 			},
 		},
 	}}}
@@ -239,7 +230,7 @@ func TestGenerateReservesSkippedDeclaredKeys(t *testing.T) {
 	require.Len(t, files, 1)
 
 	assert.Contains(t, files[0].Content, "\tm := withAdditional(v.AdditionalProperties, \"kind\", \"name\")\n")
-	assert.Equal(t, []string{`skipping property "kind" (string) of track event "Some Event": Go generation does not support enums yet`}, *warnings)
+	assert.Equal(t, []string{`skipping property "kind" (custom:kind) of track event "Some Event": Go generation does not support custom types yet`}, *warnings)
 }
 
 func captureWarnings(t *testing.T) *[]string {

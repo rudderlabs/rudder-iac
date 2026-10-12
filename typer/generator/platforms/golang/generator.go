@@ -65,8 +65,9 @@ type trackRule struct {
 // properties with the same name and different types.
 type propertyKey struct{ name, signature string }
 
-func keyOf(p plan.Property) propertyKey {
-	return propertyKey{p.Name, typeSignature(p)}
+func keyOf(p plan.Property) (propertyKey, error) {
+	signature, err := typeSignature(p)
+	return propertyKey{p.Name, signature}, err
 }
 
 type propertyType struct {
@@ -238,8 +239,6 @@ func unsupportedReason(ps plan.PropertySchema) string {
 	switch {
 	case ps.Schema != nil:
 		return "nested object schemas"
-	case p.Config != nil && len(p.Config.Enum) > 0:
-		return "enums"
 	// A union with a custom member, of the property's types or of its item
 	// types, fails generation instead (addUnion).
 	case customUnion(p.Types), customUnion(p.ItemTypes):
@@ -276,10 +275,17 @@ func declaredTypes(p plan.Property) string {
 }
 
 // typeSignature is a property's canonical type signature: its sorted types,
-// its sorted item types and its enum values, always empty while the skip check
-// drops enum fields.
-func typeSignature(p plan.Property) string {
-	return typeList(p.Types) + ";items:" + typeList(p.ItemTypes) + ";enum:"
+// its sorted item types and its effective enum values in tracking plan order.
+func typeSignature(p plan.Property) (string, error) {
+	e, err := resolveEnum(p)
+	if err != nil {
+		return "", err
+	}
+	signature := typeList(p.Types) + ";items:" + typeList(p.ItemTypes) + ";enum:"
+	if e != nil {
+		signature += e.signature
+	}
+	return signature, nil
 }
 
 func typeList(types []plan.PropertyType) string {
@@ -295,12 +301,20 @@ func typeList(types []plan.PropertyType) string {
 	return strings.Join(names, "|")
 }
 
-// addPropertyType adds the type of prop under its registered name: a union
-// for two or more non-null types, else an alias. Either follows the union its
+// addPropertyType adds the type of prop under its registered name: its enum
+// when it has one, which beats its declared types, else a union for two or
+// more non-null types, else an alias. A union or alias follows the union its
 // array items need, so the file declares an item type before the type that
 // holds it. It reports whether the type can hold nil (slice, map or interface).
 func addPropertyType(ctx *GoContext, registry *core.NameRegistry, name string, prop plan.Property) (bool, error) {
 	lead := fmt.Sprintf("%s represents the property %s", name, strconv.Quote(prop.Name))
+	e, err := resolveEnum(prop)
+	if err != nil {
+		return false, err
+	}
+	if e != nil {
+		return false, addEnum(ctx, registry, name, lead, prop, e)
+	}
 	if isUnion(prop.Types) {
 		return false, addUnion(ctx, registry, name, lead, prop.Description, prop.Types, prop.ItemTypes)
 	}
@@ -447,22 +461,37 @@ func addUnion(ctx *GoContext, registry *core.NameRegistry, name, lead, descripti
 	return nil
 }
 
-// addConstructors registers the union constructors. It is the second
-// registration pass, for the functions and constants named from plan data: it
-// runs after every type name is registered, so none of them can take a type's
-// name.
+// addConstructors registers the union constructors, and each enum's
+// {Type}Values function before its constants or value functions. It is the
+// second registration pass, for the functions and constants named from plan
+// data: it runs after every type name is registered, so none of them can take
+// a type's name.
 func addConstructors(ctx *GoContext, registry *core.NameRegistry) error {
-	for _, pt := range ctx.PropertyTypes {
-		if pt.Union == nil {
-			continue
+	register := func(id string, name *string) error {
+		registered, err := registry.RegisterName(id, packageScope, *name)
+		if err != nil {
+			return fmt.Errorf("registering %s: %w", *name, err)
 		}
-		for i := range pt.Union.Members {
-			m := &pt.Union.Members[i]
-			name, err := registry.RegisterName("constructor:"+m.Name, packageScope, m.Name)
-			if err != nil {
-				return fmt.Errorf("registering %s: %w", m.Name, err)
+		*name = registered
+		return nil
+	}
+	for _, pt := range ctx.PropertyTypes {
+		if u := pt.Union; u != nil {
+			for i := range u.Members {
+				if err := register("constructor:"+u.Members[i].Name, &u.Members[i].Name); err != nil {
+					return err
+				}
 			}
-			m.Name = name
+		}
+		if e := pt.Enum; e != nil {
+			if err := register("values:"+e.Name, &e.ValuesFunc); err != nil {
+				return err
+			}
+			for i := range e.Values {
+				if err := register(fmt.Sprintf("value:%s:%d", e.Name, i), &e.Values[i].Name); err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return nil
@@ -476,7 +505,10 @@ func addPropertyTypes(ctx *GoContext, rules []trackRule, registry *core.NameRegi
 	for _, r := range rules {
 		for _, wireKey := range r.fields {
 			prop := r.rule.Schema.Properties[wireKey].Property
-			k := keyOf(prop)
+			k, err := keyOf(prop)
+			if err != nil {
+				return nil, fmt.Errorf("mapping property %q: %w", prop.Name, err)
+			}
 			if _, seen := first[k]; !seen {
 				first[k] = prop
 			}
@@ -608,7 +640,11 @@ func structFields(r trackRule, payload *GoPayload, propertyTypes map[propertyKey
 			return nil, fmt.Errorf("registering property %q of track event %q: %w", wireKey, r.rule.Event.Name, err)
 		}
 
-		pt := propertyTypes[keyOf(ps.Property)]
+		k, err := keyOf(ps.Property)
+		if err != nil {
+			return nil, err
+		}
+		pt := propertyTypes[k]
 		field := GoField{Name: name, Key: wireKey, Type: pt.name, Required: ps.Required}
 		// Optional fields need an absent state; slices, maps and interfaces
 		// already have one in nil.

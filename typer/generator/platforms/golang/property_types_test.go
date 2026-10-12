@@ -1,6 +1,7 @@
 package golang
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
@@ -37,11 +38,29 @@ func TestTypeSignature(t *testing.T) {
 			plan.Property{Types: []plan.PropertyType{plan.CustomType{Name: "email", Type: plan.PrimitiveTypeString}}},
 			"custom:email;items:;enum:",
 		},
+		{
+			"enum values normalized and deduplicated, in plan order",
+			plan.Property{
+				Types:  []plan.PropertyType{plan.PrimitiveTypeNumber, plan.PrimitiveTypeInteger},
+				Config: &plan.PropertyConfig{Enum: []any{2, 1.0, json.Number("1e0"), 0.5}},
+			},
+			"integer|number;items:;enum:[2,1,0.5]",
+		},
+		{
+			"only the enum values the types allow, null included",
+			plan.Property{
+				Types:  []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeNull},
+				Config: &plan.PropertyConfig{Enum: []any{nil, "a", 1}},
+			},
+			`null|string;items:;enum:[null,"a"]`,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.signature, typeSignature(tt.property))
+			signature, err := typeSignature(tt.property)
+			require.NoError(t, err)
+			assert.Equal(t, tt.signature, signature)
 		})
 	}
 }

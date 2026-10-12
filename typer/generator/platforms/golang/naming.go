@@ -52,6 +52,23 @@ func pascalCase(name string) (string, error) {
 	return b.String(), nil
 }
 
+// stringValueName returns a string enum value's part of its constant name:
+// Empty for "", and, for a value without letters or digits, U and the
+// upper-case hex code point of each rune ("🎯" → U1F3AF), as Swift spells it.
+func stringValueName(s string) string {
+	if s == "" {
+		return "Empty"
+	}
+	if name, err := pascalCase(s); err == nil {
+		return name
+	}
+	var b strings.Builder
+	for _, r := range s {
+		fmt.Fprintf(&b, "U%X", r)
+	}
+	return b.String()
+}
+
 // fieldName returns the exported struct field name for a property. Go exports
 // only names starting with an upper-case letter, so a name starting with a
 // digit or a caseless letter (CJK) gets an X prefix.
