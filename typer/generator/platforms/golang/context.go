@@ -59,6 +59,9 @@ type GoVariant struct {
 	// Payload is set on payload interfaces, which also list To{Payload}, as
 	// GoStruct.Payload.
 	Payload string
+	// Category is set on page and screen payload interfaces, which also list
+	// categoryMode.
+	Category bool
 	// Implementations are the structs, in file order.
 	Implementations []string
 }
@@ -151,6 +154,9 @@ type GoStruct struct {
 	// Sends is the discriminator value a case's toMap writes; empty for
 	// Absent, which sends none, and Default, whose field holds it.
 	Sends string
+	// CategoryMode is the categoryMode constant that a struct implementing a
+	// page or screen payload interface returns for its schema.
+	CategoryMode string
 }
 
 // GoField is a struct field, in byte order of its wire key.
@@ -184,6 +190,9 @@ type GoMethod struct {
 	Param, Var string
 	// Pointer is set for an optional payload struct, passed by pointer.
 	Pointer bool
+	// CategoryMode is the categoryMode constant of a page or screen rule's
+	// schema, the base schema for variants, which a nil payload takes.
+	CategoryMode string
 	// Send is the send helper's call with Var, and OnNil what the method
 	// returns when there is no payload, or for a nil variant payload.
 	Send, OnNil string

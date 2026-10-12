@@ -20,6 +20,10 @@ func ({{ $.Name }}) is{{ .Name }}() {}
 {{ comment $.DiscriminatorDoc }}
 func ({{ if $.ReadsReceiver }}v {{ end }}{{ $.Name }}) Discriminator() {{ .Result }} { return {{ $.Returns }} }
 {{- end }}
+{{- with .CategoryMode }}
+
+func ({{ $.Name }}) categoryMode() categoryMode { return {{ . }} }
+{{- end }}
 {{- if not .MapAlias }}
 
 func (v {{ .Name }}) toMap() map[string]any {

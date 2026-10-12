@@ -234,11 +234,6 @@ func eventRules(p *plan.TrackingPlan) ([]eventRule, []*customType, error) {
 			core.Warn(sectionWarning(r.rule))
 			continue
 		}
-		if event.EventType == plan.EventTypePage || event.EventType == plan.EventTypeScreen {
-			core.Warn(fmt.Sprintf("skipping the %s rule (section %q): Go generation does not support %s events yet", event.EventType, r.rule.Section, event.EventType))
-			continue
-		}
-
 		var (
 			where = fmt.Sprintf("%s event %q", event.EventType, event.Name)
 			err   error
@@ -897,7 +892,11 @@ func addRule(ctx *GoContext, r eventRule, propertyTypes map[propertyKey]property
 	if err != nil {
 		return fmt.Errorf("registering the method of %s event %q: %w", typ, event.Name, err)
 	}
-	ctx.Methods = append(ctx.Methods, eventMethod(ctx.PackageName, r, method, st))
+	m := eventMethod(ctx.PackageName, r, method, st)
+	if m.CategoryMode != "" && st != nil && st.Variant != nil {
+		addCategoryModes(*ctx.out, st.Variant)
+	}
+	ctx.Methods = append(ctx.Methods, m)
 	ctx.Helpers[typ] = true
 	return nil
 }

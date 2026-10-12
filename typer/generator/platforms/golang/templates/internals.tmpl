@@ -41,6 +41,50 @@ func (r *RudderTyperAnalytics) identify(identity Identity, traits analytics.Trai
 	return r.client.Enqueue(msg)
 }
 {{- end }}
+{{- if .Helpers.page }}
+
+func (r *RudderTyperAnalytics) page(identity Identity, name string, properties analytics.Properties, mode categoryMode, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	if properties, err = o.withCategory(properties, mode); err != nil {
+		return err
+	}
+	return r.client.Enqueue(analytics.Page{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		Name:              name,
+		Properties:        properties,
+		Context:           o.analyticsContext(nil),
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	})
+}
+{{- end }}
+{{- if .Helpers.screen }}
+
+func (r *RudderTyperAnalytics) screen(identity Identity, name string, properties analytics.Properties, mode categoryMode, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	if properties, err = o.withCategory(properties, mode); err != nil {
+		return err
+	}
+	return r.client.Enqueue(analytics.Screen{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		Name:              name,
+		Properties:        properties,
+		Context:           o.analyticsContext(nil),
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	})
+}
+{{- end }}
 {{- if .Helpers.group }}
 
 // group always sends traits as the message's traits: context.traits holds the
@@ -75,6 +119,40 @@ func rudderTyperContext() map[string]any {
 	}
 }
 {{ runtime }}
+{{- if or .Helpers.page .Helpers.screen }}
+
+// categoryMode says how a page or screen rule treats properties.category.
+type categoryMode int
+
+const (
+	categoryDeclared categoryMode = iota // the schema declares category
+	categoryOpen                         // undeclared, but the schema accepts extra keys
+	categoryClosed                       // undeclared, and the schema accepts no extra keys
+)
+
+// withCategory applies WithCategory. props is always a private copy, so it
+// can be modified in place.
+func (o callOptions) withCategory(props analytics.Properties, mode categoryMode) (analytics.Properties, error) {
+	if o.category == nil {
+		return props, nil
+	}
+	category := *o.category
+	if existing, ok := props["category"]; ok {
+		if existing == category {
+			return props, nil
+		}
+		return nil, fmt.Errorf("%w: WithCategory(%q) differs from properties.category %v", ErrCategoryConflict, category, existing)
+	}
+	if mode != categoryOpen {
+		return nil, fmt.Errorf("%w: WithCategory(%q) on a payload that does not accept an undeclared category", ErrCategoryConflict, category)
+	}
+	if props == nil {
+		props = analytics.Properties{}
+	}
+	props["category"] = category
+	return props, nil
+}
+{{- end }}
 {{- if .UsesWithAdditional }}
 
 // withAdditional starts an object from the keys of extra that the tracking

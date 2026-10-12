@@ -16,18 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The reference plan uses constructs the generator does not support yet; each
-// one it leaves out must be reported.
-var referenceWarnings = []string{
-	`skipping the page rule (section "properties"): Go generation does not support page events yet`,
-	`skipping the screen rule (section "properties"): Go generation does not support screen events yet`,
-}
-
+// Every golden plan is generated whole: a rule left out would be reported.
 func TestGenerateGoldens(t *testing.T) {
-	wantWarnings := map[string][]string{
-		"testdata/validator/ruddertyper/ruddertyper.go": referenceWarnings,
-		"testdata/validator/examples/ruddertyper.go":    nil,
-	}
 	runtimeFile, err := parser.ParseFile(token.NewFileSet(), "internal/runtime/runtime.go", nil, parser.ImportsOnly)
 	require.NoError(t, err)
 
@@ -44,7 +34,7 @@ func TestGenerateGoldens(t *testing.T) {
 			want, err := os.ReadFile(golden.Path)
 			require.NoError(t, err)
 			assert.Equal(t, string(want), files[0].Content, "generated content does not match %s; run 'make typer-go-update-testdata' to update the goldens", golden.Path)
-			assert.Equal(t, wantWarnings[golden.Path], *warnings)
+			assert.Empty(t, *warnings)
 			// The runtime package's tests cover the generated runtime only
 			// while it is emitted unchanged.
 			assert.Contains(t, files[0].Content, golang.RuntimeSource)

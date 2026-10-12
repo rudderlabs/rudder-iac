@@ -85,6 +85,7 @@ type callOptions struct {
 	integrations analytics.Integrations
 	timestamp    time.Time
 	messageID    string
+	category     *string // nil when WithCategory is not used
 }
 
 // WithAnalyticsContext sets the event context. Everything reachable from ctx
@@ -110,6 +111,17 @@ func WithTimestamp(t time.Time) Option {
 // WithMessageID sets the message ID. The SDK generates one when it is not set.
 func WithMessageID(id string) Option {
 	return func(o *callOptions) { o.messageID = id }
+}
+
+// WithCategory sets properties.category on page and screen calls; other calls
+// ignore it. If the payload holds a category, the option must equal it.
+// Otherwise the option is rejected when the schema declares category or is
+// closed, and added only when category is undeclared and the schema is open.
+// For variants, the selected struct's schema decides. A rejected option fails
+// the call with ErrCategoryConflict. An empty category counts as supplied and
+// is sent like any other value.
+func WithCategory(category string) Option {
+	return func(o *callOptions) { o.category = &category }
 }
 
 // --- Value helpers ---
@@ -1305,6 +1317,51 @@ func (v IdentifyTraits) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 
+// PageProperties holds the properties of the page event.
+type PageProperties struct {
+	Profile PropertyProfile // required
+}
+
+func (v PageProperties) toMap() map[string]any {
+	m := map[string]any{
+		"profile": v.Profile,
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v PageProperties) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v PageProperties) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// ScreenProperties holds the properties of the screen event.
+type ScreenProperties struct {
+	Profile *PropertyProfile // optional
+}
+
+func (v ScreenProperties) toMap() map[string]any {
+	m := map[string]any{}
+	if v.Profile != nil {
+		m["profile"] = *v.Profile
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v ScreenProperties) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v ScreenProperties) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
 // TrackVariableStringProperties holds the properties of "$Variable$String".
 type TrackVariableStringProperties struct {
 	DollarField PropertyDollarField // required
@@ -1790,6 +1847,34 @@ func (r *RudderTyperAnalytics) Identify(identity Identity, traits *IdentifyTrait
 	return r.identify(identity, t, false, opts)
 }
 
+// Page sends the page event. name is the page name; "" sends none. props may be nil, which sends no properties. This rule neither declares a category nor accepts undeclared properties, so WithCategory fails with ErrCategoryConflict.
+//
+// Page view event
+func (r *RudderTyperAnalytics) Page(identity Identity, name string, props *PageProperties, opts ...Option) error {
+	var p analytics.Properties
+	if props != nil {
+		var err error
+		if p, err = props.ToProperties(); err != nil {
+			return err
+		}
+	}
+	return r.page(identity, name, p, categoryClosed, opts)
+}
+
+// Screen sends the screen event. name is the screen name; "" sends none. props may be nil, which sends no properties. This rule neither declares a category nor accepts undeclared properties, so WithCategory fails with ErrCategoryConflict.
+//
+// Screen view event
+func (r *RudderTyperAnalytics) Screen(identity Identity, name string, props *ScreenProperties, opts ...Option) error {
+	var p analytics.Properties
+	if props != nil {
+		var err error
+		if p, err = props.ToProperties(); err != nil {
+			return err
+		}
+	}
+	return r.screen(identity, name, p, categoryClosed, opts)
+}
+
 // TrackVariableString sends the track event "$Variable$String".
 //
 // Event with dollar signs to test string interpolation escaping
@@ -1917,6 +2002,46 @@ func (r *RudderTyperAnalytics) identify(identity Identity, traits analytics.Trai
 		msg.Traits = traits
 	}
 	return r.client.Enqueue(msg)
+}
+
+func (r *RudderTyperAnalytics) page(identity Identity, name string, properties analytics.Properties, mode categoryMode, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	if properties, err = o.withCategory(properties, mode); err != nil {
+		return err
+	}
+	return r.client.Enqueue(analytics.Page{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		Name:              name,
+		Properties:        properties,
+		Context:           o.analyticsContext(nil),
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	})
+}
+
+func (r *RudderTyperAnalytics) screen(identity Identity, name string, properties analytics.Properties, mode categoryMode, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	if properties, err = o.withCategory(properties, mode); err != nil {
+		return err
+	}
+	return r.client.Enqueue(analytics.Screen{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		Name:              name,
+		Properties:        properties,
+		Context:           o.analyticsContext(nil),
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	})
 }
 
 // group always sends traits as the message's traits: context.traits holds the
@@ -2308,4 +2433,36 @@ func isNil(v any) bool {
 	}
 	rv := reflect.ValueOf(v)
 	return rv.Kind() == reflect.Pointer && rv.IsNil()
+}
+
+// categoryMode says how a page or screen rule treats properties.category.
+type categoryMode int
+
+const (
+	categoryDeclared categoryMode = iota // the schema declares category
+	categoryOpen                         // undeclared, but the schema accepts extra keys
+	categoryClosed                       // undeclared, and the schema accepts no extra keys
+)
+
+// withCategory applies WithCategory. props is always a private copy, so it
+// can be modified in place.
+func (o callOptions) withCategory(props analytics.Properties, mode categoryMode) (analytics.Properties, error) {
+	if o.category == nil {
+		return props, nil
+	}
+	category := *o.category
+	if existing, ok := props["category"]; ok {
+		if existing == category {
+			return props, nil
+		}
+		return nil, fmt.Errorf("%w: WithCategory(%q) differs from properties.category %v", ErrCategoryConflict, category, existing)
+	}
+	if mode != categoryOpen {
+		return nil, fmt.Errorf("%w: WithCategory(%q) on a payload that does not accept an undeclared category", ErrCategoryConflict, category)
+	}
+	if props == nil {
+		props = analytics.Properties{}
+	}
+	props["category"] = category
+	return props, nil
 }
