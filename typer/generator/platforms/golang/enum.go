@@ -73,10 +73,8 @@ func resolveEnum(p plan.Property) (*effectiveEnum, error) {
 		case string:
 			v = GoEnumValue{Name: stringValueName(n), Text: strconv.Quote(n)}
 		case bool:
-			v = GoEnumValue{Name: "False", Text: strconv.FormatBool(n)}
-			if n {
-				v.Name = "True"
-			}
+			text := strconv.FormatBool(n)
+			v = GoEnumValue{Name: stringValueName(text), Text: text}
 		case *big.Rat:
 			var err error
 			if v, err = numberValue(n, raw[i], e.base, floats); err != nil {
