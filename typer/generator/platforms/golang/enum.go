@@ -25,7 +25,9 @@ type effectiveEnum struct {
 	values []GoEnumValue
 	// null is set when null is one of the values.
 	null bool
-	// signature lists every value, null included, as a JSON array.
+	// signature lists every value's Text, and null, in brackets: the JSON
+	// array of the values, except that Go quotes non-printable characters and
+	// invalid UTF-8 differently.
 	signature string
 }
 
@@ -47,6 +49,8 @@ func resolveEnum(p plan.Property) (*effectiveEnum, error) {
 		if err != nil {
 			return nil, err
 		}
+		// A *big.Rat prints exactly, in lowest terms, so equal numbers share a
+		// key; the type keeps the string "1/1" apart from the number 1.
 		key := fmt.Sprintf("%T %v", n, n)
 		if seen[key] || !allows(p.Types, n) {
 			continue
