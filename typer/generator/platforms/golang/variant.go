@@ -202,8 +202,11 @@ func (res *resolver) branch(s, b *plan.ObjectSchema, label, where string) (*obje
 // sameDefinition reports whether a and b agree in everything but required:
 // types, item types, enum values and nested schema.
 func sameDefinition(a, b plan.PropertySchema) bool {
-	ea, _ := resolveEnum(a.Property) // the resolver reports an invalid enum
-	eb, _ := resolveEnum(b.Property)
+	// The resolver reports an invalid enum.
+	var (
+		ea, _ = resolveEnum(a.Property)
+		eb, _ = resolveEnum(b.Property)
+	)
 	return typeSignature(a.Property, ea) == typeSignature(b.Property, eb) && reflect.DeepEqual(a.Schema, b.Schema)
 }
 
