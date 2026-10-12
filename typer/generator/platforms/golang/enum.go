@@ -59,9 +59,9 @@ func resolveEnum(p plan.Property) (*effectiveEnum, error) {
 	}
 
 	var (
-		e      = &effectiveEnum{base: enumBase(p.Types, allowed)}
-		texts  = make([]string, 0, len(allowed))
-		floats = map[float64]any{}
+		e        = &effectiveEnum{base: enumBase(p.Types, allowed)}
+		texts    = make([]string, 0, len(allowed))
+		literals = map[string]any{}
 	)
 	for i, n := range allowed {
 		var v GoEnumValue
@@ -77,7 +77,7 @@ func resolveEnum(p plan.Property) (*effectiveEnum, error) {
 			v = GoEnumValue{Name: stringValueName(text), Text: text}
 		case *big.Rat:
 			var err error
-			if v, err = numberValue(n, raw[i], e.base, floats); err != nil {
+			if v, err = numberValue(n, raw[i], e.base, literals); err != nil {
 				return nil, err
 			}
 		}
@@ -90,10 +90,11 @@ func resolveEnum(p plan.Property) (*effectiveEnum, error) {
 }
 
 // numberValue writes r as an int64 for an int64 enum, or for an integral
-// value of a mixed enum that fits, and as a float64 otherwise. floats holds
-// the plan value behind each float64 already written, since two values that
-// one float64 represents would become duplicate constants.
-func numberValue(r *big.Rat, raw any, base string, floats map[float64]any) (GoEnumValue, error) {
+// value of a mixed enum that fits, and as a float64 otherwise. literals holds
+// the plan value behind each number already written, since two values written
+// alike would become duplicate constants: one float64 can represent two
+// values, and in a mixed enum an int64 and a float64 can be the same number.
+func numberValue(r *big.Rat, raw any, base string, literals map[string]any) (GoEnumValue, error) {
 	var (
 		v       GoEnumValue
 		isInt64 = r.IsInt() && r.Num().IsInt64()
@@ -109,16 +110,16 @@ func numberValue(r *big.Rat, raw any, base string, floats map[float64]any) (GoEn
 		if math.IsInf(f, 0) {
 			return v, fmt.Errorf("enum value %v does not fit in float64", raw)
 		}
-		if first, ok := floats[f]; ok {
-			return v, fmt.Errorf("enum values %v and %v are the same float64", first, raw)
-		}
-		floats[f] = raw
 		v.Text = strconv.FormatFloat(f, 'f', -1, 64)
 		if !strings.Contains(v.Text, ".") {
 			// A mixed enum's value is untyped; an integer literal would default to int.
 			v.Expr = "float64(" + v.Text + ")"
 		}
 	}
+	if first, ok := literals[v.Text]; ok {
+		return v, fmt.Errorf("enum values %v and %v are the same float64", first, raw)
+	}
+	literals[v.Text] = raw
 	v.Name = strings.NewReplacer("-", "Neg", ".", "_").Replace(v.Text)
 	return v, nil
 }

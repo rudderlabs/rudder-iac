@@ -291,6 +291,11 @@ func TestGenerateRejectsInvalidEnums(t *testing.T) {
 			wantErr:  `mapping property "kind": enum values 9007199254740992 and 9007199254740993 are the same float64`,
 		},
 		{
+			name:     "an int64 and a float64 of a mixed enum written alike",
+			property: enumProperty("kind", nil, "a", json.Number("9007199254740992"), json.Number("9007199254740992.5")),
+			wantErr:  `mapping property "kind": enum values 9007199254740992 and 9007199254740992.5 are the same float64`,
+		},
+		{
 			name:     "integer beyond int64",
 			property: enumProperty("kind", integerType, json.Number("9223372036854775808")),
 			wantErr:  `mapping property "kind": enum value 9223372036854775808 does not fit in int64`,
