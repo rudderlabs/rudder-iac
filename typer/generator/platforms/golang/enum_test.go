@@ -256,6 +256,11 @@ func TestGenerateRejectsInvalidEnums(t *testing.T) {
 		wantErr  string
 	}{
 		{
+			name:     "explicitly empty enum",
+			property: plan.Property{Name: "kind", Types: onlyString, Config: &plan.PropertyConfig{Enum: []any{}}},
+			wantErr:  `mapping property "kind" of track event "Some Event": enum has no values`,
+		},
+		{
 			name:     "no value of the declared types",
 			property: enumProperty("kind", onlyString, 1, 2),
 			wantErr:  `mapping property "kind" of track event "Some Event": no enum value has a declared type (string)`,

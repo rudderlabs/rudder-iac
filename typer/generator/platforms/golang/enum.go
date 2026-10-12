@@ -3,6 +3,7 @@ package golang
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -35,8 +36,13 @@ type effectiveEnum struct {
 // Numbers are compared exactly, so 1 and 1.0 are one value; the first of
 // equal values is kept, and the rest are dropped.
 func resolveEnum(p plan.Property) (*effectiveEnum, error) {
-	if p.Config == nil || len(p.Config.Enum) == 0 {
+	if p.Config == nil || p.Config.Enum == nil {
 		return nil, nil
+	}
+	// An explicit `enum: []` allows no value at all, so generating the bare
+	// declared type would accept values the tracking plan rejects.
+	if len(p.Config.Enum) == 0 {
+		return nil, errors.New("enum has no values")
 	}
 
 	var (
