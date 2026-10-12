@@ -286,6 +286,80 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 	}
 }
 
+// A custom type that refers to itself, through any path, fails generation
+// with an error naming the cycle, found by the first reference in rule-key and
+// wire-key order.
+func TestGenerateRejectsRecursiveCustomTypes(t *testing.T) {
+	object := func(name string) *plan.CustomType {
+		return &plan.CustomType{Name: name, Type: plan.PrimitiveTypeObject, Schema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}}}
+	}
+	refer := func(from *plan.CustomType, key string, ps plan.PropertySchema) {
+		ps.Property.Name = key
+		from.Schema.Properties[key] = ps
+	}
+	typed := func(types ...plan.PropertyType) plan.PropertySchema {
+		return plan.PropertySchema{Property: plan.Property{Types: types}}
+	}
+
+	tests := []struct {
+		name    string
+		plan    func() *plan.TrackingPlan
+		wantErr string
+	}{
+		{
+			name: "directly",
+			plan: func() *plan.TrackingPlan {
+				a := object("a")
+				refer(a, "self", typed(a, plan.PrimitiveTypeNull))
+				return golang.TrackPlan(plan.Property{Name: "value", Types: []plan.PropertyType{a}})
+			},
+			wantErr: `custom type "a" refers to itself: a → a`,
+		},
+		{
+			name: "through other custom types",
+			plan: func() *plan.TrackingPlan {
+				a, b, c := object("a"), object("b"), object("c")
+				refer(a, "b", typed(b))
+				refer(b, "c", typed(c))
+				refer(c, "b", typed(b))
+				return golang.TrackPlan(plan.Property{Name: "value", Types: []plan.PropertyType{a}})
+			},
+			wantErr: `custom type "b" refers to itself: b → c → b`,
+		},
+		{
+			name: "through an array custom type",
+			plan: func() *plan.TrackingPlan {
+				a := object("a")
+				list := &plan.CustomType{Name: "list", Type: plan.PrimitiveTypeArray, ItemType: a}
+				refer(a, "children", typed(list))
+				return golang.TrackPlan(plan.Property{Name: "value", Types: []plan.PropertyType{list}})
+			},
+			wantErr: `custom type "list" refers to itself: list → a → list`,
+		},
+		{
+			name: "through array items in a nested schema",
+			plan: func() *plan.TrackingPlan {
+				a := object("a")
+				nested := typed(plan.PrimitiveTypeObject)
+				nested.Schema = &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}}
+				refer(a, "nested", nested)
+				items := typed(plan.PrimitiveTypeArray)
+				items.Property.Name, items.Property.ItemTypes = "items", []plan.PropertyType{a}
+				nested.Schema.Properties["items"] = items
+				return golang.TrackPlan(plan.Property{Name: "value", Types: []plan.PropertyType{a}})
+			},
+			wantErr: `custom type "a" refers to itself: a → a`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := (&golang.Generator{}).Generate(tt.plan(), core.GenerateOptions{}, nil)
+			assert.EqualError(t, err, tt.wantErr)
+		})
+	}
+}
+
 // Each value helper is emitted only when the generated types use it, under a
 // section header emitted only with one of them. TrackPlan's fields are
 // optional, so Ptr comes with every type that cannot hold nil. Null also comes

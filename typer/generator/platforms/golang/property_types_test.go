@@ -125,3 +125,36 @@ func TestItemUnionNameOrder(t *testing.T) {
 		{Alias: &GoTypeAlias{Name: "PropertyFooItem1", Doc: "PropertyFooItem1 represents the property \"fooItem\".", Type: "string"}},
 	}, ctx.PropertyTypes)
 }
+
+// Hoisted names spell the path, so foo.barBaz and fooBar.baz both make
+// {Parent}FooBarBaz; the one registered second, depth-first in wire-key
+// order, takes the suffix.
+func TestHoistedNameCollision(t *testing.T) {
+	object := func(name string, properties map[string]plan.PropertySchema) plan.PropertySchema {
+		return plan.PropertySchema{
+			Property: plan.Property{Name: name, Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+			Schema:   &plan.ObjectSchema{Properties: properties},
+		}
+	}
+	leaf := map[string]plan.PropertySchema{"x": {Property: plan.Property{Name: "x", Types: []plan.PropertyType{plan.PrimitiveTypeString}}}}
+	p := trackPlan()
+	p.Rules[0].Schema.Properties = map[string]plan.PropertySchema{
+		"foo":    object("foo", map[string]plan.PropertySchema{"barBaz": object("barBaz", leaf)}),
+		"fooBar": object("fooBar", map[string]plan.PropertySchema{"baz": object("baz", leaf)}),
+	}
+
+	ctx, err := newContext(p, "", "ruddertyper")
+	require.NoError(t, err)
+
+	var names []string
+	for _, d := range ctx.Payloads {
+		names = append(names, d.Struct.Name)
+	}
+	assert.Equal(t, []string{
+		"TrackSomeEventProperties",
+		"TrackSomeEventPropertiesFoo",
+		"TrackSomeEventPropertiesFooBarBaz",
+		"TrackSomeEventPropertiesFooBar",
+		"TrackSomeEventPropertiesFooBarBaz1",
+	}, names)
+}

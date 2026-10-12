@@ -102,11 +102,12 @@ func TestRecursiveCustomTypesTerminate(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		plan func() *plan.TrackingPlan
+		name  string
+		plan  func() *plan.TrackingPlan
+		goErr string
 	}{
-		{"direct", direct},
-		{"indirect", indirect},
+		{"direct", direct, `custom type "a" refers to itself: a → a`},
+		{"indirect", indirect, `custom type "a" refers to itself: a → b → a`},
 	}
 
 	for name, g := range platforms {
@@ -119,7 +120,10 @@ func TestRecursiveCustomTypesTerminate(t *testing.T) {
 				}()
 
 				select {
-				case <-done:
+				case err := <-done:
+					if name == "go" {
+						assert.EqualError(t, err, tt.goErr)
+					}
 				case <-time.After(5 * time.Second):
 					t.Fatal("generation did not return")
 				}
