@@ -177,9 +177,8 @@ type GoField struct {
 
 // GoMethod is an event method on RudderTyperAnalytics.
 type GoMethod struct {
-	Name  string
-	Doc   string
-	Event string
+	Name string
+	Doc  string
 	// Type is the event type, which names the send helper.
 	Type string
 	// Payload is nil when the rule's schema is empty and closed.
