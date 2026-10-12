@@ -425,8 +425,10 @@ func (c *RudderDataCatalog) GetTrackingPlanEventSchema(ctx context.Context, id s
 
 	// Numbers stay json.Number: as float64, enum values such as
 	// 9007199254740992 and 9007199254740993 would become the same number.
-	schema := TrackingPlanEventSchema{}
-	dec := json.NewDecoder(bytes.NewReader(resp))
+	var (
+		schema TrackingPlanEventSchema
+		dec    = json.NewDecoder(bytes.NewReader(resp))
+	)
 	dec.UseNumber()
 	if err := dec.Decode(&schema); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
