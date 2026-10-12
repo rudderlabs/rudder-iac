@@ -324,17 +324,18 @@ func (res *resolver) customType(ct *plan.CustomType) (*customType, error) {
 	case len(ct.Variants) > 0:
 		c.reason = "variants"
 	case ct.Type == plan.PrimitiveTypeArray:
-		c.reason, err = res.unsupportedReason(plan.Property{ItemTypes: []plan.PropertyType{ct.ItemType}})
+		if c.reason, err = res.unsupportedReason(plan.Property{ItemTypes: []plan.PropertyType{ct.ItemType}}); err != nil {
+			return nil, err
+		}
 	case ct.Type == plan.PrimitiveTypeObject && isStruct(ct.Schema):
 		where := fmt.Sprintf("custom type %q", ct.Name)
 		// Names are checked before the skip check, as in rules.
-		if err = validateSchemaNames(*ct.Schema, where); err != nil {
-			break
+		if err := validateSchemaNames(*ct.Schema, where); err != nil {
+			return nil, err
 		}
-		c.schema, err = res.schema(ct.Schema, where, "")
-	}
-	if err != nil {
-		return nil, err
+		if c.schema, err = res.schema(ct.Schema, where, ""); err != nil {
+			return nil, err
+		}
 	}
 	res.customTypes[ct.Name] = c
 	return c, nil
@@ -581,9 +582,12 @@ func goType(ctx *GoContext, registry *core.NameRegistry, owner string, types, it
 func memberType(ctx *GoContext, registry *core.NameRegistry, owner string, t plan.PropertyType, items []plan.PropertyType) (string, bool, error) {
 	if ct := plan.AsCustomType(t); ct != nil {
 		name, err := customTypeName(registry, ct.Name)
+		if err != nil {
+			return "", false, err
+		}
 		// Array custom types are slices, and object ones without a struct maps.
 		nilable := ct.Type == plan.PrimitiveTypeArray || ct.Type == plan.PrimitiveTypeObject && !isStruct(ct.Schema)
-		return name, nilable, err
+		return name, nilable, nil
 	}
 	switch t {
 	case plan.PrimitiveTypeString:
