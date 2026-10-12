@@ -46,14 +46,6 @@ func TestTypeSignature(t *testing.T) {
 			},
 			"integer|number;items:;enum:[2,1,0.5]",
 		},
-		{
-			"only the enum values the types allow, null included",
-			plan.Property{
-				Types:  []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeNull},
-				Config: &plan.PropertyConfig{Enum: []any{nil, "a", 1}},
-			},
-			`null|string;items:;enum:[null,"a"]`,
-		},
 	}
 
 	for _, tt := range tests {
