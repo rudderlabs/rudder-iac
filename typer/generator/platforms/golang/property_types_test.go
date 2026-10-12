@@ -126,6 +126,53 @@ func TestItemUnionNameOrder(t *testing.T) {
 	}, ctx.PropertyTypes)
 }
 
+// Every custom type name is registered before the structs custom types
+// hoist, so a custom type named UserProfileAddress keeps its name and
+// UserProfile's hoisted address takes the suffix.
+func TestCustomTypeNameBeatsHoistedName(t *testing.T) {
+	var (
+		street      = plan.PropertySchema{Property: plan.Property{Name: "street", Types: []plan.PropertyType{plan.PrimitiveTypeString}}, Required: true}
+		userProfile = &plan.CustomType{
+			Name: "UserProfile",
+			Type: plan.PrimitiveTypeObject,
+			Schema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+				"address": {
+					Property: plan.Property{Name: "address", Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+					Schema:   &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"street": street}},
+				},
+			}},
+		}
+		userProfileAddress = &plan.CustomType{Name: "UserProfileAddress", Type: plan.PrimitiveTypeString}
+	)
+	p := trackPlan(
+		plan.Property{Name: "profile", Types: []plan.PropertyType{userProfile}},
+		plan.Property{Name: "address", Types: []plan.PropertyType{userProfileAddress}},
+	)
+
+	ctx, err := newContext(p, "", "ruddertyper")
+	require.NoError(t, err)
+
+	assert.Equal(t, []GoDecl{
+		{Struct: &GoStruct{
+			Name:         "CustomTypeUserProfile",
+			Doc:          "CustomTypeUserProfile represents the custom type \"UserProfile\".",
+			DeclaredKeys: []string{"address"},
+			Fields:       []GoField{{Name: "Address", Key: "address", Type: "*CustomTypeUserProfileAddress1", Pointer: true}},
+		}},
+		{Struct: &GoStruct{
+			Name:         "CustomTypeUserProfileAddress1",
+			Doc:          "CustomTypeUserProfileAddress1 is the object in CustomTypeUserProfile.Address.",
+			DeclaredKeys: []string{"street"},
+			Fields:       []GoField{{Name: "Street", Key: "street", Type: "PropertyStreet", Required: true}},
+		}},
+		{Alias: &GoTypeAlias{
+			Name: "CustomTypeUserProfileAddress",
+			Doc:  "CustomTypeUserProfileAddress represents the custom type \"UserProfileAddress\".",
+			Type: "string",
+		}},
+	}, ctx.CustomTypes)
+}
+
 // Hoisted names spell the path, so foo.barBaz and fooBar.baz both make
 // {Parent}FooBarBaz; the one registered second, depth-first in wire-key
 // order, takes the suffix.
