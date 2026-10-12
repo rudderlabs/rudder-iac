@@ -83,7 +83,8 @@ type ruleField struct {
 
 // customType is a custom type that a kept field references.
 type customType struct {
-	ct *plan.CustomType
+	ct   *plan.CustomType
+	name string
 	// schema is set for an object custom type generated as a struct.
 	schema *objectSchema
 	// reason names the construct the custom type needs that the generator
@@ -137,7 +138,7 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 	// it hoists, whose CustomType-prefixed names no property name can take.
 	schemas := make([]*objectSchema, 0, len(customTypes)+len(rules))
 	for _, c := range customTypes {
-		if _, err := customTypeName(registry, c.ct.Name); err != nil {
+		if c.name, err = customTypeName(registry, c.ct.Name); err != nil {
 			return nil, err
 		}
 		if c.schema != nil {
@@ -728,13 +729,9 @@ func addCustomTypes(ctx *GoContext, customTypes []*customType, propertyTypes map
 	ctx.out = &ctx.CustomTypes
 	for _, c := range customTypes {
 		ct := c.ct
-		name, err := customTypeName(registry, ct.Name)
-		if err != nil {
-			return err
-		}
-		lead := fmt.Sprintf("%s represents the custom type %s", name, strconv.Quote(ct.Name))
+		lead := fmt.Sprintf("%s represents the custom type %s", c.name, strconv.Quote(ct.Name))
 		if c.schema != nil {
-			if _, err := addStruct(ctx, registry, propertyTypes, name, withDescription(lead+".", ct.Description), c.schema, false); err != nil {
+			if _, err := addStruct(ctx, registry, propertyTypes, c.name, withDescription(lead+".", ct.Description), c.schema, false); err != nil {
 				return err
 			}
 			continue
@@ -748,7 +745,7 @@ func addCustomTypes(ctx *GoContext, customTypes []*customType, propertyTypes map
 		if err != nil {
 			return fmt.Errorf("mapping custom type %q: %w", ct.Name, err)
 		}
-		if _, err := addPropertyType(ctx, registry, name, lead, prop, e); err != nil {
+		if _, err := addPropertyType(ctx, registry, c.name, lead, prop, e); err != nil {
 			return fmt.Errorf("mapping custom type %q: %w", ct.Name, err)
 		}
 	}
