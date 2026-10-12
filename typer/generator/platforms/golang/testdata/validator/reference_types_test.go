@@ -133,7 +133,7 @@ func TestReferenceTypesWire(t *testing.T) {
 			call: func() error {
 				p := base
 				p.MixedValue = &ruddertyper.PropertyMixedValue{}
-				_, err := json.Marshal(p)
+				_, err := json.Marshal(p.MixedValue)
 				return err
 			},
 			errIs: ruddertyper.ErrInvalidValue,

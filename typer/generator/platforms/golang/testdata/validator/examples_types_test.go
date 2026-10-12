@@ -112,7 +112,7 @@ func TestExamplesTypesWire(t *testing.T) {
 			call: func() error {
 				p := multi
 				p.StringOrStrings = examples.PropertyStringOrStrings{}
-				_, err := json.Marshal(p)
+				_, err := json.Marshal(p.StringOrStrings)
 				return err
 			},
 			errIs: examples.ErrInvalidValue,
