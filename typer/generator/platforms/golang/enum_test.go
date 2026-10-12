@@ -16,18 +16,6 @@ func enumProperty(name string, types []plan.PropertyType, values ...any) plan.Pr
 	return plan.Property{Name: name, Types: types, Config: &plan.PropertyConfig{Enum: values}}
 }
 
-func enumPlan(properties ...plan.Property) *plan.TrackingPlan {
-	schema := plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}}
-	for _, p := range properties {
-		schema.Properties[p.Name] = plan.PropertySchema{Property: p, Required: true}
-	}
-	return &plan.TrackingPlan{Rules: []plan.EventRule{{
-		Event:   plan.Event{EventType: plan.EventTypeTrack, Name: "Some Event"},
-		Section: plan.IdentitySectionProperties,
-		Schema:  schema,
-	}}}
-}
-
 var (
 	stringType  = []plan.PropertyType{plan.PrimitiveTypeString}
 	integerType = []plan.PropertyType{plan.PrimitiveTypeInteger}
@@ -238,7 +226,7 @@ func TestEnumNameCollisions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, err := newContext(enumPlan(tt.properties...), "", "ruddertyper")
+			ctx, err := newContext(trackPlan(tt.properties...), "", "ruddertyper")
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, ctx.PropertyTypes)
 		})
@@ -300,7 +288,7 @@ func TestGenerateRejectsInvalidEnums(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := (&Generator{}).Generate(enumPlan(tt.property), core.GenerateOptions{}, nil)
+			_, err := (&Generator{}).Generate(trackPlan(tt.property), core.GenerateOptions{}, nil)
 			assert.EqualError(t, err, tt.wantErr)
 		})
 	}

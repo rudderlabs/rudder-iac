@@ -242,19 +242,6 @@ func captureWarnings(t *testing.T) *[]string {
 	return &warnings
 }
 
-// trackPlan is a plan with one track event, "Some Event", declaring properties.
-func trackPlan(properties ...plan.Property) *plan.TrackingPlan {
-	schema := plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}}
-	for _, p := range properties {
-		schema.Properties[p.Name] = plan.PropertySchema{Property: p}
-	}
-	return &plan.TrackingPlan{Rules: []plan.EventRule{{
-		Event:   plan.Event{EventType: plan.EventTypeTrack, Name: "Some Event"},
-		Section: plan.IdentitySectionProperties,
-		Schema:  schema,
-	}}}
-}
-
 // A custom type cannot be a union member, as in Kotlin and Swift, whether the
 // union holds the property or its array items. With one non-null type it is a
 // nullable custom type, or an array of them, left out until custom types are
@@ -317,7 +304,7 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			warnings := captureWarnings(t)
 
-			_, err := (&golang.Generator{}).Generate(trackPlan(plan.Property{Name: "contact", Types: tt.types, ItemTypes: tt.items}), core.GenerateOptions{}, nil)
+			_, err := (&golang.Generator{}).Generate(golang.TrackPlan(plan.Property{Name: "contact", Types: tt.types, ItemTypes: tt.items}), core.GenerateOptions{}, nil)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
 				return
@@ -329,7 +316,7 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 }
 
 // Each value helper is emitted only when the generated types use it, under a
-// section header emitted only with one of them. trackPlan's fields are
+// section header emitted only with one of them. TrackPlan's fields are
 // optional, so Ptr comes with every type that cannot hold nil. Null also comes
 // with an untyped property, which takes Null{} to send null.
 func TestGenerateValueHelpers(t *testing.T) {
@@ -403,7 +390,7 @@ func TestGenerateValueHelpers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			files, err := (&golang.Generator{}).Generate(trackPlan(tt.properties...), core.GenerateOptions{}, nil)
+			files, err := (&golang.Generator{}).Generate(golang.TrackPlan(tt.properties...), core.GenerateOptions{}, nil)
 			require.NoError(t, err)
 			require.Len(t, files, 1)
 
