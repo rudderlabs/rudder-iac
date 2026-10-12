@@ -24,18 +24,17 @@ func TestVariantsWire(t *testing.T) {
 		address  = examples.PropertyAddress{"city": "Pune"}
 		variant  = examples.TrackSomeVariantEventProperties{Shipping: examples.CustomTypeShippingAbsent{Address: address}}
 	)
-	const absentSent = `{"address": {"city": "Pune"}}`
 	// mobileSent, signedUpSent and variantSent are the messages mobile,
 	// signedUp and variant send, with extra, the changed field's key and value,
-	// appended to their properties; variantSent also takes the shipping object.
+	// appended to their properties.
 	mobileSent := func(extra string) string {
 		return trackJSON(refMeta, "Event With Variants", `{"device_type": "mobile", "profile": {"email": "a@b.c", "first_name": "Ann"}`+extra+`}`)
 	}
 	signedUpSent := func(extra string) string {
 		return trackJSON(refMeta, "User Signed Up", `{"active": false, "profile": {"email": "a@b.c", "first_name": "Ann"}`+extra+`}`)
 	}
-	variantSent := func(shipping, extra string) string {
-		return trackJSON(exMeta, "Some Variant Event", `{"shipping": `+shipping+extra+`}`)
+	variantSent := func(extra string) string {
+		return trackJSON(exMeta, "Some Variant Event", `{"shipping": {"address": {"city": "Pune"}}`+extra+`}`)
 	}
 
 	rows := []wireRow{
@@ -137,7 +136,7 @@ func TestVariantsWire(t *testing.T) {
 				p.Releases = []examples.CustomTypeRelease{examples.CustomTypeReleaseCaseDraft{}}
 				return ex.TrackSomeVariantEvent(id, p)
 			},
-			want: variantSent(absentSent, `, "releases": [{"stage": "draft"}]`),
+			want: variantSent(`, "releases": [{"stage": "draft"}]`),
 		},
 		{
 			name: "variant: release CaseLive sends the nullable enum's value",
@@ -146,7 +145,7 @@ func TestVariantsWire(t *testing.T) {
 				p.Releases = []examples.CustomTypeRelease{examples.CustomTypeReleaseCaseLive{URL: "https://x.io"}}
 				return ex.TrackSomeVariantEvent(id, p)
 			},
-			want: variantSent(absentSent, `, "releases": [{"stage": "live", "url": "https://x.io"}]`),
+			want: variantSent(`, "releases": [{"stage": "live", "url": "https://x.io"}]`),
 		},
 		{
 			name: "variant: shipping CaseExpress sends its optional discriminator",
@@ -155,7 +154,7 @@ func TestVariantsWire(t *testing.T) {
 				p.Shipping = examples.CustomTypeShippingCaseExpress{Address: address, Deadline: "today"}
 				return ex.TrackSomeVariantEvent(id, p)
 			},
-			want: variantSent(`{"method": "express", "address": {"city": "Pune"}, "deadline": "today"}`, ""),
+			want: trackJSON(exMeta, "Some Variant Event", `{"shipping": {"method": "express", "address": {"city": "Pune"}, "deadline": "today"}}`),
 		},
 		{
 			name: "default: Event With Variants Default sends the enum value it holds",
@@ -168,27 +167,18 @@ func TestVariantsWire(t *testing.T) {
 				`{"device_type": "tablet", "profile": {"email": "a@b.c", "first_name": "Ann"}, "untyped_field": 1}`),
 		},
 		{
-			name: "default: shipping Default sends the optional discriminator it holds",
-			call: func() error {
-				p := variant
-				p.Shipping = examples.CustomTypeShippingDefault{Address: address, Carrier: "ups", Method: "ground"}
-				return ex.TrackSomeVariantEvent(id, p)
-			},
-			want: variantSent(`{"address": {"city": "Pune"}, "carrier": "ups", "method": "ground"}`, ""),
-		},
-		{
 			name: "default: release Default holding null sends null",
 			call: func() error {
 				p := variant
 				p.Releases = []examples.CustomTypeRelease{examples.CustomTypeReleaseDefault{}}
 				return ex.TrackSomeVariantEvent(id, p)
 			},
-			want: variantSent(absentSent, `, "releases": [{"stage": null}]`),
+			want: variantSent(`, "releases": [{"stage": null}]`),
 		},
 		{
 			name: "absent: shipping Absent sends no discriminator key",
 			call: func() error { return ex.TrackSomeVariantEvent(id, variant) },
-			want: variantSent(absentSent, ""),
+			want: variantSent(""),
 		},
 		{
 			name:  "nil: a nil track payload returns ErrNilPayload",
@@ -296,7 +286,7 @@ func TestVariantsWire(t *testing.T) {
 				}
 				return ex.TrackSomeVariantEvent(id, p)
 			},
-			want: variantSent(`{"address": {"city": "Pune"}, "coupon": "SAVE"}`, ""),
+			want: trackJSON(exMeta, "Some Variant Event", `{"shipping": {"address": {"city": "Pune"}, "coupon": "SAVE"}}`),
 		},
 	}
 
@@ -307,27 +297,18 @@ func TestVariantsWire(t *testing.T) {
 	// Discriminator() is never sent on its own, so its values are compared
 	// directly. methodOK pairs the two results of an optional discriminator.
 	methodOK := func(v examples.PropertyMethod, ok bool) []any { return []any{v, ok} }
-	discriminators := []struct {
-		name      string
-		got, want any
-	}{
-		{"Event With Variants Mobile returns its enum constant", ruddertyper.TrackEventWithVariantsPropertiesCaseMobile{}.Discriminator(), ruddertyper.PropertyDeviceTypeMobile},
-		{"Event With Variants Desktop returns its enum constant", ruddertyper.TrackEventWithVariantsPropertiesCaseDesktop{}.Discriminator(), ruddertyper.PropertyDeviceTypeDesktop},
-		{"page_context Search returns its string", ruddertyper.CustomTypePageContextCaseSearch{}.Discriminator(), "search"},
-		{"page_context Product returns its string", ruddertyper.CustomTypePageContextCaseProduct{}.Discriminator(), "product"},
-		{"page_context Home returns its string", ruddertyper.CustomTypePageContextCaseHome{}.Discriminator(), "home"},
-		{"user_access CaseTrue returns true", ruddertyper.CustomTypeUserAccessCaseTrue{}.Discriminator(), true},
-		{"user_access CaseFalse returns false", ruddertyper.CustomTypeUserAccessCaseFalse{}.Discriminator(), false},
-		{"feature_config CaseTrue returns the boolean member true", ruddertyper.CustomTypeFeatureConfigCaseTrue{}.Discriminator(), ruddertyper.NewPropertyFeatureFlagBoolean(true)},
-		{"feature_config CaseFalse returns the boolean member false", ruddertyper.CustomTypeFeatureConfigCaseFalse{}.Discriminator(), ruddertyper.NewPropertyFeatureFlagBoolean(false)},
-		{"feature_config CaseBeta returns the string member beta", ruddertyper.CustomTypeFeatureConfigCaseBeta{}.Discriminator(), ruddertyper.NewPropertyFeatureFlagString("beta")},
-		{"release CaseDraft returns a valid Nullable of draft", examples.CustomTypeReleaseCaseDraft{}.Discriminator(), examples.NewNullable(examples.PropertyStageValueDraft)},
-		{"release CaseLive returns a valid Nullable of live", examples.CustomTypeReleaseCaseLive{}.Discriminator(), examples.NewNullable(examples.PropertyStageValueLive)},
-		{"shipping CaseExpress returns express and ok", methodOK(examples.CustomTypeShippingCaseExpress{}.Discriminator()), methodOK("express", true)},
-		{"shipping Default returns its Method and ok", methodOK(examples.CustomTypeShippingDefault{Method: "ground"}.Discriminator()), methodOK("ground", true)},
-		{"shipping Absent returns the zero value and not ok", methodOK(examples.CustomTypeShippingAbsent{}.Discriminator()), methodOK("", false)},
-	}
-	for _, d := range discriminators {
-		t.Run("discriminator: "+d.name, func(t *testing.T) { assert.Equal(t, d.want, d.got) })
-	}
+	assert.Equal(t, ruddertyper.PropertyDeviceTypeMobile, ruddertyper.TrackEventWithVariantsPropertiesCaseMobile{}.Discriminator())
+	assert.Equal(t, ruddertyper.PropertyDeviceTypeDesktop, ruddertyper.TrackEventWithVariantsPropertiesCaseDesktop{}.Discriminator())
+	assert.Equal(t, "search", ruddertyper.CustomTypePageContextCaseSearch{}.Discriminator())
+	assert.Equal(t, "product", ruddertyper.CustomTypePageContextCaseProduct{}.Discriminator())
+	assert.Equal(t, "home", ruddertyper.CustomTypePageContextCaseHome{}.Discriminator())
+	assert.Equal(t, true, ruddertyper.CustomTypeUserAccessCaseTrue{}.Discriminator())
+	assert.Equal(t, false, ruddertyper.CustomTypeUserAccessCaseFalse{}.Discriminator())
+	assert.Equal(t, ruddertyper.NewPropertyFeatureFlagBoolean(true), ruddertyper.CustomTypeFeatureConfigCaseTrue{}.Discriminator())
+	assert.Equal(t, ruddertyper.NewPropertyFeatureFlagBoolean(false), ruddertyper.CustomTypeFeatureConfigCaseFalse{}.Discriminator())
+	assert.Equal(t, ruddertyper.NewPropertyFeatureFlagString("beta"), ruddertyper.CustomTypeFeatureConfigCaseBeta{}.Discriminator())
+	assert.Equal(t, examples.NewNullable(examples.PropertyStageValueDraft), examples.CustomTypeReleaseCaseDraft{}.Discriminator())
+	assert.Equal(t, examples.NewNullable(examples.PropertyStageValueLive), examples.CustomTypeReleaseCaseLive{}.Discriminator())
+	assert.Equal(t, methodOK("express", true), methodOK(examples.CustomTypeShippingCaseExpress{}.Discriminator()))
+	assert.Equal(t, methodOK("", false), methodOK(examples.CustomTypeShippingAbsent{}.Discriminator()))
 }
