@@ -114,7 +114,7 @@ func eventMethod(packageName string, r eventRule, name string, payload *GoStruct
 		m.Pointer = true
 		notes = append(notes, fmt.Sprintf("%s may be nil, which sends no %s.", m.Param, nouns))
 	}
-	if r.rule.Section == plan.IdentitySectionContextTraits && event.EventType == plan.EventTypeIdentify {
+	if payload != nil && r.rule.Section == plan.IdentitySectionContextTraits && event.EventType == plan.EventTypeIdentify {
 		notes = append(notes, "The traits are sent as context.traits, where they win over the traits WithAnalyticsContext sets.")
 	}
 	if m.CategoryMode != "" {
