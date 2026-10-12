@@ -190,6 +190,11 @@ func TestGenerateEventTypes(t *testing.T) {
 			rules:        []plan.EventRule{rule(plan.EventTypeScreen, "", plan.IdentitySectionContextTraits)},
 			wantWarnings: []string{`invalid section "context.traits" for event type "screen"`},
 		},
+		{
+			name:         "alias, which takes no section",
+			rules:        []plan.EventRule{rule("alias", "", plan.IdentitySectionTraits)},
+			wantWarnings: []string{`invalid section "traits" for event type "alias"`},
+		},
 	}
 
 	for _, tt := range tests {
