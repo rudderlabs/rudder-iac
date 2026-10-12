@@ -189,7 +189,7 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, error) {
 			}
 			enum, err := resolveEnum(ps.Property)
 			if err != nil {
-				return nil, fmt.Errorf("mapping property %q: %w", ps.Property.Name, err)
+				return nil, fmt.Errorf("mapping property %q of track event %q: %w", wireKey, event.Name, err)
 			}
 			r.fields = append(r.fields, ruleField{wireKey: wireKey, ps: ps, enum: enum})
 		}

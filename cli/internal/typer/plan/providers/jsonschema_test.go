@@ -1010,5 +1010,5 @@ func TestJSONSchemaPlanProvider_EnumNumberPrecision(t *testing.T) {
 
 	// Go would generate both as one float64 constant, so it fails instead.
 	_, err = (&golang.Generator{}).Generate(trackingPlan, core.GenerateOptions{}, nil)
-	assert.EqualError(t, err, `mapping property "id": enum values 9007199254740992 and 9007199254740993 are the same float64`)
+	assert.EqualError(t, err, `mapping property "id" of track event "Big Numbers": enum values 9007199254740992 and 9007199254740993 are the same float64`)
 }

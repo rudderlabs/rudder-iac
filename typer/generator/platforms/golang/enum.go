@@ -101,14 +101,14 @@ func numberValue(r *big.Rat, raw any, base string, literals map[string]any) (GoE
 	)
 	switch {
 	case base == "int64" && !isInt64:
-		return v, fmt.Errorf("enum value %v does not fit in int64", raw)
+		return v, fmt.Errorf("enum value %s does not fit in int64", jsonText(raw))
 	case isInt64 && base != "float64":
 		v.Text = r.Num().String()
 		v.Expr = "int64(" + v.Text + ")"
 	default:
 		f, _ := r.Float64()
 		if math.IsInf(f, 0) {
-			return v, fmt.Errorf("enum value %v does not fit in float64", raw)
+			return v, fmt.Errorf("enum value %s does not fit in float64", jsonText(raw))
 		}
 		v.Text = strconv.FormatFloat(f, 'f', -1, 64)
 		if !strings.Contains(v.Text, ".") {
@@ -117,7 +117,7 @@ func numberValue(r *big.Rat, raw any, base string, literals map[string]any) (GoE
 		}
 	}
 	if first, ok := literals[v.Text]; ok {
-		return v, fmt.Errorf("enum values %v and %v are the same float64", first, raw)
+		return v, fmt.Errorf("enum values %s and %s are the same float64", jsonText(first), jsonText(raw))
 	}
 	literals[v.Text] = raw
 	v.Name = strings.NewReplacer("-", "Neg", ".", "_").Replace(v.Text)
@@ -142,9 +142,18 @@ func normalizeEnumValue(v any) (any, error) {
 		r, _ = new(big.Rat).SetString(string(v))
 	}
 	if r == nil {
-		return nil, fmt.Errorf("enum value %v is not a string, finite number, boolean or null", v)
+		return nil, fmt.Errorf("enum value %s is not a string, finite number, boolean or null", jsonText(v))
 	}
 	return r, nil
+}
+
+// jsonText writes an enum value for an error as JSON, as tracking plans write
+// it, or as Go prints it when JSON cannot hold it (NaN and ±Inf).
+func jsonText(v any) string {
+	if b, err := json.Marshal(v); err == nil {
+		return string(b)
+	}
+	return fmt.Sprint(v)
 }
 
 // allows reports whether the declared types allow the normalized value v.

@@ -258,52 +258,52 @@ func TestGenerateRejectsInvalidEnums(t *testing.T) {
 		{
 			name:     "no value of the declared types",
 			property: enumProperty("kind", stringType, 1, 2),
-			wantErr:  `mapping property "kind": no enum value has a declared type (string)`,
+			wantErr:  `mapping property "kind" of track event "Some Event": no enum value has a declared type (string)`,
 		},
 		{
 			name:     "no integral value for an integer enum",
 			property: enumProperty("kind", integerType, 1.5),
-			wantErr:  `mapping property "kind": no enum value has a declared type (integer)`,
+			wantErr:  `mapping property "kind" of track event "Some Event": no enum value has a declared type (integer)`,
 		},
 		{
 			name:     "object value",
 			property: enumProperty("kind", nil, "a", map[string]any{"b": 1}),
-			wantErr:  `mapping property "kind": enum value map[b:1] is not a string, finite number, boolean or null`,
+			wantErr:  `mapping property "kind" of track event "Some Event": enum value {"b":1} is not a string, finite number, boolean or null`,
 		},
 		{
 			name:     "array value",
 			property: enumProperty("kind", nil, []any{1}),
-			wantErr:  `mapping property "kind": enum value [1] is not a string, finite number, boolean or null`,
+			wantErr:  `mapping property "kind" of track event "Some Event": enum value [1] is not a string, finite number, boolean or null`,
 		},
 		{
 			name:     "NaN",
 			property: enumProperty("kind", numberType, math.NaN()),
-			wantErr:  `mapping property "kind": enum value NaN is not a string, finite number, boolean or null`,
+			wantErr:  `mapping property "kind" of track event "Some Event": enum value NaN is not a string, finite number, boolean or null`,
 		},
 		{
 			name:     "infinity",
 			property: enumProperty("kind", numberType, math.Inf(1)),
-			wantErr:  `mapping property "kind": enum value +Inf is not a string, finite number, boolean or null`,
+			wantErr:  `mapping property "kind" of track event "Some Event": enum value +Inf is not a string, finite number, boolean or null`,
 		},
 		{
 			name:     "two values one float64 represents",
 			property: enumProperty("kind", numberType, json.Number("9007199254740992"), json.Number("9007199254740993")),
-			wantErr:  `mapping property "kind": enum values 9007199254740992 and 9007199254740993 are the same float64`,
+			wantErr:  `mapping property "kind" of track event "Some Event": enum values 9007199254740992 and 9007199254740993 are the same float64`,
 		},
 		{
 			name:     "an int64 and a float64 of a mixed enum written alike",
 			property: enumProperty("kind", nil, "a", json.Number("9007199254740992"), json.Number("9007199254740992.5")),
-			wantErr:  `mapping property "kind": enum values 9007199254740992 and 9007199254740992.5 are the same float64`,
+			wantErr:  `mapping property "kind" of track event "Some Event": enum values 9007199254740992 and 9007199254740992.5 are the same float64`,
 		},
 		{
 			name:     "integer beyond int64",
 			property: enumProperty("kind", integerType, json.Number("9223372036854775808")),
-			wantErr:  `mapping property "kind": enum value 9223372036854775808 does not fit in int64`,
+			wantErr:  `mapping property "kind" of track event "Some Event": enum value 9223372036854775808 does not fit in int64`,
 		},
 		{
 			name:     "number beyond float64",
 			property: enumProperty("kind", numberType, json.Number("1e400")),
-			wantErr:  `mapping property "kind": enum value 1e400 does not fit in float64`,
+			wantErr:  `mapping property "kind" of track event "Some Event": enum value 1e400 does not fit in float64`,
 		},
 	}
 
