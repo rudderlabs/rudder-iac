@@ -264,7 +264,7 @@ func TestVariantsWire(t *testing.T) {
 			call: func() error {
 				return ex.TrackSomeOpenVariantEvent(id, examples.TrackSomeOpenVariantEventPropertiesCaseOnLine{
 					URL:                  "u",
-					AdditionalProperties: map[string]any{"coupon": "SAVE", "geo": "override", "meta": "override", "kind": "offline"},
+					AdditionalProperties: map[string]any{"coupon": "SAVE", "discriminator": "override", "geo": "override", "meta": "override", "kind": "offline"},
 				})
 			},
 			want: trackJSON(exMeta, "Some Open Variant Event", `{"kind": "on-line", "url": "u", "coupon": "SAVE"}`),
@@ -274,7 +274,7 @@ func TestVariantsWire(t *testing.T) {
 			call: func() error {
 				return ex.TrackSomeOpenVariantEvent(id, examples.TrackSomeOpenVariantEventPropertiesDefault{
 					Kind:                 "retail",
-					AdditionalProperties: map[string]any{"coupon": "SAVE", "meta": "override", "note": "override", "kind": "on-line"},
+					AdditionalProperties: map[string]any{"coupon": "SAVE", "discriminator": "override", "meta": "override", "note": "override", "kind": "on-line"},
 				})
 			},
 			want: trackJSON(exMeta, "Some Open Variant Event", `{"kind": "retail", "coupon": "SAVE"}`),
