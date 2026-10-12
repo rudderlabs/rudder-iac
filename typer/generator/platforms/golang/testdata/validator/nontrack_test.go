@@ -49,11 +49,6 @@ func TestNonTrackWire(t *testing.T) {
 				"context": {"traits": {"email": "new@b.c", "plan": "free"}, "ruddertyper": ` + idsMeta + `}}`,
 		},
 		{
-			name: "examples: identify with nil traits sends no traits",
-			call: func() error { return ex.Identify(id, nil) },
-			want: messageJSON(exMeta, "identify", ""),
-		},
-		{
 			name: "identitysections: group on traits sends the message's traits",
 			call: func() error {
 				return ids.Group(idsID, "g1", &identitysections.GroupTraits{Active: true, Status: identitysections.Ptr(identitysections.CustomTypeStatusActive)})
@@ -68,11 +63,6 @@ func TestNonTrackWire(t *testing.T) {
 			},
 			want: `{"type": "group", "channel": "server", "userId": "user-123", "groupId": "g1", "traits": {"active": true},
 				"context": {"traits": {"active": false, "plan": "pro"}, "ruddertyper": ` + refMeta + `}}`,
-		},
-		{
-			name: "identitysections: group with nil traits sends no traits",
-			call: func() error { return ids.Group(idsID, "g1", nil) },
-			want: messageJSON(idsMeta, "group", `, "groupId": "g1"`),
 		},
 		{
 			name: "emptyidentity: the empty identify sends no traits and leaves the caller's context.traits untouched",
@@ -240,12 +230,12 @@ func TestNonTrackWire(t *testing.T) {
 			want: messageJSON(exMeta, "track", `, "event": "Some Empty Track Event"`),
 		},
 		{
-			name: "examples: WithCategory on identify is ignored",
+			name: "examples: identify with nil traits sends no traits, and ignores WithCategory",
 			call: func() error { return ex.Identify(id, nil, examples.WithCategory("Products")) },
 			want: messageJSON(exMeta, "identify", ""),
 		},
 		{
-			name: "examples: WithCategory on group is ignored",
+			name: "examples: group with nil traits sends no traits, and ignores WithCategory",
 			call: func() error { return ex.Group(id, "g1", nil, examples.WithCategory("Products")) },
 			want: messageJSON(exMeta, "group", `, "groupId": "g1"`),
 		},
