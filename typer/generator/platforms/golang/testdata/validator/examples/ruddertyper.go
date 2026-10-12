@@ -193,7 +193,7 @@ type CustomTypeSomeVariantTypeCaseCase1 struct {
 func (CustomTypeSomeVariantTypeCaseCase1) isCustomTypeSomeVariantType() {}
 
 // Discriminator returns "case_1".
-func (v CustomTypeSomeVariantTypeCaseCase1) Discriminator() PropertySomeString { return "case_1" }
+func (CustomTypeSomeVariantTypeCaseCase1) Discriminator() PropertySomeString { return "case_1" }
 
 func (v CustomTypeSomeVariantTypeCaseCase1) toMap() map[string]any {
 	m := map[string]any{
@@ -217,7 +217,7 @@ type CustomTypeSomeVariantTypeCaseCase2A struct {
 func (CustomTypeSomeVariantTypeCaseCase2A) isCustomTypeSomeVariantType() {}
 
 // Discriminator returns "case_2_a".
-func (v CustomTypeSomeVariantTypeCaseCase2A) Discriminator() PropertySomeString { return "case_2_a" }
+func (CustomTypeSomeVariantTypeCaseCase2A) Discriminator() PropertySomeString { return "case_2_a" }
 
 func (v CustomTypeSomeVariantTypeCaseCase2A) toMap() map[string]any {
 	m := map[string]any{
@@ -244,7 +244,7 @@ type CustomTypeSomeVariantTypeCaseCase2B struct {
 func (CustomTypeSomeVariantTypeCaseCase2B) isCustomTypeSomeVariantType() {}
 
 // Discriminator returns "case_2_b".
-func (v CustomTypeSomeVariantTypeCaseCase2B) Discriminator() PropertySomeString { return "case_2_b" }
+func (CustomTypeSomeVariantTypeCaseCase2B) Discriminator() PropertySomeString { return "case_2_b" }
 
 func (v CustomTypeSomeVariantTypeCaseCase2B) toMap() map[string]any {
 	m := map[string]any{
@@ -343,7 +343,7 @@ type CustomTypeReleaseCaseDraft struct{}
 func (CustomTypeReleaseCaseDraft) isCustomTypeRelease() {}
 
 // Discriminator returns "draft".
-func (v CustomTypeReleaseCaseDraft) Discriminator() PropertyStage {
+func (CustomTypeReleaseCaseDraft) Discriminator() PropertyStage {
 	return NewNullable[PropertyStageValue](PropertyStageValueDraft)
 }
 
@@ -367,7 +367,7 @@ type CustomTypeReleaseCaseLive struct {
 func (CustomTypeReleaseCaseLive) isCustomTypeRelease() {}
 
 // Discriminator returns "live".
-func (v CustomTypeReleaseCaseLive) Discriminator() PropertyStage {
+func (CustomTypeReleaseCaseLive) Discriminator() PropertyStage {
 	return NewNullable[PropertyStageValue](PropertyStageValueLive)
 }
 
@@ -424,9 +424,7 @@ type CustomTypeShippingAbsent struct {
 func (CustomTypeShippingAbsent) isCustomTypeShipping() {}
 
 // Discriminator reports that "method" is absent.
-func (v CustomTypeShippingAbsent) Discriminator() (value PropertyMethod, ok bool) {
-	return value, false
-}
+func (CustomTypeShippingAbsent) Discriminator() (value PropertyMethod, ok bool) { return value, false }
 
 func (v CustomTypeShippingAbsent) toMap() map[string]any {
 	m := withAdditional(v.AdditionalProperties, "address", "method")
@@ -448,7 +446,7 @@ type CustomTypeShippingCaseExpress struct {
 func (CustomTypeShippingCaseExpress) isCustomTypeShipping() {}
 
 // Discriminator returns "express".
-func (v CustomTypeShippingCaseExpress) Discriminator() (value PropertyMethod, ok bool) {
+func (CustomTypeShippingCaseExpress) Discriminator() (value PropertyMethod, ok bool) {
 	return "express", true
 }
 
@@ -914,7 +912,7 @@ type TrackDeviceEventPropertiesCaseMobile struct {
 func (TrackDeviceEventPropertiesCaseMobile) isTrackDeviceEventProperties() {}
 
 // Discriminator returns "mobile".
-func (v TrackDeviceEventPropertiesCaseMobile) Discriminator() PropertyDeviceType { return "mobile" }
+func (TrackDeviceEventPropertiesCaseMobile) Discriminator() PropertyDeviceType { return "mobile" }
 
 func (v TrackDeviceEventPropertiesCaseMobile) toMap() map[string]any {
 	m := map[string]any{
@@ -943,7 +941,7 @@ type TrackDeviceEventPropertiesCaseDesktop struct {
 func (TrackDeviceEventPropertiesCaseDesktop) isTrackDeviceEventProperties() {}
 
 // Discriminator returns "desktop".
-func (v TrackDeviceEventPropertiesCaseDesktop) Discriminator() PropertyDeviceType { return "desktop" }
+func (TrackDeviceEventPropertiesCaseDesktop) Discriminator() PropertyDeviceType { return "desktop" }
 
 func (v TrackDeviceEventPropertiesCaseDesktop) toMap() map[string]any {
 	m := map[string]any{
@@ -1447,7 +1445,7 @@ type TrackSomeOpenVariantEventPropertiesCaseOnLine struct {
 func (TrackSomeOpenVariantEventPropertiesCaseOnLine) isTrackSomeOpenVariantEventProperties() {}
 
 // Discriminator returns "on-line".
-func (v TrackSomeOpenVariantEventPropertiesCaseOnLine) Discriminator() PropertyKind { return "on-line" }
+func (TrackSomeOpenVariantEventPropertiesCaseOnLine) Discriminator() PropertyKind { return "on-line" }
 
 func (v TrackSomeOpenVariantEventPropertiesCaseOnLine) toMap() map[string]any {
 	m := withAdditional(v.AdditionalProperties, "discriminator", "geo", "kind", "meta", "url")
@@ -1506,9 +1504,7 @@ type TrackSomeOpenVariantEventPropertiesCaseOnLine1 struct {
 func (TrackSomeOpenVariantEventPropertiesCaseOnLine1) isTrackSomeOpenVariantEventProperties() {}
 
 // Discriminator returns "on_line".
-func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1) Discriminator() PropertyKind {
-	return "on_line"
-}
+func (TrackSomeOpenVariantEventPropertiesCaseOnLine1) Discriminator() PropertyKind { return "on_line" }
 
 func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1) toMap() map[string]any {
 	m := withAdditional(v.AdditionalProperties, "discriminator", "geo", "kind", "meta", "url")

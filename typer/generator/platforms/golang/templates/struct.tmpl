@@ -18,7 +18,7 @@ type {{ .Name }} struct {
 func ({{ $.Name }}) is{{ .Name }}() {}
 
 {{ comment $.DiscriminatorDoc }}
-func (v {{ $.Name }}) Discriminator() {{ .Result }} { return {{ $.Returns }} }
+func ({{ if $.ReadsReceiver }}v {{ end }}{{ $.Name }}) Discriminator() {{ .Result }} { return {{ $.Returns }} }
 {{- end }}
 {{- if not .MapAlias }}
 

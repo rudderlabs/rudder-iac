@@ -242,7 +242,7 @@ type CustomTypeFeatureConfigCaseTrue struct {
 func (CustomTypeFeatureConfigCaseTrue) isCustomTypeFeatureConfig() {}
 
 // Discriminator returns true.
-func (v CustomTypeFeatureConfigCaseTrue) Discriminator() PropertyFeatureFlag {
+func (CustomTypeFeatureConfigCaseTrue) Discriminator() PropertyFeatureFlag {
 	return NewPropertyFeatureFlagBoolean(true)
 }
 
@@ -271,7 +271,7 @@ type CustomTypeFeatureConfigCaseFalse struct {
 func (CustomTypeFeatureConfigCaseFalse) isCustomTypeFeatureConfig() {}
 
 // Discriminator returns false.
-func (v CustomTypeFeatureConfigCaseFalse) Discriminator() PropertyFeatureFlag {
+func (CustomTypeFeatureConfigCaseFalse) Discriminator() PropertyFeatureFlag {
 	return NewPropertyFeatureFlagBoolean(false)
 }
 
@@ -300,7 +300,7 @@ type CustomTypeFeatureConfigCaseBeta struct {
 func (CustomTypeFeatureConfigCaseBeta) isCustomTypeFeatureConfig() {}
 
 // Discriminator returns "beta".
-func (v CustomTypeFeatureConfigCaseBeta) Discriminator() PropertyFeatureFlag {
+func (CustomTypeFeatureConfigCaseBeta) Discriminator() PropertyFeatureFlag {
 	return NewPropertyFeatureFlagString("beta")
 }
 
@@ -367,7 +367,7 @@ type CustomTypePageContextCaseSearch struct {
 func (CustomTypePageContextCaseSearch) isCustomTypePageContext() {}
 
 // Discriminator returns "search".
-func (v CustomTypePageContextCaseSearch) Discriminator() PropertyPageType { return "search" }
+func (CustomTypePageContextCaseSearch) Discriminator() PropertyPageType { return "search" }
 
 func (v CustomTypePageContextCaseSearch) toMap() map[string]any {
 	m := map[string]any{
@@ -392,7 +392,7 @@ type CustomTypePageContextCaseProduct struct {
 func (CustomTypePageContextCaseProduct) isCustomTypePageContext() {}
 
 // Discriminator returns "product".
-func (v CustomTypePageContextCaseProduct) Discriminator() PropertyPageType { return "product" }
+func (CustomTypePageContextCaseProduct) Discriminator() PropertyPageType { return "product" }
 
 func (v CustomTypePageContextCaseProduct) toMap() map[string]any {
 	m := map[string]any{
@@ -415,7 +415,7 @@ type CustomTypePageContextCaseHome struct{}
 func (CustomTypePageContextCaseHome) isCustomTypePageContext() {}
 
 // Discriminator returns "home".
-func (v CustomTypePageContextCaseHome) Discriminator() PropertyPageType { return "home" }
+func (CustomTypePageContextCaseHome) Discriminator() PropertyPageType { return "home" }
 
 func (v CustomTypePageContextCaseHome) toMap() map[string]any {
 	m := map[string]any{
@@ -521,7 +521,7 @@ type CustomTypeUserAccessCaseTrue struct {
 func (CustomTypeUserAccessCaseTrue) isCustomTypeUserAccess() {}
 
 // Discriminator returns true.
-func (v CustomTypeUserAccessCaseTrue) Discriminator() PropertyActive { return true }
+func (CustomTypeUserAccessCaseTrue) Discriminator() PropertyActive { return true }
 
 func (v CustomTypeUserAccessCaseTrue) toMap() map[string]any {
 	m := map[string]any{
@@ -546,7 +546,7 @@ type CustomTypeUserAccessCaseFalse struct {
 func (CustomTypeUserAccessCaseFalse) isCustomTypeUserAccess() {}
 
 // Discriminator returns false.
-func (v CustomTypeUserAccessCaseFalse) Discriminator() PropertyActive { return false }
+func (CustomTypeUserAccessCaseFalse) Discriminator() PropertyActive { return false }
 
 func (v CustomTypeUserAccessCaseFalse) toMap() map[string]any {
 	m := map[string]any{
@@ -1324,7 +1324,7 @@ type TrackEventWithVariantsPropertiesCaseMobile struct {
 func (TrackEventWithVariantsPropertiesCaseMobile) isTrackEventWithVariantsProperties() {}
 
 // Discriminator returns PropertyDeviceTypeMobile.
-func (v TrackEventWithVariantsPropertiesCaseMobile) Discriminator() PropertyDeviceType {
+func (TrackEventWithVariantsPropertiesCaseMobile) Discriminator() PropertyDeviceType {
 	return PropertyDeviceTypeMobile
 }
 
@@ -1365,7 +1365,7 @@ type TrackEventWithVariantsPropertiesCaseDesktop struct {
 func (TrackEventWithVariantsPropertiesCaseDesktop) isTrackEventWithVariantsProperties() {}
 
 // Discriminator returns PropertyDeviceTypeDesktop.
-func (v TrackEventWithVariantsPropertiesCaseDesktop) Discriminator() PropertyDeviceType {
+func (TrackEventWithVariantsPropertiesCaseDesktop) Discriminator() PropertyDeviceType {
 	return PropertyDeviceTypeDesktop
 }
 

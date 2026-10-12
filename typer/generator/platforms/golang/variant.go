@@ -351,7 +351,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 		}
 		field := &st.Fields[slices.IndexFunc(st.Fields, func(f GoField) bool { return f.Key == v.key })]
 		st.DiscriminatorDoc = "Discriminator returns " + field.Name + "."
-		st.Returns = "v." + field.Name + ok
+		st.Returns, st.ReadsReceiver = "v."+field.Name+ok, true
 		ctx.afterValueNames = append(ctx.afterValueNames, func(decls map[string]GoDecl) {
 			st.Doc, field.Note = defaultDocs(decls, typ, v, name, st.Name)
 		})

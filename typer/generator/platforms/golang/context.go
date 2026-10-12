@@ -138,9 +138,11 @@ type GoStruct struct {
 	// GoStruct naming it, with Variant set to it.
 	Variant *GoVariant
 	// DiscriminatorDoc documents the Discriminator method, which returns
-	// Returns.
+	// Returns. The method names its receiver only when Returns reads it, as
+	// Default's does.
 	DiscriminatorDoc string
 	Returns          string
+	ReadsReceiver    bool
 	// Sends is the discriminator value a case's toMap writes; empty for
 	// Absent, which sends none, and Default, whose field holds it.
 	Sends string
