@@ -6,7 +6,7 @@ Generates a type-safe Go package for a tracking plan on top of analytics-go. Eac
 
 - `rudder-cli typer generate --platform go --tracking-plan-id <id>` generates from your workspace's tracking plan; add `--local --location <project>` to generate from local specs ([Target Versions][spec]).
 - `rudder-cli typer options --platform go` lists the options; set one with `--option name=value` ([Generator Options][spec]).
-- The output is one file, written to the `--output` (`-o`) directory, `.` by default. Point it at the package's own directory, such as `-o internal/ruddertyper` ([Target Versions][spec]).
+- The output is one file, `ruddertyper.go` in package `ruddertyper`; the `outputFileName` and `packageName` options rename them ([Generator Options][spec]). `--output` (`-o`) sets its directory, `.` by default: point it at the package's own directory, such as `-o internal/ruddertyper`.
 - Never edit the file; regenerate it after every tracking plan change ([Generated File Structure][spec]).
 - It needs Go 1.21 or later and analytics-go v4.2.2 or later, imported as `analytics "github.com/rudderlabs/analytics-go/v4"` ([Target Versions][spec]).
 
@@ -27,7 +27,7 @@ user := ruddertyper.Identity{UserID: "user-123"}
 ## Calling
 
 - Every method takes an `Identity` first. Set `UserID`, `AnonymousID` or both: the SDK keeps no current user and rejects a call that sets neither ([Generated File Structure][spec]).
-- Payloads are generated types. Track takes a value; page, screen, identify and group take a pointer, and `nil` sends no payload. An event whose rule allows no properties has no payload parameter ([Event Types][spec]).
+- Payloads are generated types. For a struct payload, track takes a value and page, screen, identify and group take a pointer (`nil` sends no payload); variant and open-map payloads are passed as is. An event whose rule allows no properties has no payload parameter ([Event Types][spec]).
 - Required fields hold values, and optional fields pointers (or `nil`-able slices, maps and interfaces). Set an optional scalar with `Ptr`; integer fields need `ruddertyper.Ptr[int64](2)`, because `Ptr(2)` is an `*int` ([Required and Optional Fields][spec]).
 
 ```go
@@ -39,8 +39,8 @@ props := ruddertyper.TrackSomeTrackEventProperties{
 ```
 
 - A property that is one type or `null` is a `Nullable[T]`, whose zero value is `null`. Build a value with `NewNullable[T](v)` and write `T` out: `NewNullable(1)` is a `Nullable[int]`, not a `Nullable[int64]` ([Nullable Types][spec], [Discriminator Values][spec]).
-- Multi-type values come from their `New{Type}{Member}` constructors ([Multi-Type Properties][spec]), and enum values from their typed constants ([Enums][spec]).
-- For a variant, pass a case struct by value: it fixes the discriminator. The `Default` struct takes any other discriminator value ([Custom Type with Variants][spec], [Event Rule with Variants][spec]).
+- Multi-type values come from their `New{Type}{Member}` constructors ([Multi-Type Properties][spec]), and enum values from their typed constants, or for a mixed enum from its value functions ([Enums][spec]).
+- For a variant, pass a case struct (by value, so type switches match); it fixes the discriminator. The `Default` struct takes any other discriminator value ([Custom Type with Variants][spec], [Event Rule with Variants][spec]).
 
 ```go
 err := rt.TrackDeviceEvent(user, ruddertyper.TrackDeviceEventPropertiesCaseMobile{OsVersion: "17.1", AppVersion: "2.0"})
@@ -85,7 +85,7 @@ err = rt.Page(
 )
 ```
 
-- `WithCategory` sets `properties.category` on page and screen calls: it must equal a category the payload already holds, or else the schema must be open and not declare `category`. Anything else fails with `ErrCategoryConflict`, even `WithCategory("")`; leave the option out to send no category ([Call Options][spec], [Page Events][spec]).
+- `WithCategory` sets `properties.category` on page and screen calls: it must equal a category the payload already holds, or else the schema must be open and not declare `category`. Anything else fails with `ErrCategoryConflict`. An empty string is checked and sent like any other value; leave the option out to send no category ([Call Options][spec], [Page Events][spec]).
 - External IDs travel in the context: `WithAnalyticsContext(analytics.Context{Extra: map[string]any{"externalId": ...}})` ([Call Options][spec]).
 - Go does not allow single options and an `opts...` slice in one call. Build one slice instead: `append([]ruddertyper.Option{ruddertyper.WithCategory(category)}, opts...)` ([Alternate Invocations (Function Overloads)][spec]).
 
@@ -93,7 +93,7 @@ err = rt.Page(
 
 - Methods return the SDK's errors unchanged, and their own errors wrap three sentinels. Match them with `errors.Is` and `errors.As`, never by the error's type ([Errors][spec]):
   - `ErrNilPayload`: a nil or typed-nil track variant payload.
-  - `ErrInvalidValue`: an unset value that has no valid zero value (see Caveats), or a value that cannot be serialized.
+  - `ErrInvalidValue`: an unset value that has no valid zero value (see Caveats), or a payload or option value that cannot be sent.
   - `ErrCategoryConflict`: a `WithCategory` the rule does not accept.
   - SDK errors: `errors.As(err, &analytics.FieldError{})` when the identity or group ID is missing, and `errors.Is(err, analytics.ErrClosed)` after `Close`.
 - A `nil` error means the message was queued. Delivery failures and messages over `Config.MaxMessageBytes` reach only the client-wide `Config.Callback`, whose messages hold plain maps and slices, not the generated types ([Errors][spec], [Serialization Internals][appendix]).
@@ -124,7 +124,7 @@ if err == nil {
 
 ## Developing
 
-- `testdata/validator/` holds one golden per plan, each in its own package: `ruddertyper/` (reference), `identitysections/`, `emptyidentity/`, `examples/` (`testutils/examples_plan.go`); `generator_test.go` diffs against them ([Testing][appendix]).
+- `testdata/validator/` holds one golden per plan, each in its own package: `ruddertyper/` (reference), `identitysections/`, `emptyidentity/`, `examples/` (`testutils/examples_plan.go`). `go test ./typer/generator/platforms/golang/...` runs the unit tests and diffs the generator's output against the goldens ([Testing][appendix]).
 - `make typer-go-update-testdata` regenerates every golden after a generator or plan change ([Testing][appendix]).
 - `make typer-go-validate` runs vet, gofmt and `go test -race` in the `testdata/validator` module (analytics-go v4.2.2), compiling the goldens and `examples_test.go` ([Testing][appendix]). It also checks that this README's samples are quoted from `examples_test.go`.
 - CI (`.github/workflows/typer-go-validate.yml`) regenerates the goldens and fails when one is stale, then runs `make typer-go-validate` with Go 1.21.0, against v4.2.2 and against the latest analytics-go v4 ([Testing][appendix]).
