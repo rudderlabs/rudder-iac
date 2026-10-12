@@ -1,5 +1,24 @@
 package plan
 
+import (
+	"encoding/json"
+	"slices"
+	"strconv"
+)
+
+// Float64Numbers returns a copy of enum or match values with each json.Number
+// replaced by the float64 that decoding without UseNumber gives, which is what
+// the Kotlin, Swift and TypeScript generators format.
+func Float64Numbers(values []any) []any {
+	values = slices.Clone(values)
+	for i, v := range values {
+		if n, ok := v.(json.Number); ok {
+			values[i], _ = strconv.ParseFloat(string(n), 64)
+		}
+	}
+	return values
+}
+
 // ExtractAllCustomTypes extracts all custom types from a tracking plan
 // Returns a map of custom type name to CustomType
 func (tp *TrackingPlan) ExtractAllCustomTypes() map[string]*CustomType {

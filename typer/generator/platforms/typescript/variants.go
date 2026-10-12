@@ -65,7 +65,7 @@ func buildVariantGroup(
 	var coveredValues []any
 
 	for _, vc := range variant.Cases {
-		for _, matchValue := range vc.Match {
+		for _, matchValue := range plan.Float64Numbers(vc.Match) {
 			coveredValues = append(coveredValues, matchValue)
 
 			caseName := formatVariantCaseName(parentName, matchValue)

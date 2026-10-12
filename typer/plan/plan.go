@@ -45,6 +45,9 @@ type PropertyType any
 
 // PropertyConfig represents additional configuration for a property
 type PropertyConfig struct {
+	// Enum holds strings, booleans, nil and numbers. Numbers from the remote
+	// catalog are json.Number, which keeps their exact value; other plans hold
+	// float64 or int (see Float64Numbers).
 	Enum []any `json:"enum,omitempty"`
 }
 
@@ -107,7 +110,7 @@ type Variant struct {
 // VariantCase represents a single case in a variant
 type VariantCase struct {
 	DisplayName string       `json:"displayName,omitempty"`
-	Match       []any        `json:"match"`
+	Match       []any        `json:"match"` // numbers as in PropertyConfig.Enum
 	Description string       `json:"description,omitempty"`
 	Schema      ObjectSchema `json:"schema"`
 }

@@ -436,7 +436,7 @@ func formatEnumLiteral(value any) string {
 
 func buildEnumUnion(values []any) string {
 	parts := make([]string, 0, len(values))
-	for _, v := range values {
+	for _, v := range plan.Float64Numbers(values) {
 		parts = append(parts, formatEnumLiteral(v))
 	}
 	if len(parts) == 0 {
