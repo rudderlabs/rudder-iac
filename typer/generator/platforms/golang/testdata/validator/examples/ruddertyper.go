@@ -157,6 +157,55 @@ func (n Nullable[T]) MarshalJSON() ([]byte, error) { return marshal(n) }
 
 // --- Custom types ---
 
+// CustomTypeCoded represents the custom type "Coded", a discriminated union on "code". It is implemented by CustomTypeCodedCase1 and CustomTypeCodedCaseA.
+type CustomTypeCoded interface {
+	json.Marshaler
+	// Discriminator returns the value of "code".
+	Discriminator() PropertyCode
+	toMap() map[string]any
+	isCustomTypeCoded()
+}
+
+// CustomTypeCodedCase1 is the case where code is 1.
+type CustomTypeCodedCase1 struct{}
+
+func (CustomTypeCodedCase1) isCustomTypeCoded() {}
+
+// Discriminator returns PropertyCode1().
+func (CustomTypeCodedCase1) Discriminator() PropertyCode { return PropertyCode1() }
+
+func (v CustomTypeCodedCase1) toMap() map[string]any {
+	m := map[string]any{
+		"code": v.Discriminator(),
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeCodedCase1) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeCodedCaseA is the case where code is "a".
+type CustomTypeCodedCaseA struct{}
+
+func (CustomTypeCodedCaseA) isCustomTypeCoded() {}
+
+// Discriminator returns PropertyCodeA().
+func (CustomTypeCodedCaseA) Discriminator() PropertyCode { return PropertyCodeA() }
+
+func (v CustomTypeCodedCaseA) toMap() map[string]any {
+	m := map[string]any{
+		"code": v.Discriminator(),
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeCodedCaseA) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
 // CustomTypeRow represents the custom type "Row".
 type CustomTypeRow = []string
 
@@ -554,6 +603,43 @@ type PropertyCategory = string
 
 // PropertyCleared represents the property "cleared".
 type PropertyCleared = Null
+
+// PropertyCode represents the property "code", whose allowed values have different JSON types.
+// Values can only be obtained from the functions below; the zero value cannot be sent.
+type PropertyCode struct{ value any }
+
+// PropertyCodeA returns the allowed value "a".
+func PropertyCodeA() PropertyCode { return PropertyCode{value: "a"} }
+
+// PropertyCode1 returns the allowed value 1.
+func PropertyCode1() PropertyCode { return PropertyCode{value: int64(1)} }
+
+// PropertyCodeValues returns every allowed value, in tracking plan order.
+func PropertyCodeValues() []PropertyCode {
+	return []PropertyCode{
+		PropertyCodeA(),
+		PropertyCode1(),
+	}
+}
+
+// Value returns the underlying JSON value.
+func (v PropertyCode) Value() any { return v.value }
+
+// IsValid reports whether v is an allowed value. Only the zero value is not.
+func (v PropertyCode) IsValid() bool { return v.value != nil }
+
+func (v PropertyCode) wireValue() (any, error) {
+	if v.value == nil {
+		return nil, fmt.Errorf("%w: PropertyCode is not set", ErrInvalidValue)
+	}
+	return v.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value.
+func (v PropertyCode) MarshalJSON() ([]byte, error) { return marshal(v) }
+
+// PropertyCoded represents the property "coded".
+type PropertyCoded = CustomTypeCoded
 
 // PropertyCompanyName represents the property "companyName".
 type PropertyCompanyName = string
@@ -1482,6 +1568,28 @@ func (v TrackEventWithNameCamelCaseProperties) ToProperties() (analytics.Propert
 
 // MarshalJSON implements json.Marshaler using the tracking plan's keys.
 func (v TrackEventWithNameCamelCaseProperties) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackCodedEventProperties holds the properties of "Coded Event".
+type TrackCodedEventProperties struct {
+	Coded                PropertyCoded  // required
+	AdditionalProperties map[string]any // optional; undeclared keys only
+}
+
+func (v TrackCodedEventProperties) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "coded")
+	m["coded"] = required(v.Coded, "coded")
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackCodedEventProperties) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackCodedEventProperties) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 
@@ -2533,6 +2641,15 @@ func (r *RudderTyperAnalytics) TrackEventWithNameCamelCase(identity Identity, pr
 		return err
 	}
 	return r.track(identity, "$eventWithNameCamelCase$!", p, opts)
+}
+
+// TrackCodedEvent sends the track event "Coded Event".
+func (r *RudderTyperAnalytics) TrackCodedEvent(identity Identity, props TrackCodedEventProperties, opts ...Option) error {
+	p, err := props.ToProperties()
+	if err != nil {
+		return err
+	}
+	return r.track(identity, "Coded Event", p, opts)
 }
 
 // TrackDeviceEvent sends the track event "Device Event". props must hold one of the case structs; nil, including a nil pointer, returns ErrNilPayload.

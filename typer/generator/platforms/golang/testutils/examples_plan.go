@@ -96,6 +96,20 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				}},
 			}},
 		}
+		// A mixed-enum discriminator whose cases cover every value, so there
+		// is no Default.
+		coded = &plan.CustomType{
+			Name: "Coded",
+			Type: object,
+			Schema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+				"code": required(enum(property("code", "", plan.PrimitiveTypeString, plan.PrimitiveTypeInteger), "a", 1)),
+			}},
+			Variants: []plan.Variant{{
+				Type:          "discriminator",
+				Discriminator: "code",
+				Cases:         []plan.VariantCase{{Match: []any{1}}, {Match: []any{"a"}}},
+			}},
+		}
 		// The spec's variant rule.
 		deviceEvent = track("Device Event", "", false, map[string]plan.PropertySchema{
 			"deviceType": required(property("deviceType", "", plan.PrimitiveTypeString)),
@@ -321,6 +335,11 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"someVariantType": optional(property("someVariantType", "", someVariantType)),
 				"shipping":        required(property("shipping", "", shipping)),
 				"releases":        optional(items(property("releases", "", plan.PrimitiveTypeArray), release)),
+			}),
+			// An open rule's required variant field, which toMap writes outside
+			// the map literal.
+			track("Coded Event", "", true, map[string]plan.PropertySchema{
+				"coded": required(property("coded", "", coded)),
 			}),
 			// The spec's identify, group, page and screen rules. The page rule is
 			// open, so WithCategory may add a category; the screen rule is closed.
