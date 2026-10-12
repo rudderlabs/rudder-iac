@@ -33,10 +33,11 @@ type variantSchema struct {
 // so that each struct's discriminator is fixed.
 type variantCase struct {
 	vc *plan.VariantCase
-	// value is the normalized match value, and text its Go literal.
-	value  any
-	text   string
-	schema *objectSchema
+	// value is the normalized match value, text its Go literal and name the
+	// suffix of its struct's name.
+	value      any
+	text, name string
+	schema     *objectSchema
 }
 
 // schemas are the base schema and the merged branches, whose fields need
@@ -145,7 +146,7 @@ func (res *resolver) mergeVariant(s *plan.ObjectSchema, base *objectSchema, vari
 		// toMap sends the discriminator a case fixes.
 		schema.fields = withoutField(schema.fields, v.key)
 		for _, m := range vc.Match {
-			value, text, err := matchValue(m)
+			value, text, name, err := matchValue(m)
 			switch {
 			case err != nil:
 				return nil, fmt.Errorf("%s: %w", label, err)
@@ -155,7 +156,7 @@ func (res *resolver) mergeVariant(s *plan.ObjectSchema, base *objectSchema, vari
 				return nil, fmt.Errorf("%s: match value %s appears more than once", label, text)
 			}
 			matched[text] = true
-			v.cases = append(v.cases, variantCase{vc: vc, value: value, text: text, schema: schema})
+			v.cases = append(v.cases, variantCase{vc: vc, value: value, text: text, name: name, schema: schema})
 		}
 	}
 
@@ -211,22 +212,25 @@ func withoutField(fields []ruleField, key string) []ruleField {
 }
 
 // matchValue normalizes a match value as enum values are, so 1 and 1.0 match
-// alike, and returns it with its Go literal.
-func matchValue(m any) (any, string, error) {
+// alike, and returns it with its Go literal and its name, which Enum Constant
+// Names would give it as an enum value.
+func matchValue(m any) (value any, text, name string, err error) {
 	n, err := normalizeEnumValue(m)
 	if err == nil {
 		switch n := n.(type) {
 		case string:
-			return n, strconv.Quote(n), nil
+			return n, strconv.Quote(n), valueName(n), nil
 		case bool:
-			return n, strconv.FormatBool(n), nil
+			text = strconv.FormatBool(n)
+			return n, text, valueName(text), nil
 		case *big.Rat:
 			if n.IsInt() && n.Num().IsInt64() {
-				return n, n.Num().String(), nil
+				text = n.Num().String()
+				return n, text, strings.Replace(text, "-", "Neg", 1), nil
 			}
 		}
 	}
-	return nil, "", fmt.Errorf("match value %s is not a string, integer or boolean", jsonText(m))
+	return nil, "", "", fmt.Errorf("match value %s is not a string, integer or boolean", jsonText(m))
 }
 
 // isVariant reports whether a property's type is a custom type with variants,
@@ -265,12 +269,13 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 		i   = slices.IndexFunc(v.base.fields, func(f ruleField) bool { return f.wireKey == v.key })
 		typ = cmp.Or(hoisted[v.key], propertyTypes[keyOf(v.base.fields[i])].name)
 		// ok follows the value a case or Default returns.
-		ok string
+		ok       string
+		optional string
 	)
 	iface.Result = typ
 	iface.DiscriminatorDoc = fmt.Sprintf("Discriminator returns the value of %s.", strconv.Quote(v.key))
 	if v.optional {
-		ok = ", true"
+		ok, optional = ", true", "the optional "
 		iface.Result = "(value " + typ + ", ok bool)"
 		iface.DiscriminatorDoc = fmt.Sprintf("Discriminator returns the value of %s; ok is false when it is absent.", strconv.Quote(v.key))
 	}
@@ -307,7 +312,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	}
 
 	for _, c := range v.cases {
-		st, err := add("case:"+name+":"+c.text, "Case"+caseName(c), c.schema)
+		st, err := add("case:"+name+":"+c.text, "Case"+c.name, c.schema)
 		if err != nil {
 			return nil, err
 		}
@@ -318,7 +323,11 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 		st.Doc = withDescription(doc, c.vc.Description)
 		st.DiscriminatorDoc = "Discriminator returns " + c.text + "."
 		ctx.afterValueNames = append(ctx.afterValueNames, func(decls map[string]GoDecl) {
-			value := discriminatorValue(decls, typ, c)
+			value, nullable := spell(decls, typ, c.value, c.text)
+			if nullable != "" {
+				// T must be spelled out: NewNullable(1) would be a Nullable[int].
+				value = "NewNullable[" + nullable + "](" + value + ")"
+			}
 			st.Returns, st.Sends = value+ok, "v.Discriminator()"
 			if v.optional {
 				// Discriminator also returns ok, so toMap writes the value itself.
@@ -340,26 +349,10 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 		})
 	}
 
-	var optional string
-	if v.optional {
-		optional = "the optional "
-	}
 	implementations := slices.Sorted(slices.Values(iface.Implementations))
 	iface.Doc = withDescription(fmt.Sprintf("%s, a discriminated union on %s%s. It is implemented by %s.",
 		lead, optional, strconv.Quote(v.key), joinList(implementations, "and")), description)
 	return iface, nil
-}
-
-// caseName names a case struct after its match value, as Enum Constant Names
-// name an enum value.
-func caseName(c variantCase) string {
-	switch value := c.value.(type) {
-	case string:
-		return valueName(value)
-	case bool:
-		return valueName(c.text)
-	}
-	return strings.Replace(c.text, "-", "Neg", 1)
 }
 
 // defaultDocs returns the doc comment of the Default struct dflt and the note
@@ -376,13 +369,9 @@ func defaultDocs(decls map[string]GoDecl, typ string, v *variantSchema, name, df
 			"not " + joinList(texts, "or")
 	}
 
-	matched := map[string]bool{}
-	for _, c := range v.cases {
-		matched[c.text] = true
-	}
 	var rest []string
 	for _, e := range v.domain.enum.values {
-		if !matched[e.Text] {
+		if !slices.ContainsFunc(v.cases, func(c variantCase) bool { return c.text == e.Text }) {
 			value, _ := spell(decls, typ, nil, e.Text)
 			rest = append(rest, value)
 		}
@@ -415,18 +404,6 @@ func finishVariants(ctx *GoContext) {
 	for _, f := range ctx.afterValueNames {
 		f(decls)
 	}
-}
-
-// discriminatorValue spells c's match value as a value of typ, the
-// discriminator's Go type (Discriminator Values). The match domain check
-// guarantees that typ holds it.
-func discriminatorValue(decls map[string]GoDecl, typ string, c variantCase) string {
-	value, nullable := spell(decls, typ, c.value, c.text)
-	if nullable == "" {
-		return value
-	}
-	// T must be spelled out: NewNullable(1) would be a Nullable[int].
-	return "NewNullable[" + nullable + "](" + value + ")"
 }
 
 // spell writes a match value, whose Go literal is text, as a value of typ: the
