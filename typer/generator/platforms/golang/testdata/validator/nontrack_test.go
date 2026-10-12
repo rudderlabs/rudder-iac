@@ -12,8 +12,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang/testdata/validator/ruddertyper"
 )
 
-// messageJSON is the whole typ message of a call for user-123 without
-// options, with fields, the message's other keys, appended after userId.
+// messageJSON is the whole typ message of a call for user-123 whose context
+// holds only ruddertyper, with fields, the message's other keys, appended
+// after userId.
 func messageJSON(meta, typ, fields string) string {
 	return fmt.Sprintf(`{"type": %q, "channel": "server", "userId": "user-123"%s, "context": {"ruddertyper": %s}}`, typ, fields, meta)
 }
@@ -21,14 +22,14 @@ func messageJSON(meta, typ, fields string) string {
 // Each row's name starts with the golden whose wrapper it calls.
 func TestNonTrackWire(t *testing.T) {
 	var (
-		ex      *examples.RudderTyperAnalytics
-		ref     *ruddertyper.RudderTyperAnalytics
-		ids     *identitysections.RudderTyperAnalytics
-		empty   *emptyidentity.RudderTyperAnalytics
-		id      = examples.Identity{UserID: "user-123"}
-		refID   = ruddertyper.Identity{UserID: "user-123"}
-		idsID   = identitysections.Identity{UserID: "user-123"}
-		emptyID = emptyidentity.Identity{UserID: "user-123"}
+		ex         *examples.RudderTyperAnalytics
+		ref        *ruddertyper.RudderTyperAnalytics
+		sections   *identitysections.RudderTyperAnalytics
+		empty      *emptyidentity.RudderTyperAnalytics
+		id         = examples.Identity{UserID: "user-123"}
+		refID      = ruddertyper.Identity{UserID: "user-123"}
+		sectionsID = identitysections.Identity{UserID: "user-123"}
+		emptyID    = emptyidentity.Identity{UserID: "user-123"}
 	)
 
 	rows := []wireRow{
@@ -42,18 +43,18 @@ func TestNonTrackWire(t *testing.T) {
 		{
 			name: "identitysections: identify on context.traits sends context.traits, whose keys win over the caller's, and keeps the caller's other keys",
 			call: func() error {
-				return ids.Identify(idsID, &identitysections.IdentifyTraits{Email: "new@b.c"},
+				return sections.Identify(sectionsID, &identitysections.IdentifyTraits{Email: "new@b.c"},
 					identitysections.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"email": "old@b.c", "plan": "free"}}))
 			},
 			want: `{"type": "identify", "channel": "server", "userId": "user-123",
-				"context": {"traits": {"email": "new@b.c", "plan": "free"}, "ruddertyper": ` + idsMeta + `}}`,
+				"context": {"traits": {"email": "new@b.c", "plan": "free"}, "ruddertyper": ` + sectionsMeta + `}}`,
 		},
 		{
 			name: "identitysections: group on traits sends the message's traits",
 			call: func() error {
-				return ids.Group(idsID, "g1", &identitysections.GroupTraits{Active: true, Status: identitysections.Ptr(identitysections.CustomTypeStatusActive)})
+				return sections.Group(sectionsID, "g1", &identitysections.GroupTraits{Active: true, Status: identitysections.Ptr(identitysections.CustomTypeStatusActive)})
 			},
-			want: messageJSON(idsMeta, "group", `, "groupId": "g1", "traits": {"active": true, "status": "active"}`),
+			want: messageJSON(sectionsMeta, "group", `, "groupId": "g1", "traits": {"active": true, "status": "active"}`),
 		},
 		{
 			name: "ruddertyper: group on context.traits sends the message's traits and leaves the caller's context.traits untouched",
@@ -70,7 +71,7 @@ func TestNonTrackWire(t *testing.T) {
 				return empty.Identify(emptyID, emptyidentity.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"plan": "pro"}}))
 			},
 			want: `{"type": "identify", "channel": "server", "userId": "user-123",
-				"context": {"traits": {"plan": "pro"}, "ruddertyper": ` + emptyMeta + `}}`,
+				"context": {"traits": {"plan": "pro"}, "ruddertyper": ` + emptyIdentityMeta + `}}`,
 		},
 		{
 			name: "emptyidentity: the empty group sends no traits and leaves the caller's context.traits untouched",
@@ -78,7 +79,7 @@ func TestNonTrackWire(t *testing.T) {
 				return empty.Group(emptyID, "g1", emptyidentity.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"plan": "pro"}}))
 			},
 			want: `{"type": "group", "channel": "server", "userId": "user-123", "groupId": "g1",
-				"context": {"traits": {"plan": "pro"}, "ruddertyper": ` + emptyMeta + `}}`,
+				"context": {"traits": {"plan": "pro"}, "ruddertyper": ` + emptyIdentityMeta + `}}`,
 		},
 		{
 			name: "examples: page sends a non-empty name as the top-level name",
@@ -174,7 +175,7 @@ func TestNonTrackWire(t *testing.T) {
 			errIs: examples.ErrCategoryConflict,
 		},
 		{
-			name: "examples: WithCategory different from an AdditionalProperties category returns ErrCategoryConflict, on an open schema too",
+			name: "examples: WithCategory different from an AdditionalProperties category returns ErrCategoryConflict",
 			call: func() error {
 				return ex.Page(id, "", &examples.PageProperties{ProductID: "p1", AdditionalProperties: map[string]any{"category": "deals"}},
 					examples.WithCategory("news"))
@@ -303,6 +304,6 @@ func TestNonTrackWire(t *testing.T) {
 
 	assertWireRows(t, func(client analytics.Client) {
 		ex, ref = examples.New(client), ruddertyper.New(client)
-		ids, empty = identitysections.New(client), emptyidentity.New(client)
+		sections, empty = identitysections.New(client), emptyidentity.New(client)
 	}, rows)
 }

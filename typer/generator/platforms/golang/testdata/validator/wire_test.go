@@ -133,10 +133,10 @@ func assertPlain(t *testing.T, v any) {
 
 // The context.ruddertyper objects of the goldens.
 const (
-	exMeta    = `{"platform": "go", "rudderCLIVersion": "1.0.0", "trackingPlanId": "plan_examples", "trackingPlanVersion": 0}`
-	refMeta   = `{"platform": "go", "rudderCLIVersion": "1.0.0", "trackingPlanId": "plan_12345", "trackingPlanVersion": 13}`
-	idsMeta   = `{"platform": "go", "rudderCLIVersion": "1.0.0", "trackingPlanId": "plan_identity_sections", "trackingPlanVersion": 1}`
-	emptyMeta = `{"platform": "go", "rudderCLIVersion": "1.0.0", "trackingPlanId": "plan_empty_identity", "trackingPlanVersion": 1}`
+	exMeta            = `{"platform": "go", "rudderCLIVersion": "1.0.0", "trackingPlanId": "plan_examples", "trackingPlanVersion": 0}`
+	refMeta           = `{"platform": "go", "rudderCLIVersion": "1.0.0", "trackingPlanId": "plan_12345", "trackingPlanVersion": 13}`
+	sectionsMeta      = `{"platform": "go", "rudderCLIVersion": "1.0.0", "trackingPlanId": "plan_identity_sections", "trackingPlanVersion": 1}`
+	emptyIdentityMeta = `{"platform": "go", "rudderCLIVersion": "1.0.0", "trackingPlanId": "plan_empty_identity", "trackingPlanVersion": 1}`
 )
 
 func TestTrackWire(t *testing.T) {
