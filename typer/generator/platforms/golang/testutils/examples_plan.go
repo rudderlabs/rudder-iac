@@ -71,6 +71,7 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 			// gets the suffix.
 			track("Some Enum Event", "", false, map[string]plan.PropertySchema{
 				"stage":        optional(enum(property("stage", "", plan.PrimitiveTypeString, plan.PrimitiveTypeNull), "draft", "live", nil)),
+				"cleared":      optional(enum(property("cleared", "", plan.PrimitiveTypeString, plan.PrimitiveTypeNull), nil)),
 				"mode":         required(enum(property("mode", "", plan.PrimitiveTypeString), "Active", "active", "values", "")),
 				"status":       required(enum(property("status", "", plan.PrimitiveTypeString), "active", "inactive")),
 				"statusActive": optional(property("statusActive", "", plan.PrimitiveTypeBoolean)),

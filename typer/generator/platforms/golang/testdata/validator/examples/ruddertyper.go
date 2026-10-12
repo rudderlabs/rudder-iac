@@ -170,6 +170,9 @@ type PropertyArray = []any
 // PropertyBoolean represents the property "boolean".
 type PropertyBoolean = bool
 
+// PropertyCleared represents the property "cleared".
+type PropertyCleared = Null
+
 // PropertyInteger represents the property "integer".
 type PropertyInteger = int64
 
@@ -550,6 +553,7 @@ type TrackSomeEmptyTrackEventWithAdditionalPropertiesProperties = map[string]any
 
 // TrackSomeEnumEventProperties holds the properties of "Some Enum Event".
 type TrackSomeEnumEventProperties struct {
+	Cleared      *PropertyCleared      // optional
 	Mode         PropertyMode          // required
 	Stage        *PropertyStage        // optional
 	Status       PropertyStatus        // required
@@ -560,6 +564,9 @@ func (v TrackSomeEnumEventProperties) toMap() map[string]any {
 	m := map[string]any{
 		"mode":   v.Mode,
 		"status": v.Status,
+	}
+	if v.Cleared != nil {
+		m["cleared"] = *v.Cleared
 	}
 	if v.Stage != nil {
 		m["stage"] = *v.Stage
