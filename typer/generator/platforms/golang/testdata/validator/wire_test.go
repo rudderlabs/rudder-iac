@@ -314,6 +314,19 @@ func TestTrackWire(t *testing.T) {
 			err:  analytics.ErrClosed,
 		},
 		{
+			name: "the depth bound is per path, so a slice wider than maxDepth is sent whole",
+			call: func() error {
+				wide := make([]any, 2001)
+				for i := range wide {
+					wide[i] = map[string]any{"k": "x"}
+				}
+				return ex.TrackSomeEmptyTrackEventWithAdditionalProperties(id, map[string]any{"wide": wide})
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event With Additional Properties", "userId": "user-123",
+				"properties": {"wide": [` + strings.TrimSuffix(strings.Repeat(`{"k": "x"}, `, 2001), ", ") + `]},
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
 			name: "a self-containing map is invalid",
 			call: func() error {
 				m := map[string]any{}
