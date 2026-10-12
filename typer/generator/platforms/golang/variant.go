@@ -302,19 +302,20 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	var (
 		i   = slices.IndexFunc(v.base.fields, func(f ruleField) bool { return f.wireKey == v.key })
 		typ = cmp.Or(hoisted[v.key], propertyTypes[keyOf(v.base.fields[i])].name)
-		// ok follows the value a case or Default returns.
-		ok       string
-		optional string
+		// okSuffix follows the value a case or Default returns, and qualifier
+		// the discriminator's key in the interface's doc.
+		okSuffix  string
+		qualifier string
 	)
 	iface.Result = typ
 	iface.DiscriminatorDoc = fmt.Sprintf("Discriminator returns the value of %s.", strconv.Quote(v.key))
 	if v.optional {
-		ok, optional = ", true", "the optional "
+		okSuffix, qualifier = ", true", "the optional "
 		iface.Result = "(value " + typ + ", ok bool)"
 		iface.DiscriminatorDoc = fmt.Sprintf("Discriminator returns the value of %s; ok is false when it is absent.", strconv.Quote(v.key))
 	}
 
-	add := func(id, suffix string, s *objectSchema) (*GoStruct, error) {
+	addImplementation := func(id, suffix string, s *objectSchema) (*GoStruct, error) {
 		structName, err := registry.RegisterName(id, packageScope, name+suffix)
 		if err != nil {
 			return nil, fmt.Errorf("registering %s%s: %w", name, suffix, err)
@@ -336,7 +337,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	}
 
 	if v.absent != nil {
-		st, err := add("absent:"+name, "Absent", v.absent)
+		st, err := addImplementation("absent:"+name, "Absent", v.absent)
 		if err != nil {
 			return nil, err
 		}
@@ -346,7 +347,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	}
 
 	for _, c := range v.cases {
-		st, err := add("case:"+name+":"+c.text, "Case"+c.name, c.schema)
+		st, err := addImplementation("case:"+name+":"+c.text, "Case"+c.name, c.schema)
 		if err != nil {
 			return nil, err
 		}
@@ -368,7 +369,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 				// than the call.
 				st.DiscriminatorDoc = "Discriminator returns " + value + "."
 			}
-			st.Returns, st.Sends = value+ok, "v.Discriminator()"
+			st.Returns, st.Sends = value+okSuffix, "v.Discriminator()"
 			if v.optional {
 				// Discriminator also returns ok, so toMap writes the value itself.
 				st.Sends = value
@@ -377,13 +378,13 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	}
 
 	if v.dflt != nil {
-		st, err := add("default:"+name, "Default", v.dflt)
+		st, err := addImplementation("default:"+name, "Default", v.dflt)
 		if err != nil {
 			return nil, err
 		}
 		field := &st.Fields[slices.IndexFunc(st.Fields, func(f GoField) bool { return f.Key == v.key })]
 		st.DiscriminatorDoc = "Discriminator returns " + field.Name + "."
-		st.Returns, st.ReadsReceiver = "v."+field.Name+ok, true
+		st.Returns, st.ReadsReceiver = "v."+field.Name+okSuffix, true
 		ctx.afterValueNames = append(ctx.afterValueNames, func(decls map[string]GoDecl) {
 			st.Doc, field.Note = defaultDocs(decls, typ, v, name, st.Name)
 		})
@@ -391,7 +392,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 
 	implementations := slices.Sorted(slices.Values(iface.Implementations))
 	iface.Doc = withDescription(fmt.Sprintf("%s, a discriminated union on %s%s. It is implemented by %s.",
-		lead, optional, strconv.Quote(v.key), joinList(implementations, "and")), description)
+		lead, qualifier, strconv.Quote(v.key), joinList(implementations, "and")), description)
 	return iface, nil
 }
 
