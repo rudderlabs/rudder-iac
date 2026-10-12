@@ -103,6 +103,11 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			wantErr: `mapping the variants of track event "Some Event": case ["a"]: property "kind" conflicts with its definition in the base schema`,
 		},
 		{
+			name:    "a case redefines a base property with an invalid enum",
+			plan:    variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), redefine(plan.Property{Types: onlyString, Config: &plan.PropertyConfig{Enum: []any{}}}))),
+			wantErr: `mapping the variants of track event "Some Event": case ["a"]: mapping property "kind": enum has no values`,
+		},
+		{
 			name:    "a case redefines a base property's nested schema",
 			plan:    nestedConflict,
 			wantErr: `mapping the variants of track event "Some Event": case ["a"]: property "meta" conflicts with its definition in the base schema`,

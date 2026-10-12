@@ -185,7 +185,11 @@ func (res *resolver) branch(s, b *plan.ObjectSchema, label, where string) (*obje
 	for _, key := range slices.Sorted(maps.Keys(b.Properties)) {
 		ps := b.Properties[key]
 		if bp, ok := merged.Properties[key]; ok {
-			if !sameDefinition(bp, ps) {
+			same, err := sameDefinition(bp, ps)
+			if err != nil {
+				return nil, fmt.Errorf("%s: mapping property %q: %w", label, key, err)
+			}
+			if !same {
 				return nil, fmt.Errorf("%s: property %q conflicts with its definition in the base schema", label, key)
 			}
 			bp.Required = bp.Required || ps.Required
@@ -197,14 +201,18 @@ func (res *resolver) branch(s, b *plan.ObjectSchema, label, where string) (*obje
 }
 
 // sameDefinition reports whether a and b agree in everything but required:
-// types, item types, enum values and nested schema.
-func sameDefinition(a, b plan.PropertySchema) bool {
-	// The resolver reports an invalid enum.
-	var (
-		ea, _ = resolveEnum(a.Property)
-		eb, _ = resolveEnum(b.Property)
-	)
-	return typeSignature(a.Property, ea) == typeSignature(b.Property, eb) && reflect.DeepEqual(a.Schema, b.Schema)
+// types, item types, enum values and nested schema. An invalid enum is an
+// error, because the merge keeps only one definition and would drop it.
+func sameDefinition(a, b plan.PropertySchema) (bool, error) {
+	ea, err := resolveEnum(a.Property)
+	if err != nil {
+		return false, err
+	}
+	eb, err := resolveEnum(b.Property)
+	if err != nil {
+		return false, err
+	}
+	return typeSignature(a.Property, ea) == typeSignature(b.Property, eb) && reflect.DeepEqual(a.Schema, b.Schema), nil
 }
 
 // validateVariantNames checks the names in the case and default schemas of
