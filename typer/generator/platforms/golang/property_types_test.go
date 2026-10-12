@@ -184,9 +184,11 @@ func TestHoistedNameCollision(t *testing.T) {
 		}
 	}
 	leaf := map[string]plan.PropertySchema{"x": {Property: plan.Property{Name: "x", Types: []plan.PropertyType{plan.PrimitiveTypeString}}}}
+	foo := object("foo", map[string]plan.PropertySchema{"barBaz": object("barBaz", leaf)})
+	foo.Property.Description = "the foo object"
 	p := trackPlan()
 	p.Rules[0].Schema.Properties = map[string]plan.PropertySchema{
-		"foo":    object("foo", map[string]plan.PropertySchema{"barBaz": object("barBaz", leaf)}),
+		"foo":    foo,
 		"fooBar": object("fooBar", map[string]plan.PropertySchema{"baz": object("baz", leaf)}),
 	}
 
@@ -207,7 +209,7 @@ func TestHoistedNameCollision(t *testing.T) {
 		}},
 		{Struct: &GoStruct{
 			Name:         "TrackSomeEventPropertiesFoo",
-			Doc:          "TrackSomeEventPropertiesFoo is the object in TrackSomeEventProperties.Foo.",
+			Doc:          "TrackSomeEventPropertiesFoo is the object in TrackSomeEventProperties.Foo.\n\nthe foo object",
 			DeclaredKeys: []string{"barBaz"},
 			Fields:       []GoField{{Name: "BarBaz", Key: "barBaz", Type: "*TrackSomeEventPropertiesFooBarBaz", Pointer: true}},
 		}},

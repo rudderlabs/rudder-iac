@@ -1741,6 +1741,8 @@ func (v TrackUserSignedUpProperties) MarshalJSON() ([]byte, error) {
 }
 
 // TrackUserSignedUpPropertiesContext is the object in TrackUserSignedUpProperties.Context.
+//
+// example of object property
 type TrackUserSignedUpPropertiesContext struct {
 	IPAddress     PropertyIPAddress                               // required
 	NestedContext TrackUserSignedUpPropertiesContextNestedContext // required
@@ -1760,6 +1762,8 @@ func (v TrackUserSignedUpPropertiesContext) MarshalJSON() ([]byte, error) {
 }
 
 // TrackUserSignedUpPropertiesContextNestedContext is the object in TrackUserSignedUpPropertiesContext.NestedContext.
+//
+// demonstrates multiple levels of nesting
 type TrackUserSignedUpPropertiesContextNestedContext struct {
 	FavoriteColors PropertyFavoriteColors // optional
 	Profile        *PropertyProfile       // optional
@@ -1782,6 +1786,8 @@ func (v TrackUserSignedUpPropertiesContextNestedContext) MarshalJSON() ([]byte, 
 }
 
 // TrackUserSignedUpPropertiesNestedEmptyObjectNoAdditionalProps is the object in TrackUserSignedUpProperties.NestedEmptyObjectNoAdditionalProps.
+//
+// Nested property with empty object not allowing additional properties
 type TrackUserSignedUpPropertiesNestedEmptyObjectNoAdditionalProps struct{}
 
 func (v TrackUserSignedUpPropertiesNestedEmptyObjectNoAdditionalProps) toMap() map[string]any {

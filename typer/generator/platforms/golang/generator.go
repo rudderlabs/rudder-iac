@@ -1018,19 +1018,22 @@ func addNested(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[pr
 	}
 
 	var (
-		types  = f.ps.Property.Types
-		object = name
+		types       = f.ps.Property.Types
+		object      = name
+		description = f.ps.Property.Description
 	)
 	if isUnion(types) {
 		if object, err = registry.RegisterName("object:"+name, packageScope, name+"Object"); err != nil {
 			return "", fmt.Errorf("registering the object member of %s: %w", name, err)
 		}
 		lead := fmt.Sprintf("%s is the value in %s.%s", name, parent, field)
-		if err := addUnion(ctx, registry, name, lead, "", types, f.ps.Property.ItemTypes, object); err != nil {
+		if err := addUnion(ctx, registry, name, lead, description, types, f.ps.Property.ItemTypes, object); err != nil {
 			return "", fmt.Errorf("mapping %s.%s: %w", parent, field, err)
 		}
+		// The union, the field's type, carries the description.
+		description = ""
 	}
-	if _, err := addStruct(ctx, registry, propertyTypes, object, fmt.Sprintf("%s is the object in %s.%s.", object, parent, field), f.nested, ""); err != nil {
+	if _, err := addStruct(ctx, registry, propertyTypes, object, withDescription(fmt.Sprintf("%s is the object in %s.%s.", object, parent, field), description), f.nested, ""); err != nil {
 		return "", err
 	}
 
