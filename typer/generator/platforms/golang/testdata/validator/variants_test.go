@@ -328,6 +328,24 @@ func TestVariantsWire(t *testing.T) {
 			},
 			want: trackJSON(exMeta, "Some Variant Event", `{"shipping": {"address": {"city": "Pune"}, "coupon": "SAVE"}}`),
 		},
+		{
+			name: "empty: an empty optional slice is sent as []",
+			call: func() error {
+				p := mobile
+				p.Tags = []string{}
+				return ref.TrackEventWithVariants(refID, p)
+			},
+			want: mobileSent(`, "tags": []`),
+		},
+		{
+			name: "empty: an empty optional map is sent as {}",
+			call: func() error {
+				p := mobile
+				p.PageContext = ruddertyper.CustomTypePageContextDefault{PageType: "other", PageData: map[string]any{}}
+				return ref.TrackEventWithVariants(refID, p)
+			},
+			want: mobileSent(`, "page_context": {"page_type": "other", "page_data": {}}`),
+		},
 	}
 
 	assertWireRows(t, func(client analytics.Client) {
