@@ -355,17 +355,155 @@ Next: rudder-cli dev events --url `+u+` --since 47 --event 'Order Completed' --j
 `, stdout)
 }
 
-func TestEventsNotesEvictionAndTimeout(t *testing.T) {
+// lossy is a summary whose window lost requests, as the listener writes it.
+var lossy = strings.NewReplacer(
+	`"evictedThrough":0`, `"evictedThrough":44`,
+	`"diagnosis":[`, `"diagnosis":[{"code":"events_evicted","count":3,"message":"3 requests were evicted from this window.",`+
+		`"next":"rudder-cli dev events --since 44 --json"},`,
+).Replace(summaryBody)
+
+// A window that lost requests prints what is left and fails, so a count
+// that came out short never passes. --allow-partial accepts it.
+func TestReadsFailOnAWindowThatLostRequests(t *testing.T) {
 	t.Parallel()
-	body := strings.Replace(strings.Replace(summaryBody, `"evictedThrough":0`, `"evictedThrough":44`, 1),
-		`"timedOut":false,"waitedMs":0`, `"timedOut":true,"waitedMs":30001`, 1)
+	lossyStream := streamHeader.Clone()
+	lossyStream.Set("X-Dev-Evicted-Through", "44")
+	lossyStream.Set("X-Dev-Diagnosis", "events_evicted")
+	evicted := streamHeader.Clone()
+	evicted.Set("X-Dev-Evicted-Through", "44")
+	const message = "requests up to seq 44 were evicted, so this window is incomplete"
+
+	for _, tc := range []struct {
+		name   string
+		args   []string
+		header http.Header
+		body   string
+		stdout string
+		fails  bool
+		stderr string
+	}{
+		{
+			name: "summary", args: []string{"events", "--since", "41"}, header: summaryHeader, body: lossy,
+			stdout: "events_evicted (3): 3 requests were evicted from this window.\n", fails: true,
+			stderr: "Error: " + message + "; pass --allow-partial to accept it\nNext: rudder-cli dev events --url URL --since 44\n",
+		},
+		{
+			name: "summary in JSON", args: []string{"events", "--since", "5m", "--json"}, header: summaryHeader, body: lossy,
+			stdout: `"byEvent":{"Order Completed":0,"chatOpened":1,"chatSuggestionClicked":1}`, fails: true,
+			stderr: `{"error":{"status":null,"code":"events_evicted","message":"` + message + `; pass --allow-partial to accept it",` +
+				`"param":null,"details":null,"next":"rudder-cli dev events --url URL --since 44"}}` + "\n",
+		},
+		{
+			name: "summary of the default window", args: []string{"events"}, header: summaryHeader, body: lossy,
+			stdout: "ACCEPTED EVENTS  2\n", fails: true,
+			stderr: "Error: " + message + "; pass --allow-partial to accept it\nNext: rudder-cli dev events --url URL --since 44\n",
+		},
+		{
+			name: "summary with --allow-partial", args: []string{"events", "--since", "41", "--allow-partial"},
+			header: summaryHeader, body: lossy,
+			stdout: "ACCEPTED EVENTS  2\n", stderr: "note: " + message + "\n",
+		},
+		{
+			name: "summary of a complete window after an eviction", args: []string{"events", "--since", "44"},
+			header: summaryHeader, body: strings.Replace(summaryBody, `"evictedThrough":0`, `"evictedThrough":44`, 1),
+			stdout: "ACCEPTED EVENTS  2\n",
+		},
+		{
+			name: "list", args: []string{"events", "list", "--since", "2026-09-30T12:00:00Z"}, header: lossyStream, body: streamBody,
+			stdout: "3 events since 2026-09-30T12:00:00Z\n", fails: true,
+			stderr: "Error: " + message + "; pass --allow-partial to accept it\nNext: rudder-cli dev events list --url URL --since 44\n",
+		},
+		{
+			name: "list in JSON", args: []string{"events", "list", "--json"}, header: lossyStream, body: streamBody,
+			stdout: streamBody, fails: true,
+			stderr: `{"error":{"status":null,"code":"events_evicted","message":"` + message + `; pass --allow-partial to accept it",` +
+				`"param":null,"details":null,"next":"rudder-cli dev events list --url URL --since 44"}}` + "\n",
+		},
+		{
+			name: "list with --allow-partial", args: []string{"events", "list", "--json", "--allow-partial"},
+			header: lossyStream, body: streamBody,
+			stdout: streamBody, stderr: "note: " + message + "\n",
+		},
+		{
+			name: "list of a complete window after an eviction", args: []string{"events", "list", "--json", "--since", "44"},
+			header: evicted, body: streamBody, stdout: streamBody,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rec := newRecorder(t, http.StatusOK, tc.header, tc.body)
+
+			stdout, stderr, err := execute(append([]string{"dev"}, append(tc.args, "--url", rec.srv.URL)...)...)
+
+			if tc.fails {
+				var silent *cmderrors.SilentError
+				require.ErrorAs(t, err, &silent)
+			} else {
+				require.NoError(t, err, stderr)
+			}
+			require.Contains(t, stdout, tc.stdout)
+			require.Equal(t, strings.ReplaceAll(tc.stderr, "URL", rec.srv.URL), stderr)
+		})
+	}
+}
+
+// A wait that ran out prints what arrived and fails: the events the caller
+// waited for did not come.
+func TestEventsFailsWhenTheWaitRunsOut(t *testing.T) {
+	t.Parallel()
+	body := strings.Replace(summaryBody, `"timedOut":false,"waitedMs":0`, `"timedOut":true,"waitedMs":30001`, 1)
 	rec := newRecorder(t, http.StatusOK, summaryHeader, body)
+	u := rec.srv.URL
+	const message = "--wait ran out after 30.0s: 2 of --min 5 matching accepted events arrived"
 
-	stdout, stderr, err := execute("dev", "events", "--url", rec.srv.URL, "--since", "41", "--wait", "30s")
+	stdout, stderr, err := execute("dev", "events", "--url", u, "--since", "41", "--wait", "30s", "--min", "5")
 
-	require.NoError(t, err, "a wait that runs out is a successful read")
-	require.Equal(t, "note: requests up to seq 44 were evicted; the window starts after them\n", stderr)
+	var silent *cmderrors.SilentError
+	require.ErrorAs(t, err, &silent)
 	require.True(t, strings.HasPrefix(stdout, "Window after cursor 41; cursor now 47. The wait ran out after 30.0s.\n"), stdout)
+	require.Contains(t, stdout, "ACCEPTED EVENTS  2\n")
+	require.Equal(t, "Error: "+message+"\nNext: rudder-cli dev events --url "+u+" --since 41 --json\n", stderr)
+
+	stdout, stderr, err = execute("dev", "events", "--url", u, "--since", "41", "--wait", "30s", "--min", "5", "--json")
+
+	require.ErrorAs(t, err, &silent)
+	require.Contains(t, stdout, `"timedOut":true,"waitedMs":30001`)
+	require.Equal(t, `{"error":{"status":null,"code":"wait_timeout","message":"`+message+`","param":null,"details":null,`+
+		`"next":"rudder-cli dev events --url `+u+` --since 41 --json"}}`+"\n", stderr)
+
+	// The loss explains a short count, so it is the error when both hold;
+	// an accepted loss leaves the wait to fail the read.
+	rec = newRecorder(t, http.StatusOK, summaryHeader,
+		strings.Replace(lossy, `"timedOut":false,"waitedMs":0`, `"timedOut":true,"waitedMs":30001`, 1))
+
+	_, stderr, err = execute("dev", "events", "--url", rec.srv.URL, "--since", "41", "--wait", "30s")
+
+	require.ErrorAs(t, err, &silent)
+	require.Contains(t, stderr, "Error: requests up to seq 44 were evicted")
+	require.NotContains(t, stderr, "--wait ran out")
+
+	_, stderr, err = execute("dev", "events", "--url", rec.srv.URL, "--since", "41", "--wait", "30s", "--allow-partial")
+
+	require.ErrorAs(t, err, &silent)
+	require.Equal(t, "note: requests up to seq 44 were evicted, so this window is incomplete\n"+
+		"Error: --wait ran out after 30.0s: 2 of --min 1 matching accepted events arrived\n"+
+		"Next: rudder-cli dev events --url "+rec.srv.URL+" --since 41 --json\n", stderr)
+}
+
+// A listener that does not answer in time is unreachable, whatever --wait
+// asked for: no summary came back to judge.
+func TestEventsReportsAClientTimeoutAsUnreachable(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
+	t.Cleanup(srv.Close)
+
+	stdout, stderr, err := execute("dev", "events", "--url", srv.URL, "--wait", "1s", "--timeout", "50ms", "--json")
+
+	var silent *cmderrors.SilentError
+	require.ErrorAs(t, err, &silent)
+	require.Empty(t, stdout)
+	require.Equal(t, `{"error":{"status":null,"code":"server_unreachable","message":"the listener at `+srv.URL+
+		` did not answer within 50ms","param":null,"details":null,"next":"rudder-cli dev listen --help"}}`+"\n", stderr)
 }
 
 const streamBody = `{"type":"track","event":"Order Completed","userId":"u1","originalTimestamp":"2026-09-30T12:00:00.000Z","properties":{"total":42,"note":"a` + "\\u001b[31m" + `b"}}

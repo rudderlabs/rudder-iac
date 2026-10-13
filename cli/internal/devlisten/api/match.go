@@ -109,6 +109,18 @@ func (w window) holds(r *store.Record) bool {
 	return r.Seq > w.since && r.Seq <= w.cursor && !r.ReceivedAt.Before(w.floor)
 }
 
+// lost reports whether the store evicted a record of the window: one after
+// the cursor or, for a time, one received at or after it. Every read uses
+// it, so the summary, the stream and the CLI agree on which windows are
+// incomplete. Call it after the records are read: an eviction between the
+// two then shows as a loss, never as a complete window.
+func (w window) lost(evictedThrough uint64, evictedAt time.Time) bool {
+	if w.floor.IsZero() {
+		return evictedThrough > w.since
+	}
+	return !evictedAt.Before(w.floor)
+}
+
 // records returns the records in the window, oldest first.
 func (h *Handler) records(w window) []*store.Record {
 	all, _ := h.store.Since(w.since)

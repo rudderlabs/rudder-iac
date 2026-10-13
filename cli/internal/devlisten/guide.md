@@ -52,7 +52,7 @@ shell needs that export too. With the gate off, each dev command exits 1 with
   (`summary.byEvent`), events inside refused requests (`summary.rejected`),
   requests, write keys, SDK bootstrap calls, the diagnosis and the `cursor`.
   `--wait 30s` holds the call until `--min` matching accepted events exist (at most
-  110s).
+  110s). When the wait runs out, the command prints the summary and exits 1.
 - `dev events list` prints the accepted events after a cursor. With `--json` it
   is NDJSON: one event per line, the keys, key order, numbers and strings the SDK
   sent, with nothing added. Without `--json` it is a table.
@@ -118,8 +118,8 @@ exact and case-sensitive.
 
 ## Check with jq
 
-The CLI exits 0 on every successful read, an empty one included. The check is
-`jq -e`: true exits 0, false exits 1.
+The CLI exits 0 on a read of an empty window too. The check is `jq -e`: true
+exits 0, false exits 1.
 
 ```sh
 # exactly one accepted Order Completed
@@ -173,6 +173,9 @@ when it is shorter than 12 characters. Type the real key in a filter.
 The diagnosis reads the whole window after `since` and ignores the filters.
 Several codes can hold at once. Each has a `next`: the command to run.
 
+- `events_evicted`: the listener dropped requests of this window to stay within
+  its limit, so the counts and the events are incomplete. `all_accepted` never
+  shows with it. `next` reads the window after the dropped requests.
 - `nothing_received`: no event request ever reached the listener. The app is not
   pointed at it. `next` is a curl self-test.
 - `nothing_new`: the listener holds requests, but none after your cursor. The app
@@ -195,11 +198,17 @@ Several codes can hold at once. Each has a `next`: the command to run.
 
 ## Output, errors and exit codes
 
-stdout holds data only. Exit 0 for every successful read: an empty result, zeros
-in `byEvent`, a `--wait` that ran out (`timedOut` is true), and `--help`. Exit 1
-for every error: a bad flag or value, an unknown command, the gate off, no URL, no
-listener at the URL (`server_unreachable`), another listener at the URL
-(`server_changed`, when you pass `--server-id`), or a port in use. An error goes to
+stdout holds data only. Exit 0 for a read that answers what you asked: an empty
+result, zeros in `byEvent`, and `--help`. Exit 1 for every error: a bad flag or
+value, an unknown command, the gate off, no URL, no listener at the URL
+(`server_unreachable`), another listener at the URL (`server_changed`, when you
+pass `--server-id`), or a port in use.
+
+Two reads print their result and then exit 1. A `--wait` that ran out before
+`--min` matching events arrived is `wait_timeout`; `timedOut` is true in the JSON. A
+window that lost requests to the listener's limit is `events_evicted`, on
+`dev events` and on `dev events list`; `--allow-partial` accepts it, prints a
+`note:` line on stderr and exits 0. An error goes to
 stderr with a `next` command that fixes it: one JSON object with `--json`, else an
 `Error:` line and a `Next:` line. The CLI never retries.
 
@@ -324,7 +333,10 @@ on a laptop:
 - At most 8 requests are read at once; more get 503. A body that takes over
   10s to arrive is refused.
 - The listener keeps the last 10,000 requests or 64 MiB, and drops the oldest
-  whole requests first. `evictedThrough` is the highest `seq` it dropped.
+  whole requests first. `evictedThrough` is the highest `seq` it dropped. A read
+  of a window that lost requests has the `events_evicted` diagnosis, and the
+  stream answers with `X-Dev-Diagnosis: events_evicted`. `X-Dev-Evicted-Through`
+  is on every stream answer.
 - It does not check the 32 KB per-event limit or the JSON depth limit.
 
 Each request gets the next `seq`, in the order its capture completed. Gaps in what

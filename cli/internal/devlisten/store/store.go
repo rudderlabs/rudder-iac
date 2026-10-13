@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/ingest"
 )
@@ -27,10 +28,14 @@ type Store struct {
 	bytes          int
 	seq            uint64
 	evictedThrough uint64
-	requests       int
-	events         int
-	control        int
-	evicted        int
+	// evictedAt is the latest ReceivedAt of an evicted record. A record gets
+	// its seq when its capture completes, so the newest evicted record is not
+	// always the one received last.
+	evictedAt time.Time
+	requests  int
+	events    int
+	control   int
+	evicted   int
 	// changed is closed on the next Capture. It is made only when a waiter
 	// asks for it, so a store without waiters allocates nothing per request.
 	changed chan struct{}
@@ -75,6 +80,9 @@ func (s *Store) Capture(c *ingest.Capture) {
 		s.count(oldest, -1)
 		s.evicted++
 		s.evictedThrough = oldest.Seq
+		if oldest.ReceivedAt.After(s.evictedAt) {
+			s.evictedAt = oldest.ReceivedAt
+		}
 	}
 	if s.changed != nil {
 		close(s.changed)
@@ -107,6 +115,14 @@ func (s *Store) Stats() Stats {
 		MaxRequests:    s.maxRequests,
 		MaxBytes:       s.maxBytes,
 	}
+}
+
+// Evicted returns the seq of the newest evicted record and the latest time
+// an evicted record was received. Both are zero while nothing is evicted.
+func (s *Store) Evicted() (through uint64, receivedAt time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.evictedThrough, s.evictedAt
 }
 
 // Cursor returns the highest seq stored so far, 0 before the first request.

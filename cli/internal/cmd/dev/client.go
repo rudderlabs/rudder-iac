@@ -1,6 +1,7 @@
 package dev
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -94,15 +95,35 @@ func trimNewline(b []byte) []byte {
 	return b
 }
 
-// readSummary prints the summary object as the server wrote it, with the
-// URL added to every rudder-cli next, or as text.
+// readSummary prints the summary, then fails a read that cannot back a
+// check: a window that lost requests, or a wait that ran out.
 func readSummary(cmd *cobra.Command, opts *readOptions, base string, q url.Values, timeout time.Duration) error {
 	_, body, err := get(cmd, base, q, timeout)
 	if err != nil {
 		return err
 	}
-	noteEviction(cmd, opts.since, gjson.GetBytes(body, "evictedThrough").Uint())
+	if err := writeSummary(cmd, opts, base, body); err != nil {
+		return err
+	}
+	if gjson.GetBytes(body, `summary.diagnosis.#(code=="`+codeEvicted+`")`).Exists() {
+		if err := partial(cmd, opts, base, gjson.GetBytes(body, "evictedThrough").String()); err != nil {
+			return err
+		}
+	}
+	if !gjson.GetBytes(body, "timedOut").Bool() {
+		return nil
+	}
+	return fail(cmd, &usageError{
+		code: "wait_timeout",
+		message: fmt.Sprintf("--wait ran out after %.1fs: %d of --min %s matching accepted events arrived",
+			gjson.GetBytes(body, "waitedMs").Float()/1000, gjson.GetBytes(body, "summary.events.total").Int(), cmp.Or(q.Get("min"), "1")),
+		next: "rudder-cli dev events --url " + shellWord(base) + " --since " + gjson.GetBytes(body, "since").String() + " --json",
+	})
+}
 
+// writeSummary prints the summary object as the server wrote it, with the
+// URL added to every rudder-cli next, or as text.
+func writeSummary(cmd *cobra.Command, opts *readOptions, base string, body []byte) error {
 	if !opts.json {
 		var s summaryText
 		if err := json.Unmarshal(body, &s); err != nil {
@@ -132,7 +153,7 @@ func readSummary(cmd *cobra.Command, opts *readOptions, base string, q url.Value
 			body = out
 		}
 	}
-	_, err = cmd.OutOrStdout().Write(body)
+	_, err := cmd.OutOrStdout().Write(body)
 	return err
 }
 
@@ -149,22 +170,37 @@ func readStream(cmd *cobra.Command, opts *readOptions, base string, q url.Values
 		if hasMore {
 			fmt.Fprintf(cmd.ErrOrStderr(), "more events: continue with --since %s\n", cursor)
 		}
-		_, err := cmd.OutOrStdout().Write(body)
+		_, err = cmd.OutOrStdout().Write(body)
+	} else {
+		more := ""
+		if hasMore {
+			more = cursor
+		}
+		err = renderStream(cmd.OutOrStdout(), body, streamTable{since: opts.since, base: base, more: more, view: view, fields: fields})
+	}
+	if err != nil || resp.Header.Get("X-Dev-Diagnosis") != codeEvicted {
 		return err
 	}
-	more := ""
-	if hasMore {
-		more = cursor
-	}
-	return renderStream(cmd.OutOrStdout(), body, streamTable{since: opts.since, base: base, more: more, view: view, fields: fields})
+	return partial(cmd, opts, base, resp.Header.Get("X-Dev-Evicted-Through"))
 }
 
-// noteEviction warns that the window lost requests to the store budget, so
-// a count may be short.
-func noteEviction(cmd *cobra.Command, since string, evictedThrough uint64) {
-	cursor, err := strconv.ParseUint(since, 10, 64)
-	if err != nil || evictedThrough <= cursor {
-		return
+// codeEvicted is the listener's code for a window that lost requests to the
+// store budget. The listener decides which windows did; the CLI only reads it.
+const codeEvicted = "events_evicted"
+
+// partial runs after the output is written. It fails the read, because a
+// count that came out short must not pass a check, unless the caller
+// accepted the loss.
+func partial(cmd *cobra.Command, opts *readOptions, base, evictedThrough string) error {
+	message := "requests up to seq " + evictedThrough + " were evicted, so this window is incomplete"
+	if opts.allowPartial {
+		fmt.Fprintln(cmd.ErrOrStderr(), "note: "+message)
+		return nil
 	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "note: requests up to seq %d were evicted; the window starts after them\n", evictedThrough)
+	return fail(cmd, &usageError{
+		code:    codeEvicted,
+		message: message + "; pass --allow-partial to accept it",
+		// The window after the newest evicted request is complete.
+		next: cmd.CommandPath() + " --url " + shellWord(base) + " --since " + evictedThrough,
+	})
 }

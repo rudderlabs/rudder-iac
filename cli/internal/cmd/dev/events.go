@@ -29,22 +29,25 @@ const (
 // readOptions are the flags both read commands share. Each filter is the
 // query parameter of the same name.
 type readOptions struct {
-	url         string
-	serverID    string
-	timeout     time.Duration
-	json        bool
-	since       string
-	events      []string
-	types       []string
-	userID      string
-	anonymousID string
-	writeKeys   []string
+	url          string
+	allowPartial bool
+	serverID     string
+	timeout      time.Duration
+	json         bool
+	since        string
+	events       []string
+	types        []string
+	userID       string
+	anonymousID  string
+	writeKeys    []string
 }
 
 func addReadFlags(f *pflag.FlagSet, o *readOptions) {
 	f.StringVar(&o.url, "url", "", "URL of the listener, from its ready line (default $"+urlEnv+")")
 	f.StringVar(&o.serverID, "server-id", "", "Answer 409 server_changed unless the listener has this serverId")
 	f.BoolVarP(&o.json, "json", "j", false, "Print the listener's JSON instead of a table")
+	f.BoolVar(&o.allowPartial, "allow-partial", false,
+		"Exit 0 when the listener evicted requests of this window; the output is then incomplete")
 	f.StringVar(&o.since, "since", "0", "Read after this cursor, or since a duration such as 5m or an RFC 3339 time")
 	f.StringArrayVar(&o.events, "event", nil, "Only events with this name, or a prefix ending in *; repeat for more")
 	f.StringArrayVar(&o.types, "type", nil, "Only events of this type, such as track or page; repeat for more")
@@ -126,10 +129,14 @@ func newCmdEvents() *cobra.Command {
 			nothing_received: the listener never received a request. nothing_new: no request after
 			your cursor. filtered_empty: requests arrived, your filters match none.
 
-			--wait holds the call until --min matching accepted events exist, at most 110s. Every
-			successful read exits 0, also when --wait runs out (timedOut is true in the JSON); errors
-			exit 1. A request's reason, headers and body are on URL/_dev/v1/requests and on the review
-			page.
+			--wait holds the call until --min matching accepted events exist, at most 110s. When it
+			runs out, the command prints the summary (timedOut is true in the JSON) and exits 1 with
+			wait_timeout on stderr.
+
+			The listener keeps the last 10,000 requests or 64 MiB. A window that lost requests to that
+			limit has the events_evicted diagnosis: the command prints the summary and exits 1, or
+			exits 0 with --allow-partial. A request's reason, headers and body are on
+			URL/_dev/v1/requests and on the review page.
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli dev events --url http://127.0.0.1:4321
@@ -206,6 +213,10 @@ func newCmdEventsList() *cobra.Command {
 			The stream carries no cursor. Take it from the ready line or from dev events --json. At
 			most --limit events per page; when more are left, stderr names the --since to continue
 			from. Events of rejected requests are not in the stream: dev events counts them.
+
+			The listener keeps the last 10,000 requests or 64 MiB. When the window lost requests to
+			that limit, the command prints the events that are left and exits 1 with events_evicted on
+			stderr, or exits 0 with --allow-partial.
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli dev events list --url http://127.0.0.1:4321 --since 5m

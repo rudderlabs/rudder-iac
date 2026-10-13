@@ -721,3 +721,116 @@ func TestStreamFieldsThroughAList(t *testing.T) {
 	require.Equal(t, `{"properties":{"products":[{"sku":"a"},{},"x",null,3]}}`+"\n", w.Body.String(),
 		"an element that is not an object stays as sent")
 }
+
+// captured stores one accepted track request received at at. It skips the
+// ingestion handler, so a test sets the time and fills the store fast.
+func captured(st *store.Store, at time.Time, event string) {
+	body := []byte(`{"userId":"u","event":"` + event + `"}`)
+	st.Capture(&ingest.Capture{
+		ReceivedAt:   at,
+		Kind:         "ingestion",
+		Route:        "/v1/track",
+		Transport:    "http",
+		Request:      httptest.NewRequest(http.MethodPost, "/v1/track", nil),
+		WriteKey:     "dev",
+		Body:         body,
+		Decoded:      body,
+		BodyComplete: true,
+		Events:       []ingest.Event{{Message: body}},
+		StatusCode:   http.StatusOK,
+	})
+}
+
+func codes(items []diagnosis) []string {
+	var out []string
+	for _, d := range items {
+		out = append(out, d.Code)
+	}
+	return out
+}
+
+// A window that lost a request to the store budget says so in the summary
+// and in the stream headers, and never reads as all accepted.
+func TestReadsSignalAWindowThatLostRequests(t *testing.T) {
+	t.Parallel()
+	t0 := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
+	h, st := newTestHandler("127.0.0.1")
+	h.now = func() time.Time { return t0.Add(time.Minute) }
+	// seq 1 and 2 leave the store; the newest evicted one arrived at t0+1s.
+	captured(st, t0, "Lost")
+	captured(st, t0.Add(time.Second), "Lost")
+	for range st.Stats().MaxRequests {
+		captured(st, t0.Add(2*time.Second), "Kept")
+	}
+	require.Equal(t, uint64(2), st.Stats().EvictedThrough)
+
+	for _, tc := range []struct {
+		name  string
+		query string
+		lost  bool
+	}{
+		{name: "the default window", query: "", lost: true},
+		{name: "a cursor before the evicted requests", query: "since=0", lost: true},
+		{name: "a cursor inside the evicted requests", query: "since=1", lost: true},
+		{name: "a cursor at the newest evicted request", query: "since=2", lost: false},
+		{name: "a cursor after the evicted requests", query: "since=3", lost: false},
+		{name: "a time before the evicted requests", query: "since=2026-09-30T11:59:59Z", lost: true},
+		{name: "the time of the newest evicted request", query: "since=2026-09-30T12:00:01Z", lost: true},
+		{name: "a time after the evicted requests", query: "since=2026-09-30T12:00:02Z", lost: false},
+		{name: "a duration that reaches the evicted requests", query: "since=5m", lost: true},
+		{name: "a duration that ends after them", query: "since=58s", lost: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := codes(summaryOf(t, h, tc.query).Summary.Diagnosis)
+			stream := get(h, "/_dev/v1/events?limit=2&"+tc.query, nil)
+
+			require.Equal(t, http.StatusOK, stream.Code)
+			require.Equal(t, "2", stream.Header().Get("X-Dev-Evicted-Through"))
+			require.Equal(t, []string{`{"userId":"u","event":"Kept"}`, `{"userId":"u","event":"Kept"}`},
+				lines(stream.Body.String()), "the body holds events only")
+			if !tc.lost {
+				require.Contains(t, got, "all_accepted")
+				require.NotContains(t, got, "events_evicted")
+				require.Empty(t, stream.Header().Values("X-Dev-Diagnosis"))
+				return
+			}
+			require.Equal(t, "events_evicted", got[0], "the loss leads the diagnosis")
+			require.NotContains(t, got, "all_accepted")
+			require.Equal(t, "events_evicted", stream.Header().Get("X-Dev-Diagnosis"))
+		})
+	}
+
+	t.Run("the diagnosis names what the window lost", func(t *testing.T) {
+		t.Parallel()
+		require.Equal(t, diagnosis{
+			Code: "events_evicted", Count: 1,
+			Message: "1 request was evicted from this window: the listener keeps the last 10000 requests or 64 MiB. " +
+				"The counts and the events are incomplete.",
+			Next: "rudder-cli dev events --since 2 --event Kept --json",
+		}, summaryOf(t, h, "since=1&event=Kept").Summary.Diagnosis[0])
+		// A time does not say how many requests the window lost.
+		require.Equal(t, diagnosis{
+			Code: "events_evicted", Count: 0,
+			Message: "Requests were evicted from this window: the listener keeps the last 10000 requests or 64 MiB. " +
+				"The counts and the events are incomplete.",
+			Next: "rudder-cli dev events --since 2 --json",
+		}, summaryOf(t, h, "since=5m").Summary.Diagnosis[0])
+	})
+}
+
+func TestReadsOfAStoreThatEvictedNothingSignalNoLoss(t *testing.T) {
+	t.Parallel()
+	h, st := newTestHandler("127.0.0.1")
+	track(t, st, `{"userId":"u","event":"e"}`)
+
+	for _, query := range []string{"", "since=0", "since=5m"} {
+		got := codes(summaryOf(t, h, query).Summary.Diagnosis)
+		stream := get(h, "/_dev/v1/events?"+query, nil)
+
+		require.Contains(t, got, "all_accepted", query)
+		require.NotContains(t, got, "events_evicted", query)
+		require.Equal(t, "0", stream.Header().Get("X-Dev-Evicted-Through"), query)
+		require.Empty(t, stream.Header().Values("X-Dev-Diagnosis"), query)
+	}
+}

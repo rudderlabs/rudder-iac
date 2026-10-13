@@ -99,9 +99,14 @@ func (h *Handler) summary(w http.ResponseWriter, r *http.Request, q *eventsQuery
 	win.cursor = h.store.Cursor()
 	records := h.records(win)
 	stats := h.store.Stats()
+	evictedThrough, evictedAt := h.store.Evicted()
 
 	filtered := tally(records, q)
-	filtered.Diagnosis = h.diagnose(win, tally(records, &eventsQuery{}), filtered, q, stats)
+	var lost *diagnosisItem
+	if win.lost(evictedThrough, evictedAt) {
+		lost = evicted(win, evictedThrough, q, stats)
+	}
+	filtered.Diagnosis = h.diagnose(win, tally(records, &eventsQuery{}), filtered, q, stats, lost)
 	writeJSON(w, http.StatusOK, summaryObject{
 		APIVersion:     h.cfg.Identity.APIVersion,
 		ServerID:       h.cfg.Identity.ServerID,
@@ -262,8 +267,12 @@ var bodyStages = []string{"decode", "body", "parse", "batch", "identity", "size"
 
 // diagnose reads the whole window, not the filters: a typo in a filter must
 // not read as a listener that received nothing. Every rule that holds is
-// listed, in the order of what it rules out first.
-func (h *Handler) diagnose(win window, all, filtered counts, q *eventsQuery, stats store.Stats) []diagnosisItem {
+// listed, in the order of what it rules out first. lost is set when the
+// window lost requests to the store budget; no other rule can then vouch
+// for what arrived.
+func (h *Handler) diagnose(
+	win window, all, filtered counts, q *eventsQuery, stats store.Stats, lost *diagnosisItem,
+) []diagnosisItem {
 	var (
 		out   = []diagnosisItem{}
 		since = strconv.FormatUint(win.since, 10)
@@ -274,6 +283,9 @@ func (h *Handler) diagnose(win window, all, filtered counts, q *eventsQuery, sta
 		control = all.Control
 	)
 	requests := func(query string) string { return h.curl("requests?since=" + since + query) }
+	if lost != nil {
+		out = append(out, *lost)
+	}
 
 	// The store counts ingestion requests only, so control requests alone
 	// still read as nothing received. Eviction needs requests to evict.
@@ -336,7 +348,7 @@ func (h *Handler) diagnose(win window, all, filtered counts, q *eventsQuery, sta
 			requestsVerb(missing.Requests, "arrived", "arrived")+" with no write key. The listener accepts them; RudderStack answers 401.",
 			requests("&writeKey="))
 	}
-	if reqs > 0 && all.Requests.Failed == 0 {
+	if reqs > 0 && all.Requests.Failed == 0 && lost == nil {
 		add("all_accepted", reqs,
 			"Every request that arrived was accepted. This says nothing about events that never came: read byEvent.",
 			"rudder-cli dev events list --since "+since+q.args()+" --json")
@@ -347,6 +359,27 @@ func (h *Handler) diagnose(win window, all, filtered counts, q *eventsQuery, sta
 			"rudder-cli dev events --since "+since+" --json")
 	}
 	return out
+}
+
+// codeEvicted marks a window that lost requests to the store budget.
+const codeEvicted = "events_evicted"
+
+// evicted describes the loss. A cursor window counts the lost requests,
+// because each request takes the next seq; a time window cannot.
+func evicted(win window, evictedThrough uint64, q *eventsQuery, stats store.Stats) *diagnosisItem {
+	count, subject := 0, "Requests were"
+	if win.floor.IsZero() {
+		count = int(evictedThrough - win.since)
+		subject = requestsVerb(count, "was", "were")
+	}
+	return &diagnosisItem{
+		Code:  codeEvicted,
+		Count: count,
+		Message: fmt.Sprintf("%s evicted from this window: the listener keeps the last %d requests or %d MiB. "+
+			"The counts and the events are incomplete.", subject, stats.MaxRequests, stats.MaxBytes>>20),
+		// The window after the newest evicted request is complete.
+		Next: "rudder-cli dev events --since " + strconv.FormatUint(evictedThrough, 10) + q.args() + " --json",
+	}
 }
 
 func requestsVerb(n int, one, many string) string {

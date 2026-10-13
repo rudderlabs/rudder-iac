@@ -79,11 +79,17 @@ func (h *Handler) stream(w http.ResponseWriter, r *http.Request, q *eventsQuery)
 		n += len(page)
 		scanned = rec.Seq
 	}
+	evictedThrough, evictedAt := h.store.Evicted()
 
 	header := w.Header()
 	header.Set("Content-Type", "application/x-ndjson")
 	header.Set("X-Dev-Cursor", strconv.FormatUint(cursor, 10))
 	header.Set("X-Dev-Has-More", strconv.FormatBool(hasMore))
+	// The loss goes in headers, so the body stays one event per line.
+	header.Set("X-Dev-Evicted-Through", strconv.FormatUint(evictedThrough, 10))
+	if win.lost(evictedThrough, evictedAt) {
+		header.Set("X-Dev-Diagnosis", codeEvicted)
+	}
 	if hasMore {
 		header.Set("Link", "<"+base+"events?"+nextQuery(q.raw, cursor)+`>; rel="next"`)
 	}
