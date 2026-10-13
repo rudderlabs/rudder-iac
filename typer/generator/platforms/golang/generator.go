@@ -191,6 +191,9 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, error) {
 			if err != nil {
 				return nil, fmt.Errorf("mapping property %q of track event %q: %w", wireKey, event.Name, err)
 			}
+			if enum != nil && len(enum.dropped) > 0 {
+				core.Warn(fmt.Sprintf("leaving out the enum values %s of property %q (%s) of track event %q: its declared types do not allow them", jsonText(enum.dropped), wireKey, declaredTypes(ps.Property), event.Name))
+			}
 			r.fields = append(r.fields, ruleField{wireKey: wireKey, ps: ps, enum: enum})
 		}
 		rules = append(rules, r)

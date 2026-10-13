@@ -118,7 +118,7 @@ func TestResolveEnum(t *testing.T) {
 		{
 			name:     "values the declared types do not allow are left out",
 			property: enumProperty("p", onlyInteger, "a", nil, 1.5, 1, true),
-			want: &effectiveEnum{base: "int64", signature: "[1]", values: []GoEnumValue{
+			want: &effectiveEnum{base: "int64", signature: "[1]", dropped: []any{"a", nil, 1.5, true}, values: []GoEnumValue{
 				{Name: "1", Text: "1", Expr: "int64(1)"},
 			}},
 		},

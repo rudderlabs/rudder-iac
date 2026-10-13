@@ -26,6 +26,8 @@ type effectiveEnum struct {
 	values []GoEnumValue
 	// null is set when null is one of the values.
 	null bool
+	// dropped are the plan's values the declared types do not allow.
+	dropped []any
 	// signature lists every value's Text, and null, in brackets: the JSON
 	// array of the values, except that Go quotes non-printable characters and
 	// invalid UTF-8 differently.
@@ -48,6 +50,7 @@ func resolveEnum(p plan.Property) (*effectiveEnum, error) {
 	var (
 		allowed []any // normalized
 		raw     []any // as in the plan, for errors
+		dropped []any
 		seen    = map[string]bool{}
 	)
 	for _, v := range p.Config.Enum {
@@ -58,10 +61,14 @@ func resolveEnum(p plan.Property) (*effectiveEnum, error) {
 		// A *big.Rat prints exactly, in lowest terms, so equal numbers share a
 		// key; the type keeps the string "1/1" apart from the number 1.
 		key := fmt.Sprintf("%T %v", n, n)
-		if seen[key] || !allows(p.Types, n) {
+		if seen[key] {
 			continue
 		}
 		seen[key] = true
+		if !allows(p.Types, n) {
+			dropped = append(dropped, v)
+			continue
+		}
 		allowed, raw = append(allowed, n), append(raw, v)
 	}
 	if len(allowed) == 0 {
@@ -69,7 +76,7 @@ func resolveEnum(p plan.Property) (*effectiveEnum, error) {
 	}
 
 	var (
-		e        = &effectiveEnum{base: enumBase(p.Types, allowed)}
+		e        = &effectiveEnum{base: enumBase(p.Types, allowed), dropped: dropped}
 		texts    = make([]string, 0, len(allowed))
 		literals = map[string]any{}
 	)

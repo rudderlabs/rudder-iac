@@ -233,6 +233,18 @@ func TestGenerateReservesSkippedDeclaredKeys(t *testing.T) {
 	assert.Equal(t, []string{`skipping property "kind" (custom:kind) of track event "Some Event": Go generation does not support custom types yet`}, *warnings)
 }
 
+func TestGenerateWarnsAboutEnumValuesLeftOut(t *testing.T) {
+	warnings := captureWarnings(t)
+
+	_, err := (&golang.Generator{}).Generate(golang.TrackPlan(plan.Property{
+		Name:   "kind",
+		Types:  []plan.PropertyType{plan.PrimitiveTypeInteger},
+		Config: &plan.PropertyConfig{Enum: []any{"a", nil, 1.5, 1, 1.5}},
+	}), core.GenerateOptions{}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{`leaving out the enum values ["a",null,1.5] of property "kind" (integer) of track event "Some Event": its declared types do not allow them`}, *warnings)
+}
+
 func captureWarnings(t *testing.T) *[]string {
 	t.Helper()
 	var warnings []string
