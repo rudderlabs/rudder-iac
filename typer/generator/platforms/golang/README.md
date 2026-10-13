@@ -40,7 +40,7 @@ props := ruddertyper.TrackSomeTrackEventProperties{
 
 - A property that is one type or `null` is a `Nullable[T]`, whose zero value is `null`. Build a value with `NewNullable[T](v)` and write `T` out: `NewNullable(1)` is a `Nullable[int]`, not a `Nullable[int64]` ([Nullable Types][spec], [Discriminator Values][spec]).
 - Multi-type values come from their `New{Type}{Member}` constructors ([Multi-Type Properties][spec]), and enum values from their typed constants, or for a mixed enum from its value functions ([Enums][spec]).
-- For a variant, pass a case struct (by value, so type switches match); it fixes the discriminator. When generated, the `Default` struct takes any other discriminator value; a boolean or enum discriminator whose cases cover every value gets none ([Variant Rules][spec], [Custom Type with Variants][spec], [Event Rule with Variants][spec]).
+- For a variant, pass a case struct (by value, so type switches match); it fixes the discriminator. When generated, the `Default` struct is meant for values no case matches, but sends whatever value it holds, even a case value or, when unset, the zero value such as `""`; a boolean or enum discriminator whose cases cover every value gets none. An optional discriminator also gets a `{Type}Absent` struct, which sends no discriminator ([Variant Rules][spec], [Custom Type with Variants][spec], [Event Rule with Variants][spec]).
 
 ```go
 err := rt.TrackDeviceEvent(user, ruddertyper.TrackDeviceEventPropertiesCaseMobile{OsVersion: "17.1", AppVersion: "2.0"})
@@ -50,7 +50,7 @@ err = rt.TrackDeviceEvent(user, ruddertyper.TrackDeviceEventPropertiesDefault{De
 // properties: {"deviceType": "tv"}
 ```
 
-- To read a variant, use one `case` per struct: a combined `case A, B:` clause leaves `v` typed as the interface, and these clauses do not match a pointer to a case. `Discriminator()` returns the value without a switch ([Type Narrowing Usage][spec]).
+- To read a variant, use one `case` per struct: a combined `case A, B:` clause leaves `v` typed as the interface. `Discriminator()` returns the value without a switch; for an optional discriminator it returns `(value, ok)`, and `ok` is false only for `Absent` ([Type Narrowing Usage][spec], [Variant Rules][spec]).
 
 ```go
 func handleVariant(data ruddertyper.CustomTypeSomeVariantType) {
@@ -103,7 +103,7 @@ err = rt.Page(
 
 - Go cannot force a field to be set, so an unset required field is sent as its zero value (`""`, `0`, `false`, `[]`). Unions without a `null` member, mixed enums and variants have no valid zero value, so an unset one fails the call with `ErrInvalidValue` ([Required and Optional Fields][spec], [Plan Shapes That Fail Generation][appendix]).
 - To catch unset required fields at lint time, enable the `exhaustruct` linter for the packages that build payloads ([Required and Optional Fields][spec]).
-- Generated code checks shapes, not values: an enum accepts any value of its type, and a variant's `Default` may repeat a case value. Check untrusted input with the enum's `IsValid()` ([Errors][spec], [Enums][spec]).
+- Generated code checks shapes, not values: an enum accepts any value of its type, and so does a variant's `Default` (see Calling). Check untrusted input with the enum's `IsValid()` ([Errors][spec], [Enums][spec]).
 - Identify traits go where the rule's identity section says, `traits` or `context.traits`, while analytics.js always sends them in `context.traits`. Group traits always go to `traits` ([Identity Sections][spec]).
 - Nothing carries over between calls: an event sent after `Identify` has no `context.traits` unless you pass them ([Identify Events][spec]):
 
