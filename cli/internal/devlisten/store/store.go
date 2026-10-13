@@ -105,6 +105,11 @@ func (s *Store) count(rec *Record, sign int) {
 func (s *Store) Stats() Stats {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.stats()
+}
+
+// stats needs s.mu.
+func (s *Store) stats() Stats {
 	return Stats{
 		Requests:       s.requests,
 		Events:         s.events,
@@ -117,12 +122,25 @@ func (s *Store) Stats() Stats {
 	}
 }
 
-// Evicted returns the seq of the newest evicted record and the latest time
-// an evicted record was received. Both are zero while nothing is evicted.
-func (s *Store) Evicted() (through uint64, receivedAt time.Time) {
+// Snapshot is the store at one moment. A reader that judges whether its
+// window is complete needs the records and the eviction state of the same
+// moment: read apart, a later eviction marks a complete answer as lossy.
+type Snapshot struct {
+	// Records are the records after the seq asked for, oldest first.
+	Records []*Record
+	Cursor  uint64
+	Stats   Stats
+	// EvictedAt is the latest time an evicted record was received. It is
+	// the zero time while Stats.EvictedThrough is 0.
+	EvictedAt time.Time
+}
+
+// Snapshot returns the records after seq with the cursor, the totals and
+// the eviction state they belong to.
+func (s *Store) Snapshot(seq uint64) Snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.evictedThrough, s.evictedAt
+	return Snapshot{Records: s.after(seq), Cursor: s.seq, Stats: s.stats(), EvictedAt: s.evictedAt}
 }
 
 // Cursor returns the highest seq stored so far, 0 before the first request.

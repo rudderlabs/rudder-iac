@@ -55,7 +55,7 @@ func (h *Handler) serverChanged(w http.ResponseWriter) {
 // stream writes the accepted events after the cursor, one per line. A page
 // holds whole requests only, so the next cursor never splits one.
 func (h *Handler) stream(w http.ResponseWriter, r *http.Request, q *eventsQuery) {
-	win := h.window(q.since)
+	win, records, stats, lost := h.snapshot(h.window(q.since))
 	var (
 		body    bytes.Buffer
 		n       int
@@ -63,7 +63,7 @@ func (h *Handler) stream(w http.ResponseWriter, r *http.Request, q *eventsQuery)
 		scanned uint64
 		hasMore bool
 	)
-	for _, rec := range h.records(win) {
+	for _, rec := range records {
 		var page []int
 		if accepted(rec) {
 			page = q.matches(rec)
@@ -79,15 +79,14 @@ func (h *Handler) stream(w http.ResponseWriter, r *http.Request, q *eventsQuery)
 		n += len(page)
 		scanned = rec.Seq
 	}
-	evictedThrough, evictedAt := h.store.Evicted()
 
 	header := w.Header()
 	header.Set("Content-Type", "application/x-ndjson")
 	header.Set("X-Dev-Cursor", strconv.FormatUint(cursor, 10))
 	header.Set("X-Dev-Has-More", strconv.FormatBool(hasMore))
 	// The loss goes in headers, so the body stays one event per line.
-	header.Set("X-Dev-Evicted-Through", strconv.FormatUint(evictedThrough, 10))
-	if win.lost(evictedThrough, evictedAt) {
+	header.Set("X-Dev-Evicted-Through", strconv.FormatUint(stats.EvictedThrough, 10))
+	if lost {
 		header.Set("X-Dev-Diagnosis", codeEvicted)
 	}
 	if hasMore {

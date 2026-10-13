@@ -79,14 +79,12 @@ func TestStoreEvictsWholeOldestRequests(t *testing.T) {
 
 // A slow upload is received early and stored late, so the newest evicted
 // record is not always the one received last.
-func TestStoreEvictedKeepsTheLatestReceivedTime(t *testing.T) {
+func TestStoreSnapshotKeepsTheLatestEvictedReceivedTime(t *testing.T) {
 	t.Parallel()
 	t0 := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
 	s := &Store{maxRequests: 1, maxBytes: maxBytes}
 
-	through, at := s.Evicted()
-	require.Zero(t, through)
-	require.True(t, at.IsZero())
+	require.True(t, s.Snapshot(0).EvictedAt.IsZero())
 
 	for _, received := range []time.Duration{2 * time.Second, time.Second, 3 * time.Second} {
 		c := capture("dev", "/v1/track", `{"userId":"u1"}`)
@@ -94,9 +92,16 @@ func TestStoreEvictedKeepsTheLatestReceivedTime(t *testing.T) {
 		s.Capture(c)
 	}
 
-	through, at = s.Evicted()
-	require.Equal(t, uint64(2), through)
-	require.Equal(t, t0.Add(2*time.Second), at)
+	snap := s.Snapshot(0)
+	require.Equal(t, []uint64{3}, seqs(snap.Records))
+	require.Equal(t, uint64(3), snap.Cursor)
+	require.Equal(t, uint64(2), snap.Stats.EvictedThrough)
+	require.Equal(t, t0.Add(2*time.Second), snap.EvictedAt)
+
+	// A later eviction clears a slot of the shared array, not of the snapshot.
+	s.Capture(capture("dev", "/v1/track", `{"userId":"u1"}`))
+	require.Equal(t, []uint64{3}, seqs(snap.Records))
+	require.Equal(t, uint64(2), snap.Stats.EvictedThrough)
 }
 
 func TestStoreSinceReturnsTheRecordsAfterASeq(t *testing.T) {

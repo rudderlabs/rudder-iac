@@ -73,6 +73,9 @@ type Handler struct {
 	stop    context.CancelFunc
 	waiters atomic.Int64
 	now     func() time.Time
+	// onSnapshot, when set, runs after a read took its snapshot of the
+	// store. Tests use it to capture a request between the read and the answer.
+	onSnapshot func()
 }
 
 func New(st *store.Store, cfg Config) *Handler {

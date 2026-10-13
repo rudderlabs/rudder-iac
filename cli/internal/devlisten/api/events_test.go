@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/ingest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/store"
@@ -832,5 +833,73 @@ func TestReadsOfAStoreThatEvictedNothingSignalNoLoss(t *testing.T) {
 		require.NotContains(t, got, "events_evicted", query)
 		require.Equal(t, "0", stream.Header().Get("X-Dev-Evicted-Through"), query)
 		require.Empty(t, stream.Header().Values("X-Dev-Diagnosis"), query)
+	}
+}
+
+// Nothing is evicted until something is, whatever time the caller names:
+// the zero time of an empty store is not the time of an eviction.
+func TestReadsBeforeTheFirstEvictionSignalNoLossForAnyTime(t *testing.T) {
+	t.Parallel()
+	h, st := newTestHandler("127.0.0.1")
+	track(t, st, `{"userId":"u","event":"e"}`)
+
+	for _, query := range []string{"since=0000-01-01T00:00:00Z", "since=0001-01-01T00:00:00.000000001Z"} {
+		got := codes(summaryOf(t, h, query).Summary.Diagnosis)
+		stream := get(h, "/_dev/v1/events?"+query, nil)
+
+		require.Contains(t, got, "all_accepted", query)
+		require.NotContains(t, got, "events_evicted", query)
+		require.Equal(t, []string{`{"userId":"u","event":"e"}`}, lines(stream.Body.String()), query)
+		require.Empty(t, stream.Header().Values("X-Dev-Diagnosis"), query)
+	}
+}
+
+// A read answers for one moment of the store. A request that evicts the
+// oldest one after that moment leaves the answer complete: it holds every
+// request through its cursor.
+func TestReadsDiagnoseOneMomentOfTheStore(t *testing.T) {
+	t.Parallel()
+	t0 := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
+
+	for _, tc := range []struct {
+		name string
+		read func(t *testing.T, h *Handler, full int)
+	}{
+		{name: "summary", read: func(t *testing.T, h *Handler, full int) {
+			w := get(h, "/_dev/v1/events?view=counts", nil)
+
+			require.Equal(t, http.StatusOK, w.Code)
+			require.Equal(t, int64(0), gjson.Get(w.Body.String(), "evictedThrough").Int())
+			require.Equal(t, int64(full), gjson.Get(w.Body.String(), "cursor").Int())
+			require.Equal(t, int64(full), gjson.Get(w.Body.String(), "summary.events.total").Int())
+			require.False(t, gjson.Get(w.Body.String(), `summary.diagnosis.#(code=="events_evicted")`).Exists())
+			require.True(t, gjson.Get(w.Body.String(), `summary.diagnosis.#(code=="all_accepted")`).Exists())
+		}},
+		{name: "stream", read: func(t *testing.T, h *Handler, full int) {
+			w := get(h, "/_dev/v1/events?limit=1", nil)
+
+			require.Equal(t, http.StatusOK, w.Code)
+			require.Equal(t, []string{`{"userId":"u","event":"First"}`}, lines(w.Body.String()))
+			require.Equal(t, "0", w.Header().Get("X-Dev-Evicted-Through"))
+			require.Empty(t, w.Header().Values("X-Dev-Diagnosis"))
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			h, st := newTestHandler("127.0.0.1")
+			full := st.Stats().MaxRequests
+			captured(st, t0, "First")
+			for range full - 1 {
+				captured(st, t0, "Kept")
+			}
+			h.onSnapshot = func() { captured(st, t0, "Late") }
+
+			tc.read(t, h, full)
+
+			// The next read is of a later moment, and that one lost seq 1.
+			h.onSnapshot = nil
+			require.Equal(t, uint64(1), st.Stats().EvictedThrough, "the late request evicted the first")
+			require.Equal(t, "events_evicted", get(h, "/_dev/v1/events", nil).Header().Get("X-Dev-Diagnosis"))
+		})
 	}
 }

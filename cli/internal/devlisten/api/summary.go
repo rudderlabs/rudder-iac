@@ -94,17 +94,12 @@ func (h *Handler) summary(w http.ResponseWriter, r *http.Request, q *eventsQuery
 			return
 		}
 	}
-	// The cursor is taken before the records, so a request stored between
-	// the two reads waits for the next read instead of being skipped.
-	win.cursor = h.store.Cursor()
-	records := h.records(win)
-	stats := h.store.Stats()
-	evictedThrough, evictedAt := h.store.Evicted()
+	win, records, stats, isLost := h.snapshot(win)
 
 	filtered := tally(records, q)
 	var lost *diagnosisItem
-	if win.lost(evictedThrough, evictedAt) {
-		lost = evicted(win, evictedThrough, q, stats)
+	if isLost {
+		lost = evicted(win, stats.EvictedThrough, q, stats)
 	}
 	filtered.Diagnosis = h.diagnose(win, tally(records, &eventsQuery{}), filtered, q, stats, lost)
 	writeJSON(w, http.StatusOK, summaryObject{

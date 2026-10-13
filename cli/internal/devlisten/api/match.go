@@ -112,13 +112,34 @@ func (w window) holds(r *store.Record) bool {
 // lost reports whether the store evicted a record of the window: one after
 // the cursor or, for a time, one received at or after it. Every read uses
 // it, so the summary, the stream and the CLI agree on which windows are
-// incomplete. Call it after the records are read: an eviction between the
-// two then shows as a loss, never as a complete window.
+// incomplete. Both values come from the snapshot that gave the records.
 func (w window) lost(evictedThrough uint64, evictedAt time.Time) bool {
+	// evictedAt is the zero time until something is evicted, and a caller
+	// may name an earlier time.
+	if evictedThrough == 0 {
+		return false
+	}
 	if w.floor.IsZero() {
 		return evictedThrough > w.since
 	}
 	return !evictedAt.Before(w.floor)
+}
+
+// snapshot reads the records of the window, up to the store cursor of the
+// same moment, and whether the window lost a record.
+func (h *Handler) snapshot(w window) (window, []*store.Record, store.Stats, bool) {
+	snap := h.store.Snapshot(w.since)
+	if h.onSnapshot != nil {
+		h.onSnapshot()
+	}
+	w.cursor = snap.Cursor
+	records := snap.Records[:0]
+	for _, r := range snap.Records {
+		if w.holds(r) {
+			records = append(records, r)
+		}
+	}
+	return w, records, snap.Stats, w.lost(snap.Stats.EvictedThrough, snap.EvictedAt)
 }
 
 // records returns the records in the window, oldest first.
