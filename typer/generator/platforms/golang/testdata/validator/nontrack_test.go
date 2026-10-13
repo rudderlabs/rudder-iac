@@ -13,8 +13,8 @@ import (
 )
 
 // messageJSON is the whole typ message of a call by user-123 and anon-1 whose
-// context holds only ruddertyper, with fields, the message's other keys,
-// appended after anonymousId.
+// context holds only ruddertyper. fields, the message's other keys, follow
+// anonymousId, so a non-empty fields starts with ", ".
 func messageJSON(meta, typ, fields string) string {
 	return fmt.Sprintf(`{"type": %q, "channel": "server", "userId": "user-123", "anonymousId": "anon-1"%s, "context": {"ruddertyper": %s}}`, typ, fields, meta)
 }
