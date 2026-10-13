@@ -143,6 +143,11 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 			`naming property "$$" of custom type "profile": name "$$" has no letters or digits to build a Go identifier from`,
 		},
 		{
+			"custom type property without words in a skipped rule",
+			rule(plan.EventTypeIdentify, "", plan.IdentitySectionTraits, property("kind", objectSchema)),
+			`naming property "$$" of custom type "profile": name "$$" has no letters or digits to build a Go identifier from`,
+		},
+		{
 			"nested property without words",
 			trackEvent("Some Event", property("context", nestedSchema)),
 			`naming property "$$" of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
