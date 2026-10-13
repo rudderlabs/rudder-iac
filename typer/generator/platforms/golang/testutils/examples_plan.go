@@ -119,8 +119,9 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"userProfile": optional(property("userProfile", "", userProfile)),
 				"grid":        optional(items(property("grid", "", plan.PrimitiveTypeArray), row)),
 				"items":       optional(items(property("items", "", plan.PrimitiveTypeArray), someObjectType)),
-				// Without a nested schema here, address keeps its Property type.
-				"address": optional(property("address", "", object)),
+				// With the empty open schema the providers attach here, address
+				// keeps its Property type.
+				"address": nested(optional(property("address", "", object)), true, nil),
 			}),
 			// Nested object shapes the reference plan lacks. The providers keep
 			// a nested schema only when object is listed first. foo.barBaz and
@@ -135,6 +136,10 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"contact": nested(optional(property("contact", "", object, plan.PrimitiveTypeString)), true, map[string]plan.PropertySchema{
 					"email": required(property("email", "", plan.PrimitiveTypeString)),
 				}),
+				// The providers' empty open schema hoists nothing, so these keep
+				// their Property types.
+				"objectOrNull":   nested(optional(property("objectOrNull", "", object, plan.PrimitiveTypeNull)), true, nil),
+				"objectOrString": nested(optional(property("objectOrString", "", object, plan.PrimitiveTypeString)), true, nil),
 				"foo": nested(optional(property("foo", "", object)), true, map[string]plan.PropertySchema{
 					"barBaz": nested(optional(property("barBaz", "", object)), false, nil),
 				}),

@@ -302,6 +302,38 @@ type PropertyNumber = float64
 // PropertyObject represents the property "object".
 type PropertyObject = map[string]any
 
+// PropertyObjectOrNull represents the property "objectOrNull".
+type PropertyObjectOrNull = Nullable[map[string]any]
+
+// PropertyObjectOrString represents the property "objectOrString": a string or object.
+// Build it with one of the NewPropertyObjectOrString* functions.
+// Null is not a member, so the zero value cannot be sent.
+type PropertyObjectOrString struct{ value any }
+
+// NewPropertyObjectOrStringString returns a string value.
+func NewPropertyObjectOrStringString(v string) PropertyObjectOrString {
+	return PropertyObjectOrString{value: v}
+}
+
+// NewPropertyObjectOrStringObject returns an object value; nil is sent as {}.
+func NewPropertyObjectOrStringObject(v map[string]any) PropertyObjectOrString {
+	return PropertyObjectOrString{value: v}
+}
+
+// Value returns the held value.
+func (u PropertyObjectOrString) Value() any { return u.value }
+
+func (u PropertyObjectOrString) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: PropertyObjectOrString is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u PropertyObjectOrString) MarshalJSON() ([]byte, error) { return marshal(u) }
+
 // PropertyPrice represents the property "price".
 type PropertyPrice = float64
 
@@ -761,11 +793,13 @@ func (v TrackSomeMultiTypeEventProperties) MarshalJSON() ([]byte, error) {
 
 // TrackSomeNestedObjectEventProperties holds the properties of "Some Nested Object Event".
 type TrackSomeNestedObjectEventProperties struct {
-	Address  *TrackSomeNestedObjectEventPropertiesAddress           // optional
-	Contact  *TrackSomeNestedObjectEventPropertiesContact           // optional
-	Foo      *TrackSomeNestedObjectEventPropertiesFoo               // optional
-	FooBar   *TrackSomeNestedObjectEventPropertiesFooBar            // optional
-	Location Nullable[TrackSomeNestedObjectEventPropertiesLocation] // required
+	Address        *TrackSomeNestedObjectEventPropertiesAddress           // optional
+	Contact        *TrackSomeNestedObjectEventPropertiesContact           // optional
+	Foo            *TrackSomeNestedObjectEventPropertiesFoo               // optional
+	FooBar         *TrackSomeNestedObjectEventPropertiesFooBar            // optional
+	Location       Nullable[TrackSomeNestedObjectEventPropertiesLocation] // required
+	ObjectOrNull   *PropertyObjectOrNull                                  // optional
+	ObjectOrString *PropertyObjectOrString                                // optional
 }
 
 func (v TrackSomeNestedObjectEventProperties) toMap() map[string]any {
@@ -783,6 +817,12 @@ func (v TrackSomeNestedObjectEventProperties) toMap() map[string]any {
 	}
 	if v.FooBar != nil {
 		m["fooBar"] = *v.FooBar
+	}
+	if v.ObjectOrNull != nil {
+		m["objectOrNull"] = *v.ObjectOrNull
+	}
+	if v.ObjectOrString != nil {
+		m["objectOrString"] = *v.ObjectOrString
 	}
 	return m
 }
