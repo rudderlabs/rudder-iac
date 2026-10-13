@@ -23,16 +23,6 @@ func validSection(rule *plan.EventRule) bool {
 	return false
 }
 
-// sectionWarning reports a rule skipped for its section, in the Kotlin
-// generator's words.
-func sectionWarning(rule *plan.EventRule) string {
-	msg := fmt.Sprintf("invalid section %q for event type %q", rule.Section, rule.Event.EventType)
-	if rule.Event.Name != "" {
-		msg += fmt.Sprintf(" and event name %q", rule.Event.Name)
-	}
-	return msg
-}
-
 // payloadNoun is what an event type's payload holds, which ends its type's
 // name and names its conversion method: Traits for identify and group,
 // Properties for the others.

@@ -231,7 +231,12 @@ func eventRules(p *plan.TrackingPlan) ([]eventRule, []*customType, error) {
 
 		event := r.rule.Event
 		if !validSection(r.rule) {
-			core.Warn(sectionWarning(r.rule))
+			// Kotlin's warning, word for word.
+			msg := fmt.Sprintf("invalid section %q for event type %q", r.rule.Section, event.EventType)
+			if event.Name != "" {
+				msg += fmt.Sprintf(" and event name %q", event.Name)
+			}
+			core.Warn(msg)
 			continue
 		}
 		var (
