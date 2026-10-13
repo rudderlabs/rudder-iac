@@ -92,6 +92,28 @@ func TestNonTrackWire(t *testing.T) {
 			want: messageJSON(exMeta, "screen", `, "name": "Product Detail", "properties": {"productId": "p1"}`),
 		},
 		{
+			name: "ruddertyper: identify on traits sends the message's traits",
+			call: func() error {
+				return ref.Identify(refID, &ruddertyper.IdentifyTraits{Email: "a@b.c", Active: ruddertyper.Ptr(true)})
+			},
+			want: messageJSON(refMeta, "identify", `, "traits": {"email": "a@b.c", "active": true}`),
+		},
+		{
+			name: "ruddertyper: page sends a nested custom type under the plan's keys",
+			call: func() error {
+				return ref.Page(refID, "Dashboard", &ruddertyper.PageProperties{Profile: ruddertyper.CustomTypeUserProfile{
+					Email: "a@b.c", FirstName: "Alice", LastName: ruddertyper.Ptr("Johnson"),
+				}})
+			},
+			want: messageJSON(refMeta, "page", `, "name": "Dashboard",
+				"properties": {"profile": {"email": "a@b.c", "first_name": "Alice", "last_name": "Johnson"}}`),
+		},
+		{
+			name: "ruddertyper: screen with an empty non-nil payload sends no properties",
+			call: func() error { return ref.Screen(refID, "Settings", &ruddertyper.ScreenProperties{}) },
+			want: messageJSON(refMeta, "screen", `, "name": "Settings"`),
+		},
+		{
 			name: "examples: page with an empty name and a nil payload sends no name or properties",
 			call: func() error { return ex.Page(id, "", nil) },
 			want: messageJSON(exMeta, "page", ""),
