@@ -179,6 +179,26 @@ func TestVariantsWire(t *testing.T) {
 			want: someVariantSent(`, "releases": [{"stage": null}]`),
 		},
 		{
+			name: "default: feature_config Default sends the union's string member it holds",
+			call: func() error {
+				p := signedUp
+				p.FeatureConfig = ruddertyper.CustomTypeFeatureConfigDefault{FeatureFlag: ruddertyper.NewPropertyFeatureFlagString("alpha")}
+				return ref.TrackUserSignedUp(refID, p)
+			},
+			want: signedUpSent(`, "feature_config": {"feature_flag": "alpha"}`),
+		},
+		{
+			name: "default: page_context Default inside the event Default sends the string it holds",
+			call: func() error {
+				return ref.TrackEventWithVariants(refID, ruddertyper.TrackEventWithVariantsPropertiesDefault{
+					DeviceType: ruddertyper.PropertyDeviceTypeTablet, Profile: profile,
+					PageContext: ruddertyper.CustomTypePageContextDefault{PageType: "settings", PageData: map[string]any{"theme": "dark", "language": "en"}},
+				})
+			},
+			want: trackJSON(refMeta, "Event With Variants",
+				`{"device_type": "tablet", "profile": {"email": "a@b.c", "first_name": "Ann"}, "page_context": {"page_type": "settings", "page_data": {"theme": "dark", "language": "en"}}}`),
+		},
+		{
 			name: "absent: shipping Absent sends no discriminator key",
 			call: func() error { return ex.TrackSomeVariantEvent(id, someVariant) },
 			want: someVariantSent(""),
