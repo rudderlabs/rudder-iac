@@ -240,7 +240,7 @@ func eventRules(p *plan.TrackingPlan) ([]eventRule, []*customType, error) {
 			continue
 		}
 		var (
-			where = fmt.Sprintf("%s event %q", event.EventType, event.Name)
+			where = strings.TrimPrefix(eventLabel(event), "the ")
 			err   error
 		)
 		if r.schema, err = res.schema(&r.rule.Schema, where, ""); err != nil {
