@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"maps"
 	"math/big"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -200,8 +199,11 @@ func (res *resolver) branch(s, b *plan.ObjectSchema, label, where string) (*obje
 	return res.schema(&merged, where, "")
 }
 
-// sameDefinition reports whether a and b agree in everything but required:
-// types, item types, enum values and nested schema. An invalid enum is an
+// sameDefinition reports whether a, the base's property, and b, the branch's,
+// agree in everything but required: types, item types, enum values and nested
+// schema, whose properties are compared the same way. A branch that declares
+// no nested schema keeps the base's: the local provider gives a case property
+// an empty open one, since only rules carry nesting. An invalid enum is an
 // error, because the merge keeps only one definition and would drop it.
 func sameDefinition(a, b plan.PropertySchema) (bool, error) {
 	ea, err := resolveEnum(a.Property)
@@ -212,7 +214,24 @@ func sameDefinition(a, b plan.PropertySchema) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return typeSignature(a.Property, ea) == typeSignature(b.Property, eb) && reflect.DeepEqual(a.Schema, b.Schema), nil
+	switch {
+	case typeSignature(a.Property, ea) != typeSignature(b.Property, eb):
+		return false, nil
+	case !isStruct(b.Schema):
+		return true, nil
+	case !isStruct(a.Schema) || a.Schema.AdditionalProperties != b.Schema.AdditionalProperties || len(a.Schema.Properties) != len(b.Schema.Properties):
+		return false, nil
+	}
+	for _, key := range slices.Sorted(maps.Keys(a.Schema.Properties)) {
+		pb, ok := b.Schema.Properties[key]
+		if !ok || pb.Required != a.Schema.Properties[key].Required {
+			return false, nil
+		}
+		if same, err := sameDefinition(a.Schema.Properties[key], pb); err != nil || !same {
+			return false, err
+		}
+	}
+	return true, nil
 }
 
 // validateVariantNames checks the names in the case and default schemas of

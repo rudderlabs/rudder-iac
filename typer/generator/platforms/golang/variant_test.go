@@ -72,9 +72,13 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			p.Name = "kind"
 			return plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"kind": {Property: p}}}
 		}
-		nestedConflict = variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
-			"meta": object(map[string]plan.PropertySchema{"b": {Property: plan.Property{Name: "b", Types: onlyString}}}),
-		}}))
+		// metaCase is a plan whose base holds the object meta {a} and whose case
+		// repeats meta.
+		metaCase = func(meta plan.PropertySchema) *plan.TrackingPlan {
+			p := variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"meta": meta}}))
+			p.Rules[0].Schema.Properties["meta"] = object(map[string]plan.PropertySchema{"a": {Property: plan.Property{Name: "a", Types: onlyString}}})
+			return p
+		}
 		defaultConflict = variantPlan(typed(onlyString...), discriminate([]any{"a"}))
 		variantType     = plan.CustomType{Name: "meta", Type: plan.PrimitiveTypeObject, Variants: []plan.Variant{discriminate([]any{"a"})}, Schema: &plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
@@ -83,7 +87,6 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			},
 		}}
 	)
-	nestedConflict.Rules[0].Schema.Properties["meta"] = object(map[string]plan.PropertySchema{"a": {Property: plan.Property{Name: "a", Types: onlyString}}})
 	defaultConflict.Rules[0].Variants[0].DefaultSchema = &plan.ObjectSchema{Properties: redefine(typed(onlyInteger...)).Properties}
 
 	tests := []struct {
@@ -109,8 +112,22 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 		},
 		{
 			name:    "a case redefines a base property's nested schema",
-			plan:    nestedConflict,
+			plan:    metaCase(object(map[string]plan.PropertySchema{"b": {Property: plan.Property{Name: "b", Types: onlyString}}})),
 			wantErr: `mapping the variants of track event "Some Event": case ["a"]: property "meta" conflicts with its definition in the base schema`,
+		},
+		{
+			// The local provider builds a case's object property from its bare
+			// definition, which has no nested schema.
+			name: "a case repeats a base object property without its nested schema",
+			plan: metaCase(plan.PropertySchema{
+				Property: plan.Property{Name: "meta", Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+				Required: true,
+				Schema:   &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}, AdditionalProperties: true},
+			}),
+		},
+		{
+			name: "a case repeats a base nested property with another description",
+			plan: metaCase(object(map[string]plan.PropertySchema{"a": {Property: plan.Property{Name: "a", Description: "Another description.", Types: onlyString}}})),
 		},
 		{
 			name:    "the default schema redefines a base property",
