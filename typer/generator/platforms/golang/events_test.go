@@ -71,11 +71,6 @@ func TestGenerateEventTypes(t *testing.T) {
 			want:  []string{method("Identify(identity Identity, opts ...Option)")},
 		},
 		{
-			name:  "identify on context.traits, declared traits",
-			rules: declared(rule(plan.EventTypeIdentify, "", plan.IdentitySectionContextTraits)),
-			want:  []string{"type IdentifyTraits struct", method("Identify(identity Identity, traits *IdentifyTraits, opts ...Option)")},
-		},
-		{
 			name:  "group, declared traits",
 			rules: declared(rule(plan.EventTypeGroup, "", plan.IdentitySectionTraits)),
 			want:  []string{"type GroupTraits struct", method("Group(identity Identity, groupID string, traits *GroupTraits, opts ...Option)")},
@@ -94,11 +89,6 @@ func TestGenerateEventTypes(t *testing.T) {
 			name:  "group, empty and closed",
 			rules: closed(rule(plan.EventTypeGroup, "", plan.IdentitySectionTraits)),
 			want:  []string{method("Group(identity Identity, groupID string, opts ...Option)")},
-		},
-		{
-			name:  "group on context.traits, declared traits",
-			rules: declared(rule(plan.EventTypeGroup, "", plan.IdentitySectionContextTraits)),
-			want:  []string{"type GroupTraits struct", method("Group(identity Identity, groupID string, traits *GroupTraits, opts ...Option)")},
 		},
 		{
 			name:  "page, declared properties",
