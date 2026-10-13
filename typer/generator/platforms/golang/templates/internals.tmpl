@@ -43,3 +43,20 @@ func withAdditional(extra map[string]any, declared ...string) map[string]any {
 	return m
 }
 {{- end }}
+{{- if .UsesRequired }}
+
+// required returns v, or a value whose serialization fails when v is nil, so
+// a required variant left unset is reported instead of being sent as null.
+func required(v any, key string) any {
+	if isNil(v) {
+		return missingValue(key)
+	}
+	return v
+}
+
+type missingValue string
+
+func (k missingValue) wireValue() (any, error) {
+	return nil, fmt.Errorf("%w: required property %q is not set", ErrInvalidValue, string(k))
+}
+{{- end }}

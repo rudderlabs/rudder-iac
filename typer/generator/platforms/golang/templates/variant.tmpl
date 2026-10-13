@@ -1,0 +1,12 @@
+{{ comment .Doc }}
+type {{ .Name }} interface {
+	json.Marshaler
+	{{ comment .DiscriminatorDoc }}
+	Discriminator() {{ .Result }}
+{{- if .Payload }}
+	// ToProperties returns a deep copy of the properties as sent on the wire.
+	ToProperties() (analytics.Properties, error)
+{{- end }}
+	toMap() map[string]any
+	is{{ .Name }}()
+}

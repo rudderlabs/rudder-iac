@@ -221,10 +221,239 @@ func (v CustomTypeEmptyObjectNoAdditionalProps) MarshalJSON() ([]byte, error) {
 // Empty object that allows additional properties
 type CustomTypeEmptyObjectWithAdditionalProps = map[string]any
 
+// CustomTypeFeatureConfig represents the custom type "feature_config", a discriminated union on "feature_flag". It is implemented by CustomTypeFeatureConfigCaseBeta, CustomTypeFeatureConfigCaseFalse, CustomTypeFeatureConfigCaseTrue and CustomTypeFeatureConfigDefault.
+//
+// Feature configuration with variants based on multi-type flag
+type CustomTypeFeatureConfig interface {
+	json.Marshaler
+	// Discriminator returns the value of "feature_flag".
+	Discriminator() PropertyFeatureFlag
+	toMap() map[string]any
+	isCustomTypeFeatureConfig()
+}
+
+// CustomTypeFeatureConfigCaseTrue is the "Enabled" case of CustomTypeFeatureConfig, where feature_flag is true.
+//
+// Feature enabled (boolean true)
+type CustomTypeFeatureConfigCaseTrue struct {
+	Age *PropertyAge // optional
+}
+
+func (CustomTypeFeatureConfigCaseTrue) isCustomTypeFeatureConfig() {}
+
+// Discriminator returns true.
+func (CustomTypeFeatureConfigCaseTrue) Discriminator() PropertyFeatureFlag {
+	return NewPropertyFeatureFlagBoolean(true)
+}
+
+func (v CustomTypeFeatureConfigCaseTrue) toMap() map[string]any {
+	m := map[string]any{
+		"feature_flag": v.Discriminator(),
+	}
+	if v.Age != nil {
+		m["age"] = *v.Age
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeFeatureConfigCaseTrue) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeFeatureConfigCaseFalse is the "Disabled" case of CustomTypeFeatureConfig, where feature_flag is false.
+//
+// Feature disabled (boolean false)
+type CustomTypeFeatureConfigCaseFalse struct {
+	FirstName *PropertyFirstName // optional
+}
+
+func (CustomTypeFeatureConfigCaseFalse) isCustomTypeFeatureConfig() {}
+
+// Discriminator returns false.
+func (CustomTypeFeatureConfigCaseFalse) Discriminator() PropertyFeatureFlag {
+	return NewPropertyFeatureFlagBoolean(false)
+}
+
+func (v CustomTypeFeatureConfigCaseFalse) toMap() map[string]any {
+	m := map[string]any{
+		"feature_flag": v.Discriminator(),
+	}
+	if v.FirstName != nil {
+		m["first_name"] = *v.FirstName
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeFeatureConfigCaseFalse) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeFeatureConfigCaseBeta is the "Beta" case of CustomTypeFeatureConfig, where feature_flag is "beta".
+//
+// Feature in beta (string 'beta')
+type CustomTypeFeatureConfigCaseBeta struct {
+	Tags PropertyTags // optional
+}
+
+func (CustomTypeFeatureConfigCaseBeta) isCustomTypeFeatureConfig() {}
+
+// Discriminator returns "beta".
+func (CustomTypeFeatureConfigCaseBeta) Discriminator() PropertyFeatureFlag {
+	return NewPropertyFeatureFlagString("beta")
+}
+
+func (v CustomTypeFeatureConfigCaseBeta) toMap() map[string]any {
+	m := map[string]any{
+		"feature_flag": v.Discriminator(),
+	}
+	if v.Tags != nil {
+		m["tags"] = v.Tags
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeFeatureConfigCaseBeta) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeFeatureConfigDefault is the default case of CustomTypeFeatureConfig, for any feature_flag other than "beta", false and true.
+type CustomTypeFeatureConfigDefault struct {
+	FeatureFlag PropertyFeatureFlag // required; not "beta", false or true
+}
+
+func (CustomTypeFeatureConfigDefault) isCustomTypeFeatureConfig() {}
+
+// Discriminator returns FeatureFlag.
+func (v CustomTypeFeatureConfigDefault) Discriminator() PropertyFeatureFlag { return v.FeatureFlag }
+
+func (v CustomTypeFeatureConfigDefault) toMap() map[string]any {
+	m := map[string]any{
+		"feature_flag": v.FeatureFlag,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeFeatureConfigDefault) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
 // CustomTypeNullType represents the custom type "null_type".
 //
 // Custom type representing a null value
 type CustomTypeNullType = Null
+
+// CustomTypePageContext represents the custom type "page_context", a discriminated union on "page_type". It is implemented by CustomTypePageContextCaseHome, CustomTypePageContextCaseProduct, CustomTypePageContextCaseSearch and CustomTypePageContextDefault.
+//
+// Page context with variants based on page type
+type CustomTypePageContext interface {
+	json.Marshaler
+	// Discriminator returns the value of "page_type".
+	Discriminator() PropertyPageType
+	toMap() map[string]any
+	isCustomTypePageContext()
+}
+
+// CustomTypePageContextCaseSearch is the "Search" case of CustomTypePageContext, where page_type is "search".
+//
+// Search page variant
+type CustomTypePageContextCaseSearch struct {
+	Query PropertyQuery // required
+}
+
+func (CustomTypePageContextCaseSearch) isCustomTypePageContext() {}
+
+// Discriminator returns "search".
+func (CustomTypePageContextCaseSearch) Discriminator() PropertyPageType { return "search" }
+
+func (v CustomTypePageContextCaseSearch) toMap() map[string]any {
+	m := map[string]any{
+		"page_type": v.Discriminator(),
+		"query":     v.Query,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypePageContextCaseSearch) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypePageContextCaseProduct is the "Product" case of CustomTypePageContext, where page_type is "product".
+//
+// Product page variant
+type CustomTypePageContextCaseProduct struct {
+	ProductID PropertyProductID // required
+}
+
+func (CustomTypePageContextCaseProduct) isCustomTypePageContext() {}
+
+// Discriminator returns "product".
+func (CustomTypePageContextCaseProduct) Discriminator() PropertyPageType { return "product" }
+
+func (v CustomTypePageContextCaseProduct) toMap() map[string]any {
+	m := map[string]any{
+		"page_type":  v.Discriminator(),
+		"product_id": v.ProductID,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypePageContextCaseProduct) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypePageContextCaseHome is the "Home" case of CustomTypePageContext, where page_type is "home".
+//
+// Home page variant with no additional properties
+type CustomTypePageContextCaseHome struct{}
+
+func (CustomTypePageContextCaseHome) isCustomTypePageContext() {}
+
+// Discriminator returns "home".
+func (CustomTypePageContextCaseHome) Discriminator() PropertyPageType { return "home" }
+
+func (v CustomTypePageContextCaseHome) toMap() map[string]any {
+	m := map[string]any{
+		"page_type": v.Discriminator(),
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypePageContextCaseHome) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypePageContextDefault is the default case of CustomTypePageContext, for any page_type other than "home", "product" and "search".
+type CustomTypePageContextDefault struct {
+	PageData PropertyPageData // optional
+	PageType PropertyPageType // required; not "home", "product" or "search"
+}
+
+func (CustomTypePageContextDefault) isCustomTypePageContext() {}
+
+// Discriminator returns PageType.
+func (v CustomTypePageContextDefault) Discriminator() PropertyPageType { return v.PageType }
+
+func (v CustomTypePageContextDefault) toMap() map[string]any {
+	m := map[string]any{
+		"page_type": v.PageType,
+	}
+	if v.PageData != nil {
+		m["page_data"] = v.PageData
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypePageContextDefault) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
 
 // CustomTypePhoneNumber represents the custom type "phone_number".
 //
@@ -269,6 +498,67 @@ func (v CustomTypeStatus) IsValid() bool {
 		return true
 	}
 	return false
+}
+
+// CustomTypeUserAccess represents the custom type "user_access", a discriminated union on "active". It is implemented by CustomTypeUserAccessCaseFalse and CustomTypeUserAccessCaseTrue.
+//
+// User access with variants based on active status
+type CustomTypeUserAccess interface {
+	json.Marshaler
+	// Discriminator returns the value of "active".
+	Discriminator() PropertyActive
+	toMap() map[string]any
+	isCustomTypeUserAccess()
+}
+
+// CustomTypeUserAccessCaseTrue is the "Active" case of CustomTypeUserAccess, where active is true.
+//
+// Active user access
+type CustomTypeUserAccessCaseTrue struct {
+	Email PropertyEmail // required
+}
+
+func (CustomTypeUserAccessCaseTrue) isCustomTypeUserAccess() {}
+
+// Discriminator returns true.
+func (CustomTypeUserAccessCaseTrue) Discriminator() PropertyActive { return true }
+
+func (v CustomTypeUserAccessCaseTrue) toMap() map[string]any {
+	m := map[string]any{
+		"active": v.Discriminator(),
+		"email":  v.Email,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeUserAccessCaseTrue) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeUserAccessCaseFalse is the "Inactive" case of CustomTypeUserAccess, where active is false.
+//
+// Inactive user access
+type CustomTypeUserAccessCaseFalse struct {
+	Status PropertyStatus // required
+}
+
+func (CustomTypeUserAccessCaseFalse) isCustomTypeUserAccess() {}
+
+// Discriminator returns false.
+func (CustomTypeUserAccessCaseFalse) Discriminator() PropertyActive { return false }
+
+func (v CustomTypeUserAccessCaseFalse) toMap() map[string]any {
+	m := map[string]any{
+		"active": v.Discriminator(),
+		"status": v.Status,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeUserAccessCaseFalse) MarshalJSON() ([]byte, error) {
+	return marshal(v)
 }
 
 // CustomTypeUserProfile represents the custom type "user_profile".
@@ -497,6 +787,42 @@ func (v PropertyEnabled) IsValid() bool {
 // Array of favorite colors using custom type
 type PropertyFavoriteColors = []CustomTypeColor
 
+// PropertyFeatureConfig represents the property "feature_config".
+//
+// Feature configuration information
+type PropertyFeatureConfig = CustomTypeFeatureConfig
+
+// PropertyFeatureFlag represents the property "feature_flag": a string or boolean.
+// Build it with one of the NewPropertyFeatureFlag* functions.
+// Null is not a member, so the zero value cannot be sent.
+//
+// Feature flag that can be boolean or string
+type PropertyFeatureFlag struct{ value any }
+
+// NewPropertyFeatureFlagString returns a string value.
+func NewPropertyFeatureFlagString(v string) PropertyFeatureFlag {
+	return PropertyFeatureFlag{value: v}
+}
+
+// NewPropertyFeatureFlagBoolean returns a boolean value.
+func NewPropertyFeatureFlagBoolean(v bool) PropertyFeatureFlag {
+	return PropertyFeatureFlag{value: v}
+}
+
+// Value returns the held value.
+func (u PropertyFeatureFlag) Value() any { return u.value }
+
+func (u PropertyFeatureFlag) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: PropertyFeatureFlag is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u PropertyFeatureFlag) MarshalJSON() ([]byte, error) { return marshal(u) }
+
 // PropertyFirstName represents the property "first_name".
 //
 // User's first name
@@ -679,6 +1005,21 @@ type PropertyNumberOrNull = Nullable[float64]
 // An object field with no defined structure
 type PropertyObjectProperty = map[string]any
 
+// PropertyPageContext represents the property "page_context".
+//
+// Page context information
+type PropertyPageContext = CustomTypePageContext
+
+// PropertyPageData represents the property "page_data".
+//
+// Additional page data
+type PropertyPageData = map[string]any
+
+// PropertyPageType represents the property "page_type".
+//
+// Type of page
+type PropertyPageType = string
+
 // PropertyPhoneNumbers represents the property "phone_numbers".
 //
 // Array of phone numbers using custom type
@@ -721,6 +1062,11 @@ func (v PropertyPriority) IsValid() bool {
 	return false
 }
 
+// PropertyProductID represents the property "product_id".
+//
+// Product identifier
+type PropertyProductID = string
+
 // PropertyProfile represents the property "profile".
 //
 // User profile data
@@ -735,6 +1081,11 @@ type PropertyProfileList = CustomTypeProfileList
 //
 // A field that can contain any type of value
 type PropertyPropertyOfAny = any
+
+// PropertyQuery represents the property "query".
+//
+// Search query
+type PropertyQuery = string
 
 // PropertyRating represents the property "rating".
 //
@@ -890,6 +1241,11 @@ type PropertyUntypedArray = []any
 // A field with no explicit type (treated as any)
 type PropertyUntypedField = any
 
+// PropertyUserAccess represents the property "user_access".
+//
+// User access information
+type PropertyUserAccess = CustomTypeUserAccess
+
 // Property用户名 represents the property "用户名".
 //
 // Username in Chinese characters
@@ -945,27 +1301,135 @@ func (v TrackEventWithNameCamelCaseProperties) MarshalJSON() ([]byte, error) {
 // TrackEmptyEventWithAdditionalPropsProperties holds the properties of "Empty Event With Additional Props". The tracking plan declares no properties and allows any.
 type TrackEmptyEventWithAdditionalPropsProperties = map[string]any
 
-// TrackEventWithVariantsProperties holds the properties of "Event With Variants".
-type TrackEventWithVariantsProperties struct {
-	DeviceType PropertyDeviceType // required
-	Profile    PropertyProfile    // required
+// TrackEventWithVariantsProperties holds the properties of "Event With Variants", a discriminated union on "device_type". It is implemented by TrackEventWithVariantsPropertiesCaseDesktop, TrackEventWithVariantsPropertiesCaseMobile and TrackEventWithVariantsPropertiesDefault.
+type TrackEventWithVariantsProperties interface {
+	json.Marshaler
+	// Discriminator returns the value of "device_type".
+	Discriminator() PropertyDeviceType
+	// ToProperties returns a deep copy of the properties as sent on the wire.
+	ToProperties() (analytics.Properties, error)
+	toMap() map[string]any
+	isTrackEventWithVariantsProperties()
 }
 
-func (v TrackEventWithVariantsProperties) toMap() map[string]any {
+// TrackEventWithVariantsPropertiesCaseMobile is the "Mobile" case of TrackEventWithVariantsProperties, where device_type is "mobile".
+//
+// Mobile device page view
+type TrackEventWithVariantsPropertiesCaseMobile struct {
+	PageContext PropertyPageContext // optional
+	Profile     PropertyProfile     // required
+	Tags        PropertyTags        // optional
+}
+
+func (TrackEventWithVariantsPropertiesCaseMobile) isTrackEventWithVariantsProperties() {}
+
+// Discriminator returns PropertyDeviceTypeMobile.
+func (TrackEventWithVariantsPropertiesCaseMobile) Discriminator() PropertyDeviceType {
+	return PropertyDeviceTypeMobile
+}
+
+func (v TrackEventWithVariantsPropertiesCaseMobile) toMap() map[string]any {
 	m := map[string]any{
-		"device_type": v.DeviceType,
+		"device_type": v.Discriminator(),
 		"profile":     v.Profile,
+	}
+	if !isNil(v.PageContext) {
+		m["page_context"] = v.PageContext
+	}
+	if v.Tags != nil {
+		m["tags"] = v.Tags
 	}
 	return m
 }
 
 // ToProperties returns a deep copy of the properties as sent on the wire.
-func (v TrackEventWithVariantsProperties) ToProperties() (analytics.Properties, error) {
+func (v TrackEventWithVariantsPropertiesCaseMobile) ToProperties() (analytics.Properties, error) {
 	return snapshot(v)
 }
 
 // MarshalJSON implements json.Marshaler using the tracking plan's keys.
-func (v TrackEventWithVariantsProperties) MarshalJSON() ([]byte, error) {
+func (v TrackEventWithVariantsPropertiesCaseMobile) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackEventWithVariantsPropertiesCaseDesktop is the "Desktop" case of TrackEventWithVariantsProperties, where device_type is "desktop".
+//
+// Desktop page view
+type TrackEventWithVariantsPropertiesCaseDesktop struct {
+	FirstName   PropertyFirstName   // required
+	LastName    *PropertyLastName   // optional
+	PageContext PropertyPageContext // optional
+	Profile     PropertyProfile     // required
+}
+
+func (TrackEventWithVariantsPropertiesCaseDesktop) isTrackEventWithVariantsProperties() {}
+
+// Discriminator returns PropertyDeviceTypeDesktop.
+func (TrackEventWithVariantsPropertiesCaseDesktop) Discriminator() PropertyDeviceType {
+	return PropertyDeviceTypeDesktop
+}
+
+func (v TrackEventWithVariantsPropertiesCaseDesktop) toMap() map[string]any {
+	m := map[string]any{
+		"device_type": v.Discriminator(),
+		"first_name":  v.FirstName,
+		"profile":     v.Profile,
+	}
+	if v.LastName != nil {
+		m["last_name"] = *v.LastName
+	}
+	if !isNil(v.PageContext) {
+		m["page_context"] = v.PageContext
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackEventWithVariantsPropertiesCaseDesktop) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackEventWithVariantsPropertiesCaseDesktop) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackEventWithVariantsPropertiesDefault is the default case of TrackEventWithVariantsProperties: device_type is PropertyDeviceTypeTablet, PropertyDeviceTypeSmartTV or PropertyDeviceTypeIoTDevice, the values no case covers.
+type TrackEventWithVariantsPropertiesDefault struct {
+	DeviceType   PropertyDeviceType   // required; only PropertyDeviceTypeTablet, PropertyDeviceTypeSmartTV or PropertyDeviceTypeIoTDevice
+	PageContext  PropertyPageContext  // optional
+	Profile      PropertyProfile      // required
+	UntypedField PropertyUntypedField // optional
+}
+
+func (TrackEventWithVariantsPropertiesDefault) isTrackEventWithVariantsProperties() {}
+
+// Discriminator returns DeviceType.
+func (v TrackEventWithVariantsPropertiesDefault) Discriminator() PropertyDeviceType {
+	return v.DeviceType
+}
+
+func (v TrackEventWithVariantsPropertiesDefault) toMap() map[string]any {
+	m := map[string]any{
+		"device_type": v.DeviceType,
+		"profile":     v.Profile,
+	}
+	if !isNil(v.PageContext) {
+		m["page_context"] = v.PageContext
+	}
+	if v.UntypedField != nil {
+		m["untyped_field"] = v.UntypedField
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackEventWithVariantsPropertiesDefault) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackEventWithVariantsPropertiesDefault) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 
@@ -1010,6 +1474,7 @@ type TrackUserSignedUpProperties struct {
 	EmptyObjectNoAdditionalProps       *PropertyEmptyObjectNoAdditionalProps                          // optional
 	EmptyObjectWithAdditionalProps     PropertyEmptyObjectWithAdditionalProps                         // optional
 	Enabled                            *PropertyEnabled                                               // optional
+	FeatureConfig                      PropertyFeatureConfig                                          // optional
 	MixedUnicode                       *PropertyMixedUnicode                                          // optional
 	MixedValue                         *PropertyMixedValue                                            // optional
 	MultiTypeArray                     PropertyMultiTypeArray                                         // optional
@@ -1033,6 +1498,7 @@ type TrackUserSignedUpProperties struct {
 	UnicodeEnumField                   *PropertyUnicodeEnumField                                      // optional
 	UntypedArray                       PropertyUntypedArray                                           // optional
 	UntypedField                       PropertyUntypedField                                           // optional
+	UserAccess                         PropertyUserAccess                                             // optional
 	X用户名                               *Property用户名                                                   // optional
 }
 
@@ -1076,6 +1542,9 @@ func (v TrackUserSignedUpProperties) toMap() map[string]any {
 	}
 	if v.Enabled != nil {
 		m["enabled"] = *v.Enabled
+	}
+	if !isNil(v.FeatureConfig) {
+		m["feature_config"] = v.FeatureConfig
 	}
 	if v.MixedUnicode != nil {
 		m["mixed_unicode"] = *v.MixedUnicode
@@ -1142,6 +1611,9 @@ func (v TrackUserSignedUpProperties) toMap() map[string]any {
 	}
 	if v.UntypedField != nil {
 		m["untyped_field"] = v.UntypedField
+	}
+	if !isNil(v.UserAccess) {
+		m["user_access"] = v.UserAccess
 	}
 	if v.X用户名 != nil {
 		m["用户名"] = *v.X用户名
@@ -1278,10 +1750,13 @@ func (r *RudderTyperAnalytics) TrackEmptyEventWithAdditionalProps(identity Ident
 	return r.track(identity, "Empty Event With Additional Props", p, opts)
 }
 
-// TrackEventWithVariants sends the track event "Event With Variants".
+// TrackEventWithVariants sends the track event "Event With Variants". props must hold one of the case structs; nil, including a nil pointer, returns ErrNilPayload.
 //
 // Example event to demonstrate variants
 func (r *RudderTyperAnalytics) TrackEventWithVariants(identity Identity, props TrackEventWithVariantsProperties, opts ...Option) error {
+	if isNil(props) {
+		return fmt.Errorf("%w: TrackEventWithVariants needs a TrackEventWithVariantsProperties case", ErrNilPayload)
+	}
 	p, err := props.ToProperties()
 	if err != nil {
 		return err

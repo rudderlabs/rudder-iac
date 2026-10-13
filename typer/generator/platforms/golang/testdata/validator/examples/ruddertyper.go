@@ -176,6 +176,122 @@ func (v CustomTypeSomeObjectType) MarshalJSON() ([]byte, error) {
 // some string custom type
 type CustomTypeSomeStringType = string
 
+// CustomTypeSomeVariantType represents the custom type "SomeVariantType", a discriminated union on "someString". It is implemented by CustomTypeSomeVariantTypeCaseCase1, CustomTypeSomeVariantTypeCaseCase2A, CustomTypeSomeVariantTypeCaseCase2B and CustomTypeSomeVariantTypeDefault.
+type CustomTypeSomeVariantType interface {
+	json.Marshaler
+	// Discriminator returns the value of "someString".
+	Discriminator() PropertySomeString
+	toMap() map[string]any
+	isCustomTypeSomeVariantType()
+}
+
+// CustomTypeSomeVariantTypeCaseCase1 is the "Case 1" case of CustomTypeSomeVariantType, where someString is "case_1".
+type CustomTypeSomeVariantTypeCaseCase1 struct {
+	SomeInteger PropertySomeInteger // required
+}
+
+func (CustomTypeSomeVariantTypeCaseCase1) isCustomTypeSomeVariantType() {}
+
+// Discriminator returns "case_1".
+func (CustomTypeSomeVariantTypeCaseCase1) Discriminator() PropertySomeString { return "case_1" }
+
+func (v CustomTypeSomeVariantTypeCaseCase1) toMap() map[string]any {
+	m := map[string]any{
+		"someString":  v.Discriminator(),
+		"someInteger": v.SomeInteger,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeSomeVariantTypeCaseCase1) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeSomeVariantTypeCaseCase2A is the "Case 2" case of CustomTypeSomeVariantType, where someString is "case_2_a".
+type CustomTypeSomeVariantTypeCaseCase2A struct {
+	SomeInteger *PropertySomeInteger // optional
+	SomeNumber  PropertySomeNumber   // required
+}
+
+func (CustomTypeSomeVariantTypeCaseCase2A) isCustomTypeSomeVariantType() {}
+
+// Discriminator returns "case_2_a".
+func (CustomTypeSomeVariantTypeCaseCase2A) Discriminator() PropertySomeString { return "case_2_a" }
+
+func (v CustomTypeSomeVariantTypeCaseCase2A) toMap() map[string]any {
+	m := map[string]any{
+		"someString": v.Discriminator(),
+		"someNumber": v.SomeNumber,
+	}
+	if v.SomeInteger != nil {
+		m["someInteger"] = *v.SomeInteger
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeSomeVariantTypeCaseCase2A) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeSomeVariantTypeCaseCase2B is the "Case 2" case of CustomTypeSomeVariantType, where someString is "case_2_b".
+type CustomTypeSomeVariantTypeCaseCase2B struct {
+	SomeInteger *PropertySomeInteger // optional
+	SomeNumber  PropertySomeNumber   // required
+}
+
+func (CustomTypeSomeVariantTypeCaseCase2B) isCustomTypeSomeVariantType() {}
+
+// Discriminator returns "case_2_b".
+func (CustomTypeSomeVariantTypeCaseCase2B) Discriminator() PropertySomeString { return "case_2_b" }
+
+func (v CustomTypeSomeVariantTypeCaseCase2B) toMap() map[string]any {
+	m := map[string]any{
+		"someString": v.Discriminator(),
+		"someNumber": v.SomeNumber,
+	}
+	if v.SomeInteger != nil {
+		m["someInteger"] = *v.SomeInteger
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeSomeVariantTypeCaseCase2B) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeSomeVariantTypeDefault is the default case of CustomTypeSomeVariantType, for any someString other than "case_1", "case_2_a" and "case_2_b".
+type CustomTypeSomeVariantTypeDefault struct {
+	SomeBoolean *PropertySomeBoolean // optional
+	SomeInteger *PropertySomeInteger // optional
+	SomeString  PropertySomeString   // required; not "case_1", "case_2_a" or "case_2_b"
+}
+
+func (CustomTypeSomeVariantTypeDefault) isCustomTypeSomeVariantType() {}
+
+// Discriminator returns SomeString.
+func (v CustomTypeSomeVariantTypeDefault) Discriminator() PropertySomeString { return v.SomeString }
+
+func (v CustomTypeSomeVariantTypeDefault) toMap() map[string]any {
+	m := map[string]any{
+		"someString": v.SomeString,
+	}
+	if v.SomeBoolean != nil {
+		m["someBoolean"] = *v.SomeBoolean
+	}
+	if v.SomeInteger != nil {
+		m["someInteger"] = *v.SomeInteger
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeSomeVariantTypeDefault) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
 // CustomTypeUserProfile represents the custom type "UserProfile".
 type CustomTypeUserProfile struct {
 	Address              *CustomTypeUserProfileAddress // optional
@@ -212,6 +328,170 @@ func (v CustomTypeUserProfileAddress) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 
+// CustomTypeRelease represents the custom type "release", a discriminated union on "stage". It is implemented by CustomTypeReleaseCaseDraft, CustomTypeReleaseCaseLive and CustomTypeReleaseDefault.
+type CustomTypeRelease interface {
+	json.Marshaler
+	// Discriminator returns the value of "stage".
+	Discriminator() PropertyStage
+	toMap() map[string]any
+	isCustomTypeRelease()
+}
+
+// CustomTypeReleaseCaseDraft is the case where stage is "draft".
+type CustomTypeReleaseCaseDraft struct{}
+
+func (CustomTypeReleaseCaseDraft) isCustomTypeRelease() {}
+
+// Discriminator returns "draft".
+func (CustomTypeReleaseCaseDraft) Discriminator() PropertyStage {
+	return NewNullable[PropertyStageValue](PropertyStageValueDraft)
+}
+
+func (v CustomTypeReleaseCaseDraft) toMap() map[string]any {
+	m := map[string]any{
+		"stage": v.Discriminator(),
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeReleaseCaseDraft) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeReleaseCaseLive is the case where stage is "live".
+type CustomTypeReleaseCaseLive struct {
+	URL PropertyURL // required
+}
+
+func (CustomTypeReleaseCaseLive) isCustomTypeRelease() {}
+
+// Discriminator returns "live".
+func (CustomTypeReleaseCaseLive) Discriminator() PropertyStage {
+	return NewNullable[PropertyStageValue](PropertyStageValueLive)
+}
+
+func (v CustomTypeReleaseCaseLive) toMap() map[string]any {
+	m := map[string]any{
+		"stage": v.Discriminator(),
+		"url":   v.URL,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeReleaseCaseLive) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeReleaseDefault is the default case of CustomTypeRelease: stage is null, the only value no case covers.
+type CustomTypeReleaseDefault struct {
+	Stage PropertyStage // required; only null
+}
+
+func (CustomTypeReleaseDefault) isCustomTypeRelease() {}
+
+// Discriminator returns Stage.
+func (v CustomTypeReleaseDefault) Discriminator() PropertyStage { return v.Stage }
+
+func (v CustomTypeReleaseDefault) toMap() map[string]any {
+	m := map[string]any{
+		"stage": v.Stage,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeReleaseDefault) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeShipping represents the custom type "shipping", a discriminated union on the optional "method". It is implemented by CustomTypeShippingAbsent, CustomTypeShippingCaseExpress and CustomTypeShippingDefault.
+type CustomTypeShipping interface {
+	json.Marshaler
+	// Discriminator returns the value of "method"; ok is false when it is absent.
+	Discriminator() (value PropertyMethod, ok bool)
+	toMap() map[string]any
+	isCustomTypeShipping()
+}
+
+// CustomTypeShippingAbsent is the case where "method" is absent. It holds the base properties only.
+type CustomTypeShippingAbsent struct {
+	Address              PropertyAddress // required
+	AdditionalProperties map[string]any  // optional; undeclared keys only
+}
+
+func (CustomTypeShippingAbsent) isCustomTypeShipping() {}
+
+// Discriminator reports that "method" is absent.
+func (CustomTypeShippingAbsent) Discriminator() (value PropertyMethod, ok bool) { return value, false }
+
+func (v CustomTypeShippingAbsent) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "address", "method")
+	m["address"] = v.Address
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeShippingAbsent) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeShippingCaseExpress is the "Express" case of CustomTypeShipping, where method is "express".
+type CustomTypeShippingCaseExpress struct {
+	Address  PropertyAddress  // required
+	Deadline PropertyDeadline // required
+}
+
+func (CustomTypeShippingCaseExpress) isCustomTypeShipping() {}
+
+// Discriminator returns "express".
+func (CustomTypeShippingCaseExpress) Discriminator() (value PropertyMethod, ok bool) {
+	return "express", true
+}
+
+func (v CustomTypeShippingCaseExpress) toMap() map[string]any {
+	m := map[string]any{
+		"method":   "express",
+		"address":  v.Address,
+		"deadline": v.Deadline,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeShippingCaseExpress) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// CustomTypeShippingDefault is the default case of CustomTypeShipping, for any method other than "express".
+type CustomTypeShippingDefault struct {
+	Address PropertyAddress // required
+	Carrier PropertyCarrier // required
+	Method  PropertyMethod  // required; not "express"
+}
+
+func (CustomTypeShippingDefault) isCustomTypeShipping() {}
+
+// Discriminator returns Method.
+func (v CustomTypeShippingDefault) Discriminator() (value PropertyMethod, ok bool) {
+	return v.Method, true
+}
+
+func (v CustomTypeShippingDefault) toMap() map[string]any {
+	m := map[string]any{
+		"address": v.Address,
+		"carrier": v.Carrier,
+		"method":  v.Method,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v CustomTypeShippingDefault) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
 // --- Property types ---
 
 // Property1stPlace represents the property "1st_place".
@@ -236,14 +516,32 @@ type PropertyAmount1 = string
 // PropertyAny represents the property "any".
 type PropertyAny = any
 
+// PropertyAppVersion represents the property "appVersion".
+type PropertyAppVersion = string
+
 // PropertyArray represents the property "array".
 type PropertyArray = []any
 
 // PropertyBoolean represents the property "boolean".
 type PropertyBoolean = bool
 
+// PropertyBrowser represents the property "browser".
+type PropertyBrowser = string
+
+// PropertyCarrier represents the property "carrier".
+type PropertyCarrier = string
+
 // PropertyCleared represents the property "cleared".
 type PropertyCleared = Null
+
+// PropertyDeadline represents the property "deadline".
+type PropertyDeadline = string
+
+// PropertyDeviceType represents the property "deviceType".
+type PropertyDeviceType = string
+
+// PropertyDiscriminator represents the property "discriminator".
+type PropertyDiscriminator = string
 
 // PropertyEmail represents the property "email".
 type PropertyEmail = string
@@ -257,11 +555,17 @@ type PropertyInteger = int64
 // PropertyItems represents the property "items".
 type PropertyItems = []CustomTypeSomeObjectType
 
+// PropertyKind represents the property "kind".
+type PropertyKind = string
+
 // PropertyLat represents the property "lat".
 type PropertyLat = float64
 
 // PropertyMatrix represents the property "matrix".
 type PropertyMatrix = [][]any
+
+// PropertyMethod represents the property "method".
+type PropertyMethod = string
 
 // PropertyMode represents the property "mode".
 type PropertyMode string
@@ -296,11 +600,17 @@ func (v PropertyMode) IsValid() bool {
 	return false
 }
 
+// PropertyNote represents the property "note".
+type PropertyNote = string
+
 // PropertyNumber represents the property "number".
 type PropertyNumber = float64
 
 // PropertyObject represents the property "object".
 type PropertyObject = map[string]any
+
+// PropertyOsVersion represents the property "osVersion".
+type PropertyOsVersion = string
 
 // PropertyPrice represents the property "price".
 type PropertyPrice = float64
@@ -310,6 +620,12 @@ type PropertyProductID = string
 
 // PropertyProductName represents the property "productName".
 type PropertyProductName = string
+
+// PropertyReleases represents the property "releases".
+type PropertyReleases = []CustomTypeRelease
+
+// PropertyShipping represents the property "shipping".
+type PropertyShipping = CustomTypeShipping
 
 // PropertySomeArrayOfMultipleTypesItem is one item of PropertySomeArrayOfMultipleTypes: a string, integer, number or boolean.
 // Build it with one of the NewPropertySomeArrayOfMultipleTypesItem* functions.
@@ -415,6 +731,9 @@ func (u PropertySomeMultiType) wireValue() (any, error) { return u.value, nil }
 // MarshalJSON implements json.Marshaler.
 func (u PropertySomeMultiType) MarshalJSON() ([]byte, error) { return marshal(u) }
 
+// PropertySomeNumber represents the property "someNumber".
+type PropertySomeNumber = float64
+
 // PropertySomeObject represents the property "someObject".
 type PropertySomeObject = CustomTypeSomeObjectType
 
@@ -425,6 +744,12 @@ type PropertySomeObjectOrNull = Nullable[map[string]any]
 //
 // some string property
 type PropertySomeString = string
+
+// PropertySomeVariantType represents the property "someVariantType".
+type PropertySomeVariantType = CustomTypeSomeVariantType
+
+// PropertySource represents the property "source".
+type PropertySource = string
 
 // PropertyStageValue is the enum type of the property "stage".
 type PropertyStageValue string
@@ -527,6 +852,9 @@ type PropertyToProperties = string
 // PropertyType represents the property "type".
 type PropertyType = string
 
+// PropertyURL represents the property "url".
+type PropertyURL = string
+
 // PropertyUser represents the property "user".
 type PropertyUser = string
 
@@ -561,6 +889,102 @@ func (v TrackEventWithNameCamelCaseProperties) ToProperties() (analytics.Propert
 
 // MarshalJSON implements json.Marshaler using the tracking plan's keys.
 func (v TrackEventWithNameCamelCaseProperties) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackDeviceEventProperties holds the properties of "Device Event", a discriminated union on "deviceType". It is implemented by TrackDeviceEventPropertiesCaseDesktop, TrackDeviceEventPropertiesCaseMobile and TrackDeviceEventPropertiesDefault.
+type TrackDeviceEventProperties interface {
+	json.Marshaler
+	// Discriminator returns the value of "deviceType".
+	Discriminator() PropertyDeviceType
+	// ToProperties returns a deep copy of the properties as sent on the wire.
+	ToProperties() (analytics.Properties, error)
+	toMap() map[string]any
+	isTrackDeviceEventProperties()
+}
+
+// TrackDeviceEventPropertiesCaseMobile is the "Mobile" case of TrackDeviceEventProperties, where deviceType is "mobile".
+type TrackDeviceEventPropertiesCaseMobile struct {
+	AppVersion PropertyAppVersion // required
+	OsVersion  PropertyOsVersion  // required
+}
+
+func (TrackDeviceEventPropertiesCaseMobile) isTrackDeviceEventProperties() {}
+
+// Discriminator returns "mobile".
+func (TrackDeviceEventPropertiesCaseMobile) Discriminator() PropertyDeviceType { return "mobile" }
+
+func (v TrackDeviceEventPropertiesCaseMobile) toMap() map[string]any {
+	m := map[string]any{
+		"deviceType": v.Discriminator(),
+		"appVersion": v.AppVersion,
+		"osVersion":  v.OsVersion,
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackDeviceEventPropertiesCaseMobile) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackDeviceEventPropertiesCaseMobile) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackDeviceEventPropertiesCaseDesktop is the "Desktop" case of TrackDeviceEventProperties, where deviceType is "desktop".
+type TrackDeviceEventPropertiesCaseDesktop struct {
+	Browser PropertyBrowser // required
+}
+
+func (TrackDeviceEventPropertiesCaseDesktop) isTrackDeviceEventProperties() {}
+
+// Discriminator returns "desktop".
+func (TrackDeviceEventPropertiesCaseDesktop) Discriminator() PropertyDeviceType { return "desktop" }
+
+func (v TrackDeviceEventPropertiesCaseDesktop) toMap() map[string]any {
+	m := map[string]any{
+		"deviceType": v.Discriminator(),
+		"browser":    v.Browser,
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackDeviceEventPropertiesCaseDesktop) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackDeviceEventPropertiesCaseDesktop) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackDeviceEventPropertiesDefault is the default case of TrackDeviceEventProperties, for any deviceType other than "desktop" and "mobile".
+type TrackDeviceEventPropertiesDefault struct {
+	DeviceType PropertyDeviceType // required; not "desktop" or "mobile"
+}
+
+func (TrackDeviceEventPropertiesDefault) isTrackDeviceEventProperties() {}
+
+// Discriminator returns DeviceType.
+func (v TrackDeviceEventPropertiesDefault) Discriminator() PropertyDeviceType { return v.DeviceType }
+
+func (v TrackDeviceEventPropertiesDefault) toMap() map[string]any {
+	m := map[string]any{
+		"deviceType": v.DeviceType,
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackDeviceEventPropertiesDefault) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackDeviceEventPropertiesDefault) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 
@@ -979,6 +1403,191 @@ func (v TrackSomeOpenTrackEventProperties) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 
+// TrackSomeOpenVariantEventProperties holds the properties of "Some Open Variant Event", a discriminated union on "kind". It is implemented by TrackSomeOpenVariantEventPropertiesCaseOnLine, TrackSomeOpenVariantEventPropertiesCaseOnLine1 and TrackSomeOpenVariantEventPropertiesDefault.
+type TrackSomeOpenVariantEventProperties interface {
+	json.Marshaler
+	// Discriminator returns the value of "kind".
+	Discriminator() PropertyKind
+	// ToProperties returns a deep copy of the properties as sent on the wire.
+	ToProperties() (analytics.Properties, error)
+	toMap() map[string]any
+	isTrackSomeOpenVariantEventProperties()
+}
+
+// TrackSomeOpenVariantEventPropertiesMeta is the object in the Meta field of each struct implementing TrackSomeOpenVariantEventProperties.
+type TrackSomeOpenVariantEventPropertiesMeta struct {
+	Source PropertySource // required
+}
+
+func (v TrackSomeOpenVariantEventPropertiesMeta) toMap() map[string]any {
+	m := map[string]any{
+		"source": v.Source,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeOpenVariantEventPropertiesMeta) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeOpenVariantEventPropertiesCaseOnLine is the "Online" case of TrackSomeOpenVariantEventProperties, where kind is "on-line".
+//
+// Sold online.
+type TrackSomeOpenVariantEventPropertiesCaseOnLine struct {
+	Discriminator1       *PropertyDiscriminator                            // optional
+	Geo                  *TrackSomeOpenVariantEventPropertiesCaseOnLineGeo // optional
+	Meta                 *TrackSomeOpenVariantEventPropertiesMeta          // optional
+	URL                  PropertyURL                                       // required
+	AdditionalProperties map[string]any                                    // optional; undeclared keys only
+}
+
+func (TrackSomeOpenVariantEventPropertiesCaseOnLine) isTrackSomeOpenVariantEventProperties() {}
+
+// Discriminator returns "on-line".
+func (TrackSomeOpenVariantEventPropertiesCaseOnLine) Discriminator() PropertyKind { return "on-line" }
+
+func (v TrackSomeOpenVariantEventPropertiesCaseOnLine) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "discriminator", "geo", "kind", "meta", "url")
+	m["kind"] = v.Discriminator()
+	if v.Discriminator1 != nil {
+		m["discriminator"] = *v.Discriminator1
+	}
+	if v.Geo != nil {
+		m["geo"] = *v.Geo
+	}
+	if v.Meta != nil {
+		m["meta"] = *v.Meta
+	}
+	m["url"] = v.URL
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackSomeOpenVariantEventPropertiesCaseOnLine) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeOpenVariantEventPropertiesCaseOnLine) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeOpenVariantEventPropertiesCaseOnLineGeo is the object in TrackSomeOpenVariantEventPropertiesCaseOnLine.Geo.
+type TrackSomeOpenVariantEventPropertiesCaseOnLineGeo struct {
+	Lat PropertyLat // required
+}
+
+func (v TrackSomeOpenVariantEventPropertiesCaseOnLineGeo) toMap() map[string]any {
+	m := map[string]any{
+		"lat": v.Lat,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeOpenVariantEventPropertiesCaseOnLineGeo) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeOpenVariantEventPropertiesCaseOnLine1 is the "Online" case of TrackSomeOpenVariantEventProperties, where kind is "on_line".
+//
+// Sold online.
+type TrackSomeOpenVariantEventPropertiesCaseOnLine1 struct {
+	Discriminator1       *PropertyDiscriminator                             // optional
+	Geo                  *TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo // optional
+	Meta                 *TrackSomeOpenVariantEventPropertiesMeta           // optional
+	URL                  PropertyURL                                        // required
+	AdditionalProperties map[string]any                                     // optional; undeclared keys only
+}
+
+func (TrackSomeOpenVariantEventPropertiesCaseOnLine1) isTrackSomeOpenVariantEventProperties() {}
+
+// Discriminator returns "on_line".
+func (TrackSomeOpenVariantEventPropertiesCaseOnLine1) Discriminator() PropertyKind { return "on_line" }
+
+func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "discriminator", "geo", "kind", "meta", "url")
+	m["kind"] = v.Discriminator()
+	if v.Discriminator1 != nil {
+		m["discriminator"] = *v.Discriminator1
+	}
+	if v.Geo != nil {
+		m["geo"] = *v.Geo
+	}
+	if v.Meta != nil {
+		m["meta"] = *v.Meta
+	}
+	m["url"] = v.URL
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo is the object in TrackSomeOpenVariantEventPropertiesCaseOnLine1.Geo.
+type TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo struct {
+	Lat PropertyLat // required
+}
+
+func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo) toMap() map[string]any {
+	m := map[string]any{
+		"lat": v.Lat,
+	}
+	return m
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// TrackSomeOpenVariantEventPropertiesDefault is the default case of TrackSomeOpenVariantEventProperties, for any kind other than "on-line" and "on_line".
+type TrackSomeOpenVariantEventPropertiesDefault struct {
+	Discriminator1       *PropertyDiscriminator                   // optional
+	Kind                 PropertyKind                             // required; not "on-line" or "on_line"
+	Meta                 *TrackSomeOpenVariantEventPropertiesMeta // optional
+	Note                 *PropertyNote                            // optional
+	AdditionalProperties map[string]any                           // optional; undeclared keys only
+}
+
+func (TrackSomeOpenVariantEventPropertiesDefault) isTrackSomeOpenVariantEventProperties() {}
+
+// Discriminator returns Kind.
+func (v TrackSomeOpenVariantEventPropertiesDefault) Discriminator() PropertyKind { return v.Kind }
+
+func (v TrackSomeOpenVariantEventPropertiesDefault) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "discriminator", "kind", "meta", "note")
+	if v.Discriminator1 != nil {
+		m["discriminator"] = *v.Discriminator1
+	}
+	m["kind"] = v.Kind
+	if v.Meta != nil {
+		m["meta"] = *v.Meta
+	}
+	if v.Note != nil {
+		m["note"] = *v.Note
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackSomeOpenVariantEventPropertiesDefault) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeOpenVariantEventPropertiesDefault) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
 // TrackSomeTrackEventProperties holds the properties of "Some Track Event".
 type TrackSomeTrackEventProperties struct {
 	SomeBoolean      *PropertySomeBoolean                           // optional
@@ -1072,6 +1681,36 @@ func (v TrackSomeTrackEventPropertiesSomeNestedObjectSomeNestedLevel1SomeNestedL
 	return marshal(v)
 }
 
+// TrackSomeVariantEventProperties holds the properties of "Some Variant Event".
+type TrackSomeVariantEventProperties struct {
+	Releases        PropertyReleases        // optional
+	Shipping        PropertyShipping        // required
+	SomeVariantType PropertySomeVariantType // optional
+}
+
+func (v TrackSomeVariantEventProperties) toMap() map[string]any {
+	m := map[string]any{
+		"shipping": required(v.Shipping, "shipping"),
+	}
+	if v.Releases != nil {
+		m["releases"] = v.Releases
+	}
+	if !isNil(v.SomeVariantType) {
+		m["someVariantType"] = v.SomeVariantType
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v TrackSomeVariantEventProperties) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v TrackSomeVariantEventProperties) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
 // TrackUserProperties holds the properties of "User".
 type TrackUserProperties struct {
 	User *PropertyUser // optional
@@ -1127,6 +1766,18 @@ func (r *RudderTyperAnalytics) TrackEventWithNameCamelCase(identity Identity, pr
 		return err
 	}
 	return r.track(identity, "$eventWithNameCamelCase$!", p, opts)
+}
+
+// TrackDeviceEvent sends the track event "Device Event". props must hold one of the case structs; nil, including a nil pointer, returns ErrNilPayload.
+func (r *RudderTyperAnalytics) TrackDeviceEvent(identity Identity, props TrackDeviceEventProperties, opts ...Option) error {
+	if isNil(props) {
+		return fmt.Errorf("%w: TrackDeviceEvent needs a TrackDeviceEventProperties case", ErrNilPayload)
+	}
+	p, err := props.ToProperties()
+	if err != nil {
+		return err
+	}
+	return r.track(identity, "Device Event", p, opts)
 }
 
 // TrackEveryPrimitiveType sends the track event "Every Primitive Type".
@@ -1209,6 +1860,18 @@ func (r *RudderTyperAnalytics) TrackSomeOpenTrackEvent(identity Identity, props 
 	return r.track(identity, "Some Open Track Event", p, opts)
 }
 
+// TrackSomeOpenVariantEvent sends the track event "Some Open Variant Event". props must hold one of the case structs; nil, including a nil pointer, returns ErrNilPayload.
+func (r *RudderTyperAnalytics) TrackSomeOpenVariantEvent(identity Identity, props TrackSomeOpenVariantEventProperties, opts ...Option) error {
+	if isNil(props) {
+		return fmt.Errorf("%w: TrackSomeOpenVariantEvent needs a TrackSomeOpenVariantEventProperties case", ErrNilPayload)
+	}
+	p, err := props.ToProperties()
+	if err != nil {
+		return err
+	}
+	return r.track(identity, "Some Open Variant Event", p, opts)
+}
+
 // TrackSomeTrackEvent sends the track event "Some Track Event".
 //
 // This is a track event for testing.
@@ -1218,6 +1881,15 @@ func (r *RudderTyperAnalytics) TrackSomeTrackEvent(identity Identity, props Trac
 		return err
 	}
 	return r.track(identity, "Some Track Event", p, opts)
+}
+
+// TrackSomeVariantEvent sends the track event "Some Variant Event".
+func (r *RudderTyperAnalytics) TrackSomeVariantEvent(identity Identity, props TrackSomeVariantEventProperties, opts ...Option) error {
+	p, err := props.ToProperties()
+	if err != nil {
+		return err
+	}
+	return r.track(identity, "Some Variant Event", p, opts)
 }
 
 // TrackUser sends the track event "User".
@@ -1639,4 +2311,19 @@ func withAdditional(extra map[string]any, declared ...string) map[string]any {
 		}
 	}
 	return m
+}
+
+// required returns v, or a value whose serialization fails when v is nil, so
+// a required variant left unset is reported instead of being sent as null.
+func required(v any, key string) any {
+	if isNil(v) {
+		return missingValue(key)
+	}
+	return v
+}
+
+type missingValue string
+
+func (k missingValue) wireValue() (any, error) {
+	return nil, fmt.Errorf("%w: required property %q is not set", ErrInvalidValue, string(k))
 }
