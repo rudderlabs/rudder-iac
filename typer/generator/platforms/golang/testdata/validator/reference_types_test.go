@@ -140,9 +140,7 @@ func TestReferenceTypesWire(t *testing.T) {
 		{
 			name: "zero value: a mixed enum fails json.Marshal",
 			call: func() error {
-				p := base
-				p.MixedValue = &ruddertyper.PropertyMixedValue{}
-				_, err := json.Marshal(p.MixedValue)
+				_, err := json.Marshal(ruddertyper.PropertyMixedValue{})
 				return err
 			},
 			errIs: ruddertyper.ErrInvalidValue,

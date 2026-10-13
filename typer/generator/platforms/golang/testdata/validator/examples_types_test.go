@@ -148,9 +148,7 @@ func TestExamplesTypesWire(t *testing.T) {
 		{
 			name: "zero value: a union without a null member fails json.Marshal",
 			call: func() error {
-				p := multi
-				p.StringOrStrings = examples.PropertyStringOrStrings{}
-				_, err := json.Marshal(p.StringOrStrings)
+				_, err := json.Marshal(examples.PropertyStringOrStrings{})
 				return err
 			},
 			errIs: examples.ErrInvalidValue,
