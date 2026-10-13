@@ -196,7 +196,8 @@ func (res *resolver) branch(s, b *plan.ObjectSchema, label, where string) (*obje
 		}
 		merged.Properties[key] = ps
 	}
-	return res.schema(&merged, where, "")
+	// The base's properties resolved already, so an error names the branch.
+	return res.schema(&merged, label, "")
 }
 
 // sameDefinition reports whether a, the base's property, and b, the branch's,

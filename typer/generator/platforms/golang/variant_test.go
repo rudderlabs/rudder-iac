@@ -143,6 +143,13 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			wantErr: `mapping the variants of track event "Some Event": the default schema: property "kind" conflicts with its definition in the base schema`,
 		},
 		{
+			name: "a property only a case declares, with an invalid enum",
+			plan: variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+				"x": {Property: plan.Property{Name: "x", Types: onlyString, Config: &plan.PropertyConfig{Enum: []any{}}}},
+			}})),
+			wantErr: `mapping the variants of track event "Some Event": mapping property "x" of case ["a"]: enum has no values`,
+		},
+		{
 			name:    "a match value in two cases",
 			plan:    variantPlan(typed(onlyString...), discriminate([]any{"a"}, []any{"b", "a"})),
 			wantErr: `mapping the variants of track event "Some Event": case ["b","a"]: match value "a" appears more than once`,
