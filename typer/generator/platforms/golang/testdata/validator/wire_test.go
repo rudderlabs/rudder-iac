@@ -231,7 +231,7 @@ func TestTrackWire(t *testing.T) {
 					ProductID: "p1",
 					Amount:    examples.Ptr(9.5),
 					AdditionalProperties: map[string]any{
-						"coupon": "SAVE", "productId": "override", "productName": "fill",
+						"coupon": "SAVE", "productId": "override", "productName": "fill", "additionalProperties": "x",
 						"count": 3, "user": examples.TrackUserProperties{User: examples.Ptr("u")},
 					},
 				})
