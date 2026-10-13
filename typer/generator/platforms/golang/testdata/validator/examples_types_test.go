@@ -168,6 +168,15 @@ func TestExamplesTypesWire(t *testing.T) {
 			func(p *multiProps) { p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeArray(nil)) }),
 		multiSent("nil through a wrapper: a valid Nullable holding a nil slice sends []", `, "someArrayOrNull": []`,
 			func(p *multiProps) { p.SomeArrayOrNull = examples.Ptr(examples.NewNullable[[]string](nil)) }),
+		{
+			name: "nil through a wrapper: a valid Nullable holding a nil map sends {}",
+			call: func() error {
+				p := multi
+				p.SomeObjectOrNull = examples.NewNullable[map[string]any](nil)
+				return ex.TrackSomeMultiTypeEvent(id, p)
+			},
+			want: trackJSON(exMeta, "Some Multi Type Event", `{"matrix": [], "someObjectOrNull": {}, "stringOrStrings": "s"}`),
+		},
 		multiSent("union: the String constructor sends a string", `, "someMultiType": "v"`,
 			func(p *multiProps) { p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeString("v")) }),
 		// 2^53+1 has no float64, so a constructor storing a float sends a different number.
