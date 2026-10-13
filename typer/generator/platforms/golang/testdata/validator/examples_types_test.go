@@ -3,6 +3,7 @@ package validator
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"testing"
 
 	analytics "github.com/rudderlabs/analytics-go/v4"
@@ -30,7 +31,7 @@ func assertWireRows(t *testing.T, start func(analytics.Client), rows []wireRow) 
 		errs = make([]error, len(rows))
 		sent int
 	)
-	wire, _ := capture(t, func(client analytics.Client) {
+	wire, succeeded := capture(t, func(client analytics.Client) {
 		start(client)
 		for i, row := range rows {
 			errs[i] = row.call()
@@ -40,6 +41,7 @@ func assertWireRows(t *testing.T, start func(analytics.Client), rows []wireRow) 
 		}
 	})
 	require.Len(t, wire, sent, "a failed call sent a message, or a call sent none; errors: %v", errs)
+	require.Len(t, succeeded, sent)
 
 	for i, row := range rows {
 		// Taking the row's message here, not in the subtest, keeps rows and
@@ -56,6 +58,37 @@ func assertWireRows(t *testing.T, start func(analytics.Client), rows []wireRow) 
 			require.NoError(t, errs[i])
 			assertMessage(t, row.want, msg)
 		})
+	}
+
+	// Config.Callback receives the snapshot itself, so its Go value types show
+	// what the wire JSON cannot, such as an enum left as its generated type.
+	// context.ruddertyper is skipped: it is generated constant metadata, and
+	// its trackingPlanVersion is a Go int.
+	for _, msg := range succeeded {
+		var (
+			ctx  *analytics.Context
+			data []map[string]any
+		)
+		switch m := msg.(type) {
+		case analytics.Track:
+			ctx, data = m.Context, []map[string]any{m.Properties, m.Integrations}
+		case analytics.Page:
+			ctx, data = m.Context, []map[string]any{m.Properties, m.Integrations}
+		case analytics.Screen:
+			ctx, data = m.Context, []map[string]any{m.Properties, m.Integrations}
+		case analytics.Identify:
+			ctx, data = m.Context, []map[string]any{m.Traits, m.Integrations}
+		case analytics.Group:
+			ctx, data = m.Context, []map[string]any{m.Traits, m.Integrations}
+		default:
+			require.Failf(t, "Config.Callback received an unexpected message", "%T", msg)
+		}
+		require.NotNil(t, ctx)
+		extra := maps.Clone(ctx.Extra)
+		delete(extra, "ruddertyper")
+		for _, v := range append(data, ctx.Traits, extra) {
+			assertPlain(t, v)
+		}
 	}
 }
 
