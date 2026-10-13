@@ -959,7 +959,7 @@ func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[pr
 			f.nested, pt = nil, propertyType{name: f.hoisted}
 		}
 		if f.nested != nil {
-			typ, err := addNested(ctx, registry, propertyTypes, name, field, f)
+			typ, err := addNested(ctx, registry, propertyTypes, name, field, name+"."+field, f)
 			if err != nil {
 				return nil, err
 			}
@@ -985,7 +985,8 @@ func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[pr
 // member takes the struct {Parent}{Field}Object. Each hoisted name is
 // registered under its parent and wire key, so names that concatenate alike
 // (foo.barBaz and fooBar.baz) take a numeric suffix in registration order.
-func addNested(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, parent, field string, f ruleField) (string, error) {
+// Their docs call the field in, such as parent.Field.
+func addNested(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, parent, field, in string, f ruleField) (string, error) {
 	name, err := registry.RegisterName("nested:"+parent+":"+f.wireKey, packageScope, parent+field)
 	if err != nil {
 		return "", fmt.Errorf("registering the type of %s.%s: %w", parent, field, err)
@@ -999,12 +1000,12 @@ func addNested(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[pr
 		if object, err = registry.RegisterName("object:"+name, packageScope, name+"Object"); err != nil {
 			return "", fmt.Errorf("registering the object member of %s: %w", name, err)
 		}
-		lead := fmt.Sprintf("%s is the value in %s.%s", name, parent, field)
+		lead := fmt.Sprintf("%s is the value in %s", name, in)
 		if err := addUnion(ctx, registry, name, lead, "", types, f.ps.Property.ItemTypes, object); err != nil {
 			return "", fmt.Errorf("mapping %s.%s: %w", parent, field, err)
 		}
 	}
-	if _, err := addStruct(ctx, registry, propertyTypes, object, fmt.Sprintf("%s is the object in %s.%s.", object, parent, field), f.nested, false); err != nil {
+	if _, err := addStruct(ctx, registry, propertyTypes, object, fmt.Sprintf("%s is the object in %s.", object, in), f.nested, false); err != nil {
 		return "", err
 	}
 
