@@ -139,32 +139,31 @@ const (
 
 func TestTrackWire(t *testing.T) {
 	var (
-		ex        *examples.RudderTyperAnalytics
-		ref       *ruddertyper.RudderTyperAnalytics
-		id        = examples.Identity{UserID: "user-123"}
-		refID     = ruddertyper.Identity{UserID: "user-123"}
-		someTrack = examples.TrackSomeTrackEventProperties{SomeString: "hello", SomeInteger: 42, SomeBoolean: examples.Ptr(false)}
-		closed    = analytics.New("write-key", "http://127.0.0.1")
+		ex            *examples.RudderTyperAnalytics
+		ref           *ruddertyper.RudderTyperAnalytics
+		id            = examples.Identity{UserID: "user-123"}
+		refID         = ruddertyper.Identity{UserID: "user-123"}
+		someTrack     = examples.TrackSomeTrackEventProperties{SomeString: "hello", SomeInteger: 42, SomeBoolean: examples.Ptr(false)}
+		someTrackJSON = `{"someString": "hello", "someInteger": 42, "someBoolean": false}`
+		closed        = analytics.New("write-key", "http://127.0.0.1")
 	)
 	require.NoError(t, closed.Close())
 
 	// The rows share one capture, which sets ex and ref when it starts, so the
 	// batch holds one message per row that succeeds, in row order.
 	tests := []struct {
-		name    string
-		call    func() error
-		want    string
-		err     error                // the call must return exactly this error
-		errIs   error                // the call must return an error wrapping this one
-		payload any                  // when set, json.Marshal(payload) must equal the properties sent
-		props   analytics.Properties // when set, the Config.Callback message must hold exactly these properties
+		name  string
+		call  func() error
+		want  string
+		err   error                // the call must return exactly this error
+		errIs error                // the call must return an error wrapping this one
+		props analytics.Properties // when set, the Config.Callback message must hold exactly these properties
 	}{
 		{
-			name:    "a set optional field sends its value, even false",
-			call:    func() error { return ex.TrackSomeTrackEvent(id, someTrack) },
-			payload: someTrack,
+			name: "a set optional field sends its value, even false",
+			call: func() error { return ex.TrackSomeTrackEvent(id, someTrack) },
 			want: `{"type": "track", "channel": "server", "event": "Some Track Event", "userId": "user-123",
-				"properties": {"someString": "hello", "someInteger": 42, "someBoolean": false},
+				"properties": ` + someTrackJSON + `,
 				"context": {"ruddertyper": ` + exMeta + `}}`,
 		},
 		{
@@ -419,13 +418,6 @@ func TestTrackWire(t *testing.T) {
 			default:
 				require.NoError(t, errs[i])
 				assertMessage(t, tt.want, msg)
-				if tt.payload != nil {
-					want, err := json.Marshal(tt.payload)
-					require.NoError(t, err)
-					got, err := json.Marshal(msg["properties"])
-					require.NoError(t, err)
-					assert.JSONEq(t, string(want), string(got))
-				}
 
 				// Config.Callback receives the snapshot itself, so its Go value
 				// types show what the wire JSON cannot. context.ruddertyper is
@@ -445,4 +437,9 @@ func TestTrackWire(t *testing.T) {
 			}
 		})
 	}
+
+	// The first row sends someTrackJSON, so json.Marshal of its payload must match it.
+	b, err := json.Marshal(someTrack)
+	require.NoError(t, err)
+	assert.JSONEq(t, someTrackJSON, string(b))
 }
