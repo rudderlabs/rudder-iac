@@ -261,6 +261,12 @@ func TestTrackWire(t *testing.T) {
 				"context": {"ruddertyper": ` + exMeta + `}}`,
 		},
 		{
+			name: "Identity.AnonymousID sends anonymousId",
+			call: func() error { return ex.TrackSomeEmptyTrackEvent(examples.Identity{AnonymousID: "anon-1"}) },
+			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event", "anonymousId": "anon-1",
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
 			name: "options send integrations, originalTimestamp and messageId",
 			call: func() error {
 				return ex.TrackSomeEmptyTrackEvent(id,
