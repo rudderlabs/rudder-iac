@@ -159,6 +159,30 @@ func TestVariantsWire(t *testing.T) {
 			},
 			want: trackJSON(exMeta, "Some Variant Event", `{"shipping": {"method": "express", "address": {"city": "Pune"}, "deadline": "today"}}`),
 		},
+		// The next three rows pin the wire comments in examples_test.go, which the README quotes.
+		{
+			name: "variant: Device Event Mobile sends its discriminator with the case's properties",
+			call: func() error {
+				return ex.TrackDeviceEvent(id, examples.TrackDeviceEventPropertiesCaseMobile{OsVersion: "17.1", AppVersion: "2.0"})
+			},
+			want: trackJSON(exMeta, "Device Event", `{"appVersion": "2.0", "deviceType": "mobile", "osVersion": "17.1"}`),
+		},
+		{
+			name: "default: Device Event Default sends the value it holds",
+			call: func() error {
+				return ex.TrackDeviceEvent(id, examples.TrackDeviceEventPropertiesDefault{DeviceType: "tv"})
+			},
+			want: trackJSON(exMeta, "Device Event", `{"deviceType": "tv"}`),
+		},
+		{
+			name: "variant: SomeVariantType Case 2 sends its match value case_2_a",
+			call: func() error {
+				p := someVariant
+				p.SomeVariantType = examples.CustomTypeSomeVariantTypeCaseCase2A{SomeNumber: 3.5}
+				return ex.TrackSomeVariantEvent(id, p)
+			},
+			want: someVariantSent(`, "someVariantType": {"someNumber": 3.5, "someString": "case_2_a"}`),
+		},
 		{
 			name: "default: Event With Variants Default sends the enum value it holds",
 			call: func() error {
