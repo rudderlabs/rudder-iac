@@ -322,7 +322,7 @@ func (res *resolver) customType(ct *plan.CustomType) (*customType, error) {
 		err error
 	)
 	switch {
-	case len(ct.Variants) > 0:
+	case len(ct.Variants) > 0 || ct.Type == plan.PrimitiveTypeObject && isStruct(ct.Schema):
 		var (
 			where = fmt.Sprintf("custom type %q", ct.Name)
 			s     = cmp.Or(ct.Schema, &plan.ObjectSchema{})
@@ -334,24 +334,14 @@ func (res *resolver) customType(ct *plan.CustomType) (*customType, error) {
 		if err := validateVariantNames(ct.Variants, where); err != nil {
 			return nil, err
 		}
-		base, err := res.schema(s, where, "")
-		if err != nil {
+		if c.schema, err = res.schema(s, where, ""); err != nil {
 			return nil, err
 		}
-		if c.variant, err = res.variant(s, base, ct.Variants, where); err != nil {
+		if c.variant, err = res.variant(s, c.schema, ct.Variants, where); err != nil {
 			return nil, err
 		}
 	case ct.Type == plan.PrimitiveTypeArray:
 		if err = res.resolveCustomTypes(plan.Property{ItemTypes: []plan.PropertyType{ct.ItemType}}); err != nil {
-			return nil, err
-		}
-	case ct.Type == plan.PrimitiveTypeObject && isStruct(ct.Schema):
-		where := fmt.Sprintf("custom type %q", ct.Name)
-		// Names are checked first, as in rules.
-		if err := validateSchemaNames(*ct.Schema, where); err != nil {
-			return nil, err
-		}
-		if c.schema, err = res.schema(ct.Schema, where, ""); err != nil {
 			return nil, err
 		}
 	}

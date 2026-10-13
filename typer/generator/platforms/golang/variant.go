@@ -39,10 +39,10 @@ type variantCase struct {
 	schema     *objectSchema
 }
 
-// schemas are the base schema and the merged branches, whose fields need
-// property types.
+// schemas are the merged branches, whose fields need property types, as the
+// base schema's do.
 func (v *variantSchema) schemas() []*objectSchema {
-	out := []*objectSchema{v.base}
+	var out []*objectSchema
 	for _, c := range v.cases {
 		out = append(out, c.schema)
 	}
