@@ -85,7 +85,7 @@ err = rt.Page(
 )
 ```
 
-- `WithCategory` sets `properties.category` on page and screen calls: it must equal a category the payload already holds, or else the schema must be open and not declare `category`. Anything else fails with `ErrCategoryConflict`. An empty string is checked and sent like any other value; leave the option out to send no category ([Call Options][spec], [Page Events][spec]).
+- `WithCategory` sets `properties.category` on page and screen calls (other calls ignore it): it must equal a category the payload already holds, or else the schema must be open and not declare `category`. Anything else fails with `ErrCategoryConflict`. An empty string is checked and sent like any other value; leave the option out to send no category ([Call Options][spec], [Page Events][spec]).
 - External IDs travel in the context: `WithAnalyticsContext(analytics.Context{Extra: map[string]any{"externalId": ...}})` ([Call Options][spec]).
 - Go does not allow single options and an `opts...` slice in one call. Build one slice instead: `append([]ruddertyper.Option{ruddertyper.WithCategory(category)}, opts...)` ([Alternate Invocations (Function Overloads)][spec]).
 
