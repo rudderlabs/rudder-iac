@@ -17,10 +17,11 @@ import (
 // schema, and each branch merged with it.
 type variantSchema struct {
 	// key is the discriminator's wire key.
-	key      string
-	optional bool
-	domain   matchDomain
-	base     *objectSchema
+	key    string
+	domain matchDomain
+	base   *objectSchema
+	// matched holds the Go literals of the match values.
+	matched map[string]bool
 	// absent is set when the discriminator is optional.
 	absent *objectSchema
 	cases  []variantCase
@@ -126,8 +127,8 @@ func (res *resolver) mergeVariant(s *plan.ObjectSchema, base *objectSchema, vari
 	}
 
 	var (
-		v       = &variantSchema{key: vr.Discriminator, optional: !disc.Required, domain: d, base: base}
 		matched = map[string]bool{}
+		v       = &variantSchema{key: vr.Discriminator, domain: d, base: base, matched: matched}
 	)
 	for i := range vr.Cases {
 		var (
@@ -165,7 +166,7 @@ func (res *resolver) mergeVariant(s *plan.ObjectSchema, base *objectSchema, vari
 		i := slices.IndexFunc(v.dflt.fields, func(f ruleField) bool { return f.wireKey == v.key })
 		v.dflt.fields[i].ps.Required = true
 	}
-	if v.optional {
+	if !disc.Required {
 		v.absent = &objectSchema{open: base.open, declared: base.declared, fields: withoutField(base.fields, v.key)}
 	}
 	return v, nil
@@ -337,7 +338,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	)
 	iface.Result = typ
 	iface.DiscriminatorDoc = fmt.Sprintf("Discriminator returns the value of %s.", strconv.Quote(v.key))
-	if v.optional {
+	if v.absent != nil {
 		okSuffix, qualifier = ", true", "the optional "
 		iface.Result = "(value " + typ + ", ok bool)"
 		iface.DiscriminatorDoc = fmt.Sprintf("Discriminator returns the value of %s; ok is false when it is absent.", strconv.Quote(v.key))
@@ -398,7 +399,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 				st.DiscriminatorDoc = "Discriminator returns " + value + "."
 			}
 			st.Returns, st.Sends = value+okSuffix, "v.Discriminator()"
-			if v.optional {
+			if v.absent != nil {
 				// Discriminator also returns ok, so toMap writes the value itself.
 				st.Sends = value
 			}
@@ -429,12 +430,8 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 // enum values no case matches, or any value but the matches, and null when
 // the discriminator is nullable.
 func defaultDocs(decls map[string]GoDecl, typ string, v *variantSchema, name, defaultName string) (doc, note string) {
-	matched := map[string]bool{}
-	for _, c := range v.cases {
-		matched[c.text] = true
-	}
-	if v.domain.enum == nil && !v.domain.exhausts(matched) {
-		texts := slices.Sorted(maps.Keys(matched))
+	if v.domain.enum == nil && !v.domain.exhausts(v.matched) {
+		texts := slices.Sorted(maps.Keys(v.matched))
 		doc = fmt.Sprintf("%s is the default case of %s, for any %s other than %s", defaultName, name, v.key, joinList(texts, "and"))
 		note = "not " + joinList(texts, "or")
 		if v.domain.nullable {
@@ -447,7 +444,7 @@ func defaultDocs(decls map[string]GoDecl, typ string, v *variantSchema, name, de
 	var rest []string
 	if v.domain.enum != nil {
 		for _, e := range v.domain.enum.values {
-			if !matched[e.Text] {
+			if !v.matched[e.Text] {
 				value, _ := spell(decls, typ, nil, e.Text)
 				rest = append(rest, value)
 			}
