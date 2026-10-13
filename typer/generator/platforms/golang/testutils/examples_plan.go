@@ -161,9 +161,10 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 		groupVariant = event(plan.EventTypeGroup, "Variant", plan.IdentitySectionContextTraits, false, map[string]plan.PropertySchema{
 			"tier": required(property("tier", "", plan.PrimitiveTypeString)),
 		})
-		// Every struct declares category, as the discriminator.
+		// Every struct declares category, as the discriminator, Absent
+		// included.
 		pageCategoryVariant = event(plan.EventTypePage, "Category Variant", plan.IdentitySectionProperties, false, map[string]plan.PropertySchema{
-			"category": required(property("category", "", plan.PrimitiveTypeString)),
+			"category": optional(property("category", "", plan.PrimitiveTypeString)),
 		})
 		// An open base whose closed case and Default each have a mode of their
 		// own: a branch is open only when its base and its own schema are.

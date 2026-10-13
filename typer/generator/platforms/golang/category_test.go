@@ -68,10 +68,13 @@ func TestGenerateCategoryMode(t *testing.T) {
 			want: map[string]string{"Page": "categoryClosed"},
 		},
 		{
-			name: "discriminator",
-			rule: variants(rule(plan.EventTypePage, true, property("category", true)), "category", branch("news", true, nil)),
+			// Optional, so Absent, whose payload sends no category, still
+			// declares it: an open Absent would let WithCategory pick a case.
+			name: "optional discriminator",
+			rule: variants(rule(plan.EventTypePage, true, property("category", false)), "category", branch("news", true, nil)),
 			want: map[string]string{
 				"Page":                   "categoryDeclared",
+				"PagePropertiesAbsent":   "categoryDeclared",
 				"PagePropertiesCaseNews": "categoryDeclared",
 				"PagePropertiesDefault":  "categoryDeclared",
 			},

@@ -1156,16 +1156,43 @@ func (v PageProperties) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 
-// PageCategoryVariantProperties holds the properties of the page event "Category Variant", a discriminated union on "category". It is implemented by PageCategoryVariantPropertiesCaseNews and PageCategoryVariantPropertiesDefault.
+// PageCategoryVariantProperties holds the properties of the page event "Category Variant", a discriminated union on the optional "category". It is implemented by PageCategoryVariantPropertiesAbsent, PageCategoryVariantPropertiesCaseNews and PageCategoryVariantPropertiesDefault.
 type PageCategoryVariantProperties interface {
 	json.Marshaler
-	// Discriminator returns the value of "category".
-	Discriminator() PropertyCategory
+	// Discriminator returns the value of "category"; ok is false when it is absent.
+	Discriminator() (value PropertyCategory, ok bool)
 	// ToProperties returns a deep copy of the properties as sent on the wire.
 	ToProperties() (analytics.Properties, error)
 	categoryMode() categoryMode
 	toMap() map[string]any
 	isPageCategoryVariantProperties()
+}
+
+// PageCategoryVariantPropertiesAbsent is the case where "category" is absent. It holds the base properties only.
+type PageCategoryVariantPropertiesAbsent struct{}
+
+func (PageCategoryVariantPropertiesAbsent) isPageCategoryVariantProperties() {}
+
+// Discriminator reports that "category" is absent.
+func (PageCategoryVariantPropertiesAbsent) Discriminator() (value PropertyCategory, ok bool) {
+	return value, false
+}
+
+func (PageCategoryVariantPropertiesAbsent) categoryMode() categoryMode { return categoryDeclared }
+
+func (v PageCategoryVariantPropertiesAbsent) toMap() map[string]any {
+	m := map[string]any{}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v PageCategoryVariantPropertiesAbsent) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v PageCategoryVariantPropertiesAbsent) MarshalJSON() ([]byte, error) {
+	return marshal(v)
 }
 
 // PageCategoryVariantPropertiesCaseNews is the case where category is "news".
@@ -1176,13 +1203,15 @@ type PageCategoryVariantPropertiesCaseNews struct {
 func (PageCategoryVariantPropertiesCaseNews) isPageCategoryVariantProperties() {}
 
 // Discriminator returns "news".
-func (PageCategoryVariantPropertiesCaseNews) Discriminator() PropertyCategory { return "news" }
+func (PageCategoryVariantPropertiesCaseNews) Discriminator() (value PropertyCategory, ok bool) {
+	return "news", true
+}
 
 func (PageCategoryVariantPropertiesCaseNews) categoryMode() categoryMode { return categoryDeclared }
 
 func (v PageCategoryVariantPropertiesCaseNews) toMap() map[string]any {
 	m := map[string]any{
-		"category": v.Discriminator(),
+		"category": "news",
 		"headline": v.Headline,
 	}
 	return m
@@ -1206,7 +1235,9 @@ type PageCategoryVariantPropertiesDefault struct {
 func (PageCategoryVariantPropertiesDefault) isPageCategoryVariantProperties() {}
 
 // Discriminator returns Category.
-func (v PageCategoryVariantPropertiesDefault) Discriminator() PropertyCategory { return v.Category }
+func (v PageCategoryVariantPropertiesDefault) Discriminator() (value PropertyCategory, ok bool) {
+	return v.Category, true
+}
 
 func (PageCategoryVariantPropertiesDefault) categoryMode() categoryMode { return categoryDeclared }
 
