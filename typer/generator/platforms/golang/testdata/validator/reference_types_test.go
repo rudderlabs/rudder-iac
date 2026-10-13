@@ -59,6 +59,23 @@ func TestReferenceTypesWire(t *testing.T) {
 		signedUp("enum: a mixed enum's number value sends a JSON number", `, "mixed_value": 2.5`,
 			func(p *props) { p.MixedValue = ruddertyper.Ptr(ruddertyper.PropertyMixedValue2_5()) }),
 		{
+			name: "enum: a value with punctuation and quotes sends it unchanged",
+			call: func() error {
+				return ref.TrackProductPremiumClicked(id, ruddertyper.TrackProductPremiumClickedProperties{
+					SpecialField: "x",
+					StatusCode:   ruddertyper.Ptr(ruddertyper.PropertyStatusCode500InternalServerError),
+				})
+			},
+			want: trackJSON(refMeta, `Product "Premium" Clicked`, `{"special_field": "x", "status_code": "500: Internal \"Server\" Error"}`),
+		},
+		{
+			name: "enum: a value with a dollar sign sends it unchanged",
+			call: func() error {
+				return ref.TrackVariableString(id, ruddertyper.TrackVariableStringProperties{DollarField: ruddertyper.PropertyDollarFieldVariableName})
+			},
+			want: trackJSON(refMeta, "$Variable$String", `{"dollar_field": "$variable_name"}`),
+		},
+		{
 			name: "zero value: a mixed enum fails the event method",
 			call: func() error {
 				p := base
@@ -98,6 +115,13 @@ func TestReferenceTypesWire(t *testing.T) {
 						Profile: &ruddertyper.CustomTypeUserProfile{Email: "b@c.d", FirstName: "Bo", LastName: ruddertyper.Ptr("Li")},
 					},
 				}
+			}),
+		signedUp("custom type: arrays of custom objects send plan keys in each element",
+			`, "addresses": [{"city": "Pune", "street": "1 Main", "postal_code": "411001"}],
+			"profile_list": [{"email": "b@c.d", "first_name": "Bo", "last_name": "Li"}]`,
+			func(p *props) {
+				p.Addresses = ruddertyper.PropertyAddresses{{City: "Pune", Street: "1 Main", PostalCode: ruddertyper.Ptr("411001")}}
+				p.ProfileList = ruddertyper.PropertyProfileList{{Email: "b@c.d", FirstName: "Bo", LastName: ruddertyper.Ptr("Li")}}
 			}),
 		signedUp("custom type: a closed empty object sends {}", `, "empty_object_no_additional_props": {}`,
 			func(p *props) { p.EmptyObjectNoAdditionalProps = &ruddertyper.CustomTypeEmptyObjectNoAdditionalProps{} }),
