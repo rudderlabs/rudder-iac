@@ -106,6 +106,14 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			wantErr: `mapping the variants of track event "Some Event": case ["a"]: property "kind" conflicts with its definition in the base schema`,
 		},
 		{
+			name: "a case redefines a base property's item types",
+			plan: variantPlan(
+				plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeArray}, ItemTypes: onlyString},
+				withCase(discriminate([]any{"a"}), redefine(plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeArray}, ItemTypes: onlyInteger})),
+			),
+			wantErr: `mapping the variants of track event "Some Event": case ["a"]: property "kind" conflicts with its definition in the base schema`,
+		},
+		{
 			name:    "a case redefines a base property with an invalid enum",
 			plan:    variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), redefine(plan.Property{Types: onlyString, Config: &plan.PropertyConfig{Enum: []any{}}}))),
 			wantErr: `mapping the variants of track event "Some Event": case ["a"]: mapping property "kind": enum has no values`,
@@ -280,6 +288,13 @@ func TestGenerateVariantDefault(t *testing.T) {
 			[][]any{{"a"}},
 			[]string{"CaseA", "Default"},
 			"only null",
+		},
+		{
+			"nullable enum with a value left",
+			enumProperty("kind", nullable(plan.PrimitiveTypeString), "draft", "live", nil),
+			[][]any{{"live"}},
+			[]string{"CaseLive", "Default"},
+			"only PropertyKindValueDraft or null",
 		},
 		{
 			"boolean and string union with both booleans matched",
