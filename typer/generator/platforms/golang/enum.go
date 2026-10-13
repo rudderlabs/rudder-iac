@@ -101,7 +101,7 @@ func resolveEnum(p plan.Property) (*effectiveEnum, error) {
 
 // numberValue writes r as an int64 for an int64 enum, or for an integral
 // value of a mixed enum that fits, and as a float64 otherwise. literals holds
-// the plan value behind each number already written, since two values written
+// the plan value behind each number already named, since two values named
 // alike would become duplicate constants: one float64 can represent two
 // values, and in a mixed enum an int64 and a float64 can be the same number.
 func numberValue(r *big.Rat, raw any, base string, literals map[string]any) (GoEnumValue, error) {
@@ -113,8 +113,8 @@ func numberValue(r *big.Rat, raw any, base string, literals map[string]any) (GoE
 	case base == "int64" && !isInt64:
 		return v, fmt.Errorf("enum value %s does not fit in int64", jsonText(raw))
 	case isInt64 && base != "float64":
-		v.Text = r.Num().String()
-		v.Expr = "int64(" + v.Text + ")"
+		v.Name = r.Num().String()
+		v.Text, v.Expr = v.Name, "int64("+v.Name+")"
 	default:
 		f, _ := r.Float64()
 		if f == 0 {
@@ -123,17 +123,20 @@ func numberValue(r *big.Rat, raw any, base string, literals map[string]any) (GoE
 		if math.IsInf(f, 0) {
 			return v, fmt.Errorf("enum value %s does not fit in float64", jsonText(raw))
 		}
-		v.Text = strconv.FormatFloat(f, 'f', -1, 64)
+		v.Name = strconv.FormatFloat(f, 'f', -1, 64)
+		v.Text = v.Name
 		if !strings.Contains(v.Text, ".") {
+			// 'f' writes 1e300 as 301 digits, an integer constant too large for gc.
+			v.Text = strconv.FormatFloat(f, 'g', -1, 64)
 			// A mixed enum's value is untyped; an integer literal would default to int.
 			v.Expr = "float64(" + v.Text + ")"
 		}
 	}
-	if first, ok := literals[v.Text]; ok {
+	if first, ok := literals[v.Name]; ok {
 		return v, fmt.Errorf("enum values %s and %s are the same float64", jsonText(first), jsonText(raw))
 	}
-	literals[v.Text] = raw
-	v.Name = strings.NewReplacer("-", "Neg", ".", "_").Replace(v.Text)
+	literals[v.Name] = raw
+	v.Name = strings.NewReplacer("-", "Neg", ".", "_").Replace(v.Name)
 	return v, nil
 }
 
