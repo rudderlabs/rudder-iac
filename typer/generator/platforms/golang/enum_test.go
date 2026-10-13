@@ -296,6 +296,11 @@ func TestGenerateRejectsInvalidEnums(t *testing.T) {
 			wantErr:  `mapping property "kind" of track event "Some Event": enum values 9007199254740992 and 9007199254740993 are the same float64`,
 		},
 		{
+			name:     "zero and a value that rounds to negative zero",
+			property: enumProperty("kind", onlyNumber, 0, json.Number("-1e-400")),
+			wantErr:  `mapping property "kind" of track event "Some Event": enum values 0 and -1e-400 are the same float64`,
+		},
+		{
 			name:     "an int64 and a float64 of a mixed enum written alike",
 			property: enumProperty("kind", nil, "a", json.Number("9007199254740992"), json.Number("9007199254740992.5")),
 			wantErr:  `mapping property "kind" of track event "Some Event": enum values 9007199254740992 and 9007199254740992.5 are the same float64`,

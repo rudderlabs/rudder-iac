@@ -117,6 +117,9 @@ func numberValue(r *big.Rat, raw any, base string, literals map[string]any) (GoE
 		v.Expr = "int64(" + v.Text + ")"
 	default:
 		f, _ := r.Float64()
+		if f == 0 {
+			f = 0 // Go constants have no negative zero, so -0 is the same float64 as 0.
+		}
 		if math.IsInf(f, 0) {
 			return v, fmt.Errorf("enum value %s does not fit in float64", jsonText(raw))
 		}
