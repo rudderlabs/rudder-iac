@@ -1,6 +1,6 @@
 # Go Generator
 
-Generates a type-safe Go package for a tracking plan on top of analytics-go. Each bullet links the section of the Go Generation Specification ([main][spec], [appendix][appendix]) it summarizes.
+Generates a type-safe Go package for a tracking plan on top of analytics-go. Each bullet names the sections of the Go Generation Specification it summarizes. The spec's [main][spec] and [appendix][appendix] pages are RudderStack-internal, and each link opens the top of its page.
 
 ## Generating
 
