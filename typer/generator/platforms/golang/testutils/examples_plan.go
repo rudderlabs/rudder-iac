@@ -64,6 +64,8 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"someArrayOrNull":          optional(items(property("someArrayOrNull", "", plan.PrimitiveTypeArray, plan.PrimitiveTypeNull), plan.PrimitiveTypeString)),
 				"someObjectOrNull":         required(property("someObjectOrNull", "", plan.PrimitiveTypeObject, plan.PrimitiveTypeNull)),
 				"someArrayOfMultipleTypes": optional(items(property("someArrayOfMultipleTypes", "", plan.PrimitiveTypeArray), plan.PrimitiveTypeString, plan.PrimitiveTypeInteger, plan.PrimitiveTypeNumber, plan.PrimitiveTypeBoolean)),
+				"someMixedArrayOrNull":     optional(items(property("someMixedArrayOrNull", "", plan.PrimitiveTypeArray, plan.PrimitiveTypeNull), plan.PrimitiveTypeString, plan.PrimitiveTypeInteger)),
+				"stringOrMixedArray":       optional(items(property("stringOrMixedArray", "", plan.PrimitiveTypeArray, plan.PrimitiveTypeString), plan.PrimitiveTypeString, plan.PrimitiveTypeInteger)),
 				"matrix":                   required(items(property("matrix", "", plan.PrimitiveTypeArray), plan.PrimitiveTypeArray)),
 			}),
 		},

@@ -246,6 +246,38 @@ type PropertySomeBoolean = bool
 // some integer property
 type PropertySomeInteger = int64
 
+// PropertySomeMixedArrayOrNullItem is one item of PropertySomeMixedArrayOrNull: a string or integer.
+// Build it with one of the NewPropertySomeMixedArrayOrNullItem* functions.
+// Null is not a member, so the zero value cannot be sent.
+type PropertySomeMixedArrayOrNullItem struct{ value any }
+
+// NewPropertySomeMixedArrayOrNullItemString returns a string value.
+func NewPropertySomeMixedArrayOrNullItemString(v string) PropertySomeMixedArrayOrNullItem {
+	return PropertySomeMixedArrayOrNullItem{value: v}
+}
+
+// NewPropertySomeMixedArrayOrNullItemInteger returns an integer value.
+func NewPropertySomeMixedArrayOrNullItemInteger(v int64) PropertySomeMixedArrayOrNullItem {
+	return PropertySomeMixedArrayOrNullItem{value: v}
+}
+
+// Value returns the held value.
+func (u PropertySomeMixedArrayOrNullItem) Value() any { return u.value }
+
+func (u PropertySomeMixedArrayOrNullItem) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: PropertySomeMixedArrayOrNullItem is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u PropertySomeMixedArrayOrNullItem) MarshalJSON() ([]byte, error) { return marshal(u) }
+
+// PropertySomeMixedArrayOrNull represents the property "someMixedArrayOrNull".
+type PropertySomeMixedArrayOrNull = Nullable[[]PropertySomeMixedArrayOrNullItem]
+
 // PropertySomeMultiType represents the property "someMultiType": a string, integer, number, boolean, object, array or null.
 // Build it with one of the NewPropertySomeMultiType* functions.
 // Null is a member, so the zero value is null.
@@ -302,6 +334,64 @@ type PropertySomeString = string
 
 // PropertyString represents the property "string".
 type PropertyString = string
+
+// PropertyStringOrMixedArrayItem is one item of PropertyStringOrMixedArray: a string or integer.
+// Build it with one of the NewPropertyStringOrMixedArrayItem* functions.
+// Null is not a member, so the zero value cannot be sent.
+type PropertyStringOrMixedArrayItem struct{ value any }
+
+// NewPropertyStringOrMixedArrayItemString returns a string value.
+func NewPropertyStringOrMixedArrayItemString(v string) PropertyStringOrMixedArrayItem {
+	return PropertyStringOrMixedArrayItem{value: v}
+}
+
+// NewPropertyStringOrMixedArrayItemInteger returns an integer value.
+func NewPropertyStringOrMixedArrayItemInteger(v int64) PropertyStringOrMixedArrayItem {
+	return PropertyStringOrMixedArrayItem{value: v}
+}
+
+// Value returns the held value.
+func (u PropertyStringOrMixedArrayItem) Value() any { return u.value }
+
+func (u PropertyStringOrMixedArrayItem) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: PropertyStringOrMixedArrayItem is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u PropertyStringOrMixedArrayItem) MarshalJSON() ([]byte, error) { return marshal(u) }
+
+// PropertyStringOrMixedArray represents the property "stringOrMixedArray": a string or array.
+// Build it with one of the NewPropertyStringOrMixedArray* functions.
+// Null is not a member, so the zero value cannot be sent.
+type PropertyStringOrMixedArray struct{ value any }
+
+// NewPropertyStringOrMixedArrayString returns a string value.
+func NewPropertyStringOrMixedArrayString(v string) PropertyStringOrMixedArray {
+	return PropertyStringOrMixedArray{value: v}
+}
+
+// NewPropertyStringOrMixedArrayArray returns an array value; nil is sent as [].
+func NewPropertyStringOrMixedArrayArray(v []PropertyStringOrMixedArrayItem) PropertyStringOrMixedArray {
+	return PropertyStringOrMixedArray{value: v}
+}
+
+// Value returns the held value.
+func (u PropertyStringOrMixedArray) Value() any { return u.value }
+
+func (u PropertyStringOrMixedArray) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: PropertyStringOrMixedArray is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u PropertyStringOrMixedArray) MarshalJSON() ([]byte, error) { return marshal(u) }
 
 // PropertyStringOrStrings represents the property "stringOrStrings": a string or array.
 // Build it with one of the NewPropertyStringOrStrings* functions.
@@ -460,8 +550,10 @@ type TrackSomeMultiTypeEventProperties struct {
 	Matrix                   PropertyMatrix                   // required
 	SomeArrayOfMultipleTypes PropertySomeArrayOfMultipleTypes // optional
 	SomeArrayOrNull          *PropertySomeArrayOrNull         // optional
+	SomeMixedArrayOrNull     *PropertySomeMixedArrayOrNull    // optional
 	SomeMultiType            *PropertySomeMultiType           // optional
 	SomeObjectOrNull         PropertySomeObjectOrNull         // required
+	StringOrMixedArray       *PropertyStringOrMixedArray      // optional
 	StringOrStrings          PropertyStringOrStrings          // required
 }
 
@@ -477,8 +569,14 @@ func (v TrackSomeMultiTypeEventProperties) toMap() map[string]any {
 	if v.SomeArrayOrNull != nil {
 		m["someArrayOrNull"] = *v.SomeArrayOrNull
 	}
+	if v.SomeMixedArrayOrNull != nil {
+		m["someMixedArrayOrNull"] = *v.SomeMixedArrayOrNull
+	}
 	if v.SomeMultiType != nil {
 		m["someMultiType"] = *v.SomeMultiType
+	}
+	if v.StringOrMixedArray != nil {
+		m["stringOrMixedArray"] = *v.StringOrMixedArray
 	}
 	return m
 }
