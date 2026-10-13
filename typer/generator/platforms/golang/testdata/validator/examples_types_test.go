@@ -189,11 +189,11 @@ func TestExamplesTypesWire(t *testing.T) {
 			}),
 		multiSent("union: the Null constructor sends null", `, "someMultiType": null`,
 			func(p *multiProps) { p.SomeMultiType = examples.Ptr(examples.NewPropertySomeMultiTypeNull()) }),
-		multiSent("union: array items send one value per member", `, "someArrayOfMultipleTypes": ["a", 1, 1.5, true]`,
+		multiSent("union: array items send one value per member", `, "someArrayOfMultipleTypes": ["a", 9007199254740993, 1.5, true]`,
 			func(p *multiProps) {
 				p.SomeArrayOfMultipleTypes = examples.PropertySomeArrayOfMultipleTypes{
 					examples.NewPropertySomeArrayOfMultipleTypesItemString("a"),
-					examples.NewPropertySomeArrayOfMultipleTypesItemInteger(1),
+					examples.NewPropertySomeArrayOfMultipleTypesItemInteger(9007199254740993),
 					examples.NewPropertySomeArrayOfMultipleTypesItemNumber(1.5),
 					examples.NewPropertySomeArrayOfMultipleTypesItemBoolean(true),
 				}
