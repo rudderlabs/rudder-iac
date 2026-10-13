@@ -112,12 +112,12 @@ func decode(r io.Reader, v any) error {
 	return d.Decode(v)
 }
 
-// assertPlain fails on any value in v that a snapshot must not hold, such as
-// an int or a generated type.
+// assertPlain fails on any value in v that the spec does not allow in a
+// snapshot, such as an int or a generated type.
 func assertPlain(t *testing.T, v any) {
 	t.Helper()
 	switch v := v.(type) {
-	case nil, string, bool, int64, float64:
+	case nil, string, bool, int64, uint64, float64, float32, json.Number:
 	case map[string]any:
 		for _, e := range v {
 			assertPlain(t, e)
@@ -154,9 +154,10 @@ func TestTrackWire(t *testing.T) {
 		name    string
 		call    func() error
 		want    string
-		err     error // the call must return exactly this error
-		errIs   error // the call must return an error wrapping this one
-		payload any   // when set, json.Marshal(payload) must equal the properties sent
+		err     error                // the call must return exactly this error
+		errIs   error                // the call must return an error wrapping this one
+		payload any                  // when set, json.Marshal(payload) must equal the properties sent
+		props   analytics.Properties // when set, the Config.Callback message must hold exactly these properties
 	}{
 		{
 			name:    "a set optional field sends its value, even false",
@@ -228,6 +229,10 @@ func TestTrackWire(t *testing.T) {
 			want: `{"type": "track", "channel": "server", "event": "Some Open Track Event", "userId": "user-123",
 				"properties": {"productId": "p1", "amount": 9.5, "coupon": "SAVE", "count": 3, "user": {"user": "u"}},
 				"context": {"ruddertyper": ` + exMeta + `}}`,
+			props: analytics.Properties{
+				"productId": "p1", "amount": 9.5, "coupon": "SAVE",
+				"count": int64(3), "user": map[string]any{"user": "u"},
+			},
 		},
 		{
 			name: "the collision pair's first event sends its own name",
@@ -374,11 +379,15 @@ func TestTrackWire(t *testing.T) {
 	require.Len(t, succeeded, sent)
 
 	for i, tt := range tests {
-		// Taking the row's message here, not in the subtest, keeps rows and
+		// Taking the row's messages here, not in the subtest, keeps rows and
 		// messages paired when -run skips a subtest.
-		var msg map[string]any
+		var (
+			msg map[string]any
+			cb  analytics.Message
+		)
 		if tt.want != "" {
 			msg, wire = wire[0], wire[1:]
+			cb, succeeded = succeeded[0], succeeded[1:]
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			switch {
@@ -396,22 +405,23 @@ func TestTrackWire(t *testing.T) {
 					require.NoError(t, err)
 					assert.JSONEq(t, string(want), string(got))
 				}
+
+				// Config.Callback receives the snapshot itself, so its Go value
+				// types show what the wire JSON cannot. context.ruddertyper is
+				// skipped: it is generated constant metadata, not caller data, and
+				// the spec writes its trackingPlanVersion as an untyped constant, a Go int.
+				require.IsType(t, analytics.Track{}, cb)
+				track := cb.(analytics.Track)
+				if tt.props != nil {
+					assert.Equal(t, tt.props, track.Properties)
+				}
+				require.NotNil(t, track.Context)
+				extra := maps.Clone(track.Context.Extra)
+				delete(extra, "ruddertyper")
+				for _, m := range []map[string]any{track.Properties, track.Integrations, track.Context.Traits, extra} {
+					assertPlain(t, m)
+				}
 			}
 		})
-	}
-
-	// Config.Callback receives the snapshot itself, so its Go value types show
-	// what the wire JSON cannot. context.ruddertyper is skipped: it is generated
-	// constant metadata, not caller data, and the spec writes its
-	// trackingPlanVersion as an untyped constant, a Go int.
-	for _, msg := range succeeded {
-		require.IsType(t, analytics.Track{}, msg)
-		track := msg.(analytics.Track)
-		require.NotNil(t, track.Context)
-		extra := maps.Clone(track.Context.Extra)
-		delete(extra, "ruddertyper")
-		for _, m := range []map[string]any{track.Properties, track.Integrations, track.Context.Traits, extra} {
-			assertPlain(t, m)
-		}
 	}
 }
