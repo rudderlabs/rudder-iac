@@ -295,6 +295,16 @@ func TestExamplesTypesWire(t *testing.T) {
 			},
 			want: trackJSON(exMeta, "Some Nested Object Event", `{"location": null}`),
 		},
+		{
+			name: "nested object: hoisted closed empty objects at depth send {}",
+			call: func() error {
+				p := nested
+				p.Foo = &examples.TrackSomeNestedObjectEventPropertiesFoo{BarBaz: &examples.TrackSomeNestedObjectEventPropertiesFooBarBaz{}}
+				p.FooBar = &examples.TrackSomeNestedObjectEventPropertiesFooBar{Baz: &examples.TrackSomeNestedObjectEventPropertiesFooBarBaz1{}}
+				return ex.TrackSomeNestedObjectEvent(id, p)
+			},
+			want: trackJSON(exMeta, "Some Nested Object Event", `{"location": {"lat": 1.5}, "foo": {"barBaz": {}}, "fooBar": {"baz": {}}}`),
+		},
 	}
 
 	assertWireRows(t, func(client analytics.Client) { ex = examples.New(client) }, rows)

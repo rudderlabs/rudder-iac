@@ -101,6 +101,10 @@ func TestReferenceTypesWire(t *testing.T) {
 			}),
 		signedUp("custom type: a closed empty object sends {}", `, "empty_object_no_additional_props": {}`,
 			func(p *props) { p.EmptyObjectNoAdditionalProps = &ruddertyper.CustomTypeEmptyObjectNoAdditionalProps{} }),
+		signedUp("nested object: a hoisted closed empty object sends {}", `, "nested_empty_object_no_additional_props": {}`,
+			func(p *props) {
+				p.NestedEmptyObjectNoAdditionalProps = &ruddertyper.TrackUserSignedUpPropertiesNestedEmptyObjectNoAdditionalProps{}
+			}),
 	}
 
 	assertWireRows(t, func(client analytics.Client) { ref = ruddertyper.New(client) }, rows)
