@@ -117,6 +117,33 @@ func WithMessageID(id string) Option {
 // Ptr returns a pointer to v. Use it to set optional fields.
 func Ptr[T any](v T) *T { return &v }
 
+// Null serializes as JSON null.
+type Null struct{}
+
+func (Null) wireValue() (any, error) { return nil, nil }
+
+// MarshalJSON implements json.Marshaler.
+func (Null) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
+
+// Nullable holds either a value of T or JSON null. The zero value is null.
+type Nullable[T any] struct {
+	Value T
+	Valid bool
+}
+
+// NewNullable returns a Nullable holding v.
+func NewNullable[T any](v T) Nullable[T] { return Nullable[T]{Value: v, Valid: true} }
+
+func (n Nullable[T]) wireValue() (any, error) {
+	if !n.Valid {
+		return nil, nil
+	}
+	return n.Value, nil
+}
+
+// MarshalJSON implements json.Marshaler.
+func (n Nullable[T]) MarshalJSON() ([]byte, error) { return marshal(n) }
+
 // --- Property types ---
 
 // PropertyArrayOfAny represents the property "array_of_any".
@@ -124,10 +151,123 @@ func Ptr[T any](v T) *T { return &v }
 // An array that can contain any type of items
 type PropertyArrayOfAny = []any
 
+// PropertyArrayWithNullItems represents the property "array_with_null_items".
+//
+// Array with items that can be string or null
+type PropertyArrayWithNullItems = []Nullable[string]
+
 // PropertyMixedUnicode represents the property "mixed_unicode".
 //
 // Property with mixed unicode: café, naïve, 日本語
 type PropertyMixedUnicode = string
+
+// PropertyMultiTypeArrayItem is one item of PropertyMultiTypeArray: a string or integer.
+// Build it with one of the NewPropertyMultiTypeArrayItem* functions.
+// Null is not a member, so the zero value cannot be sent.
+type PropertyMultiTypeArrayItem struct{ value any }
+
+// NewPropertyMultiTypeArrayItemString returns a string value.
+func NewPropertyMultiTypeArrayItemString(v string) PropertyMultiTypeArrayItem {
+	return PropertyMultiTypeArrayItem{value: v}
+}
+
+// NewPropertyMultiTypeArrayItemInteger returns an integer value.
+func NewPropertyMultiTypeArrayItemInteger(v int64) PropertyMultiTypeArrayItem {
+	return PropertyMultiTypeArrayItem{value: v}
+}
+
+// Value returns the held value.
+func (u PropertyMultiTypeArrayItem) Value() any { return u.value }
+
+func (u PropertyMultiTypeArrayItem) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: PropertyMultiTypeArrayItem is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u PropertyMultiTypeArrayItem) MarshalJSON() ([]byte, error) { return marshal(u) }
+
+// PropertyMultiTypeArray represents the property "multi_type_array".
+//
+// An array with items that can be string or integer
+type PropertyMultiTypeArray = []PropertyMultiTypeArrayItem
+
+// PropertyMultiTypeField represents the property "multi_type_field": a string, integer or boolean.
+// Build it with one of the NewPropertyMultiTypeField* functions.
+// Null is not a member, so the zero value cannot be sent.
+//
+// A field that can be string, integer, or boolean
+type PropertyMultiTypeField struct{ value any }
+
+// NewPropertyMultiTypeFieldString returns a string value.
+func NewPropertyMultiTypeFieldString(v string) PropertyMultiTypeField {
+	return PropertyMultiTypeField{value: v}
+}
+
+// NewPropertyMultiTypeFieldInteger returns an integer value.
+func NewPropertyMultiTypeFieldInteger(v int64) PropertyMultiTypeField {
+	return PropertyMultiTypeField{value: v}
+}
+
+// NewPropertyMultiTypeFieldBoolean returns a boolean value.
+func NewPropertyMultiTypeFieldBoolean(v bool) PropertyMultiTypeField {
+	return PropertyMultiTypeField{value: v}
+}
+
+// Value returns the held value.
+func (u PropertyMultiTypeField) Value() any { return u.value }
+
+func (u PropertyMultiTypeField) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: PropertyMultiTypeField is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u PropertyMultiTypeField) MarshalJSON() ([]byte, error) { return marshal(u) }
+
+// PropertyMultiTypeWithNull represents the property "multi_type_with_null": a string, integer or null.
+// Build it with one of the NewPropertyMultiTypeWithNull* functions.
+// Null is a member, so the zero value is null.
+//
+// Property that can be string, integer, or null
+type PropertyMultiTypeWithNull struct{ value any }
+
+// NewPropertyMultiTypeWithNullString returns a string value.
+func NewPropertyMultiTypeWithNullString(v string) PropertyMultiTypeWithNull {
+	return PropertyMultiTypeWithNull{value: v}
+}
+
+// NewPropertyMultiTypeWithNullInteger returns an integer value.
+func NewPropertyMultiTypeWithNullInteger(v int64) PropertyMultiTypeWithNull {
+	return PropertyMultiTypeWithNull{value: v}
+}
+
+// NewPropertyMultiTypeWithNullNull returns the null value.
+func NewPropertyMultiTypeWithNullNull() PropertyMultiTypeWithNull { return PropertyMultiTypeWithNull{} }
+
+// Value returns the held value; nil means null.
+func (u PropertyMultiTypeWithNull) Value() any { return u.value }
+
+func (u PropertyMultiTypeWithNull) wireValue() (any, error) { return u.value, nil }
+
+// MarshalJSON implements json.Marshaler.
+func (u PropertyMultiTypeWithNull) MarshalJSON() ([]byte, error) { return marshal(u) }
+
+// PropertyNullField represents the property "null_field".
+//
+// Property that is always null
+type PropertyNullField = Null
+
+// PropertyNumberOrNull represents the property "number_or_null".
+//
+// Property that can be number or null
+type PropertyNumberOrNull = Nullable[float64]
 
 // PropertyObjectProperty represents the property "object_property".
 //
@@ -143,6 +283,16 @@ type PropertyPropertyOfAny = any
 //
 // Field with special chars: "quotes", backslash\path, and /* comment */
 type PropertySpecialField = string
+
+// PropertyStringOrNull represents the property "string_or_null".
+//
+// Property that can be string or null
+type PropertyStringOrNull = Nullable[string]
+
+// PropertyTags represents the property "tags".
+//
+// User tags as array of strings
+type PropertyTags = []string
 
 // PropertyUntypedArray represents the property "untyped_array".
 //
@@ -242,13 +392,21 @@ func (v TrackProductPremiumClickedProperties) MarshalJSON() ([]byte, error) {
 
 // TrackUserSignedUpProperties holds the properties of "User Signed Up".
 type TrackUserSignedUpProperties struct {
-	ArrayOfAny     PropertyArrayOfAny     // optional
-	MixedUnicode   *PropertyMixedUnicode  // optional
-	ObjectProperty PropertyObjectProperty // optional
-	PropertyOfAny  PropertyPropertyOfAny  // optional
-	UntypedArray   PropertyUntypedArray   // optional
-	UntypedField   PropertyUntypedField   // optional
-	X用户名           *Property用户名           // optional
+	ArrayOfAny         PropertyArrayOfAny         // optional
+	ArrayWithNullItems PropertyArrayWithNullItems // optional
+	MixedUnicode       *PropertyMixedUnicode      // optional
+	MultiTypeArray     PropertyMultiTypeArray     // optional
+	MultiTypeField     *PropertyMultiTypeField    // optional
+	MultiTypeWithNull  *PropertyMultiTypeWithNull // optional
+	NullField          *PropertyNullField         // optional
+	NumberOrNull       *PropertyNumberOrNull      // optional
+	ObjectProperty     PropertyObjectProperty     // optional
+	PropertyOfAny      PropertyPropertyOfAny      // optional
+	StringOrNull       *PropertyStringOrNull      // optional
+	Tags               PropertyTags               // optional
+	UntypedArray       PropertyUntypedArray       // optional
+	UntypedField       PropertyUntypedField       // optional
+	X用户名               *Property用户名               // optional
 }
 
 func (v TrackUserSignedUpProperties) toMap() map[string]any {
@@ -256,14 +414,38 @@ func (v TrackUserSignedUpProperties) toMap() map[string]any {
 	if v.ArrayOfAny != nil {
 		m["array_of_any"] = v.ArrayOfAny
 	}
+	if v.ArrayWithNullItems != nil {
+		m["array_with_null_items"] = v.ArrayWithNullItems
+	}
 	if v.MixedUnicode != nil {
 		m["mixed_unicode"] = *v.MixedUnicode
+	}
+	if v.MultiTypeArray != nil {
+		m["multi_type_array"] = v.MultiTypeArray
+	}
+	if v.MultiTypeField != nil {
+		m["multi_type_field"] = *v.MultiTypeField
+	}
+	if v.MultiTypeWithNull != nil {
+		m["multi_type_with_null"] = *v.MultiTypeWithNull
+	}
+	if v.NullField != nil {
+		m["null_field"] = *v.NullField
+	}
+	if v.NumberOrNull != nil {
+		m["number_or_null"] = *v.NumberOrNull
 	}
 	if v.ObjectProperty != nil {
 		m["object_property"] = v.ObjectProperty
 	}
 	if v.PropertyOfAny != nil {
 		m["property_of_any"] = v.PropertyOfAny
+	}
+	if v.StringOrNull != nil {
+		m["string_or_null"] = *v.StringOrNull
+	}
+	if v.Tags != nil {
+		m["tags"] = v.Tags
 	}
 	if v.UntypedArray != nil {
 		m["untyped_array"] = v.UntypedArray

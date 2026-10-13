@@ -41,20 +41,59 @@ import (
 )
 
 {{ template "client.tmpl" . }}
-{{- if .UsesPtr }}
+{{- if or .UsesPtr .UsesNull .UsesNullable }}
 
 // --- Value helpers ---
+{{- end }}
+{{- if .UsesPtr }}
 
 // Ptr returns a pointer to v. Use it to set optional fields.
 func Ptr[T any](v T) *T { return &v }
+{{- end }}
+{{- if .UsesNull }}
+
+// Null serializes as JSON null.
+type Null struct{}
+
+func (Null) wireValue() (any, error) { return nil, nil }
+
+// MarshalJSON implements json.Marshaler.
+func (Null) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
+{{- end }}
+{{- if .UsesNullable }}
+
+// Nullable holds either a value of T or JSON null. The zero value is null.
+type Nullable[T any] struct {
+	Value T
+	Valid bool
+}
+
+// NewNullable returns a Nullable holding v.
+func NewNullable[T any](v T) Nullable[T] { return Nullable[T]{Value: v, Valid: true} }
+
+func (n Nullable[T]) wireValue() (any, error) {
+	if !n.Valid {
+		return nil, nil
+	}
+	return n.Value, nil
+}
+
+// MarshalJSON implements json.Marshaler.
+func (n Nullable[T]) MarshalJSON() ([]byte, error) { return marshal(n) }
 {{- end }}
 {{- if .PropertyTypes }}
 
 // --- Property types ---
 {{- range .PropertyTypes }}
+{{- with .Alias }}
 
 {{ comment .Doc }}
 type {{ .Name }} = {{ .Type }}
+{{- end }}
+{{- with .Union }}
+
+{{ template "union.tmpl" . }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- if .Payloads }}
