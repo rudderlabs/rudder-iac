@@ -17,7 +17,7 @@ func TestVariantsWire(t *testing.T) {
 		id    = examples.Identity{UserID: "user-123"}
 		refID = ruddertyper.Identity{UserID: "user-123"}
 
-		// Shared sub-values and one valid payload per event; each row changes
+		// Shared sub-values and one valid payload per event; most rows change
 		// one field of a copy.
 		profile     = ruddertyper.CustomTypeUserProfile{Email: "a@b.c", FirstName: "Ann"}
 		mobile      = ruddertyper.TrackEventWithVariantsPropertiesCaseMobile{Profile: profile}
@@ -280,7 +280,7 @@ func TestVariantsWire(t *testing.T) {
 			want: mobileSent(`, "page_context": {"page_type": "search", "query": "q"}`),
 		},
 		{
-			name: "open: an open case passes undeclared AdditionalProperties keys, not declared ones or the discriminator",
+			name: "open: an open case passes undeclared AdditionalProperties keys, not declared ones or its discriminator kind",
 			call: func() error {
 				return ex.TrackSomeOpenVariantEvent(id, examples.TrackSomeOpenVariantEventPropertiesCaseOnLine{
 					URL:                  "u",
@@ -290,7 +290,7 @@ func TestVariantsWire(t *testing.T) {
 			want: trackJSON(exMeta, "Some Open Variant Event", `{"kind": "on-line", "url": "u", "coupon": "SAVE"}`),
 		},
 		{
-			name: "open: an open Default passes undeclared AdditionalProperties keys, not declared ones or the discriminator",
+			name: "open: an open Default passes undeclared AdditionalProperties keys, not declared ones or its discriminator kind",
 			call: func() error {
 				return ex.TrackSomeOpenVariantEvent(id, examples.TrackSomeOpenVariantEventPropertiesDefault{
 					Kind:                 "retail",
