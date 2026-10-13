@@ -10,9 +10,8 @@ on:
       - "typer/plan/**"
       - "Makefile"
       - ".github/workflows/typer-go-validate.yml"
+  # No branches filter, so stacked PRs that target a feature branch run it too.
   pull_request:
-    branches:
-      - main
     paths:
       - "typer/generator/platforms/golang/**"
       - "typer/generator/core/**"
