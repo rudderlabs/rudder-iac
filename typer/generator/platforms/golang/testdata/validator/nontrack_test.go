@@ -59,10 +59,10 @@ func TestNonTrackWire(t *testing.T) {
 		{
 			name: "ruddertyper: group on context.traits sends the message's traits and leaves the caller's context.traits untouched",
 			call: func() error {
-				return ref.Group(refID, "g1", &ruddertyper.GroupTraits{Active: true},
+				return ref.Group(refID, "g1", &ruddertyper.GroupTraits{Active: true, Status: ruddertyper.Ptr(ruddertyper.CustomTypeStatusActive)},
 					ruddertyper.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"active": false, "plan": "pro"}}))
 			},
-			want: `{"type": "group", "channel": "server", "userId": "user-123", "anonymousId": "anon-1", "groupId": "g1", "traits": {"active": true},
+			want: `{"type": "group", "channel": "server", "userId": "user-123", "anonymousId": "anon-1", "groupId": "g1", "traits": {"active": true, "status": "active"},
 				"context": {"traits": {"active": false, "plan": "pro"}, "ruddertyper": ` + refMeta + `}}`,
 		},
 		{
