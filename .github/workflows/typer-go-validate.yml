@@ -55,6 +55,7 @@ jobs:
           changes=$(git status --porcelain -- typer/generator/platforms/golang/testdata/validator)
           if [ -n "$changes" ]; then
             echo "$changes"
+            git --no-pager diff -- typer/generator/platforms/golang/testdata/validator
             echo "::error::Go golden files are out of date. Run 'make typer-go-update-testdata' locally and commit the changes."
             exit 1
           fi
