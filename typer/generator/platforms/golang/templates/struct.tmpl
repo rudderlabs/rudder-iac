@@ -20,6 +20,10 @@ func ({{ $.Name }}) is{{ .Name }}() {}
 {{ comment $.DiscriminatorDoc }}
 func ({{ if $.ReadsReceiver }}v {{ end }}{{ $.Name }}) Discriminator() {{ .Result }} { return {{ $.Returns }} }
 {{- end }}
+{{- with .CategoryMode }}
+
+func ({{ $.Name }}) categoryMode() categoryMode { return {{ . }} }
+{{- end }}
 {{- if not .MapAlias }}
 
 func (v {{ .Name }}) toMap() map[string]any {
@@ -50,10 +54,10 @@ func (v {{ .Name }}) toMap() map[string]any {
 {{- end }}
 	return m
 }
-{{- if .Payload }}
+{{- with .Noun }}
 
-// ToProperties returns a deep copy of the properties as sent on the wire.
-func (v {{ .Name }}) ToProperties() (analytics.Properties, error) {
+// To{{ . }} returns a deep copy of the {{ lower . }} as sent on the wire.
+func (v {{ $.Name }}) To{{ . }}() (analytics.{{ . }}, error) {
 	return snapshot(v)
 }
 {{- end }}

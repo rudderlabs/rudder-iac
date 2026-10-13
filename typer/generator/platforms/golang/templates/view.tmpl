@@ -1,0 +1,19 @@
+func (r *RudderTyperAnalytics) {{ lower . }}(identity Identity, name string, properties analytics.Properties, mode categoryMode, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	if properties, err = o.withCategory(properties, mode); err != nil {
+		return err
+	}
+	return r.client.Enqueue(analytics.{{ . }}{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		Name:              name,
+		Properties:        properties,
+		Context:           o.analyticsContext(nil),
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	})
+}

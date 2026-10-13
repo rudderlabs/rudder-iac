@@ -18,8 +18,8 @@
 {{- with .QuickStart }}
 //	err := rt.{{ .Name }}(
 //		{{ $.PackageName }}.Identity{UserID: "user-123"},
-{{- with .Payload }}
-//		{{ $.PackageName }}.{{ with .Variant }}{{ index .Implementations 0 }}{{ else }}{{ .Name }}{{ end }}{ /* ... */ },
+{{- range .Example }}
+//		{{ . }},
 {{- end }}
 //	)
 {{- end }}

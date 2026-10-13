@@ -1,5 +1,7 @@
 package golang
 
+import "github.com/rudderlabs/rudder-iac/typer/plan"
+
 // GoContext holds every name, type expression and comment of the generated
 // file; the templates only lay them out.
 type GoContext struct {
@@ -17,6 +19,8 @@ type GoContext struct {
 	UsesRequired bool
 	// QuickStart is the method the package doc calls; nil when there is none.
 	QuickStart *GoMethod
+	// Helpers are the event types whose send helper a method calls.
+	Helpers map[string]bool
 	// The type sections, in file order. Each type is followed by the types it
 	// hoists.
 	CustomTypes   []GoDecl
@@ -54,8 +58,12 @@ type GoVariant struct {
 	// (value T, ok bool) when the discriminator is optional.
 	Result           string
 	DiscriminatorDoc string
-	// Payload interfaces also list ToProperties.
-	Payload bool
+	// Noun is set on event payload interfaces, which also list To{Noun}:
+	// Properties, or Traits for identify and group.
+	Noun string
+	// Category is set on page and screen payload interfaces, which also list
+	// categoryMode.
+	Category bool
 	// Implementations are the structs, in file order.
 	Implementations []string
 }
@@ -124,8 +132,10 @@ type GoStruct struct {
 	Name     string
 	Doc      string
 	MapAlias bool
-	// Payload structs also have ToProperties.
-	Payload bool
+	// Noun is set on event payloads: Properties, or Traits for identify and
+	// group. It names the To{Noun} method of a payload struct and the
+	// analytics map type it returns.
+	Noun string
 	// Open structs carry undeclared keys in AdditionalProperties.
 	Open bool
 	// DeclaredKeys are the wire keys the schema declares, which
@@ -146,6 +156,9 @@ type GoStruct struct {
 	// Sends is the discriminator value a case's toMap writes; empty for
 	// Absent, which sends none, and Default, whose field holds it.
 	Sends string
+	// CategoryMode is the categoryMode constant that a struct implementing a
+	// page or screen payload interface returns for its schema.
+	CategoryMode string
 }
 
 // GoField is a struct field, in byte order of its wire key.
@@ -166,9 +179,24 @@ type GoField struct {
 
 // GoMethod is an event method on RudderTyperAnalytics.
 type GoMethod struct {
-	Name  string
-	Doc   string
-	Event string
+	Name string
+	Doc  string
+	// Type is the event type; the quick start prefers a track method.
+	Type plan.EventType
 	// Payload is nil when the rule's schema is empty and closed.
 	Payload *GoStruct
+	// Params are the parameters between identity and opts, as declared.
+	Params []string
+	// Param names the payload parameter, and Var the map it converts to.
+	Param, Var string
+	// Pointer is set for an optional payload struct, passed by pointer.
+	Pointer bool
+	// CategoryMode is the categoryMode constant of a page or screen rule's
+	// schema, the base schema for variants, which a nil payload takes.
+	CategoryMode string
+	// Send is the send helper's call with Var, and OnNil what the method
+	// returns when there is no payload, or for a nil variant payload.
+	Send, OnNil string
+	// Example holds the arguments after identity that the quick start passes.
+	Example []string
 }

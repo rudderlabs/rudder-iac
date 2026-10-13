@@ -1,4 +1,4 @@
-{{- if .Methods }}
+{{- if .Helpers.track }}
 func (r *RudderTyperAnalytics) track(identity Identity, event string, properties analytics.Properties, opts []Option) error {
 	o, err := applyOptions(opts)
 	if err != nil {
@@ -9,6 +9,60 @@ func (r *RudderTyperAnalytics) track(identity Identity, event string, properties
 		AnonymousId:       identity.AnonymousID,
 		Event:             event,
 		Properties:        properties,
+		Context:           o.analyticsContext(nil),
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	})
+}
+{{- end }}
+{{- if .Helpers.identify }}
+
+// identify sends traits as the message's traits, or as context.traits when
+// the rule's identity section is context.traits.
+func (r *RudderTyperAnalytics) identify(identity Identity, traits analytics.Traits, inContext bool, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	msg := analytics.Identify{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	}
+	if inContext {
+		msg.Context = o.analyticsContext(traits)
+	} else {
+		msg.Context = o.analyticsContext(nil)
+		msg.Traits = traits
+	}
+	return r.client.Enqueue(msg)
+}
+{{- end }}
+{{- if .Helpers.page }}
+
+{{ template "view.tmpl" "Page" }}
+{{- end }}
+{{- if .Helpers.screen }}
+
+{{ template "view.tmpl" "Screen" }}
+{{- end }}
+{{- if .Helpers.group }}
+
+// group always sends traits as the message's traits: context.traits holds the
+// user's traits, not the group's.
+func (r *RudderTyperAnalytics) group(identity Identity, groupID string, traits analytics.Traits, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	return r.client.Enqueue(analytics.Group{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		GroupId:           groupID,
+		Traits:            traits,
 		Context:           o.analyticsContext(nil),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,
@@ -29,6 +83,40 @@ func rudderTyperContext() map[string]any {
 	}
 }
 {{ runtime }}
+{{- if or .Helpers.page .Helpers.screen }}
+
+// categoryMode says how a page or screen rule treats properties.category.
+type categoryMode int
+
+const (
+	categoryDeclared categoryMode = iota // the schema declares category
+	categoryOpen                         // undeclared, but the schema accepts extra keys
+	categoryClosed                       // undeclared, and the schema accepts no extra keys
+)
+
+// withCategory applies WithCategory. props is always a private copy, so it
+// can be modified in place.
+func (o callOptions) withCategory(props analytics.Properties, mode categoryMode) (analytics.Properties, error) {
+	if o.category == nil {
+		return props, nil
+	}
+	category := *o.category
+	if existing, ok := props["category"]; ok {
+		if existing == category {
+			return props, nil
+		}
+		return nil, fmt.Errorf("%w: WithCategory(%q) differs from properties.category %v", ErrCategoryConflict, category, existing)
+	}
+	if mode != categoryOpen {
+		return nil, fmt.Errorf("%w: WithCategory(%q) on a payload that does not accept an undeclared category", ErrCategoryConflict, category)
+	}
+	if props == nil {
+		props = analytics.Properties{}
+	}
+	props["category"] = category
+	return props, nil
+}
+{{- end }}
 {{- if .UsesWithAdditional }}
 
 // withAdditional starts an object from the keys of extra that the tracking

@@ -84,6 +84,7 @@ type callOptions struct {
 	integrations analytics.Integrations
 	timestamp    time.Time
 	messageID    string
+	category     *string // nil when WithCategory is not used
 }
 
 // WithAnalyticsContext sets the event context. Everything reachable from ctx
@@ -109,6 +110,17 @@ func WithTimestamp(t time.Time) Option {
 // WithMessageID sets the message ID. The SDK generates one when it is not set.
 func WithMessageID(id string) Option {
 	return func(o *callOptions) { o.messageID = id }
+}
+
+// WithCategory sets properties.category on page and screen calls; other calls
+// ignore it. If the payload holds a category, the option must equal it.
+// Otherwise the option is rejected when the schema declares category or is
+// closed, and added only when category is undeclared and the schema is open.
+// For variants, the selected struct's schema decides. A rejected option fails
+// the call with ErrCategoryConflict. An empty category counts as supplied and
+// is sent like any other value.
+func WithCategory(category string) Option {
+	return func(o *callOptions) { o.category = &category }
 }
 
 // --- Value helpers ---
@@ -497,6 +509,9 @@ func (v CustomTypeShippingDefault) MarshalJSON() ([]byte, error) {
 // Property1stPlace represents the property "1st_place".
 type Property1stPlace = int64
 
+// PropertyAccountType represents the property "accountType".
+type PropertyAccountType = string
+
 // PropertyAdditionalProperties represents the property "additionalProperties".
 type PropertyAdditionalProperties = string
 
@@ -522,6 +537,9 @@ type PropertyAppVersion = string
 // PropertyArray represents the property "array".
 type PropertyArray = []any
 
+// PropertyAuthor represents the property "author".
+type PropertyAuthor = string
+
 // PropertyBoolean represents the property "boolean".
 type PropertyBoolean = bool
 
@@ -531,8 +549,14 @@ type PropertyBrowser = string
 // PropertyCarrier represents the property "carrier".
 type PropertyCarrier = string
 
+// PropertyCategory represents the property "category".
+type PropertyCategory = string
+
 // PropertyCleared represents the property "cleared".
 type PropertyCleared = Null
+
+// PropertyCompanyName represents the property "companyName".
+type PropertyCompanyName = string
 
 // PropertyDeadline represents the property "deadline".
 type PropertyDeadline = string
@@ -546,8 +570,20 @@ type PropertyDiscriminator = string
 // PropertyEmail represents the property "email".
 type PropertyEmail = string
 
+// PropertyEmployeeCount represents the property "employeeCount".
+type PropertyEmployeeCount = int64
+
 // PropertyGrid represents the property "grid".
 type PropertyGrid = []CustomTypeRow
+
+// PropertyHeadline represents the property "headline".
+type PropertyHeadline = string
+
+// PropertyImages represents the property "images".
+type PropertyImages = int64
+
+// PropertyIndustry represents the property "industry".
+type PropertyIndustry = string
 
 // PropertyInteger represents the property "integer".
 type PropertyInteger = int64
@@ -612,6 +648,9 @@ type PropertyObject = map[string]any
 // PropertyOsVersion represents the property "osVersion".
 type PropertyOsVersion = string
 
+// PropertyPlan represents the property "plan".
+type PropertyPlan = string
+
 // PropertyPrice represents the property "price".
 type PropertyPrice = float64
 
@@ -623,6 +662,9 @@ type PropertyProductName = string
 
 // PropertyReleases represents the property "releases".
 type PropertyReleases = []CustomTypeRelease
+
+// PropertyScreenType represents the property "screenType".
+type PropertyScreenType = string
 
 // PropertyShipping represents the property "shipping".
 type PropertyShipping = CustomTypeShipping
@@ -846,8 +888,14 @@ func (u PropertyStringOrStrings) wireValue() (any, error) {
 // null is not a member.
 func (u PropertyStringOrStrings) MarshalJSON() ([]byte, error) { return marshal(u) }
 
+// PropertyTier represents the property "tier".
+type PropertyTier = string
+
 // PropertyToProperties represents the property "toProperties".
 type PropertyToProperties = string
+
+// PropertyToTraits represents the property "toTraits".
+type PropertyToTraits = string
 
 // PropertyType represents the property "type".
 type PropertyType = string
@@ -861,6 +909,9 @@ type PropertyUser = string
 // PropertyUserID represents the property "userId".
 type PropertyUserID = string
 
+// PropertyUserName represents the property "userName".
+type PropertyUserName = string
+
 // PropertyUserProfile represents the property "userProfile".
 type PropertyUserProfile = CustomTypeUserProfile
 
@@ -868,6 +919,579 @@ type PropertyUserProfile = CustomTypeUserProfile
 type PropertyUserID1 = string
 
 // --- Event payloads ---
+
+// GroupTraits holds the traits of the group event.
+type GroupTraits struct {
+	CompanyName   PropertyCompanyName    // required
+	EmployeeCount *PropertyEmployeeCount // optional
+	Industry      *PropertyIndustry      // optional
+}
+
+func (v GroupTraits) toMap() map[string]any {
+	m := map[string]any{
+		"companyName": v.CompanyName,
+	}
+	if v.EmployeeCount != nil {
+		m["employeeCount"] = *v.EmployeeCount
+	}
+	if v.Industry != nil {
+		m["industry"] = *v.Industry
+	}
+	return m
+}
+
+// ToTraits returns a deep copy of the traits as sent on the wire.
+func (v GroupTraits) ToTraits() (analytics.Traits, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v GroupTraits) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// GroupOpenTraits holds the traits of the group event "Open". The tracking plan declares no traits and allows any.
+type GroupOpenTraits = map[string]any
+
+// GroupVariantTraits holds the traits of the group event "Variant", a discriminated union on "tier". It is implemented by GroupVariantTraitsCaseEnterprise and GroupVariantTraitsDefault.
+type GroupVariantTraits interface {
+	json.Marshaler
+	// Discriminator returns the value of "tier".
+	Discriminator() PropertyTier
+	// ToTraits returns a deep copy of the traits as sent on the wire.
+	ToTraits() (analytics.Traits, error)
+	toMap() map[string]any
+	isGroupVariantTraits()
+}
+
+// GroupVariantTraitsCaseEnterprise is the case where tier is "enterprise".
+type GroupVariantTraitsCaseEnterprise struct {
+	EmployeeCount PropertyEmployeeCount // required
+}
+
+func (GroupVariantTraitsCaseEnterprise) isGroupVariantTraits() {}
+
+// Discriminator returns "enterprise".
+func (GroupVariantTraitsCaseEnterprise) Discriminator() PropertyTier { return "enterprise" }
+
+func (v GroupVariantTraitsCaseEnterprise) toMap() map[string]any {
+	m := map[string]any{
+		"tier":          v.Discriminator(),
+		"employeeCount": v.EmployeeCount,
+	}
+	return m
+}
+
+// ToTraits returns a deep copy of the traits as sent on the wire.
+func (v GroupVariantTraitsCaseEnterprise) ToTraits() (analytics.Traits, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v GroupVariantTraitsCaseEnterprise) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// GroupVariantTraitsDefault is the default case of GroupVariantTraits, for any tier other than "enterprise".
+type GroupVariantTraitsDefault struct {
+	Tier PropertyTier // required; not "enterprise"
+}
+
+func (GroupVariantTraitsDefault) isGroupVariantTraits() {}
+
+// Discriminator returns Tier.
+func (v GroupVariantTraitsDefault) Discriminator() PropertyTier { return v.Tier }
+
+func (v GroupVariantTraitsDefault) toMap() map[string]any {
+	m := map[string]any{
+		"tier": v.Tier,
+	}
+	return m
+}
+
+// ToTraits returns a deep copy of the traits as sent on the wire.
+func (v GroupVariantTraitsDefault) ToTraits() (analytics.Traits, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v GroupVariantTraitsDefault) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// IdentifyTraits holds the traits of the identify event.
+type IdentifyTraits struct {
+	Email    PropertyEmail     // required
+	Plan     *PropertyPlan     // optional
+	UserName *PropertyUserName // optional
+}
+
+func (v IdentifyTraits) toMap() map[string]any {
+	m := map[string]any{
+		"email": v.Email,
+	}
+	if v.Plan != nil {
+		m["plan"] = *v.Plan
+	}
+	if v.UserName != nil {
+		m["userName"] = *v.UserName
+	}
+	return m
+}
+
+// ToTraits returns a deep copy of the traits as sent on the wire.
+func (v IdentifyTraits) ToTraits() (analytics.Traits, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v IdentifyTraits) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// IdentifyOpenTraits holds the traits of the identify event "Open". The tracking plan declares no traits and allows any.
+type IdentifyOpenTraits = map[string]any
+
+// IdentifyVariantTraits holds the traits of the identify event "Variant", a discriminated union on "accountType". It is implemented by IdentifyVariantTraitsCaseBusiness and IdentifyVariantTraitsDefault.
+type IdentifyVariantTraits interface {
+	json.Marshaler
+	// Discriminator returns the value of "accountType".
+	Discriminator() PropertyAccountType
+	// ToTraits returns a deep copy of the traits as sent on the wire.
+	ToTraits() (analytics.Traits, error)
+	toMap() map[string]any
+	isIdentifyVariantTraits()
+}
+
+// IdentifyVariantTraitsCaseBusiness is the case where accountType is "business".
+type IdentifyVariantTraitsCaseBusiness struct {
+	CompanyName PropertyCompanyName // required
+	ToTraits1   *PropertyToTraits   // optional
+}
+
+func (IdentifyVariantTraitsCaseBusiness) isIdentifyVariantTraits() {}
+
+// Discriminator returns "business".
+func (IdentifyVariantTraitsCaseBusiness) Discriminator() PropertyAccountType { return "business" }
+
+func (v IdentifyVariantTraitsCaseBusiness) toMap() map[string]any {
+	m := map[string]any{
+		"accountType": v.Discriminator(),
+		"companyName": v.CompanyName,
+	}
+	if v.ToTraits1 != nil {
+		m["toTraits"] = *v.ToTraits1
+	}
+	return m
+}
+
+// ToTraits returns a deep copy of the traits as sent on the wire.
+func (v IdentifyVariantTraitsCaseBusiness) ToTraits() (analytics.Traits, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v IdentifyVariantTraitsCaseBusiness) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// IdentifyVariantTraitsDefault is the default case of IdentifyVariantTraits, for any accountType other than "business".
+type IdentifyVariantTraitsDefault struct {
+	AccountType PropertyAccountType // required; not "business"
+	ToTraits1   *PropertyToTraits   // optional
+}
+
+func (IdentifyVariantTraitsDefault) isIdentifyVariantTraits() {}
+
+// Discriminator returns AccountType.
+func (v IdentifyVariantTraitsDefault) Discriminator() PropertyAccountType { return v.AccountType }
+
+func (v IdentifyVariantTraitsDefault) toMap() map[string]any {
+	m := map[string]any{
+		"accountType": v.AccountType,
+	}
+	if v.ToTraits1 != nil {
+		m["toTraits"] = *v.ToTraits1
+	}
+	return m
+}
+
+// ToTraits returns a deep copy of the traits as sent on the wire.
+func (v IdentifyVariantTraitsDefault) ToTraits() (analytics.Traits, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v IdentifyVariantTraitsDefault) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// PageProperties holds the properties of the page event.
+type PageProperties struct {
+	Price                *PropertyPrice       // optional
+	ProductID            PropertyProductID    // required
+	ProductName          *PropertyProductName // optional
+	AdditionalProperties map[string]any       // optional; undeclared keys only
+}
+
+func (v PageProperties) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "price", "productId", "productName")
+	if v.Price != nil {
+		m["price"] = *v.Price
+	}
+	m["productId"] = v.ProductID
+	if v.ProductName != nil {
+		m["productName"] = *v.ProductName
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v PageProperties) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v PageProperties) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// PageCategoryVariantProperties holds the properties of the page event "Category Variant", a discriminated union on the optional "category". It is implemented by PageCategoryVariantPropertiesAbsent, PageCategoryVariantPropertiesCaseNews and PageCategoryVariantPropertiesDefault.
+type PageCategoryVariantProperties interface {
+	json.Marshaler
+	// Discriminator returns the value of "category"; ok is false when it is absent.
+	Discriminator() (value PropertyCategory, ok bool)
+	// ToProperties returns a deep copy of the properties as sent on the wire.
+	ToProperties() (analytics.Properties, error)
+	categoryMode() categoryMode
+	toMap() map[string]any
+	isPageCategoryVariantProperties()
+}
+
+// PageCategoryVariantPropertiesAbsent is the case where "category" is absent. It holds the base properties only.
+type PageCategoryVariantPropertiesAbsent struct{}
+
+func (PageCategoryVariantPropertiesAbsent) isPageCategoryVariantProperties() {}
+
+// Discriminator reports that "category" is absent.
+func (PageCategoryVariantPropertiesAbsent) Discriminator() (value PropertyCategory, ok bool) {
+	return value, false
+}
+
+func (PageCategoryVariantPropertiesAbsent) categoryMode() categoryMode { return categoryDeclared }
+
+func (v PageCategoryVariantPropertiesAbsent) toMap() map[string]any {
+	m := map[string]any{}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v PageCategoryVariantPropertiesAbsent) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v PageCategoryVariantPropertiesAbsent) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// PageCategoryVariantPropertiesCaseNews is the case where category is "news".
+type PageCategoryVariantPropertiesCaseNews struct {
+	Headline PropertyHeadline // required
+}
+
+func (PageCategoryVariantPropertiesCaseNews) isPageCategoryVariantProperties() {}
+
+// Discriminator returns "news".
+func (PageCategoryVariantPropertiesCaseNews) Discriminator() (value PropertyCategory, ok bool) {
+	return "news", true
+}
+
+func (PageCategoryVariantPropertiesCaseNews) categoryMode() categoryMode { return categoryDeclared }
+
+func (v PageCategoryVariantPropertiesCaseNews) toMap() map[string]any {
+	m := map[string]any{
+		"category": "news",
+		"headline": v.Headline,
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v PageCategoryVariantPropertiesCaseNews) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v PageCategoryVariantPropertiesCaseNews) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// PageCategoryVariantPropertiesDefault is the default case of PageCategoryVariantProperties, for any category other than "news".
+type PageCategoryVariantPropertiesDefault struct {
+	Category PropertyCategory // required; not "news"
+}
+
+func (PageCategoryVariantPropertiesDefault) isPageCategoryVariantProperties() {}
+
+// Discriminator returns Category.
+func (v PageCategoryVariantPropertiesDefault) Discriminator() (value PropertyCategory, ok bool) {
+	return v.Category, true
+}
+
+func (PageCategoryVariantPropertiesDefault) categoryMode() categoryMode { return categoryDeclared }
+
+func (v PageCategoryVariantPropertiesDefault) toMap() map[string]any {
+	m := map[string]any{
+		"category": v.Category,
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v PageCategoryVariantPropertiesDefault) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v PageCategoryVariantPropertiesDefault) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// PageCategoryProperties holds the properties of the page event "Category".
+type PageCategoryProperties struct {
+	Category *PropertyCategory // optional
+}
+
+func (v PageCategoryProperties) toMap() map[string]any {
+	m := map[string]any{}
+	if v.Category != nil {
+		m["category"] = *v.Category
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v PageCategoryProperties) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v PageCategoryProperties) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// PageKindVariantProperties holds the properties of the page event "Kind Variant", a discriminated union on "kind". It is implemented by PageKindVariantPropertiesCaseArticle, PageKindVariantPropertiesCaseGallery and PageKindVariantPropertiesDefault.
+type PageKindVariantProperties interface {
+	json.Marshaler
+	// Discriminator returns the value of "kind".
+	Discriminator() PropertyKind
+	// ToProperties returns a deep copy of the properties as sent on the wire.
+	ToProperties() (analytics.Properties, error)
+	categoryMode() categoryMode
+	toMap() map[string]any
+	isPageKindVariantProperties()
+}
+
+// PageKindVariantPropertiesCaseArticle is the case where kind is "article".
+type PageKindVariantPropertiesCaseArticle struct {
+	Author               *PropertyAuthor // optional
+	AdditionalProperties map[string]any  // optional; undeclared keys only
+}
+
+func (PageKindVariantPropertiesCaseArticle) isPageKindVariantProperties() {}
+
+// Discriminator returns "article".
+func (PageKindVariantPropertiesCaseArticle) Discriminator() PropertyKind { return "article" }
+
+func (PageKindVariantPropertiesCaseArticle) categoryMode() categoryMode { return categoryOpen }
+
+func (v PageKindVariantPropertiesCaseArticle) toMap() map[string]any {
+	m := withAdditional(v.AdditionalProperties, "author", "kind")
+	m["kind"] = v.Discriminator()
+	if v.Author != nil {
+		m["author"] = *v.Author
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v PageKindVariantPropertiesCaseArticle) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v PageKindVariantPropertiesCaseArticle) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// PageKindVariantPropertiesCaseGallery is the case where kind is "gallery".
+type PageKindVariantPropertiesCaseGallery struct {
+	Images *PropertyImages // optional
+}
+
+func (PageKindVariantPropertiesCaseGallery) isPageKindVariantProperties() {}
+
+// Discriminator returns "gallery".
+func (PageKindVariantPropertiesCaseGallery) Discriminator() PropertyKind { return "gallery" }
+
+func (PageKindVariantPropertiesCaseGallery) categoryMode() categoryMode { return categoryClosed }
+
+func (v PageKindVariantPropertiesCaseGallery) toMap() map[string]any {
+	m := map[string]any{
+		"kind": v.Discriminator(),
+	}
+	if v.Images != nil {
+		m["images"] = *v.Images
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v PageKindVariantPropertiesCaseGallery) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v PageKindVariantPropertiesCaseGallery) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// PageKindVariantPropertiesDefault is the default case of PageKindVariantProperties, for any kind other than "article" and "gallery".
+type PageKindVariantPropertiesDefault struct {
+	Kind PropertyKind // required; not "article" or "gallery"
+}
+
+func (PageKindVariantPropertiesDefault) isPageKindVariantProperties() {}
+
+// Discriminator returns Kind.
+func (v PageKindVariantPropertiesDefault) Discriminator() PropertyKind { return v.Kind }
+
+func (PageKindVariantPropertiesDefault) categoryMode() categoryMode { return categoryClosed }
+
+func (v PageKindVariantPropertiesDefault) toMap() map[string]any {
+	m := map[string]any{
+		"kind": v.Kind,
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v PageKindVariantPropertiesDefault) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v PageKindVariantPropertiesDefault) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// PageOpenProperties holds the properties of the page event "Open". The tracking plan declares no properties and allows any.
+type PageOpenProperties = map[string]any
+
+// ScreenProperties holds the properties of the screen event.
+type ScreenProperties struct {
+	Price       *PropertyPrice       // optional
+	ProductID   PropertyProductID    // required
+	ProductName *PropertyProductName // optional
+}
+
+func (v ScreenProperties) toMap() map[string]any {
+	m := map[string]any{
+		"productId": v.ProductID,
+	}
+	if v.Price != nil {
+		m["price"] = *v.Price
+	}
+	if v.ProductName != nil {
+		m["productName"] = *v.ProductName
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v ScreenProperties) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v ScreenProperties) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// ScreenOpenProperties holds the properties of the screen event "Open". The tracking plan declares no properties and allows any.
+type ScreenOpenProperties = map[string]any
+
+// ScreenVariantProperties holds the properties of the screen event "Variant", a discriminated union on "screenType". It is implemented by ScreenVariantPropertiesCaseProduct and ScreenVariantPropertiesDefault.
+type ScreenVariantProperties interface {
+	json.Marshaler
+	// Discriminator returns the value of "screenType".
+	Discriminator() PropertyScreenType
+	// ToProperties returns a deep copy of the properties as sent on the wire.
+	ToProperties() (analytics.Properties, error)
+	categoryMode() categoryMode
+	toMap() map[string]any
+	isScreenVariantProperties()
+}
+
+// ScreenVariantPropertiesCaseProduct is the case where screenType is "product".
+type ScreenVariantPropertiesCaseProduct struct {
+	ProductID PropertyProductID // required
+}
+
+func (ScreenVariantPropertiesCaseProduct) isScreenVariantProperties() {}
+
+// Discriminator returns "product".
+func (ScreenVariantPropertiesCaseProduct) Discriminator() PropertyScreenType { return "product" }
+
+func (ScreenVariantPropertiesCaseProduct) categoryMode() categoryMode { return categoryClosed }
+
+func (v ScreenVariantPropertiesCaseProduct) toMap() map[string]any {
+	m := map[string]any{
+		"screenType": v.Discriminator(),
+		"productId":  v.ProductID,
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v ScreenVariantPropertiesCaseProduct) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v ScreenVariantPropertiesCaseProduct) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+
+// ScreenVariantPropertiesDefault is the default case of ScreenVariantProperties, for any screenType other than "product".
+type ScreenVariantPropertiesDefault struct {
+	ScreenType PropertyScreenType // required; not "product"
+}
+
+func (ScreenVariantPropertiesDefault) isScreenVariantProperties() {}
+
+// Discriminator returns ScreenType.
+func (v ScreenVariantPropertiesDefault) Discriminator() PropertyScreenType { return v.ScreenType }
+
+func (ScreenVariantPropertiesDefault) categoryMode() categoryMode { return categoryClosed }
+
+func (v ScreenVariantPropertiesDefault) toMap() map[string]any {
+	m := map[string]any{
+		"screenType": v.ScreenType,
+	}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v ScreenVariantPropertiesDefault) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v ScreenVariantPropertiesDefault) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
 
 // TrackEventWithNameCamelCaseProperties holds the properties of "$eventWithNameCamelCase$!".
 type TrackEventWithNameCamelCaseProperties struct {
@@ -1759,6 +2383,180 @@ func (v TrackEventWithNameCamelCaseProperties1) MarshalJSON() ([]byte, error) {
 
 // --- Events ---
 
+// Group sends the group event. traits may be nil, which sends no traits.
+//
+// Associates user with their company.
+func (r *RudderTyperAnalytics) Group(identity Identity, groupID string, traits *GroupTraits, opts ...Option) error {
+	var t analytics.Traits
+	if traits != nil {
+		var err error
+		if t, err = traits.ToTraits(); err != nil {
+			return err
+		}
+	}
+	return r.group(identity, groupID, t, opts)
+}
+
+// Group1 sends the group event "Open". traits may be nil; it is copied, so it can be reused after the call.
+func (r *RudderTyperAnalytics) Group1(identity Identity, groupID string, traits GroupOpenTraits, opts ...Option) error {
+	t, err := snapshot(traits)
+	if err != nil {
+		return err
+	}
+	return r.group(identity, groupID, t, opts)
+}
+
+// Group2 sends the group event "Variant". traits may be nil, including a nil pointer, which sends no traits.
+func (r *RudderTyperAnalytics) Group2(identity Identity, groupID string, traits GroupVariantTraits, opts ...Option) error {
+	if isNil(traits) {
+		return r.group(identity, groupID, nil, opts)
+	}
+	t, err := traits.ToTraits()
+	if err != nil {
+		return err
+	}
+	return r.group(identity, groupID, t, opts)
+}
+
+// Identify sends the identify event. traits may be nil, which sends no traits.
+//
+// Identifies a user with their traits.
+func (r *RudderTyperAnalytics) Identify(identity Identity, traits *IdentifyTraits, opts ...Option) error {
+	var t analytics.Traits
+	if traits != nil {
+		var err error
+		if t, err = traits.ToTraits(); err != nil {
+			return err
+		}
+	}
+	return r.identify(identity, t, false, opts)
+}
+
+// Identify1 sends the identify event "Open". traits may be nil; it is copied, so it can be reused after the call.
+func (r *RudderTyperAnalytics) Identify1(identity Identity, traits IdentifyOpenTraits, opts ...Option) error {
+	t, err := snapshot(traits)
+	if err != nil {
+		return err
+	}
+	return r.identify(identity, t, false, opts)
+}
+
+// Identify2 sends the identify event "Variant". traits may be nil, including a nil pointer, which sends no traits. The traits are sent as context.traits, where they win over the traits WithAnalyticsContext sets.
+func (r *RudderTyperAnalytics) Identify2(identity Identity, traits IdentifyVariantTraits, opts ...Option) error {
+	if isNil(traits) {
+		return r.identify(identity, nil, true, opts)
+	}
+	t, err := traits.ToTraits()
+	if err != nil {
+		return err
+	}
+	return r.identify(identity, t, true, opts)
+}
+
+// Page sends the page event. name is the page name; "" sends none. props may be nil, which sends no properties. Use WithCategory to set the page category.
+//
+// User viewed a product page.
+func (r *RudderTyperAnalytics) Page(identity Identity, name string, props *PageProperties, opts ...Option) error {
+	var p analytics.Properties
+	if props != nil {
+		var err error
+		if p, err = props.ToProperties(); err != nil {
+			return err
+		}
+	}
+	return r.page(identity, name, p, categoryOpen, opts)
+}
+
+// PageCategoryVariant sends the page event "Category Variant". name is the page name; "" sends none. props may be nil, including a nil pointer, which sends no properties. WithCategory is checked against the schema of the struct in props, or the base schema when props is nil.
+func (r *RudderTyperAnalytics) PageCategoryVariant(identity Identity, name string, props PageCategoryVariantProperties, opts ...Option) error {
+	if isNil(props) {
+		return r.page(identity, name, nil, categoryDeclared, opts)
+	}
+	p, err := props.ToProperties()
+	if err != nil {
+		return err
+	}
+	return r.page(identity, name, p, props.categoryMode(), opts)
+}
+
+// PageCategory sends the page event "Category". name is the page name; "" sends none. props may be nil, which sends no properties. This rule declares a category, so set it in props; WithCategory must equal it.
+func (r *RudderTyperAnalytics) PageCategory(identity Identity, name string, props *PageCategoryProperties, opts ...Option) error {
+	var p analytics.Properties
+	if props != nil {
+		var err error
+		if p, err = props.ToProperties(); err != nil {
+			return err
+		}
+	}
+	return r.page(identity, name, p, categoryDeclared, opts)
+}
+
+// PageEmpty sends the page event "Empty", which has no properties. name is the page name; "" sends none. This rule neither declares a category nor accepts undeclared properties, so WithCategory fails with ErrCategoryConflict.
+func (r *RudderTyperAnalytics) PageEmpty(identity Identity, name string, opts ...Option) error {
+	return r.page(identity, name, nil, categoryClosed, opts)
+}
+
+// PageKindVariant sends the page event "Kind Variant". name is the page name; "" sends none. props may be nil, including a nil pointer, which sends no properties. WithCategory is checked against the schema of the struct in props, or the base schema when props is nil.
+func (r *RudderTyperAnalytics) PageKindVariant(identity Identity, name string, props PageKindVariantProperties, opts ...Option) error {
+	if isNil(props) {
+		return r.page(identity, name, nil, categoryOpen, opts)
+	}
+	p, err := props.ToProperties()
+	if err != nil {
+		return err
+	}
+	return r.page(identity, name, p, props.categoryMode(), opts)
+}
+
+// PageOpen sends the page event "Open". name is the page name; "" sends none. props may be nil; it is copied, so it can be reused after the call. Use WithCategory to set the page category.
+func (r *RudderTyperAnalytics) PageOpen(identity Identity, name string, props PageOpenProperties, opts ...Option) error {
+	p, err := snapshot(props)
+	if err != nil {
+		return err
+	}
+	return r.page(identity, name, p, categoryOpen, opts)
+}
+
+// Screen sends the screen event. name is the screen name; "" sends none. props may be nil, which sends no properties. This rule neither declares a category nor accepts undeclared properties, so WithCategory fails with ErrCategoryConflict.
+//
+// User viewed a product screen.
+func (r *RudderTyperAnalytics) Screen(identity Identity, name string, props *ScreenProperties, opts ...Option) error {
+	var p analytics.Properties
+	if props != nil {
+		var err error
+		if p, err = props.ToProperties(); err != nil {
+			return err
+		}
+	}
+	return r.screen(identity, name, p, categoryClosed, opts)
+}
+
+// ScreenEmpty sends the screen event "Empty", which has no properties. name is the screen name; "" sends none. This rule neither declares a category nor accepts undeclared properties, so WithCategory fails with ErrCategoryConflict.
+func (r *RudderTyperAnalytics) ScreenEmpty(identity Identity, name string, opts ...Option) error {
+	return r.screen(identity, name, nil, categoryClosed, opts)
+}
+
+// ScreenOpen sends the screen event "Open". name is the screen name; "" sends none. props may be nil; it is copied, so it can be reused after the call. Use WithCategory to set the screen category.
+func (r *RudderTyperAnalytics) ScreenOpen(identity Identity, name string, props ScreenOpenProperties, opts ...Option) error {
+	p, err := snapshot(props)
+	if err != nil {
+		return err
+	}
+	return r.screen(identity, name, p, categoryOpen, opts)
+}
+
+// ScreenVariant sends the screen event "Variant". name is the screen name; "" sends none. props may be nil, including a nil pointer, which sends no properties. WithCategory is checked against the schema of the struct in props, or the base schema when props is nil.
+func (r *RudderTyperAnalytics) ScreenVariant(identity Identity, name string, props ScreenVariantProperties, opts ...Option) error {
+	if isNil(props) {
+		return r.screen(identity, name, nil, categoryClosed, opts)
+	}
+	p, err := props.ToProperties()
+	if err != nil {
+		return err
+	}
+	return r.screen(identity, name, p, props.categoryMode(), opts)
+}
+
 // TrackEventWithNameCamelCase sends the track event "$eventWithNameCamelCase$!".
 func (r *RudderTyperAnalytics) TrackEventWithNameCamelCase(identity Identity, props TrackEventWithNameCamelCaseProperties, opts ...Option) error {
 	p, err := props.ToProperties()
@@ -1922,6 +2720,88 @@ func (r *RudderTyperAnalytics) track(identity Identity, event string, properties
 		AnonymousId:       identity.AnonymousID,
 		Event:             event,
 		Properties:        properties,
+		Context:           o.analyticsContext(nil),
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	})
+}
+
+// identify sends traits as the message's traits, or as context.traits when
+// the rule's identity section is context.traits.
+func (r *RudderTyperAnalytics) identify(identity Identity, traits analytics.Traits, inContext bool, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	msg := analytics.Identify{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	}
+	if inContext {
+		msg.Context = o.analyticsContext(traits)
+	} else {
+		msg.Context = o.analyticsContext(nil)
+		msg.Traits = traits
+	}
+	return r.client.Enqueue(msg)
+}
+
+func (r *RudderTyperAnalytics) page(identity Identity, name string, properties analytics.Properties, mode categoryMode, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	if properties, err = o.withCategory(properties, mode); err != nil {
+		return err
+	}
+	return r.client.Enqueue(analytics.Page{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		Name:              name,
+		Properties:        properties,
+		Context:           o.analyticsContext(nil),
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	})
+}
+
+func (r *RudderTyperAnalytics) screen(identity Identity, name string, properties analytics.Properties, mode categoryMode, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	if properties, err = o.withCategory(properties, mode); err != nil {
+		return err
+	}
+	return r.client.Enqueue(analytics.Screen{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		Name:              name,
+		Properties:        properties,
+		Context:           o.analyticsContext(nil),
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	})
+}
+
+// group always sends traits as the message's traits: context.traits holds the
+// user's traits, not the group's.
+func (r *RudderTyperAnalytics) group(identity Identity, groupID string, traits analytics.Traits, opts []Option) error {
+	o, err := applyOptions(opts)
+	if err != nil {
+		return err
+	}
+	return r.client.Enqueue(analytics.Group{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		GroupId:           groupID,
+		Traits:            traits,
 		Context:           o.analyticsContext(nil),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,
@@ -2299,6 +3179,38 @@ func isNil(v any) bool {
 	}
 	rv := reflect.ValueOf(v)
 	return rv.Kind() == reflect.Pointer && rv.IsNil()
+}
+
+// categoryMode says how a page or screen rule treats properties.category.
+type categoryMode int
+
+const (
+	categoryDeclared categoryMode = iota // the schema declares category
+	categoryOpen                         // undeclared, but the schema accepts extra keys
+	categoryClosed                       // undeclared, and the schema accepts no extra keys
+)
+
+// withCategory applies WithCategory. props is always a private copy, so it
+// can be modified in place.
+func (o callOptions) withCategory(props analytics.Properties, mode categoryMode) (analytics.Properties, error) {
+	if o.category == nil {
+		return props, nil
+	}
+	category := *o.category
+	if existing, ok := props["category"]; ok {
+		if existing == category {
+			return props, nil
+		}
+		return nil, fmt.Errorf("%w: WithCategory(%q) differs from properties.category %v", ErrCategoryConflict, category, existing)
+	}
+	if mode != categoryOpen {
+		return nil, fmt.Errorf("%w: WithCategory(%q) on a payload that does not accept an undeclared category", ErrCategoryConflict, category)
+	}
+	if props == nil {
+		props = analytics.Properties{}
+	}
+	props["category"] = category
+	return props, nil
 }
 
 // withAdditional starts an object from the keys of extra that the tracking

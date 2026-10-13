@@ -35,6 +35,7 @@ func render(ctx *GoContext) (string, error) {
 		"quote":   strconv.Quote,
 		"comment": comment,
 		"inline":  inlineComment,
+		"lower":   strings.ToLower,
 		"runtime": func() string { return runtimeSource },
 	}).ParseFS(templateFS, "templates/*.tmpl")
 	if err != nil {

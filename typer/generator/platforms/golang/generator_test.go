@@ -16,20 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The reference plan uses constructs the generator does not support yet; each
-// one it leaves out must be reported.
-var referenceWarnings = []string{
-	`skipping the group rule (section "context.traits"): Go generation does not support group events yet`,
-	`skipping the identify rule (section "traits"): Go generation does not support identify events yet`,
-	`skipping the page rule (section "properties"): Go generation does not support page events yet`,
-	`skipping the screen rule (section "properties"): Go generation does not support screen events yet`,
-}
-
+// Every golden plan is generated whole: a rule left out would be reported.
 func TestGenerateGoldens(t *testing.T) {
-	wantWarnings := map[string][]string{
-		"testdata/validator/ruddertyper/ruddertyper.go": referenceWarnings,
-		"testdata/validator/examples/ruddertyper.go":    nil,
-	}
 	runtimeFile, err := parser.ParseFile(token.NewFileSet(), "internal/runtime/runtime.go", nil, parser.ImportsOnly)
 	require.NoError(t, err)
 
@@ -46,7 +34,7 @@ func TestGenerateGoldens(t *testing.T) {
 			want, err := os.ReadFile(golden.Path)
 			require.NoError(t, err)
 			assert.Equal(t, string(want), files[0].Content, "generated content does not match %s; run 'make typer-go-update-testdata' to update the goldens", golden.Path)
-			assert.Equal(t, wantWarnings[golden.Path], *warnings)
+			assert.Empty(t, *warnings)
 			// The runtime package's tests cover the generated runtime only
 			// while it is emitted unchanged.
 			assert.Contains(t, files[0].Content, golang.RuntimeSource)
@@ -154,6 +142,11 @@ func TestGenerateQuickStart(t *testing.T) {
 	}
 	variantRule := rule("A", map[string]plan.PropertySchema{"name": {Property: stringProperty.Property, Required: true}})
 	variantRule.Variants = []plan.Variant{{Discriminator: "name", Cases: []plan.VariantCase{{Match: []any{"on"}}}}}
+	groupRule := plan.EventRule{
+		Event:   plan.Event{EventType: plan.EventTypeGroup},
+		Section: plan.IdentitySectionTraits,
+		Schema:  plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"name": stringProperty}},
+	}
 
 	tests := []struct {
 		name  string
@@ -174,6 +167,16 @@ func TestGenerateQuickStart(t *testing.T) {
 			"first method when no payload declares a property",
 			[]plan.EventRule{rule("A", nil), rule("B", nil)},
 			"//\terr := rt.TrackA(\n",
+		},
+		{
+			"track payload that declares a property after a group payload that does",
+			[]plan.EventRule{groupRule, rule("B", map[string]plan.PropertySchema{"name": stringProperty})},
+			"//\terr := rt.TrackB(\n",
+		},
+		{
+			"first method without a track payload that declares a property, with its other arguments",
+			[]plan.EventRule{groupRule, rule("A", nil)},
+			"//\terr := rt.Group(\n//\t\truddertyper.Identity{UserID: \"user-123\"},\n//\t\t\"group-123\",\n//\t\t&ruddertyper.GroupTraits{ /* ... */ },\n//\t)\n",
 		},
 	}
 

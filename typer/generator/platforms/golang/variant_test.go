@@ -310,14 +310,14 @@ func TestGenerateVariantOptionalDiscriminator(t *testing.T) {
 		Key:              "kind",
 		Result:           "(value PropertyKind, ok bool)",
 		DiscriminatorDoc: `Discriminator returns the value of "kind"; ok is false when it is absent.`,
-		Payload:          true,
+		Noun:             "Properties",
 		Implementations:  []string{"TrackSomeEventPropertiesAbsent", "TrackSomeEventPropertiesCaseA", "TrackSomeEventPropertiesDefault"},
 	}, variant)
 	assert.Equal(t, []*GoStruct{
 		{
 			Name:             "TrackSomeEventPropertiesAbsent",
 			Doc:              `TrackSomeEventPropertiesAbsent is the case where "kind" is absent. It holds the base properties only.`,
-			Payload:          true,
+			Noun:             "Properties",
 			DeclaredKeys:     []string{"kind"},
 			Variant:          variant,
 			DiscriminatorDoc: `Discriminator reports that "kind" is absent.`,
@@ -326,7 +326,7 @@ func TestGenerateVariantOptionalDiscriminator(t *testing.T) {
 		{
 			Name:             "TrackSomeEventPropertiesCaseA",
 			Doc:              `TrackSomeEventPropertiesCaseA is the case where kind is "a".`,
-			Payload:          true,
+			Noun:             "Properties",
 			DeclaredKeys:     []string{"kind"},
 			Variant:          variant,
 			DiscriminatorDoc: `Discriminator returns "a".`,
@@ -336,7 +336,7 @@ func TestGenerateVariantOptionalDiscriminator(t *testing.T) {
 		{
 			Name:             "TrackSomeEventPropertiesDefault",
 			Doc:              `TrackSomeEventPropertiesDefault is the default case of TrackSomeEventProperties, for any kind other than "a".`,
-			Payload:          true,
+			Noun:             "Properties",
 			DeclaredKeys:     []string{"kind"},
 			Fields:           []GoField{{Name: "Kind", Key: "kind", Type: "PropertyKind", Required: true, Note: `not "a"`}},
 			Variant:          variant,
