@@ -12,11 +12,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang/testdata/validator/ruddertyper"
 )
 
-// messageJSON is the whole typ message of a call for user-123 whose context
-// holds only ruddertyper, with fields, the message's other keys, appended
-// after userId.
+// messageJSON is the whole typ message of a call by user-123 and anon-1 whose
+// context holds only ruddertyper, with fields, the message's other keys,
+// appended after anonymousId.
 func messageJSON(meta, typ, fields string) string {
-	return fmt.Sprintf(`{"type": %q, "channel": "server", "userId": "user-123"%s, "context": {"ruddertyper": %s}}`, typ, fields, meta)
+	return fmt.Sprintf(`{"type": %q, "channel": "server", "userId": "user-123", "anonymousId": "anon-1"%s, "context": {"ruddertyper": %s}}`, typ, fields, meta)
 }
 
 // Each row's name starts with the golden whose wrapper it calls.
@@ -26,10 +26,10 @@ func TestNonTrackWire(t *testing.T) {
 		ref        *ruddertyper.RudderTyperAnalytics
 		sections   *identitysections.RudderTyperAnalytics
 		empty      *emptyidentity.RudderTyperAnalytics
-		id         = examples.Identity{UserID: "user-123"}
-		refID      = ruddertyper.Identity{UserID: "user-123"}
-		sectionsID = identitysections.Identity{UserID: "user-123"}
-		emptyID    = emptyidentity.Identity{UserID: "user-123"}
+		id         = examples.Identity{UserID: "user-123", AnonymousID: "anon-1"}
+		refID      = ruddertyper.Identity{UserID: "user-123", AnonymousID: "anon-1"}
+		sectionsID = identitysections.Identity{UserID: "user-123", AnonymousID: "anon-1"}
+		emptyID    = emptyidentity.Identity{UserID: "user-123", AnonymousID: "anon-1"}
 	)
 
 	rows := []wireRow{
@@ -46,7 +46,7 @@ func TestNonTrackWire(t *testing.T) {
 				return sections.Identify(sectionsID, &identitysections.IdentifyTraits{Email: "new@b.c"},
 					identitysections.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"email": "old@b.c", "plan": "free"}}))
 			},
-			want: `{"type": "identify", "channel": "server", "userId": "user-123",
+			want: `{"type": "identify", "channel": "server", "userId": "user-123", "anonymousId": "anon-1",
 				"context": {"traits": {"email": "new@b.c", "plan": "free"}, "ruddertyper": ` + sectionsMeta + `}}`,
 		},
 		{
@@ -62,7 +62,7 @@ func TestNonTrackWire(t *testing.T) {
 				return ref.Group(refID, "g1", &ruddertyper.GroupTraits{Active: true},
 					ruddertyper.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"active": false, "plan": "pro"}}))
 			},
-			want: `{"type": "group", "channel": "server", "userId": "user-123", "groupId": "g1", "traits": {"active": true},
+			want: `{"type": "group", "channel": "server", "userId": "user-123", "anonymousId": "anon-1", "groupId": "g1", "traits": {"active": true},
 				"context": {"traits": {"active": false, "plan": "pro"}, "ruddertyper": ` + refMeta + `}}`,
 		},
 		{
@@ -70,7 +70,7 @@ func TestNonTrackWire(t *testing.T) {
 			call: func() error {
 				return empty.Identify(emptyID, emptyidentity.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"plan": "pro"}}))
 			},
-			want: `{"type": "identify", "channel": "server", "userId": "user-123",
+			want: `{"type": "identify", "channel": "server", "userId": "user-123", "anonymousId": "anon-1",
 				"context": {"traits": {"plan": "pro"}, "ruddertyper": ` + emptyIdentityMeta + `}}`,
 		},
 		{
@@ -78,7 +78,7 @@ func TestNonTrackWire(t *testing.T) {
 			call: func() error {
 				return empty.Group(emptyID, "g1", emptyidentity.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"plan": "pro"}}))
 			},
-			want: `{"type": "group", "channel": "server", "userId": "user-123", "groupId": "g1",
+			want: `{"type": "group", "channel": "server", "userId": "user-123", "anonymousId": "anon-1", "groupId": "g1",
 				"context": {"traits": {"plan": "pro"}, "ruddertyper": ` + emptyIdentityMeta + `}}`,
 		},
 		{
@@ -283,7 +283,7 @@ func TestNonTrackWire(t *testing.T) {
 			call: func() error {
 				return ex.Identify2(id, examples.IdentifyVariantTraitsCaseBusiness{CompanyName: "Acme"})
 			},
-			want: `{"type": "identify", "channel": "server", "userId": "user-123",
+			want: `{"type": "identify", "channel": "server", "userId": "user-123", "anonymousId": "anon-1",
 				"context": {"traits": {"accountType": "business", "companyName": "Acme"}, "ruddertyper": ` + exMeta + `}}`,
 		},
 		{
