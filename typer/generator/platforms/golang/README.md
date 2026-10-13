@@ -9,6 +9,7 @@ Generates a type-safe Go package for a tracking plan on top of analytics-go. Eac
 - The output is one file, `ruddertyper.go` in package `ruddertyper`; the `outputFileName` and `packageName` options rename them ([Generator Options][spec]). `--output` (`-o`) sets its directory, `.` by default: point it at the package's own directory, such as `-o internal/ruddertyper`.
 - Never edit the file; regenerate it after every tracking plan change ([Generated File Structure][spec]).
 - It needs Go 1.21 or later and analytics-go v4.2.2 or later, imported as `analytics "github.com/rudderlabs/analytics-go/v4"` ([Target Versions][spec]).
+- Go fails generation on some plan shapes that other platforms accept, such as one match value in two cases of a variant ([Plan Shapes That Fail Generation][appendix]).
 
 ## Wiring
 
@@ -28,6 +29,7 @@ user := ruddertyper.Identity{UserID: "user-123"}
 
 - Every method takes an `Identity` first. Set `UserID`, `AnonymousID` or both: the SDK keeps no current user and rejects a call that sets neither ([Generated File Structure][spec]).
 - Payloads are generated types. For a struct payload, track takes a value and page, screen, identify and group take a pointer (`nil` sends no payload); variant and open-map payloads are passed as is. An event whose rule allows no properties has no payload parameter ([Event Types][spec]).
+- Generated names come from the plan: `Track{Event}` takes a `Track{Event}Properties`, custom types are `CustomType{Name}` and variant cases `{Type}Case{Match}`. A name already taken gets a numeric suffix, such as `Identify1` for a second identify rule ([Naming Conventions][spec]).
 - Required fields hold values, and optional fields pointers (or `nil`-able slices, maps and interfaces). Set an optional scalar with `Ptr`; integer fields need `ruddertyper.Ptr[int64](2)`, because `Ptr(2)` is an `*int` ([Required and Optional Fields][spec]).
 
 ```go
