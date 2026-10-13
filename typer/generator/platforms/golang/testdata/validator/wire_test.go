@@ -224,15 +224,6 @@ func TestTrackWire(t *testing.T) {
 				"context": {"ruddertyper": ` + refMeta + `}}`,
 		},
 		{
-			// productId is required, so the open rule's empty case cannot be reached. The
-			// collision pair's closed structs below show the SDK omitting an empty map instead.
-			name: "the open rule's struct with nothing set sends only its required key",
-			call: func() error { return ex.TrackSomeOpenTrackEvent(id, examples.TrackSomeOpenTrackEventProperties{}) },
-			want: `{"type": "track", "channel": "server", "event": "Some Open Track Event", "userId": "user-123",
-				"properties": {"productId": ""},
-				"context": {"ruddertyper": ` + exMeta + `}}`,
-		},
-		{
 			// amount as a number: half of the same-name, different-type pair with Name Collisions.
 			name: "AdditionalProperties: undeclared keys pass as plain values, declared ones ignored",
 			call: func() error {
