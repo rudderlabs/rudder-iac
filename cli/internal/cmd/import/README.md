@@ -258,10 +258,13 @@ re-running.
 - **Linking never overwrites.** A linked resource's local spec is never rewritten
   from the workspace; content differences are resolved at `apply`.
 - **Ambiguous matches stop the import.** If two workspace resources would link to
-  the same local resource (for example, duplicate data upstream), the import
-  fails rather than guessing which one to link.
+  the same local resource (for example, duplicate data upstream), or a workspace
+  resource matches a local resource that is already managed (for example after
+  renaming it locally), the import fails rather than guessing which one to link.
 - **Data graph children that exist only in the workspace are skipped** (see
   [Data graphs](#data-graphs)).
 - **A destination links by display name alone.** If the workspace destination is
-  of a different type than your local one, `apply` fails with `destination type
-  change is not supported`; rename one of them or make the types match.
+  of a different type than your local one, `apply` fails partway with
+  `destination type change is not supported`, after applying the changes ordered
+  before it. Change your local `type` to match, or remove the destination's entry
+  from `imported/import-manifest.yaml` and then rename one of them.
