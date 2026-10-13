@@ -319,22 +319,15 @@ func TestVariantsWire(t *testing.T) {
 }
 
 func TestVariantsDiscriminator(t *testing.T) {
-	// Discriminator() is never sent on its own, so its values are compared
-	// directly. methodOK packs an optional discriminator's (value, ok) results
-	// into one value, so each pair is compared whole in a single assert.
+	// Only the values no wire row checks: Express's toMap writes a literal,
+	// Absent sends none, and no row sends the other three. Every other case's
+	// toMap writes Discriminator(), so its wire row checks it. methodOK packs
+	// an optional discriminator's (value, ok) into one value, so each pair is
+	// compared whole in a single assert.
 	methodOK := func(v examples.PropertyMethod, ok bool) []any { return []any{v, ok} }
-	assert.Equal(t, ruddertyper.PropertyDeviceTypeMobile, ruddertyper.TrackEventWithVariantsPropertiesCaseMobile{}.Discriminator())
-	assert.Equal(t, ruddertyper.PropertyDeviceTypeDesktop, ruddertyper.TrackEventWithVariantsPropertiesCaseDesktop{}.Discriminator())
-	assert.Equal(t, "search", ruddertyper.CustomTypePageContextCaseSearch{}.Discriminator())
-	assert.Equal(t, "product", ruddertyper.CustomTypePageContextCaseProduct{}.Discriminator())
-	assert.Equal(t, "home", ruddertyper.CustomTypePageContextCaseHome{}.Discriminator())
-	assert.Equal(t, true, ruddertyper.CustomTypeUserAccessCaseTrue{}.Discriminator())
-	assert.Equal(t, false, ruddertyper.CustomTypeUserAccessCaseFalse{}.Discriminator())
-	assert.Equal(t, ruddertyper.NewPropertyFeatureFlagBoolean(true), ruddertyper.CustomTypeFeatureConfigCaseTrue{}.Discriminator())
-	assert.Equal(t, ruddertyper.NewPropertyFeatureFlagBoolean(false), ruddertyper.CustomTypeFeatureConfigCaseFalse{}.Discriminator())
-	assert.Equal(t, ruddertyper.NewPropertyFeatureFlagString("beta"), ruddertyper.CustomTypeFeatureConfigCaseBeta{}.Discriminator())
-	assert.Equal(t, examples.NewNullable(examples.PropertyStageValueDraft), examples.CustomTypeReleaseCaseDraft{}.Discriminator())
-	assert.Equal(t, examples.NewNullable(examples.PropertyStageValueLive), examples.CustomTypeReleaseCaseLive{}.Discriminator())
 	assert.Equal(t, methodOK("express", true), methodOK(examples.CustomTypeShippingCaseExpress{}.Discriminator()))
 	assert.Equal(t, methodOK("", false), methodOK(examples.CustomTypeShippingAbsent{}.Discriminator()))
+	assert.Equal(t, methodOK("ground", true), methodOK(examples.CustomTypeShippingDefault{Method: "ground"}.Discriminator()))
+	assert.Equal(t, "on_line", examples.TrackSomeOpenVariantEventPropertiesCaseOnLine1{}.Discriminator())
+	assert.Equal(t, "case_2_b", examples.CustomTypeSomeVariantTypeCaseCase2B{}.Discriminator())
 }
