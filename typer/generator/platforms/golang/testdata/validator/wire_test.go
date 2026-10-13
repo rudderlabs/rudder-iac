@@ -254,6 +254,17 @@ func TestTrackWire(t *testing.T) {
 			},
 		},
 		{
+			name: "quotes and backslashes in the event name and a value are sent unchanged",
+			call: func() error {
+				return ref.TrackProductPremiumClicked(refID, ruddertyper.TrackProductPremiumClickedProperties{
+					SpecialField: "value with \"quotes\" and \\path",
+				})
+			},
+			want: `{"type": "track", "channel": "server", "event": "Product \"Premium\" Clicked", "userId": "user-123",
+				"properties": {"special_field": "value with \"quotes\" and \\path"},
+				"context": {"ruddertyper": ` + refMeta + `}}`,
+		},
+		{
 			name: "the collision pair's first event sends its own name",
 			call: func() error {
 				return ex.TrackEventWithNameCamelCase(id, examples.TrackEventWithNameCamelCaseProperties{})
