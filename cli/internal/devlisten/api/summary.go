@@ -77,12 +77,12 @@ type diagnosisItem struct {
 }
 
 func (h *Handler) summary(w http.ResponseWriter, r *http.Request, q *eventsQuery) {
-	win := h.window(q.since)
+	rd := h.read(q.since)
 	var waited time.Duration
 	if q.wait > 0 {
 		ctx, cancel := context.WithTimeout(r.Context(), q.wait)
 		began := time.Now()
-		_, err := h.wait(ctx, win.since, q.min, q.acceptedMatches(win))
+		_, err := h.wait(ctx, rd.since, q.min, q.acceptedMatches(rd.window))
 		cancel()
 		waited = time.Since(began)
 		switch {
@@ -93,25 +93,21 @@ func (h *Handler) summary(w http.ResponseWriter, r *http.Request, q *eventsQuery
 		case r.Context().Err() != nil:
 			return
 		}
+		rd = h.reread(rd.window)
 	}
-	win, records, stats, isLost := h.snapshot(win)
 
-	filtered := tally(records, q)
-	var lost *diagnosisItem
-	if isLost {
-		lost = evicted(win, stats.EvictedThrough, q, stats)
-	}
-	filtered.Diagnosis = h.diagnose(win, tally(records, &eventsQuery{}), filtered, q, stats, lost)
+	filtered := tally(rd.records, q)
+	filtered.Diagnosis = h.diagnose(rd, tally(rd.records, &eventsQuery{}), filtered, q)
 	writeJSON(w, http.StatusOK, summaryObject{
 		APIVersion:     h.cfg.Identity.APIVersion,
 		ServerID:       h.cfg.Identity.ServerID,
-		Since:          win.since,
-		Cursor:         win.cursor,
-		EvictedThrough: stats.EvictedThrough,
+		Since:          rd.since,
+		Cursor:         rd.cursor,
+		EvictedThrough: rd.stats.EvictedThrough,
 		TimedOut:       q.wait > 0 && filtered.Events.Total < q.min,
 		WaitedMs:       waited.Milliseconds(),
 		Summary:        filtered,
-		Next:           "rudder-cli dev events --since " + strconv.FormatUint(win.cursor, 10) + q.args() + " --json",
+		Next:           "rudder-cli dev events --since " + strconv.FormatUint(rd.cursor, 10) + q.args() + " --json",
 	})
 }
 
@@ -262,14 +258,13 @@ var bodyStages = []string{"decode", "body", "parse", "batch", "identity", "size"
 
 // diagnose reads the whole window, not the filters: a typo in a filter must
 // not read as a listener that received nothing. Every rule that holds is
-// listed, in the order of what it rules out first. lost is set when the
-// window lost requests to the store budget; no other rule can then vouch
-// for what arrived.
-func (h *Handler) diagnose(
-	win window, all, filtered counts, q *eventsQuery, stats store.Stats, lost *diagnosisItem,
-) []diagnosisItem {
+// listed, in the order of what it rules out first. When the window lost
+// requests to the store budget, no rule can vouch for what arrived.
+func (h *Handler) diagnose(rd reading, all, filtered counts, q *eventsQuery) []diagnosisItem {
 	var (
 		out   = []diagnosisItem{}
+		win   = rd.window
+		stats = rd.stats
 		since = strconv.FormatUint(win.since, 10)
 		add   = func(code string, count int, message, next string) {
 			out = append(out, diagnosisItem{code, count, message, next})
@@ -278,8 +273,8 @@ func (h *Handler) diagnose(
 		control = all.Control
 	)
 	requests := func(query string) string { return h.curl("requests?since=" + since + query) }
-	if lost != nil {
-		out = append(out, *lost)
+	if rd.lost {
+		out = append(out, evicted(rd, q))
 	}
 
 	// The store counts ingestion requests only, so control requests alone
@@ -343,7 +338,7 @@ func (h *Handler) diagnose(
 			requestsVerb(missing.Requests, "arrived", "arrived")+" with no write key. The listener accepts them; RudderStack answers 401.",
 			requests("&writeKey="))
 	}
-	if reqs > 0 && all.Requests.Failed == 0 && lost == nil {
+	if reqs > 0 && all.Requests.Failed == 0 && !rd.lost {
 		add("all_accepted", reqs,
 			"Every request that arrived was accepted. This says nothing about events that never came: read byEvent.",
 			"rudder-cli dev events list --since "+since+q.args()+" --json")
@@ -356,24 +351,25 @@ func (h *Handler) diagnose(
 	return out
 }
 
-// codeEvicted marks a window that lost requests to the store budget.
-const codeEvicted = "events_evicted"
+// CodeEvicted marks a window that lost requests to the store budget, in the
+// diagnosis and in the stream headers.
+const CodeEvicted = "events_evicted"
 
 // evicted describes the loss. A cursor window counts the lost requests,
 // because each request takes the next seq; a time window cannot.
-func evicted(win window, evictedThrough uint64, q *eventsQuery, stats store.Stats) *diagnosisItem {
+func evicted(rd reading, q *eventsQuery) diagnosisItem {
 	count, subject := 0, "Requests were"
-	if win.floor.IsZero() {
-		count = int(evictedThrough - win.since)
+	if rd.floor.IsZero() {
+		count = int(rd.stats.EvictedThrough - rd.since)
 		subject = requestsVerb(count, "was", "were")
 	}
-	return &diagnosisItem{
-		Code:  codeEvicted,
+	return diagnosisItem{
+		Code:  CodeEvicted,
 		Count: count,
 		Message: fmt.Sprintf("%s evicted from this window: the listener keeps the last %d requests or %d MiB. "+
-			"The counts and the events are incomplete.", subject, stats.MaxRequests, stats.MaxBytes>>20),
+			"The counts and the events are incomplete.", subject, rd.stats.MaxRequests, rd.stats.MaxBytes>>20),
 		// The window after the newest evicted request is complete.
-		Next: "rudder-cli dev events --since " + strconv.FormatUint(evictedThrough, 10) + q.args() + " --json",
+		Next: "rudder-cli dev events --since " + strconv.FormatUint(rd.stats.EvictedThrough, 10) + q.args() + " --json",
 	}
 }
 

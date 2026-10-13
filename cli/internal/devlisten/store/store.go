@@ -59,6 +59,12 @@ type Stats struct {
 }
 
 func New() *Store {
+	return NewWithLimits(maxRequests, maxBytes)
+}
+
+// NewWithLimits returns a store with its own budget. The listener uses New;
+// a small budget lets a test evict with a few requests.
+func NewWithLimits(maxRequests, maxBytes int) *Store {
 	return &Store{maxRequests: maxRequests, maxBytes: maxBytes}
 }
 

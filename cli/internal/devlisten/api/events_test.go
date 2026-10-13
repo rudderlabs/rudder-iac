@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/tidwall/gjson"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/ingest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/store"
@@ -431,11 +430,12 @@ type diagnosis struct {
 }
 
 func summaryOf(t *testing.T, h http.Handler, query string) (out struct {
-	Since    uint64 `json:"since"`
-	Cursor   uint64 `json:"cursor"`
-	TimedOut bool   `json:"timedOut"`
-	WaitedMs int64  `json:"waitedMs"`
-	Summary  struct {
+	Since          uint64 `json:"since"`
+	Cursor         uint64 `json:"cursor"`
+	EvictedThrough uint64 `json:"evictedThrough"`
+	TimedOut       bool   `json:"timedOut"`
+	WaitedMs       int64  `json:"waitedMs"`
+	Summary        struct {
 		Events    struct{ Total int } `json:"events"`
 		Diagnosis []diagnosis         `json:"diagnosis"`
 	} `json:"summary"`
@@ -755,7 +755,8 @@ func codes(items []diagnosis) []string {
 func TestReadsSignalAWindowThatLostRequests(t *testing.T) {
 	t.Parallel()
 	t0 := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
-	h, st := newTestHandler("127.0.0.1")
+	st := store.NewWithLimits(3, 64<<20)
+	h := New(st, testConfig("127.0.0.1"))
 	h.now = func() time.Time { return t0.Add(time.Minute) }
 	// seq 1 and 2 leave the store; the newest evicted one arrived at t0+1s.
 	captured(st, t0, "Lost")
@@ -806,14 +807,14 @@ func TestReadsSignalAWindowThatLostRequests(t *testing.T) {
 		t.Parallel()
 		require.Equal(t, diagnosis{
 			Code: "events_evicted", Count: 1,
-			Message: "1 request was evicted from this window: the listener keeps the last 10000 requests or 64 MiB. " +
+			Message: "1 request was evicted from this window: the listener keeps the last 3 requests or 64 MiB. " +
 				"The counts and the events are incomplete.",
 			Next: "rudder-cli dev events --since 2 --event Kept --json",
 		}, summaryOf(t, h, "since=1&event=Kept").Summary.Diagnosis[0])
 		// A time does not say how many requests the window lost.
 		require.Equal(t, diagnosis{
 			Code: "events_evicted", Count: 0,
-			Message: "Requests were evicted from this window: the listener keeps the last 10000 requests or 64 MiB. " +
+			Message: "Requests were evicted from this window: the listener keeps the last 3 requests or 64 MiB. " +
 				"The counts and the events are incomplete.",
 			Next: "rudder-cli dev events --since 2 --json",
 		}, summaryOf(t, h, "since=5m").Summary.Diagnosis[0])
@@ -854,6 +855,19 @@ func TestReadsBeforeTheFirstEvictionSignalNoLossForAnyTime(t *testing.T) {
 	}
 }
 
+// lateStore stores one more request right after each snapshot, as an app
+// that sends while a read is answered.
+type lateStore struct {
+	*store.Store
+	late func()
+}
+
+func (s lateStore) Snapshot(seq uint64) store.Snapshot {
+	snap := s.Store.Snapshot(seq)
+	s.late()
+	return snap
+}
+
 // A read answers for one moment of the store. A request that evicts the
 // oldest one after that moment leaves the answer complete: it holds every
 // request through its cursor.
@@ -866,14 +880,21 @@ func TestReadsDiagnoseOneMomentOfTheStore(t *testing.T) {
 		read func(t *testing.T, h *Handler, full int)
 	}{
 		{name: "summary", read: func(t *testing.T, h *Handler, full int) {
-			w := get(h, "/_dev/v1/events?view=counts", nil)
+			got := summaryOf(t, h, "")
 
-			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, int64(0), gjson.Get(w.Body.String(), "evictedThrough").Int())
-			require.Equal(t, int64(full), gjson.Get(w.Body.String(), "cursor").Int())
-			require.Equal(t, int64(full), gjson.Get(w.Body.String(), "summary.events.total").Int())
-			require.False(t, gjson.Get(w.Body.String(), `summary.diagnosis.#(code=="events_evicted")`).Exists())
-			require.True(t, gjson.Get(w.Body.String(), `summary.diagnosis.#(code=="all_accepted")`).Exists())
+			require.Zero(t, got.EvictedThrough)
+			require.Equal(t, uint64(full), got.Cursor)
+			require.Equal(t, full, got.Summary.Events.Total)
+			require.Contains(t, codes(got.Summary.Diagnosis), "all_accepted")
+			require.NotContains(t, codes(got.Summary.Diagnosis), "events_evicted")
+		}},
+		{name: "summary of a time", read: func(t *testing.T, h *Handler, full int) {
+			got := summaryOf(t, h, "since=2026-09-30T12:00:00Z")
+
+			require.Zero(t, got.EvictedThrough)
+			require.Equal(t, uint64(full), got.Cursor)
+			require.Equal(t, full, got.Summary.Events.Total)
+			require.NotContains(t, codes(got.Summary.Diagnosis), "events_evicted")
 		}},
 		{name: "stream", read: func(t *testing.T, h *Handler, full int) {
 			w := get(h, "/_dev/v1/events?limit=1", nil)
@@ -883,21 +904,28 @@ func TestReadsDiagnoseOneMomentOfTheStore(t *testing.T) {
 			require.Equal(t, "0", w.Header().Get("X-Dev-Evicted-Through"))
 			require.Empty(t, w.Header().Values("X-Dev-Diagnosis"))
 		}},
+		{name: "requests", read: func(t *testing.T, h *Handler, full int) {
+			env, _ := requestsOf(t, h, "")
+
+			require.Zero(t, env.EvictedThrough)
+			require.Equal(t, uint64(full), env.Cursor)
+			require.Equal(t, full, env.Total)
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			h, st := newTestHandler("127.0.0.1")
+			st := store.NewWithLimits(4, 64<<20)
+			h := New(st, testConfig("127.0.0.1"))
 			full := st.Stats().MaxRequests
 			captured(st, t0, "First")
 			for range full - 1 {
 				captured(st, t0, "Kept")
 			}
-			h.onSnapshot = func() { captured(st, t0, "Late") }
+			h.store = lateStore{Store: st, late: func() { captured(st, t0, "Late") }}
 
 			tc.read(t, h, full)
 
 			// The next read is of a later moment, and that one lost seq 1.
-			h.onSnapshot = nil
 			require.Equal(t, uint64(1), st.Stats().EvictedThrough, "the late request evicted the first")
 			require.Equal(t, "events_evicted", get(h, "/_dev/v1/events", nil).Header().Get("X-Dev-Diagnosis"))
 		})

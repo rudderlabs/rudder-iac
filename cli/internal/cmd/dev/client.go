@@ -17,6 +17,7 @@ import (
 	"github.com/tidwall/sjson"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
+	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten"
 )
 
 // get sends the one request of a read command and returns the answer of a
@@ -105,20 +106,24 @@ func readSummary(cmd *cobra.Command, opts *readOptions, base string, q url.Value
 	if err := writeSummary(cmd, opts, base, body); err != nil {
 		return err
 	}
-	if gjson.GetBytes(body, `summary.diagnosis.#(code=="`+codeEvicted+`")`).Exists() {
-		if err := partial(cmd, opts, base, gjson.GetBytes(body, "evictedThrough").String()); err != nil {
-			return err
-		}
-	}
+	return verdict(cmd, opts, base, readResult{
+		lost:           gjson.GetBytes(body, `summary.diagnosis.#(code=="`+devlisten.CodeEvicted+`")`).Exists(),
+		evictedThrough: gjson.GetBytes(body, "evictedThrough").String(),
+		waitTimeout:    waitTimeout(body, base, q),
+	})
+}
+
+// waitTimeout is the error of a wait that ran out, or nil.
+func waitTimeout(body []byte, base string, q url.Values) *usageError {
 	if !gjson.GetBytes(body, "timedOut").Bool() {
 		return nil
 	}
-	return fail(cmd, &usageError{
+	return &usageError{
 		code: "wait_timeout",
 		message: fmt.Sprintf("--wait ran out after %.1fs: %d of --min %s matching accepted events arrived",
 			gjson.GetBytes(body, "waitedMs").Float()/1000, gjson.GetBytes(body, "summary.events.total").Int(), cmp.Or(q.Get("min"), "1")),
 		next: "rudder-cli dev events --url " + shellWord(base) + " --since " + gjson.GetBytes(body, "since").String() + " --json",
-	})
+	}
 }
 
 // writeSummary prints the summary object as the server wrote it, with the
@@ -157,50 +162,67 @@ func writeSummary(cmd *cobra.Command, opts *readOptions, base string, body []byt
 	return err
 }
 
-// readStream prints the stream as the server wrote it, or as a table. The
-// cursor to continue from goes to stderr, so stdout stays one event per line.
+// readStream prints the stream, then fails a window that lost requests.
 func readStream(cmd *cobra.Command, opts *readOptions, base string, q url.Values, timeout time.Duration, view string, fields []string) error {
 	resp, body, err := get(cmd, base, q, timeout)
 	if err != nil {
 		return err
 	}
-	hasMore := resp.Header.Get("X-Dev-Has-More") == "true"
-	cursor := resp.Header.Get("X-Dev-Cursor")
+	if err := writeStream(cmd, opts, base, resp.Header, body, view, fields); err != nil {
+		return err
+	}
+	return verdict(cmd, opts, base, readResult{
+		lost:           resp.Header.Get("X-Dev-Diagnosis") == devlisten.CodeEvicted,
+		evictedThrough: resp.Header.Get("X-Dev-Evicted-Through"),
+	})
+}
+
+// writeStream prints the stream as the server wrote it, or as a table. The
+// cursor to continue from goes to stderr, so stdout stays one event per line.
+func writeStream(cmd *cobra.Command, opts *readOptions, base string, header http.Header, body []byte, view string, fields []string) error {
+	hasMore := header.Get("X-Dev-Has-More") == "true"
+	cursor := header.Get("X-Dev-Cursor")
 	if opts.json {
 		if hasMore {
 			fmt.Fprintf(cmd.ErrOrStderr(), "more events: continue with --since %s\n", cursor)
 		}
-		_, err = cmd.OutOrStdout().Write(body)
-	} else {
-		more := ""
-		if hasMore {
-			more = cursor
-		}
-		err = renderStream(cmd.OutOrStdout(), body, streamTable{since: opts.since, base: base, more: more, view: view, fields: fields})
-	}
-	if err != nil || resp.Header.Get("X-Dev-Diagnosis") != codeEvicted {
+		_, err := cmd.OutOrStdout().Write(body)
 		return err
 	}
-	return partial(cmd, opts, base, resp.Header.Get("X-Dev-Evicted-Through"))
+	more := ""
+	if hasMore {
+		more = cursor
+	}
+	return renderStream(cmd.OutOrStdout(), body, streamTable{since: opts.since, base: base, more: more, view: view, fields: fields})
 }
 
-// codeEvicted is the listener's code for a window that lost requests to the
-// store budget. The listener decides which windows did; the CLI only reads it.
-const codeEvicted = "events_evicted"
+// readResult is what a read says about its own output. The listener
+// decides which windows lost requests; the CLI only reads its answer.
+type readResult struct {
+	lost           bool
+	evictedThrough string
+	waitTimeout    *usageError
+}
 
-// partial runs after the output is written. It fails the read, because a
-// count that came out short must not pass a check, unless the caller
-// accepted the loss.
-func partial(cmd *cobra.Command, opts *readOptions, base, evictedThrough string) error {
-	message := "requests up to seq " + evictedThrough + " were evicted, so this window is incomplete"
-	if opts.allowPartial {
+// verdict runs after the output is written. It fails a read whose output
+// cannot back a check: a count that came out short, unless the caller
+// accepted the loss, or a wait that ran out. The loss comes first, because
+// it can explain a short count.
+func verdict(cmd *cobra.Command, opts *readOptions, base string, r readResult) error {
+	if r.lost {
+		message := "requests up to seq " + r.evictedThrough + " were evicted, so this window is incomplete"
+		if !opts.allowPartial {
+			return fail(cmd, &usageError{
+				code:    devlisten.CodeEvicted,
+				message: message + "; pass --allow-partial to accept it",
+				// The window after the newest evicted request is complete.
+				next: cmd.CommandPath() + " --url " + shellWord(base) + " --since " + r.evictedThrough,
+			})
+		}
 		fmt.Fprintln(cmd.ErrOrStderr(), "note: "+message)
-		return nil
 	}
-	return fail(cmd, &usageError{
-		code:    codeEvicted,
-		message: message + "; pass --allow-partial to accept it",
-		// The window after the newest evicted request is complete.
-		next: cmd.CommandPath() + " --url " + shellWord(base) + " --since " + evictedThrough,
-	})
+	if r.waitTimeout != nil {
+		return fail(cmd, r.waitTimeout)
+	}
+	return nil
 }

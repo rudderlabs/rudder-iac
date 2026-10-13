@@ -77,32 +77,13 @@ func routeType(route string) string {
 }
 
 // window holds the records a read covers: after the cursor, up to the
-// store cursor taken before the read, and, for a time, received at or after
+// store cursor of the read, and, for a time, received at or after
 // it. A slow upload that started before the time completes with a later
 // seq, so the time alone keeps it out.
 type window struct {
 	since  uint64
 	floor  time.Time
 	cursor uint64
-}
-
-func (h *Handler) window(s Since) window {
-	w := window{since: s.Cursor, cursor: h.store.Cursor()}
-	if s.At.IsZero() {
-		return w
-	}
-	w.floor, w.since = s.At, w.cursor
-	records, _ := h.store.Since(0)
-	for _, r := range records {
-		if r.Seq > w.cursor {
-			break
-		}
-		if !r.ReceivedAt.Before(s.At) {
-			w.since = r.Seq - 1
-			break
-		}
-	}
-	return w
 }
 
 func (w window) holds(r *store.Record) bool {
@@ -125,13 +106,40 @@ func (w window) lost(evictedThrough uint64, evictedAt time.Time) bool {
 	return !evictedAt.Before(w.floor)
 }
 
-// snapshot reads the records of the window, up to the store cursor of the
-// same moment, and whether the window lost a record.
-func (h *Handler) snapshot(w window) (window, []*store.Record, store.Stats, bool) {
-	snap := h.store.Snapshot(w.since)
-	if h.onSnapshot != nil {
-		h.onSnapshot()
+// reading is a window with its records, oldest first, the store totals and
+// whether the window lost a record, all of one moment of the store.
+type reading struct {
+	window
+	records []*store.Record
+	stats   store.Stats
+	lost    bool
+}
+
+// read takes the window of s from one snapshot of the store. Every read
+// handler gets its records this way and reads nothing else of the store, so
+// a request stored during the read cannot show in one part of an answer and
+// not in another.
+func (h *Handler) read(s Since) reading {
+	if s.At.IsZero() {
+		return h.reread(window{since: s.Cursor})
 	}
+	snap := h.store.Snapshot(0)
+	w := window{since: snap.Cursor, floor: s.At}
+	for _, r := range snap.Records {
+		if !r.ReceivedAt.Before(s.At) {
+			w.since = r.Seq - 1
+			break
+		}
+	}
+	return w.reading(snap)
+}
+
+// reread reads a window again, from the same seq, after a wait.
+func (h *Handler) reread(w window) reading {
+	return w.reading(h.store.Snapshot(w.since))
+}
+
+func (w window) reading(snap store.Snapshot) reading {
 	w.cursor = snap.Cursor
 	records := snap.Records[:0]
 	for _, r := range snap.Records {
@@ -139,19 +147,7 @@ func (h *Handler) snapshot(w window) (window, []*store.Record, store.Stats, bool
 			records = append(records, r)
 		}
 	}
-	return w, records, snap.Stats, w.lost(snap.Stats.EvictedThrough, snap.EvictedAt)
-}
-
-// records returns the records in the window, oldest first.
-func (h *Handler) records(w window) []*store.Record {
-	all, _ := h.store.Since(w.since)
-	out := all[:0]
-	for _, r := range all {
-		if w.holds(r) {
-			out = append(out, r)
-		}
-	}
-	return out
+	return reading{window: w, records: records, stats: snap.Stats, lost: w.lost(snap.Stats.EvictedThrough, snap.EvictedAt)}
 }
 
 // keyMatches matches a literal write key by its masked form, so a caller
