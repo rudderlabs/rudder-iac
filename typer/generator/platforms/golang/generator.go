@@ -906,10 +906,10 @@ func addRule(ctx *GoContext, r eventRule, propertyTypes map[propertyKey]property
 	return nil
 }
 
-// addPayload adds the payload type name of a rule, which holds its payload
-// (Properties or Traits), or returns nil when the rule's schema is empty and
-// closed.
-func addPayload(ctx *GoContext, r eventRule, name, payload string, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) (*GoStruct, error) {
+// addPayload adds the payload type requested of a rule, which holds its
+// payload (Properties or Traits), or returns nil when the rule's schema is
+// empty and closed.
+func addPayload(ctx *GoContext, r eventRule, requested, payload string, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) (*GoStruct, error) {
 	var (
 		event  = r.rule.Event
 		schema = r.rule.Schema
@@ -924,7 +924,7 @@ func addPayload(ctx *GoContext, r eventRule, name, payload string, propertyTypes
 		label = strconv.Quote(event.Name)
 	}
 
-	name, err := registry.RegisterName("payload:"+r.key, packageScope, name)
+	name, err := registry.RegisterName("payload:"+r.key, packageScope, requested)
 	if err != nil {
 		return nil, fmt.Errorf("registering the payload of %s event %q: %w", event.EventType, event.Name, err)
 	}
@@ -933,7 +933,7 @@ func addPayload(ctx *GoContext, r eventRule, name, payload string, propertyTypes
 		if err != nil {
 			return nil, err
 		}
-		return &GoStruct{Name: name, Payload: payload, Variant: v}, nil
+		return &GoStruct{Name: name, Noun: payload, Variant: v}, nil
 	}
 	if len(schema.Properties) > 0 {
 		return addStruct(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the %s of %s.", name, noun, label), r.schema, payload)
@@ -942,7 +942,7 @@ func addPayload(ctx *GoContext, r eventRule, name, payload string, propertyTypes
 		Name:     name,
 		Doc:      fmt.Sprintf("%s holds the %s of %s. The tracking plan declares no %s and allows any.", name, noun, label, noun),
 		MapAlias: true,
-		Payload:  payload,
+		Noun:     payload,
 	}
 	ctx.add(GoDecl{Struct: st})
 	return st, nil
@@ -955,7 +955,7 @@ func addPayload(ctx *GoContext, r eventRule, name, payload string, propertyTypes
 // A payload struct, whose payload is Properties or Traits, also has
 // To{payload}.
 func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, doc string, s *objectSchema, payload string) (*GoStruct, error) {
-	st := &GoStruct{Name: name, Doc: doc, Payload: payload, Open: s.open, DeclaredKeys: s.declared}
+	st := &GoStruct{Name: name, Doc: doc, Noun: payload, Open: s.open, DeclaredKeys: s.declared}
 	ctx.add(GoDecl{Struct: st})
 	ctx.UsesWithAdditional = ctx.UsesWithAdditional || s.open
 

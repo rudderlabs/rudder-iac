@@ -279,7 +279,7 @@ func isVariant(p plan.Property) bool {
 // doc comment; a payload interface, whose payload is Properties or Traits,
 // also lists To{payload}.
 func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, lead, description string, v *variantSchema, payload string) (*GoVariant, error) {
-	iface := &GoVariant{Name: name, Key: v.key, Payload: payload}
+	iface := &GoVariant{Name: name, Key: v.key, Noun: payload}
 	ctx.add(GoDecl{Variant: iface})
 
 	// Every branch holds the base's fields, so all share what the base hoists.
