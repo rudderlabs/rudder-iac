@@ -163,11 +163,11 @@ func TestVariantsWire(t *testing.T) {
 			name: "default: Event With Variants Default sends the enum value it holds",
 			call: func() error {
 				return ref.TrackEventWithVariants(refID, ruddertyper.TrackEventWithVariantsPropertiesDefault{
-					DeviceType: ruddertyper.PropertyDeviceTypeTablet, Profile: profile, UntypedField: 1,
+					DeviceType: ruddertyper.PropertyDeviceTypeTablet, Profile: profile, UntypedField: map[string]any{"custom": "data", "count": 42},
 				})
 			},
 			want: trackJSON(refMeta, "Event With Variants",
-				`{"device_type": "tablet", "profile": {"email": "a@b.c", "first_name": "Ann"}, "untyped_field": 1}`),
+				`{"device_type": "tablet", "profile": {"email": "a@b.c", "first_name": "Ann"}, "untyped_field": {"custom": "data", "count": 42}}`),
 		},
 		{
 			name: "default: release Default holding null sends null",
