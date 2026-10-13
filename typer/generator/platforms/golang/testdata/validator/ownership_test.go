@@ -23,9 +23,10 @@ func (c *fakeClient) Enqueue(msg analytics.Message) error {
 
 func (c *fakeClient) Close() error { return nil }
 
-// sendAndChange changes each input right after the call that took it. Both
-// ownership tests run it, so the deterministic fake-client check and the
-// -race check against the real SDK cover the same inputs.
+// sendAndChange changes each input right after the last call that took it:
+// props after the first call, the rest after the second. Both ownership tests
+// run it, so the deterministic fake-client check and the -race check against
+// the real SDK cover the same inputs.
 func sendAndChange(t *testing.T, client analytics.Client) {
 	t.Helper()
 	var (
