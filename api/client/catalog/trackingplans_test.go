@@ -190,6 +190,30 @@ func TestUpdateTrackingPlanEvents(t *testing.T) {
 
 }
 
+// Numbers stay json.Number, so enum values that one float64 cannot tell apart
+// keep their exact value.
+func TestGetTrackingPlanEventSchemaKeepsNumbersExact(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		Validate: func(req *http.Request) bool {
+			return assert.Equal(t, "/v2/catalog/tracking-plans/tp-123/events/ev-123", req.URL.Path)
+		},
+		ResponseStatus: 200,
+		ResponseBody:   `{"rules": {"properties": {"id": {"enum": [9007199254740992, 9007199254740993]}}}}`,
+	})
+	apiClient, err := client.New("test-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+	dataCatalog, err := catalog.NewRudderDataCatalog(apiClient)
+	require.NoError(t, err)
+
+	schema, err := dataCatalog.GetTrackingPlanEventSchema(context.Background(), "tp-123", "ev-123")
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]any{
+		"id": map[string]any{"enum": []any{json.Number("9007199254740992"), json.Number("9007199254740993")}},
+	}, schema.Rules.Properties)
+	httpClient.AssertNumberOfCalls()
+}
+
 // Helper function to generate event IDs
 func eventID(index int) string {
 	return fmt.Sprintf("event-%d", index)

@@ -2,7 +2,9 @@ package providers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/typer/plan"
@@ -243,6 +245,22 @@ func parseEventRulesDefs(ev *catalog.TrackingPlanEventSchema) (map[string]*plan.
 	return customTypes, nil
 }
 
+// beyondFloat64 returns the first number in values that no float64 can hold.
+// The catalog client decodes numbers as json.Number, which takes any size, and
+// every generator but Go writes enum and match numbers as float64.
+func beyondFloat64(values []any) (json.Number, bool) {
+	for _, v := range values {
+		n, ok := v.(json.Number)
+		if !ok {
+			continue
+		}
+		if _, err := strconv.ParseFloat(string(n), 64); err != nil {
+			return n, true
+		}
+	}
+	return "", false
+}
+
 type typeDefinition struct {
 	Types     []plan.PropertyType
 	ItemTypes []plan.PropertyType
@@ -266,6 +284,9 @@ func parseTypeDefinition(def map[string]any, customTypes map[string]*plan.Custom
 	// parse enums
 	if enumVal, exists := def["enum"]; exists {
 		if enumSlice, ok := enumVal.([]any); ok {
+			if n, ok := beyondFloat64(enumSlice); ok {
+				return nil, fmt.Errorf("enum value %s does not fit in float64", n)
+			}
 			td.Config = &plan.PropertyConfig{
 				Enum: enumSlice,
 			}
@@ -539,6 +560,9 @@ func parseVariantCases(
 				enumList, ok := enumDef.([]any)
 				if !ok {
 					return nil, "", nil, fmt.Errorf("enum must be an array")
+				}
+				if n, ok := beyondFloat64(enumList); ok {
+					return nil, "", nil, fmt.Errorf("match value %s of '%s' does not fit in float64", n, propName)
 				}
 
 				// Parse the then schema

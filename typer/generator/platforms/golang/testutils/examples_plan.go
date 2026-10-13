@@ -68,6 +68,16 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"stringOrMixedArray":       optional(items(property("stringOrMixedArray", "", plan.PrimitiveTypeArray, plan.PrimitiveTypeString), plan.PrimitiveTypeString, plan.PrimitiveTypeInteger)),
 				"matrix":                   required(items(property("matrix", "", plan.PrimitiveTypeArray), plan.PrimitiveTypeArray)),
 			}),
+			// Enum shapes the reference plan lacks. statusActive takes the type
+			// name PropertyStatusActive first, so status's "active" constant
+			// gets the suffix.
+			track("Some Enum Event", "", false, map[string]plan.PropertySchema{
+				"stage":        optional(enum(property("stage", "", plan.PrimitiveTypeString, plan.PrimitiveTypeNull), "draft", "live", nil)),
+				"cleared":      optional(enum(property("cleared", "", plan.PrimitiveTypeString, plan.PrimitiveTypeNull), nil)),
+				"mode":         required(enum(property("mode", "", plan.PrimitiveTypeString), "Active", "active", "values", "")),
+				"status":       required(enum(property("status", "", plan.PrimitiveTypeString), "active", "inactive")),
+				"statusActive": optional(property("statusActive", "", plan.PrimitiveTypeBoolean)),
+			}),
 		},
 	}
 }
@@ -86,6 +96,11 @@ func property(name, description string, types ...plan.PropertyType) plan.Propert
 
 func items(p plan.Property, types ...plan.PropertyType) plan.Property {
 	p.ItemTypes = types
+	return p
+}
+
+func enum(p plan.Property, values ...any) plan.Property {
+	p.Config = &plan.PropertyConfig{Enum: values}
 	return p
 }
 

@@ -520,6 +520,7 @@ func createPropertyEnum(p *plan.Property, nr *core.NameRegistry) (*SwiftEnum, er
 }
 
 func buildSwiftEnum(name, comment string, values []any, nr *core.NameRegistry) (*SwiftEnum, error) {
+	values = plan.Float64Numbers(values)
 	rawType := inferEnumRawType(values)
 
 	var enumValues []SwiftEnumValue
@@ -671,6 +672,7 @@ func createVariantEnum(name, comment string, baseSchema *plan.ObjectSchema, vari
 	var payloadStructs []SwiftStruct
 
 	for _, vc := range variant.Cases {
+		vc.Match = plan.Float64Numbers(vc.Match) // vc is a copy; the plan is unchanged
 		// All match values in a case share the same schema, so one struct covers them all.
 		// Use DisplayName for the struct; fall back to the first match value if unset.
 		structLabel := vc.DisplayName

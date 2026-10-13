@@ -94,6 +94,10 @@ type {{ .Name }} = {{ .Type }}
 
 {{ template "union.tmpl" . }}
 {{- end }}
+{{- with .Enum }}
+
+{{ template "enum.tmpl" . }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- if .Payloads }}

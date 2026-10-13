@@ -3,11 +3,18 @@ package providers_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
+	"github.com/rudderlabs/rudder-iac/typer/generator/core"
+	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang"
 	"github.com/rudderlabs/rudder-iac/typer/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,14 +34,19 @@ func (m *mockTrackingPlanStore) GetTrackingPlanWithSchemas(ctx context.Context, 
 	return m.trackingPlanWithSchemas, nil
 }
 
-// helper function to parse JSON rules into map[string]interface{}
+// helper function to parse JSON rules into map[string]interface{}, with
+// numbers as json.Number, as the catalog client decodes them
 func parseRulesJSON(rulesJSON string) map[string]any {
 	if rulesJSON == "" {
 		return nil
 	}
 
-	var rules map[string]interface{}
-	if err := json.Unmarshal([]byte(rulesJSON), &rules); err != nil {
+	var (
+		rules map[string]interface{}
+		dec   = json.NewDecoder(strings.NewReader(rulesJSON))
+	)
+	dec.UseNumber()
+	if err := dec.Decode(&rules); err != nil {
 		panic("failed to parse rules JSON: " + err.Error())
 	}
 	return rules
@@ -550,6 +562,30 @@ func TestJSONSchemaPlanProvider_ErrorCases(t *testing.T) {
 			mockResponse:     mockInvalidRespone("track", "properties", `{}`),
 			expectedErrorMsg: "identity section 'properties' not found in properties",
 		},
+		{
+			name: "enum number beyond float64",
+			mockResponse: mockInvalidRespone("track", "properties", `{
+				"properties": {
+					"type": "object",
+					"properties": {"big": {"type": "number", "enum": [1, 1e400]}}
+				}
+			}`),
+			expectedErrorMsg: "parsing property 'big': enum value 1e400 does not fit in float64",
+		},
+		{
+			name: "match number beyond float64",
+			mockResponse: mockInvalidRespone("track", "properties", `{
+				"properties": {
+					"type": "object",
+					"properties": {"code": {"type": "number"}},
+					"allOf": [{"allOf": [{
+						"if": {"properties": {"code": {"enum": [-1e400]}}},
+						"then": {"properties": {}}
+					}]}]
+				}
+			}`),
+			expectedErrorMsg: "parsing variants: match value -1e400 of 'code' does not fit in float64",
+		},
 	}
 
 	for _, tt := range tests {
@@ -930,4 +966,49 @@ func TestJSONSchemaPlanProvider_Variants(t *testing.T) {
 			}
 		})
 	}
+}
+
+// apiResponses answers each API request with the body for its URL path.
+type apiResponses map[string]string
+
+func (r apiResponses) Do(req *http.Request) (*http.Response, error) {
+	body, ok := r[req.URL.Path]
+	if !ok {
+		return nil, fmt.Errorf("unexpected request %s", req.URL)
+	}
+	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body))}, nil
+}
+
+// The catalog client decodes event schemas with UseNumber, so enum values that
+// the same float64 would represent reach the plan as written.
+func TestJSONSchemaPlanProvider_EnumNumberPrecision(t *testing.T) {
+	apiClient, err := client.New("token", client.WithHTTPClient(apiResponses{
+		"/v2/catalog/tracking-plans/tp":        `{"id": "tp", "name": "Precision", "version": 1}`,
+		"/v2/catalog/tracking-plans/tp/events": `{"data": [{"id": "ev"}], "total": 1, "currentPage": 1, "pageSize": 50}`,
+		"/v2/catalog/tracking-plans/tp/events/ev": `{
+			"name": "Big Numbers",
+			"eventType": "track",
+			"identitySection": "properties",
+			"rules": {"type": "object", "properties": {"properties": {
+				"type": "object",
+				"properties": {"id": {"type": "number", "enum": [9007199254740992, 9007199254740993]}}
+			}}}
+		}`,
+	}))
+	require.NoError(t, err)
+	dataCatalog, err := catalog.NewRudderDataCatalog(apiClient)
+	require.NoError(t, err)
+
+	trackingPlan, err := providers.NewJSONSchemaPlanProvider("tp", dataCatalog).GetTrackingPlan(context.Background())
+	require.NoError(t, err)
+
+	require.Len(t, trackingPlan.Rules, 1)
+	assert.Equal(t,
+		&plan.PropertyConfig{Enum: []any{json.Number("9007199254740992"), json.Number("9007199254740993")}},
+		trackingPlan.Rules[0].Schema.Properties["id"].Property.Config,
+	)
+
+	// Go would generate both as one float64 constant, so it fails instead.
+	_, err = (&golang.Generator{}).Generate(trackingPlan, core.GenerateOptions{}, nil)
+	assert.EqualError(t, err, `mapping property "id" of track event "Big Numbers": enum values 9007199254740992 and 9007199254740993 are the same float64`)
 }

@@ -534,7 +534,7 @@ func createPropertyEnum(property *plan.Property, nameRegistry *core.NameRegistry
 
 	// Convert enum values to KotlinEnumValue structs
 	var enumValues []KotlinEnumValue
-	for _, value := range property.Config.Enum {
+	for _, value := range plan.Float64Numbers(property.Config.Enum) {
 		registeredName, err := getOrRegisterEnumValue(enumName, value, nameRegistry)
 		if err != nil {
 			return nil, err
@@ -562,7 +562,7 @@ func createCustomTypeEnum(customType *plan.CustomType, nameRegistry *core.NameRe
 
 	// Convert enum values to KotlinEnumValue structs
 	var enumValues []KotlinEnumValue
-	for _, value := range customType.Config.Enum {
+	for _, value := range plan.Float64Numbers(customType.Config.Enum) {
 		registeredName, err := getOrRegisterEnumValue(enumName, value, nameRegistry)
 		if err != nil {
 			return nil, err
