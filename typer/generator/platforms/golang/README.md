@@ -91,7 +91,7 @@ err = rt.Page(
 
 ## Errors
 
-- Methods return the SDK's errors unchanged, and their own errors wrap three sentinels. Match them with `errors.Is` and `errors.As`, never by the error's type ([Errors][spec]):
+- Methods return the SDK's errors unchanged, and their own errors wrap three sentinels. Match them with `errors.Is` and `errors.As`, never with `==` or a type assertion ([Errors][spec]):
   - `ErrNilPayload`: a nil or typed-nil track variant payload.
   - `ErrInvalidValue`: an unset value that has no valid zero value (see Caveats), or a payload or option value that cannot be sent.
   - `ErrCategoryConflict`: a `WithCategory` the rule does not accept.
