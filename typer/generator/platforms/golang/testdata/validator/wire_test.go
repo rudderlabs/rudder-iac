@@ -205,6 +205,25 @@ func TestTrackWire(t *testing.T) {
 				"context": {"ruddertyper": ` + refMeta + `}}`,
 		},
 		{
+			name: "untyped fields send numbers, bools and objects at depth",
+			call: func() error {
+				return ref.TrackUserSignedUp(refID, ruddertyper.TrackUserSignedUpProperties{
+					ArrayOfAny:    []any{"string item", 42, true, map[string]any{"nested": "object", "count": 100}},
+					PropertyOfAny: map[string]any{"custom_field_1": "value1", "custom_field_2": 999, "nested_object": map[string]any{"deep_field": "deep_value"}},
+					UntypedArray:  []any{3.14159, "mixed", false, map[string]any{"id": 123, "name": "test"}},
+					UntypedField:  map[string]any{"arbitrary_key": "arbitrary_value", "number": 42.5},
+				})
+			},
+			want: `{"type": "track", "channel": "server", "event": "User Signed Up", "userId": "user-123",
+				"properties": {
+					"array_of_any": ["string item", 42, true, {"nested": "object", "count": 100}],
+					"property_of_any": {"custom_field_1": "value1", "custom_field_2": 999, "nested_object": {"deep_field": "deep_value"}},
+					"untyped_array": [3.14159, "mixed", false, {"id": 123, "name": "test"}],
+					"untyped_field": {"arbitrary_key": "arbitrary_value", "number": 42.5}
+				},
+				"context": {"ruddertyper": ` + refMeta + `}}`,
+		},
+		{
 			// productId is required, so the open rule's empty case cannot be reached. The
 			// collision pair's closed structs below show the SDK omitting an empty map instead.
 			name: "the open rule's struct with nothing set sends only its required key",
