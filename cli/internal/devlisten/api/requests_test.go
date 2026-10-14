@@ -523,7 +523,7 @@ func TestRequestsServerChanged(t *testing.T) {
 func TestGuide(t *testing.T) {
 	t.Parallel()
 	cfg := testConfig("127.0.0.1")
-	cfg.Guide = "# The guide\n\nRun `rudder-cli dev listen`.\n"
+	cfg.Guide = "# The guide\n\nRun `rudder-cli sources listen`.\n"
 	h := New(store.New(), cfg)
 
 	w := get(h, "/_dev/v1/guide", nil)

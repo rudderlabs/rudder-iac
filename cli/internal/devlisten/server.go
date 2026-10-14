@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -49,6 +50,13 @@ type Config struct {
 	AllowHosts []string
 	// Version is the CLI version that /info and /version report.
 	Version string
+	// Store keeps every request in memory and serves the query API and the
+	// review page under /_dev/. Off, the listener keeps nothing.
+	Store bool
+	// Out gets each accepted event as one JSON line; nil discards them.
+	Out io.Writer
+	// Log gets one line per refused ingestion request; nil discards them.
+	Log io.Writer
 
 	// readTimeout lets a test shorten the request read limit.
 	readTimeout time.Duration
@@ -56,13 +64,15 @@ type Config struct {
 	beforeServe func(*http.Request)
 }
 
-// Ready is the line dev listen prints once it accepts connections. A script
+// Ready is the line sources listen prints once it accepts connections. A script
 // reads the URL, the cursor and the pid from it.
 type Ready struct {
 	Ready bool `json:"ready"`
 	api.Identity
-	Cursor uint64 `json:"cursor"`
-	UI     string `json:"ui"`
+	// Cursor and UI are set with --store only, so a script tells the modes
+	// apart by ui.
+	Cursor *uint64 `json:"cursor,omitempty"`
+	UI     string  `json:"ui,omitempty"`
 }
 
 type Server struct {
@@ -121,15 +131,23 @@ func Start(cfg Config) (*Server, error) {
 		id.WriteKey, id.WriteKeyPolicy = masked[0], "allowlist"
 	}
 
-	ingestHandler, st := NewHandler(cfg.WriteKeys, cfg.Version)
+	var sink ingest.Sink = newStreamSink(orDiscard(cfg.Out), orDiscard(cfg.Log))
+	var st *store.Store
+	var apiHandler *api.Handler
+	if cfg.Store {
+		st = store.New()
+		// The store goes first, so a reader that sees a line can query it.
+		sink = fanOut{st, sink}
+		apiHandler = api.New(st, api.Config{
+			Identity: id, WriteKeys: masked, AllowHosts: cfg.AllowHosts, Version: cfg.Version, Guide: Guide,
+			UI: ui.Handler(api.UIPath),
+		})
+	}
 	s := &Server{
 		id:     id,
 		store:  st,
-		ingest: ingestHandler,
-		api: api.New(st, api.Config{
-			Identity: id, WriteKeys: masked, AllowHosts: cfg.AllowHosts, Version: cfg.Version, Guide: Guide,
-			UI: ui.Handler(api.UIPath),
-		}),
+		ingest: ingest.New(sink, cfg.WriteKeys, cfg.Version),
+		api:    apiHandler,
 		served: make(chan error, 1),
 		conns:  map[net.Conn]http.ConnState{},
 
@@ -158,6 +176,10 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.beforeServe(r)
 	}
 	if strings.HasPrefix(r.URL.Path, api.Prefix) {
+		if s.api == nil {
+			storeDisabled(w)
+			return
+		}
 		s.api.ServeHTTP(w, r)
 		return
 	}
@@ -166,7 +188,29 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Ready returns the ready object with the cursor at call time.
 func (s *Server) Ready() Ready {
-	return Ready{Ready: true, Identity: s.id, Cursor: s.store.Cursor(), UI: s.id.URL + api.UIPath}
+	r := Ready{Ready: true, Identity: s.id}
+	if s.store != nil {
+		cursor := s.store.Cursor()
+		r.Cursor, r.UI = &cursor, s.id.URL+api.UIPath
+	}
+	return r
+}
+
+// storeDisabled answers the query API of a listener started without
+// --store, in the error shape of the query API.
+func storeDisabled(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNotFound)
+	_, _ = io.WriteString(w, `{"error":{"status":404,"code":"store_disabled",`+
+		`"message":"this listener keeps nothing: it prints events on stdout. Restart it with --store to read them here",`+
+		`"param":null,"details":null,"next":"rudder-cli sources listen --store"}}`+"\n")
+}
+
+func orDiscard(w io.Writer) io.Writer {
+	if w == nil {
+		return io.Discard
+	}
+	return w
 }
 
 // Done receives the error that ended serving, nil after Close.
@@ -180,7 +224,9 @@ func (s *Server) Done() <-chan error {
 func (s *Server) Close(ctx context.Context) error {
 	s.closeOnce.Do(func() {
 		s.ingest.Stop()
-		s.api.Stop()
+		if s.api != nil {
+			s.api.Stop()
+		}
 		s.expireReads()
 		if err := s.http.Shutdown(ctx); err != nil {
 			_ = s.http.Close()

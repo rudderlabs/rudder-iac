@@ -1,4 +1,4 @@
-package dev
+package sources
 
 import (
 	"context"
@@ -37,14 +37,14 @@ func get(cmd *cobra.Command, base string, q url.Values, timeout time.Duration) (
 		if errors.Is(err, context.DeadlineExceeded) {
 			message = fmt.Sprintf("the listener at %s did not answer within %s", base, timeout)
 		}
-		return nil, nil, fail(cmd, &usageError{code: "server_unreachable", message: message, next: "rudder-cli dev listen --help"})
+		return nil, nil, fail(cmd, &usageError{code: "server_unreachable", message: message, next: "rudder-cli sources listen --help"})
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, nil, fail(cmd, &usageError{
 			code: "server_unreachable", message: "reading the answer of " + base + ": " + err.Error(),
-			next: "rudder-cli dev listen --help",
+			next: "rudder-cli sources listen --help",
 		})
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -55,8 +55,8 @@ func get(cmd *cobra.Command, base string, q url.Values, timeout time.Duration) (
 	if resp.Header.Get("X-Dev-Server-Id") == "" {
 		return nil, nil, fail(cmd, &usageError{
 			code:    "server_unreachable",
-			message: base + " answered HTTP 200, not as dev listen answers; check the url of the ready line",
-			next:    "rudder-cli dev listen --help",
+			message: base + " answered HTTP 200, not as sources listen answers; check the url of the ready line",
+			next:    "rudder-cli sources listen --help",
 		})
 	}
 	return resp, body, nil
@@ -69,8 +69,8 @@ func serverError(cmd *cobra.Command, base string, status int, body []byte) error
 	if !e.IsObject() || !e.Get("code").Exists() {
 		return fail(cmd, &usageError{
 			code:    "server_unreachable",
-			message: fmt.Sprintf("%s answered HTTP %d, not as dev listen answers; check the url of the ready line", base, status),
-			next:    "rudder-cli dev listen --help",
+			message: fmt.Sprintf("%s answered HTTP %d, not as sources listen answers; check the url of the ready line", base, status),
+			next:    "rudder-cli sources listen --help",
 		})
 	}
 	next := withURL(e.Get("next").String(), base)
@@ -108,7 +108,7 @@ func readSummary(cmd *cobra.Command, opts *readOptions, base string, q url.Value
 		if err := json.Unmarshal(body, &s); err != nil {
 			return fail(cmd, &usageError{
 				code: "server_unreachable", message: "the summary does not parse: " + err.Error(),
-				next: "rudder-cli dev listen --help",
+				next: "rudder-cli sources listen --help",
 			})
 		}
 		s.Next = withURL(s.Next, base)

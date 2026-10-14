@@ -1,4 +1,4 @@
-package dev
+package sources
 
 import (
 	"bufio"
@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,43 +27,43 @@ func TestListenRejectsBadFlags(t *testing.T) {
 	}{
 		{
 			args: []string{"--port", "70000"},
-			want: "Error: --port must be 0 to 65535, got 70000\nNext: rudder-cli dev listen --port 0\n",
+			want: "Error: --port must be 0 to 65535, got 70000\nNext: rudder-cli sources listen --port 0\n",
 		},
 		{
 			args: []string{"--port", "-1"},
-			want: "Error: --port must be 0 to 65535, got -1\nNext: rudder-cli dev listen --port 0\n",
+			want: "Error: --port must be 0 to 65535, got -1\nNext: rudder-cli sources listen --port 0\n",
 		},
 		{
 			args: []string{"--bind", "localhost"},
 			want: "Error: --bind must be an IP address such as 127.0.0.1, got \"localhost\"\n" +
-				"Next: rudder-cli dev listen --bind 127.0.0.1\n",
+				"Next: rudder-cli sources listen --bind 127.0.0.1\n",
 		},
 		{
 			args: []string{"--write-key", ""},
-			want: "Error: --write-key needs a key\nNext: rudder-cli dev listen --help\n",
+			want: "Error: --write-key needs a key\nNext: rudder-cli sources listen --help\n",
 		},
 		{
 			args: []string{"--allow-host", ""},
-			want: "Error: --allow-host needs a host name\nNext: rudder-cli dev listen --help\n",
+			want: "Error: --allow-host needs a host name\nNext: rudder-cli sources listen --help\n",
 		},
 		{
 			args: []string{"--allow-host", "dev-listen:4321"},
 			want: "Error: --allow-host takes a host name without a port, got \"dev-listen:4321\"\n" +
-				"Next: rudder-cli dev listen --allow-host dev-listen\n",
+				"Next: rudder-cli sources listen --allow-host dev-listen\n",
 		},
 		{
 			args: []string{"now"},
-			want: "Error: unknown argument \"now\" for \"rudder-cli dev listen\"\nNext: rudder-cli dev listen --help\n",
+			want: "Error: unknown argument \"now\" for \"rudder-cli sources listen\"\nNext: rudder-cli sources listen --help\n",
 		},
 		{
 			args: []string{"--json"},
-			want: "Error: unknown flag: --json\nNext: rudder-cli dev listen --help\n",
+			want: "Error: unknown flag: --json\nNext: rudder-cli sources listen --help\n",
 		},
 	} {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
 			t.Parallel()
 
-			stdout, stderr, err := execute(append([]string{"dev", "listen"}, tc.args...)...)
+			stdout, stderr, err := execute(append([]string{"sources", "listen"}, tc.args...)...)
 
 			var silent *cmderrors.SilentError
 			require.ErrorAs(t, err, &silent)
@@ -81,7 +82,7 @@ func TestListenReportsATakenPort(t *testing.T) {
 	t.Cleanup(func() { _ = taken.Close() })
 	port := strconv.Itoa(taken.Addr().(*net.TCPAddr).Port)
 
-	stdout, stderr, err := execute("dev", "listen", "--port", port)
+	stdout, stderr, err := execute("sources", "listen", "--port", port)
 
 	var silent *cmderrors.SilentError
 	require.ErrorAs(t, err, &silent)
@@ -101,28 +102,47 @@ func TestListenReportsATakenPort(t *testing.T) {
 	require.Nil(t, got.Error.Status)
 	require.Equal(t, "port_in_use", got.Error.Code)
 	require.Contains(t, got.Error.Message, port)
-	require.Equal(t, "rudder-cli dev listen --port 0", got.Error.Next)
+	require.Equal(t, "rudder-cli sources listen --port 0", got.Error.Next)
 }
 
 type listening struct {
-	ready  map[string]any
-	stderr *bytes.Buffer
-	cancel context.CancelFunc
+	ready map[string]any
+	// stdout holds the events; stderr holds every stderr line but the ready line.
+	stdout, stderr *lockedBuffer
+	cancel         context.CancelFunc
 	// done is closed when runListen returns err.
 	done chan struct{}
 	err  error
 }
 
+// lockedBuffer is safe for the listener goroutines and the test to share.
+type lockedBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.b.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.b.String()
+}
+
 // listen runs the command body until the test cancels it, and returns once
-// the ready line is out.
+// the ready line is out on stderr.
 func listen(t *testing.T, opts listenOptions) *listening {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	stdoutR, stdoutW := io.Pipe()
-	l := &listening{stderr: &bytes.Buffer{}, cancel: cancel, done: make(chan struct{})}
+	stderrR, stderrW := io.Pipe()
+	l := &listening{stdout: &lockedBuffer{}, stderr: &lockedBuffer{}, cancel: cancel, done: make(chan struct{})}
 	go func() {
-		l.err = runListen(ctx, stdoutW, l.stderr, opts, "1.2.3")
-		_ = stdoutW.Close()
+		l.err = runListen(ctx, l.stdout, stderrW, opts, "1.2.3")
+		_ = stderrW.Close()
 		close(l.done)
 	}()
 	t.Cleanup(func() {
@@ -130,10 +150,17 @@ func listen(t *testing.T, opts listenOptions) *listening {
 		<-l.done
 	})
 
-	line, err := bufio.NewReader(stdoutR).ReadBytes('\n')
-	require.NoError(t, err)
-	require.NoError(t, json.Unmarshal(line, &l.ready))
-	go func() { _, _ = io.Copy(io.Discard, stdoutR) }()
+	r := bufio.NewReader(stderrR)
+	for {
+		line, err := r.ReadBytes('\n')
+		require.NoError(t, err)
+		if bytes.HasPrefix(line, []byte(`{"ready":true`)) {
+			require.NoError(t, json.Unmarshal(line, &l.ready))
+			break
+		}
+		_, _ = l.stderr.Write(line)
+	}
+	go func() { _, _ = io.Copy(l.stderr, r) }()
 	return l
 }
 
@@ -143,6 +170,7 @@ func TestListenServesUntilItsContextEnds(t *testing.T) {
 		bind:       "127.0.0.1",
 		writeKeys:  []string{"fake-write-key-for-tests"},
 		allowHosts: []string{"dev-listen"},
+		store:      true,
 	})
 	url := l.ready["url"].(string)
 
@@ -174,15 +202,29 @@ func TestListenServesUntilItsContextEnds(t *testing.T) {
 	require.NoError(t, resp.Body.Close())
 	require.Equal(t, "1.2.3", info.Version)
 	require.Equal(t, 1, info.Cursor)
+	require.Equal(t, `{"userId":"u1","event":"e"}`+"\n", l.stdout.String())
 
 	l.cancel()
 	select {
 	case <-l.done:
 		require.NoError(t, l.err)
 	case <-time.After(2 * time.Second):
-		t.Fatal("dev listen did not stop")
+		t.Fatal("sources listen did not stop")
 	}
-	require.Empty(t, l.stderr.String(), "stderr stays silent when it is not a terminal")
+	require.Empty(t, l.stderr.String(), "stderr has the ready line only when it is not a terminal")
+}
+
+func TestListenWithoutStoreKeepsNothing(t *testing.T) {
+	t.Parallel()
+	l := listen(t, listenOptions{bind: "127.0.0.1"})
+	url := l.ready["url"].(string)
+
+	require.NotContains(t, l.ready, "cursor")
+	require.NotContains(t, l.ready, "ui")
+	resp, err := http.Get(url + "/_dev/v1/info")
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 func TestListenWarnsOnAnExposedBind(t *testing.T) {

@@ -1,4 +1,4 @@
-package dev
+package sources
 
 import (
 	"cmp"
@@ -132,20 +132,20 @@ func newCmdEvents() *cobra.Command {
 			page.
 		`),
 		Example: heredoc.Doc(`
-			$ rudder-cli dev events --url http://127.0.0.1:4321
+			$ rudder-cli sources events --url http://127.0.0.1:4321
 
 			# Assert a count in CI
-			$ rudder-cli dev events --url "$url" --since "$cur" --event 'Order Completed' --json | jq -e '.summary.byEvent["Order Completed"] == 1'
+			$ rudder-cli sources events --url "$url" --since "$cur" --event 'Order Completed' --json | jq -e '.summary.byEvent["Order Completed"] == 1'
 
 			# Wait up to 30s for an event the app sends later
-			$ rudder-cli dev events --url "$url" --since "$cur" --event 'Order Completed' --wait 30s --json
+			$ rudder-cli sources events --url "$url" --since "$cur" --event 'Order Completed' --wait 30s --json
 
 			# A fresh cursor
-			$ rudder-cli dev events --url "$url" --json | jq .cursor
+			$ rudder-cli sources events --url "$url" --json | jq .cursor
 		`),
 		Args: groupArgs,
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {
-			defer func() { track("dev events", err) }()
+			defer func() { track("sources events", err) }()
 			base, e := opts.listenerURL(cmd)
 			if e == nil {
 				e = opts.validate(cmd)
@@ -203,25 +203,25 @@ func newCmdEventsList() *cobra.Command {
 			--view compact drops the SDK's auto-collected context; --fields PATH keeps only that dotted
 			path (repeat it; it cannot be combined with --view).
 
-			The stream carries no cursor. Take it from the ready line or from dev events --json. At
+			The stream carries no cursor. Take it from the ready line or from sources events --json. At
 			most --limit events per page; when more are left, stderr names the --since to continue
-			from. Events of rejected requests are not in the stream: dev events counts them.
+			from. Events of rejected requests are not in the stream: sources events counts them.
 		`),
 		Example: heredoc.Doc(`
-			$ rudder-cli dev events list --url http://127.0.0.1:4321 --since 5m
+			$ rudder-cli sources events list --url http://127.0.0.1:4321 --since 5m
 
 			# The properties of one event
-			$ rudder-cli dev events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json
+			$ rudder-cli sources events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json
 
 			# Check a property type (guard the empty stream)
-			$ rudder-cli dev events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json | jq -e -s 'length > 0 and all(.[]; .properties.total | type == "number")'
+			$ rudder-cli sources events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json | jq -e -s 'length > 0 and all(.[]; .properties.total | type == "number")'
 
 			# How many events
-			$ rudder-cli dev events list --url "$url" --since "$cur" --json | wc -l
+			$ rudder-cli sources events list --url "$url" --since "$cur" --json | wc -l
 		`),
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {
-			defer func() { track("dev events list", err) }()
+			defer func() { track("sources events list", err) }()
 			base, e := opts.listenerURL(cmd)
 			if e == nil {
 				e = opts.validate(cmd)
@@ -264,7 +264,7 @@ func checkListFlags(cmd *cobra.Command, limit int, view string, fields []string)
 	help := cmd.CommandPath() + " --help"
 	switch {
 	case view == "counts":
-		return &usageError{message: "--view counts is the summary, which dev events prints", next: "rudder-cli dev events --json"}
+		return &usageError{message: "--view counts is the summary, which sources events prints", next: "rudder-cli sources events --json"}
 	case !slices.Contains([]string{"list", "compact", "full"}, view):
 		return &usageError{message: fmt.Sprintf("--view must be list, compact or full, got %q", view), next: help}
 	case len(fields) > 0 && cmd.Flags().Changed("view"):
@@ -298,13 +298,13 @@ func shellWords(values []string) []string {
 	return out
 }
 
-// withURL adds the listener URL to a dev events command, so a next runs
+// withURL adds the listener URL to a sources events command, so a next runs
 // against the listener the caller read. The server writes next without it.
 func withURL(next, base string) string {
 	if base == "" {
 		return next
 	}
-	for _, path := range []string{"rudder-cli dev events list", "rudder-cli dev events"} {
+	for _, path := range []string{"rudder-cli sources events list", "rudder-cli sources events"} {
 		if rest, ok := strings.CutPrefix(next, path); ok && (rest == "" || rest[0] == ' ') {
 			return path + " --url " + shellWord(base) + rest
 		}

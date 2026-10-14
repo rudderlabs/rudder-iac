@@ -13,7 +13,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	datagraphPkg "github.com/rudderlabs/rudder-iac/cli/internal/cmd/datagraph"
 	d "github.com/rudderlabs/rudder-iac/cli/internal/cmd/debug"
-	devcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/dev"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
@@ -21,6 +20,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/migrate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/validate"
 	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
+	sourcescmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/sources"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/transformations"
@@ -100,7 +100,7 @@ func init() {
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(experimentalCmd)
 
-	devCmd = devcmd.NewCmdDev()
+	devCmd = sourcescmd.NewCmdSources()
 	rootCmd.AddCommand(devCmd)
 
 	rootCmd.AddCommand(typer.NewCmdTyper())
@@ -127,7 +127,7 @@ func initConfig() {
 		experimentalCmd.Hidden = false
 	}
 
-	if config.GetConfig().ExperimentalFlags.DevListen {
+	if config.GetConfig().ExperimentalFlags.SourcesListen {
 		devCmd.Hidden = false
 	}
 }

@@ -25,11 +25,11 @@ import (
 // the exit code.
 func devRead(t *testing.T, args ...string) (string, string, int) {
 	t.Helper()
-	cmd := exec.Command(cliBinPath, append([]string{"dev", "events"}, args...)...)
+	cmd := exec.Command(cliBinPath, append([]string{"sources", "events"}, args...)...)
 	cmd.Env = append(os.Environ(),
 		"HOME="+t.TempDir(),
 		"RUDDERSTACK_CLI_EXPERIMENTAL=true",
-		"RUDDERSTACK_X_DEV_LISTEN=true",
+		"RUDDERSTACK_X_SOURCES_LISTEN=true",
 		"RUDDERSTACK_CLI_TELEMETRY_DISABLED=true",
 		// A URL exported in the developer's shell would change the nexts.
 		"RUDDERSTACK_DEV_URL=",
@@ -71,7 +71,7 @@ func post(t *testing.T, url, body string) int {
 
 // A read command prints what curl of the same URL prints. The
 // summary differs only in the --url the CLI adds to each next.
-func TestDevListenEventsMatchCurl(t *testing.T) {
+func TestSourcesListenEventsMatchCurl(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
 	url := p.url()
@@ -97,14 +97,14 @@ func TestDevListenEventsMatchCurl(t *testing.T) {
 	stdout, stderr, code := devRead(t, "--url", url, "--event", "Order Completed", "--json")
 	require.Equal(t, 0, code, stderr)
 	want := strings.ReplaceAll(curl(t, url+"/_dev/v1/events?event=Order+Completed&view=counts"),
-		`"next":"rudder-cli dev events `, `"next":"rudder-cli dev events --url `+url+` `)
+		`"next":"rudder-cli sources events `, `"next":"rudder-cli sources events --url `+url+` `)
 	require.Equal(t, want, stdout)
 	require.Contains(t, stdout, `"byEvent":{"Order Completed":2}`)
 	require.Contains(t, stdout, `"rejected":{"events":1,"byEvent":{"Order Completed":1}}`)
 }
 
 // A read that waits gets the event that arrives after it started.
-func TestDevListenEventsWaitsForANewEvent(t *testing.T) {
+func TestSourcesListenEventsWaitsForANewEvent(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
 	listener := p.url()
@@ -144,19 +144,19 @@ func TestDevListenEventsWaitsForANewEvent(t *testing.T) {
 }
 
 // --json is read wherever it appears, also after the flag that failed.
-func TestDevListenEventsErrorsInJSON(t *testing.T) {
+func TestSourcesListenEventsErrorsInJSON(t *testing.T) {
 	t.Parallel()
 	stdout, stderr, code := devRead(t, "list", "--wait", "30s", "--json")
 
 	require.Equal(t, 1, code)
 	require.Empty(t, stdout)
-	require.Equal(t, `{"error":{"status":null,"code":"usage","message":"--wait and --min belong to dev events: `+
-		`dev events list reads what is there","param":null,"details":null,`+
-		`"next":"rudder-cli dev events --url http://127.0.0.1:4321 --wait 30s --json"}}`+"\n", stderr)
+	require.Equal(t, `{"error":{"status":null,"code":"usage","message":"--wait and --min belong to sources events: `+
+		`sources events list reads what is there","param":null,"details":null,`+
+		`"next":"rudder-cli sources events --url http://127.0.0.1:4321 --wait 30s --json"}}`+"\n", stderr)
 }
 
 // SIGTERM with a blocked upload and a long-poll exits 0 in under 2 s.
-func TestDevListenStopsWithALongPollAndAStalledUpload(t *testing.T) {
+func TestSourcesListenStopsWithALongPollAndAStalledUpload(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
 	upload, err := net.Dial("tcp", strings.TrimPrefix(p.url(), "http://"))

@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// devListenImageEnv names the image under test. The test builds no image:
+// sourcesListenImageEnv names the image under test. The test builds no image:
 // the CI job runs `make docker-build` and passes the tag.
-const devListenImageEnv = "RUDDER_CLI_IMAGE"
+const sourcesListenImageEnv = "RUDDER_CLI_IMAGE"
 
 func docker(t *testing.T, args ...string) string {
 	t.Helper()
@@ -28,20 +28,20 @@ func docker(t *testing.T, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// The published image runs dev listen with the gate set by env, a host
+// The published image runs sources listen with the gate set by env, a host
 // client reaches it through the mapped port, and docker stop exits 0.
-func TestDevListenInADockerContainer(t *testing.T) {
-	image := os.Getenv(devListenImageEnv)
+func TestSourcesListenInADockerContainer(t *testing.T) {
+	image := os.Getenv(sourcesListenImageEnv)
 	if image == "" {
-		t.Skipf("set %s to an image built with make docker-build", devListenImageEnv)
+		t.Skipf("set %s to an image built with make docker-build", sourcesListenImageEnv)
 	}
 	t.Parallel()
 
 	id := docker(t, "run", "-d", "-p", "127.0.0.1::4321",
 		"-e", "RUDDERSTACK_CLI_EXPERIMENTAL=true",
-		"-e", "RUDDERSTACK_X_DEV_LISTEN=true",
+		"-e", "RUDDERSTACK_X_SOURCES_LISTEN=true",
 		"-e", "RUDDERSTACK_CLI_TELEMETRY_DISABLED=true",
-		image, "dev", "listen", "--bind", "0.0.0.0", "--port", "4321")
+		image, "sources", "listen", "--store", "--bind", "0.0.0.0", "--port", "4321")
 	t.Cleanup(func() { _ = exec.Command("docker", "rm", "-fv", id).Run() })
 
 	// "127.0.0.1:55001", the first line when docker maps IPv4 and IPv6.
@@ -69,7 +69,7 @@ func TestDevListenInADockerContainer(t *testing.T) {
 		Bind     string `json:"bind"`
 		Port     int    `json:"port"`
 	}
-	// An image without dev listen prints an error and exits: fail at once.
+	// An image without sources listen prints an error and exits: fail at once.
 	for deadline := time.Now().Add(20 * time.Second); ; time.Sleep(100 * time.Millisecond) {
 		code, body := get("localhost:"+port, "/_dev/v1/info")
 		if code == http.StatusOK && json.Unmarshal(body, &info) == nil {

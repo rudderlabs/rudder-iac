@@ -1,6 +1,6 @@
-// Package dev holds the experimental `dev` command group: a local listener
+// Package sources holds the experimental `sources` command group: a local listener
 // that captures the events an app sends, and the commands that read them.
-package dev
+package sources
 
 import (
 	"strings"
@@ -11,23 +11,23 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten"
 )
 
-const disabledMessage = "dev is experimental: set RUDDERSTACK_CLI_EXPERIMENTAL=true and RUDDERSTACK_X_DEV_LISTEN=true, " +
-	"or run rudder-cli experimental enable devListen with RUDDERSTACK_CLI_EXPERIMENTAL=true"
+const disabledMessage = "sources is experimental: set RUDDERSTACK_CLI_EXPERIMENTAL=true and RUDDERSTACK_X_SOURCES_LISTEN=true, " +
+	"or run rudder-cli experimental enable sourcesListen with RUDDERSTACK_CLI_EXPERIMENTAL=true"
 
-func NewCmdDev() *cobra.Command {
+func NewCmdSources() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:    "dev",
+		Use:    "sources",
 		Short:  "Capture and inspect the events an app sends (experimental)",
 		Long:   devlisten.Guide,
 		Hidden: true,
 		Args:   groupArgs,
 		// A child with its own PersistentPreRunE would replace this check.
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			if config.GetConfig().ExperimentalFlags.DevListen {
+			if config.GetConfig().ExperimentalFlags.SourcesListen {
 				return nil
 			}
 			return fail(cmd, &usageError{
-				code: "experimental_disabled", message: disabledMessage, next: "rudder-cli experimental enable devListen",
+				code: "experimental_disabled", message: disabledMessage, next: "rudder-cli experimental enable sourcesListen",
 			})
 		},
 		RunE: showHelp,
@@ -37,12 +37,12 @@ func NewCmdDev() *cobra.Command {
 	cmd.AddCommand(newCmdEvents())
 
 	cmd.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
-		// dev events list reads what is there; only the summary waits.
+		// sources events list reads what is there; only the summary waits.
 		if c.Name() == "list" {
 			if flag, ok := strings.CutPrefix(err.Error(), "unknown flag: --"); ok && (flag == "wait" || flag == "min") {
 				return fail(c, &usageError{
-					message: "--wait and --min belong to dev events: dev events list reads what is there",
-					next:    withURL("rudder-cli dev events --wait 30s --json", knownURL()),
+					message: "--wait and --min belong to sources events: sources events list reads what is there",
+					next:    withURL("rudder-cli sources events --wait 30s --json", knownURL()),
 				})
 			}
 		}

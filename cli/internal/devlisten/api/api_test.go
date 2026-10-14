@@ -202,15 +202,15 @@ func TestErrors(t *testing.T) {
 	}{
 		{
 			name: "host before browser origin", method: "GET", target: "/_dev/v1/info", host: "evil.example", header: crossSite,
-			status: 403, code: "host_not_allowed", next: "rudder-cli dev events --json",
+			status: 403, code: "host_not_allowed", next: "rudder-cli sources events --json",
 		},
 		{
 			name: "browser origin before shutdown", method: "GET", target: "/_dev/v1/info", header: crossSite, stopped: true,
-			status: 403, code: "browser_origin", next: "rudder-cli dev events --json",
+			status: 403, code: "browser_origin", next: "rudder-cli sources events --json",
 		},
 		{
 			name: "shutdown before route", method: "GET", target: "/_dev/v1/nope", stopped: true,
-			status: 503, code: "shutting_down", next: "rudder-cli dev listen --help",
+			status: 503, code: "shutting_down", next: "rudder-cli sources listen --help",
 		},
 		{
 			name: "unknown route", method: "GET", target: "/_dev/v1/nope",
@@ -230,11 +230,11 @@ func TestErrors(t *testing.T) {
 		},
 		{
 			name: "page host check", method: "GET", target: "/_dev/ui/", host: "evil.example",
-			status: 403, code: "host_not_allowed", next: "rudder-cli dev events --json",
+			status: 403, code: "host_not_allowed", next: "rudder-cli sources events --json",
 		},
 		{
 			name: "page shutdown", method: "GET", target: "/_dev/ui/", stopped: true,
-			status: 503, code: "shutting_down", next: "rudder-cli dev listen --help",
+			status: 503, code: "shutting_down", next: "rudder-cli sources listen --help",
 		},
 		{
 			name: "write method", method: "POST", target: "/_dev/v1/info",
@@ -438,7 +438,7 @@ func TestIndexListsEveryRoute(t *testing.T) {
 		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &idx))
 		require.Equal(t, "v1", idx.APIVersion)
 		require.Equal(t, "9f3ac1d2b7e4c601", idx.ServerID)
-		require.Equal(t, "rudder-cli dev --help", idx.Help)
+		require.Equal(t, "rudder-cli sources --help", idx.Help)
 		require.Equal(t, "curl -fsS '"+testURL+"/_dev/v1/info'", idx.Next)
 		require.Equal(t, idx.Next, idx.Curl)
 		require.Equal(t, map[string]string{
