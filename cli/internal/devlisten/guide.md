@@ -120,8 +120,8 @@ exact and case-sensitive.
 
 The CLI exits 0 on a read of an empty window too. It exits 1 when the window
 lost requests to the memory limit, or when a wait ran out. The check is `jq -e`:
-true exits 0, false exits 1. Set `pipefail`, or the pipeline drops the CLI's exit 1
-and a short count passes.
+true exits 0, false exits 1. In bash or zsh, set `pipefail`, or the pipeline drops
+the CLI's exit 1 and a short count passes.
 
 ```sh
 $ set -o pipefail

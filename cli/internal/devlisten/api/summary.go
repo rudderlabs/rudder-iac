@@ -290,14 +290,15 @@ func (h *Handler) diagnose(rd reading, all, filtered counts, q *eventsQuery) []d
 			"curl -fsS -u '"+key+":' -H 'Content-Type: application/json' -d '{\"event\":\"dev check\",\"userId\":\"dev\"}' '"+
 				h.cfg.Identity.URL+"/v1/track'")
 	}
-	// An empty window that lost requests is not empty because nothing came.
+	// An empty window that lost requests is not empty because nothing came,
+	// so the rules below that read an empty window skip it.
 	if received && reqs == 0 && !rd.lost {
 		add("nothing_new", 0,
 			fmt.Sprintf("No request after cursor %d; the listener holds %d. The app sent before the cursor, or has not sent yet.",
 				win.since, stats.Requests),
 			"rudder-cli dev events --since 0 --json")
 	}
-	if control.Preflight > 0 && control.SourceConfig == 0 && reqs == 0 {
+	if control.Preflight > 0 && control.SourceConfig == 0 && reqs == 0 && !rd.lost {
 		add("preflight_only", control.Preflight,
 			"The browser sent CORS preflights only, so it never sent the requests that carry events.",
 			requests("&kind=control"))
@@ -307,7 +308,7 @@ func (h *Handler) diagnose(rd reading, all, filtered counts, q *eventsQuery) []d
 			"The SDK asked for its config and got 401 or 400: its write key is not on the --write-key allowlist.",
 			requests("&kind=control&failed=true"))
 	}
-	if control.SourceConfig > 0 && control.SourceConfigFailed == 0 && reqs == 0 {
+	if control.SourceConfig > 0 && control.SourceConfigFailed == 0 && reqs == 0 && !rd.lost {
 		add("sdk_loaded_no_events", control.SourceConfig,
 			"The SDK loaded its config but sent no event: check the SDK plugins, or the action never ran.",
 			requests("&kind=control"))

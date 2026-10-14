@@ -933,7 +933,7 @@ func TestReadsDiagnoseOneMomentOfTheStore(t *testing.T) {
 }
 
 // A window whose event requests were all evicted is not a window the app
-// never sent to, so it does not say nothing_new.
+// never sent to, so no rule for an empty window fires.
 func TestAWindowEmptiedByEvictionIsNotNothingNew(t *testing.T) {
 	t.Parallel()
 	st := store.NewWithLimits(1, 64<<20)
@@ -947,6 +947,5 @@ func TestAWindowEmptiedByEvictionIsNotNothingNew(t *testing.T) {
 
 	got := codes(summaryOf(t, h, "since=0").Summary.Diagnosis)
 
-	require.Contains(t, got, "events_evicted")
-	require.NotContains(t, got, "nothing_new")
+	require.Equal(t, []string{"events_evicted"}, got)
 }
