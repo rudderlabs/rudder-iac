@@ -1,6 +1,7 @@
 package dev
 
 import (
+	"encoding/json"
 	"go/build"
 	"net"
 	"net/http"
@@ -391,7 +392,7 @@ func TestReadsFailOnAWindowThatLostRequests(t *testing.T) {
 			name: "summary in JSON", args: []string{"events", "--since", "5m", "--json"}, header: summaryHeader, body: lossy,
 			stdout: `"byEvent":{"Order Completed":0,"chatOpened":1,"chatSuggestionClicked":1}`, fails: true,
 			stderr: `{"error":{"status":null,"code":"events_evicted","message":"` + message + `; pass --allow-partial to accept it",` +
-				`"param":null,"details":null,"next":"rudder-cli dev events --url URL --since 44"}}` + "\n",
+				`"param":null,"details":null,"next":"rudder-cli dev events --url URL --since 44 --json"}}` + "\n",
 		},
 		{
 			name: "summary of the default window", args: []string{"events"}, header: summaryHeader, body: lossy,
@@ -417,7 +418,7 @@ func TestReadsFailOnAWindowThatLostRequests(t *testing.T) {
 			name: "list in JSON", args: []string{"events", "list", "--json"}, header: lossyStream, body: streamBody,
 			stdout: streamBody, fails: true,
 			stderr: `{"error":{"status":null,"code":"events_evicted","message":"` + message + `; pass --allow-partial to accept it",` +
-				`"param":null,"details":null,"next":"rudder-cli dev events list --url URL --since 44"}}` + "\n",
+				`"param":null,"details":null,"next":"rudder-cli dev events list --url URL --since 44 --json"}}` + "\n",
 		},
 		{
 			name: "list with --allow-partial", args: []string{"events", "list", "--json", "--allow-partial"},
@@ -462,14 +463,14 @@ func TestEventsFailsWhenTheWaitRunsOut(t *testing.T) {
 	require.ErrorAs(t, err, &silent)
 	require.True(t, strings.HasPrefix(stdout, "Window after cursor 41; cursor now 47. The wait ran out after 30.0s.\n"), stdout)
 	require.Contains(t, stdout, "ACCEPTED EVENTS  2\n")
-	require.Equal(t, "Error: "+message+"\nNext: rudder-cli dev events --url "+u+" --since 41 --json\n", stderr)
+	require.Equal(t, "Error: "+message+"\nNext: rudder-cli dev events --url "+u+" --since 41 --min 5 --wait 30s\n", stderr)
 
 	stdout, stderr, err = execute("dev", "events", "--url", u, "--since", "41", "--wait", "30s", "--min", "5", "--json")
 
 	require.ErrorAs(t, err, &silent)
 	require.Contains(t, stdout, `"timedOut":true,"waitedMs":30001`)
 	require.Equal(t, `{"error":{"status":null,"code":"wait_timeout","message":"`+message+`","param":null,"details":null,`+
-		`"next":"rudder-cli dev events --url `+u+` --since 41 --json"}}`+"\n", stderr)
+		`"next":"rudder-cli dev events --url `+u+` --since 41 --json --min 5 --wait 30s"}}`+"\n", stderr)
 
 	// The loss explains a short count, so it is the error when both hold;
 	// an accepted loss leaves the wait to fail the read.
@@ -487,7 +488,7 @@ func TestEventsFailsWhenTheWaitRunsOut(t *testing.T) {
 	require.ErrorAs(t, err, &silent)
 	require.Equal(t, "note: requests up to seq 44 were evicted, so this window is incomplete\n"+
 		"Error: --wait ran out after 30.0s: 2 of --min 1 matching accepted events arrived\n"+
-		"Next: rudder-cli dev events --url "+rec.srv.URL+" --since 41 --json\n", stderr)
+		"Next: rudder-cli dev events --url "+rec.srv.URL+" --since 41 --allow-partial --wait 30s\n", stderr)
 }
 
 // A listener that does not answer in time is unreachable, whatever --wait
@@ -504,6 +505,79 @@ func TestEventsReportsAClientTimeoutAsUnreachable(t *testing.T) {
 	require.Empty(t, stdout)
 	require.Equal(t, `{"error":{"status":null,"code":"server_unreachable","message":"the listener at `+srv.URL+
 		` did not answer within 50ms","param":null,"details":null,"next":"rudder-cli dev listen --help"}}`+"\n", stderr)
+}
+
+func TestReadFailureNextKeepsEveryOption(t *testing.T) {
+	t.Parallel()
+	header := streamHeader.Clone()
+	header.Set("X-Dev-Diagnosis", "events_evicted")
+	header.Set("X-Dev-Evicted-Through", "44")
+	for _, tc := range []struct {
+		name, body, path, since, extra string
+		header                         http.Header
+		args                           []string
+	}{
+		{
+			name: "loss with projection", body: streamBody, header: header, path: "events list", since: "44",
+			args:  []string{"events", "list", "--fields", "event", "--fields", "properties.total", "--limit", "2"},
+			extra: " --fields event --fields properties.total --json --limit 2",
+		},
+		{
+			name: "loss with view", body: streamBody, header: header, path: "events list", since: "44",
+			args: []string{"events", "list", "--view", "compact"}, extra: " --json",
+		},
+		{
+			name: "filtered wait timeout", header: summaryHeader, path: "events", since: "5m",
+			body: strings.Replace(summaryBody, `"timedOut":false,"waitedMs":0`, `"timedOut":true,"waitedMs":30001`, 1),
+			args: []string{"events", "--wait", "30s", "--min", "5", "--allow-partial"}, extra: " --json --min 5",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rec := newRecorder(t, http.StatusOK, tc.header, tc.body)
+			args := append([]string{"dev"}, tc.args...)
+			args = append(args, "--url", rec.srv.URL, "--since", "5m", "--event", "Order Completed", "--event", "chat*",
+				"--user-id", "user's id", "--anonymous-id", "a 1", "--write-key", "web", "--write-key", "",
+				"--type", "track", "--type", "page", "--json", "--server-id", "9f3ac1d2b7e4c601", "--timeout", "40s")
+
+			_, stderr, err := execute(args...)
+
+			require.Error(t, err)
+			var got struct{ Error struct{ Next string } }
+			require.NoError(t, json.Unmarshal([]byte(stderr), &got))
+			want := "rudder-cli dev " + tc.path + " --url " + rec.srv.URL + " --since " + tc.since
+			if tc.name == "filtered wait timeout" {
+				want += " --allow-partial"
+			}
+			want += " --anonymous-id 'a 1' --event 'Order Completed' --event 'chat*'" + tc.extra +
+				" --server-id 9f3ac1d2b7e4c601 --timeout 40s --type track --type page --user-id 'user'\\''s id'"
+			if tc.name == "loss with view" {
+				want += " --view compact"
+			}
+			if tc.name == "filtered wait timeout" {
+				want += " --wait 30s"
+			}
+			want += " --write-key web --write-key ''"
+			require.Equal(t, want, got.Error.Next)
+		})
+	}
+}
+
+func TestLossyJSONStreamWithMoreHasOneJSONError(t *testing.T) {
+	t.Parallel()
+	header := streamHeader.Clone()
+	header.Set("X-Dev-Diagnosis", "events_evicted")
+	header.Set("X-Dev-Evicted-Through", "44")
+	header.Set("X-Dev-Has-More", "true")
+	rec := newRecorder(t, http.StatusOK, header, streamBody)
+
+	stdout, stderr, err := execute("dev", "events", "list", "--url", rec.srv.URL, "--json")
+
+	require.Error(t, err)
+	require.Equal(t, streamBody, stdout)
+	var got struct{ Error struct{ Code string } }
+	require.NoError(t, json.Unmarshal([]byte(stderr), &got))
+	require.Equal(t, "events_evicted", got.Error.Code)
 }
 
 const streamBody = `{"type":"track","event":"Order Completed","userId":"u1","originalTimestamp":"2026-09-30T12:00:00.000Z","properties":{"total":42,"note":"a` + "\\u001b[31m" + `b"}}

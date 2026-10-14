@@ -10,9 +10,11 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
@@ -109,12 +111,12 @@ func readSummary(cmd *cobra.Command, opts *readOptions, base string, q url.Value
 	return verdict(cmd, opts, base, readResult{
 		lost:           gjson.GetBytes(body, `summary.diagnosis.#(code=="`+devlisten.CodeEvicted+`")`).Exists(),
 		evictedThrough: gjson.GetBytes(body, "evictedThrough").String(),
-		waitTimeout:    waitTimeout(body, base, q),
+		waitTimeout:    waitTimeout(cmd, body, base, q, opts.since),
 	})
 }
 
 // waitTimeout is the error of a wait that ran out, or nil.
-func waitTimeout(body []byte, base string, q url.Values) *usageError {
+func waitTimeout(cmd *cobra.Command, body []byte, base string, q url.Values, since string) *usageError {
 	if !gjson.GetBytes(body, "timedOut").Bool() {
 		return nil
 	}
@@ -122,8 +124,30 @@ func waitTimeout(body []byte, base string, q url.Values) *usageError {
 		code: "wait_timeout",
 		message: fmt.Sprintf("--wait ran out after %.1fs: %d of --min %s matching accepted events arrived",
 			gjson.GetBytes(body, "waitedMs").Float()/1000, gjson.GetBytes(body, "summary.events.total").Int(), cmp.Or(q.Get("min"), "1")),
-		next: "rudder-cli dev events --url " + shellWord(base) + " --since " + gjson.GetBytes(body, "since").String() + " --json",
+		next: again(cmd, base, since),
 	}
+}
+
+// again is the command line the caller ran, with --url filled in and --since
+// replaced, so a next command asks the same question of the same listener.
+func again(cmd *cobra.Command, base, since string) string {
+	words := []string{cmd.CommandPath(), "--url", shellWord(base), "--since", shellWord(since)}
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		slice, isSlice := f.Value.(pflag.SliceValue)
+		switch {
+		case f.Name == "url" || f.Name == "since":
+		case isSlice:
+			for _, v := range slice.GetSlice() {
+				words = append(words, "--"+f.Name, shellWord(v))
+			}
+		case f.Value.Type() == "bool":
+			// A bool takes no separate word: --json, or --json=false.
+			words = append(words, strings.TrimSuffix("--"+f.Name+"="+f.Value.String(), "=true"))
+		default:
+			words = append(words, "--"+f.Name, shellWord(f.Value.String()))
+		}
+	})
+	return strings.Join(words, " ")
 }
 
 // writeSummary prints the summary object as the server wrote it, with the
@@ -183,7 +207,9 @@ func writeStream(cmd *cobra.Command, opts *readOptions, base string, header http
 	hasMore := header.Get("X-Dev-Has-More") == "true"
 	cursor := header.Get("X-Dev-Cursor")
 	if opts.json {
-		if hasMore {
+		// A read that fails on loss writes one JSON error to stderr and nothing else.
+		lost := header.Get("X-Dev-Diagnosis") == devlisten.CodeEvicted
+		if hasMore && (!lost || opts.allowPartial) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "more events: continue with --since %s\n", cursor)
 		}
 		_, err := cmd.OutOrStdout().Write(body)
@@ -216,7 +242,7 @@ func verdict(cmd *cobra.Command, opts *readOptions, base string, r readResult) e
 				code:    devlisten.CodeEvicted,
 				message: message + "; pass --allow-partial to accept it",
 				// The window after the newest evicted request is complete.
-				next: cmd.CommandPath() + " --url " + shellWord(base) + " --since " + r.evictedThrough,
+				next: again(cmd, base, r.evictedThrough),
 			})
 		}
 		fmt.Fprintln(cmd.ErrOrStderr(), "note: "+message)
