@@ -14,6 +14,7 @@ import (
 	datagraphPkg "github.com/rudderlabs/rudder-iac/cli/internal/cmd/datagraph"
 	d "github.com/rudderlabs/rudder-iac/cli/internal/cmd/debug"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/hello"
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/destroy"
@@ -100,6 +101,7 @@ func init() {
 
 	rootCmd.AddCommand(typer.NewCmdTyper())
 	rootCmd.AddCommand(transformations.NewCmdTransformations())
+	rootCmd.AddCommand(hello.NewCmdHello())
 
 	datagraphCmd = datagraphPkg.NewCmdDataGraph()
 	rootCmd.AddCommand(datagraphCmd)

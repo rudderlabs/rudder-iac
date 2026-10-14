@@ -20,6 +20,14 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 )
 
+func TestRootCommandRegistersHello(t *testing.T) {
+	cmd, remainingArgs, err := rootCmd.Find([]string{"hello"})
+
+	require.NoError(t, err)
+	assert.Equal(t, "hello", cmd.Name())
+	assert.Empty(t, remainingArgs)
+}
+
 // A pre-run failure is reported under the command's path with stage "pre_run".
 func TestPreRunFailuresAreTrackedUnderCommandPath(t *testing.T) {
 	// Every PreRunE below fails: either on flag validation or on the missing token.
