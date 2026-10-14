@@ -3,11 +3,9 @@ package sources
 import (
 	"bufio"
 	"bytes"
-	"cmp"
 	"fmt"
 	"io"
-	"maps"
-	"slices"
+	"net/url"
 	"strconv"
 	"strings"
 	"text/tabwriter"
@@ -18,80 +16,6 @@ import (
 
 // maxCell caps a table cell, so one large property keeps the table readable.
 const maxCell = 60
-
-// summaryText holds the summary keys the text form shows. The JSON form is
-// the contract; this is for people.
-type summaryText struct {
-	Since          uint64 `json:"since"`
-	Cursor         uint64 `json:"cursor"`
-	TimedOut       bool   `json:"timedOut"`
-	WaitedMs       int64  `json:"waitedMs"`
-	EvictedThrough uint64 `json:"evictedThrough"`
-	Summary        struct {
-		Requests struct {
-			Total  int `json:"total"`
-			Failed int `json:"failed"`
-		} `json:"requests"`
-		Events struct {
-			Total int `json:"total"`
-		} `json:"events"`
-		ByEvent  map[string]int `json:"byEvent"`
-		Rejected struct {
-			Events  int            `json:"events"`
-			ByEvent map[string]int `json:"byEvent"`
-		} `json:"rejected"`
-		Control struct {
-			Total int `json:"total"`
-		} `json:"control"`
-		Diagnosis []struct {
-			Code    string `json:"code"`
-			Count   int    `json:"count"`
-			Message string `json:"message"`
-			Next    string `json:"next"`
-		} `json:"diagnosis"`
-	} `json:"summary"`
-	Next string `json:"next"`
-}
-
-func (s *summaryText) render(out io.Writer) error {
-	w := bufio.NewWriter(out)
-	fmt.Fprintf(w, "Window after cursor %d; cursor now %d.", s.Since, s.Cursor)
-	if s.TimedOut {
-		fmt.Fprintf(w, " The wait ran out after %.1fs.", float64(s.WaitedMs)/1000)
-	}
-	fmt.Fprint(w, "\n\n")
-
-	fmt.Fprintf(w, "ACCEPTED EVENTS  %d\n", s.Summary.Events.Total)
-	counts(w, s.Summary.ByEvent)
-	fmt.Fprintf(w, "REJECTED EVENTS  %d\n", s.Summary.Rejected.Events)
-	counts(w, s.Summary.Rejected.ByEvent)
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(tw, "REQUESTS\t%d (%d failed)\n", s.Summary.Requests.Total, s.Summary.Requests.Failed)
-	fmt.Fprintf(tw, "CONTROL\t%d\n", s.Summary.Control.Total)
-	_ = tw.Flush()
-
-	if len(s.Summary.Diagnosis) > 0 {
-		fmt.Fprintln(w)
-	}
-	for _, d := range s.Summary.Diagnosis {
-		fmt.Fprintf(w, "%s (%d): %s\n  Next: %s\n", d.Code, d.Count, d.Message, d.Next)
-	}
-	fmt.Fprintf(w, "\nNext: %s\n", s.Next)
-	return w.Flush()
-}
-
-// counts lists names by count, most first, so the events that arrived lead
-// and the zero entries a caller asked for follow.
-func counts(w io.Writer, byName map[string]int) {
-	names := slices.SortedFunc(maps.Keys(byName), func(a, b string) int {
-		return cmp.Or(cmp.Compare(byName[b], byName[a]), cmp.Compare(a, b))
-	})
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	for _, name := range names {
-		fmt.Fprintf(tw, "  %s\t%d\n", cell(name), byName[name])
-	}
-	_ = tw.Flush()
-}
 
 type streamTable struct {
 	since  string
@@ -114,8 +38,8 @@ func renderStream(out io.Writer, body []byte, t streamTable) error {
 		window = "since " + t.since
 	}
 	if len(events) == 0 {
-		fmt.Fprintf(w, "0 events %s; run rudder-cli sources events --url %s --since %s for the diagnosis\n",
-			window, shellWord(t.base), shellWord(t.since))
+		fmt.Fprintf(w, "0 events %s; refused requests: curl -fsS %s\n",
+			window, shellWord(t.base+"/_dev/v1/requests?since="+url.QueryEscape(t.since)+"&failed=true&view=compact"))
 		return w.Flush()
 	}
 	fmt.Fprintf(w, "%d events %s", len(events), window)

@@ -65,8 +65,8 @@ func newCmdListen() *cobra.Command {
 			--port 0 lets the system pick a free port, so parallel runs never collide. A fixed port that
 			is taken fails at start with port_in_use and exit 1. Use --bind 0.0.0.0 only in a
 			container. By default any write key is accepted, a missing one included. --write-key is an
-			allowlist: it rejects every other key and a missing key with 401. On sources events and
-			sources events list, --write-key filters instead.
+			allowlist: it rejects every other key and a missing key with 401. On sources events,
+			--write-key filters instead.
 
 			Listeners share nothing, and there is no state or lock file. rudder-cli sources --help has
 			the whole guide.

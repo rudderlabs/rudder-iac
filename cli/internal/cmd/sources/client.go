@@ -2,13 +2,11 @@ package sources
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -94,48 +92,6 @@ func trimNewline(b []byte) []byte {
 	return b
 }
 
-// readSummary prints the summary object as the server wrote it, with the
-// URL added to every rudder-cli next, or as text.
-func readSummary(cmd *cobra.Command, opts *readOptions, base string, q url.Values, timeout time.Duration) error {
-	_, body, err := get(cmd, base, q, timeout)
-	if err != nil {
-		return err
-	}
-	noteEviction(cmd, opts.since, gjson.GetBytes(body, "evictedThrough").Uint())
-
-	if !opts.json {
-		var s summaryText
-		if err := json.Unmarshal(body, &s); err != nil {
-			return fail(cmd, &usageError{
-				code: "server_unreachable", message: "the summary does not parse: " + err.Error(),
-				next: "rudder-cli sources listen --help",
-			})
-		}
-		s.Next = withURL(s.Next, base)
-		for i := range s.Summary.Diagnosis {
-			s.Summary.Diagnosis[i].Next = withURL(s.Summary.Diagnosis[i].Next, base)
-		}
-		return s.render(cmd.OutOrStdout())
-	}
-
-	paths := []string{"next"}
-	for i := range gjson.GetBytes(body, "summary.diagnosis.#").Int() {
-		paths = append(paths, "summary.diagnosis."+strconv.FormatInt(i, 10)+".next")
-	}
-	for _, path := range paths {
-		next := gjson.GetBytes(body, path)
-		if !next.Exists() {
-			continue
-		}
-		// SetBytes keeps the other keys and their order as they are.
-		if out, err := sjson.SetBytes(body, path, withURL(next.String(), base)); err == nil {
-			body = out
-		}
-	}
-	_, err = cmd.OutOrStdout().Write(body)
-	return err
-}
-
 // readStream prints the stream as the server wrote it, or as a table. The
 // cursor to continue from goes to stderr, so stdout stays one event per line.
 func readStream(cmd *cobra.Command, opts *readOptions, base string, q url.Values, timeout time.Duration, view string, fields []string) error {
@@ -157,14 +113,4 @@ func readStream(cmd *cobra.Command, opts *readOptions, base string, q url.Values
 		more = cursor
 	}
 	return renderStream(cmd.OutOrStdout(), body, streamTable{since: opts.since, base: base, more: more, view: view, fields: fields})
-}
-
-// noteEviction warns that the window lost requests to the store budget, so
-// a count may be short.
-func noteEviction(cmd *cobra.Command, since string, evictedThrough uint64) {
-	cursor, err := strconv.ParseUint(since, 10, 64)
-	if err != nil || evictedThrough <= cursor {
-		return
-	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "note: requests up to seq %d were evicted; the window starts after them\n", evictedThrough)
 }

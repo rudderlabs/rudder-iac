@@ -48,22 +48,6 @@ func (rec *recorder) sent() []string {
 	return append([]string(nil), rec.targets...)
 }
 
-const summaryBody = `{"apiVersion":"v1","serverId":"9f3ac1d2b7e4c601","since":41,"cursor":47,"evictedThrough":0,` +
-	`"timedOut":false,"waitedMs":0,"summary":{"requests":{"total":3,"failed":1,"byRoute":{"/v1/track":3},` +
-	`"byStatusCode":{"200":2,"400":1},"byOutcome":{"accepted":2,"rejected":1},"byStage":{"identity":1}},` +
-	`"events":{"total":2,"byType":{"track":2}},"byEvent":{"Order Completed":0,"chatOpened":1,"chatSuggestionClicked":1},` +
-	`"rejected":{"events":1,"byEvent":{"Order Completed":1}},"byWriteKey":{"web":{"requests":3,"events":2}},` +
-	`"control":{"total":1,"sourceConfig":1,"sourceConfigFailed":0,"preflight":0,"pluginPath":0,"other":0},` +
-	`"bySource":{"byChannel":{},"bySdk":{}},"diagnosis":[` +
-	`{"code":"body_rejected","count":1,"message":"1 request was rejected while the body was read.","next":"curl -fsS 'http://127.0.0.1:1/_dev/v1/requests?since=41&failed=true&view=compact'"},` +
-	`{"code":"filtered_empty","count":3,"message":"Requests arrived, but the filters match none.","next":"rudder-cli sources events --since 41 --json"}]},` +
-	`"next":"rudder-cli sources events --since 47 --event 'Order Completed' --json"}` + "\n"
-
-var summaryHeader = http.Header{
-	"Content-Type":    {"application/json"},
-	"X-Dev-Server-Id": {"9f3ac1d2b7e4c601"},
-}
-
 var streamHeader = http.Header{
 	"Content-Type":    {"application/x-ndjson"},
 	"X-Dev-Cursor":    {"47"},
@@ -79,38 +63,22 @@ func TestReadCommandsSendOneRequest(t *testing.T) {
 		args []string
 		want string
 	}{
-		{args: []string{"events"}, want: "/_dev/v1/events?view=counts"},
+		{args: []string{"events"}, want: "/_dev/v1/events"},
+		{args: []string{"events", "--view", "list"}, want: "/_dev/v1/events"},
+		{args: []string{"events", "--view", "full", "--json"}, want: "/_dev/v1/events"},
+		{args: []string{"events", "--view", "compact"}, want: "/_dev/v1/events?view=compact"},
 		{
-			args: []string{
-				"events", "--since", "5", "--event", "Order Completed", "--event", "chat*", "--type", "track",
-				"--user-id", "u1", "--anonymous-id", "a1", "--write-key", "web", "--write-key", "",
-				"--wait", "30s", "--min", "2", "--server-id", "9f3ac1d2b7e4c601", "--timeout", "40s", "-j",
-			},
-			want: "/_dev/v1/events?anonymousId=a1&event=Order+Completed&event=chat%2A&min=2&serverId=9f3ac1d2b7e4c601" +
-				"&since=5&type=track&userId=u1&view=counts&wait=30s&writeKey=web&writeKey=",
-		},
-		{args: []string{"events", "--since", "5m"}, want: "/_dev/v1/events?since=5m&view=counts"},
-		{args: []string{"events", "--since", "2026-09-30T12:00:00Z"}, want: "/_dev/v1/events?since=2026-09-30T12%3A00%3A00Z&view=counts"},
-		{args: []string{"events", "--user-id", ""}, want: "/_dev/v1/events?userId=&view=counts"},
-		{args: []string{"events", "list"}, want: "/_dev/v1/events"},
-		{args: []string{"events", "list", "--view", "list"}, want: "/_dev/v1/events"},
-		{args: []string{"events", "list", "--view", "full", "--json"}, want: "/_dev/v1/events"},
-		{args: []string{"events", "list", "--view", "compact"}, want: "/_dev/v1/events?view=compact"},
-		{
-			args: []string{"events", "list", "--fields", "properties", "--fields", "context.page.path", "--limit", "5"},
+			args: []string{"events", "--fields", "properties", "--fields", "context.page.path", "--limit", "5"},
 			want: "/_dev/v1/events?fields=properties&fields=context.page.path&limit=5",
 		},
 		{
-			args: []string{"events", "list", "--since", "3", "--event", "e", "--type", "page", "--write-key", "k", "--server-id", "s"},
+			args: []string{"events", "--since", "3", "--event", "e", "--type", "page", "--write-key", "k", "--server-id", "s"},
 			want: "/_dev/v1/events?event=e&serverId=s&since=3&type=page&writeKey=k",
 		},
 	} {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
 			t.Parallel()
 			rec := newRecorder(t, http.StatusOK, streamHeader, "")
-			if tc.args[len(tc.args)-1] != "list" && !contains(tc.args, "list") {
-				rec.header, rec.body = summaryHeader, summaryBody
-			}
 
 			_, stderr, err := execute(append([]string{"sources"}, append(tc.args, "--url", rec.srv.URL)...)...)
 
@@ -141,36 +109,24 @@ func TestReadUsageErrors(t *testing.T) {
 		next    string
 	}{
 		{
-			args: []string{"events", "list", "--view", "counts"}, message: "--view counts is the summary, which sources events prints",
-			next: "rudder-cli sources events --url URL --json",
-		},
-		{
-			args: []string{"events", "list", "--view", "table"}, message: `--view must be list, compact or full, got "table"`,
-			next: "rudder-cli sources events list --url URL --help",
-		},
-		{
-			args:    []string{"events", "list", "--view", "compact", "--fields", "properties"},
-			message: "--fields replaces --view; give one of them", next: "rudder-cli sources events list --url URL --fields properties",
-		},
-		{
-			args:    []string{"events", "list", "--fields", "properties,event"},
-			message: "--fields: repeat the flag for each path, as --fields properties --fields event",
-			next:    "rudder-cli sources events list --url URL --fields properties --fields event",
-		},
-		{
-			args: []string{"events", "list", "--limit", "0"}, message: "--limit must be 1 to 1000, got 0",
-			next: "rudder-cli sources events list --url URL --help",
-		},
-		{
-			args: []string{"events", "list", "--limit", "1001"}, message: "--limit must be 1 to 1000, got 1001",
-			next: "rudder-cli sources events list --url URL --help",
-		},
-		{
-			args: []string{"events", "--min", "0"}, message: "--min must be 1 or more, got 0",
+			args: []string{"events", "--view", "table"}, message: `--view must be list, compact or full, got "table"`,
 			next: "rudder-cli sources events --url URL --help",
 		},
 		{
-			args: []string{"events", "--wait", "5m"}, message: "--wait: 5m exceeds the maximum of 110s",
+			args:    []string{"events", "--view", "compact", "--fields", "properties"},
+			message: "--fields replaces --view; give one of them", next: "rudder-cli sources events --url URL --fields properties",
+		},
+		{
+			args:    []string{"events", "--fields", "properties,event"},
+			message: "--fields: repeat the flag for each path, as --fields properties --fields event",
+			next:    "rudder-cli sources events --url URL --fields properties --fields event",
+		},
+		{
+			args: []string{"events", "--limit", "0"}, message: "--limit must be 1 to 1000, got 0",
+			next: "rudder-cli sources events --url URL --help",
+		},
+		{
+			args: []string{"events", "--limit", "1001"}, message: "--limit must be 1 to 1000, got 1001",
 			next: "rudder-cli sources events --url URL --help",
 		},
 		{
@@ -184,29 +140,13 @@ func TestReadUsageErrors(t *testing.T) {
 			next:    "rudder-cli sources events --url " + placeholder,
 		},
 		{
-			args: []string{"events", "list"}, noURL: true,
+			args: []string{"events"}, noURL: true,
 			message: "no listener URL: pass --url or set RUDDERSTACK_DEV_URL to the url of the ready line",
-			next:    "rudder-cli sources events list --url " + placeholder,
+			next:    "rudder-cli sources events --url " + placeholder,
 		},
 		{
-			args: []string{"events", "list", "--wait", "30s"}, message: "--wait and --min belong to sources events: sources events list reads what is there",
-			next: "rudder-cli sources events --url " + placeholder + " --wait 30s --json",
-		},
-		{
-			args: []string{"events", "list", "--min", "1"}, message: "--wait and --min belong to sources events: sources events list reads what is there",
-			next: "rudder-cli sources events --url " + placeholder + " --wait 30s --json",
-		},
-		{
-			args: []string{"events", "--limit", "5"}, message: "unknown flag: --limit",
+			args: []string{"events", "nope"}, message: `unknown argument "nope" for "rudder-cli sources events"`,
 			next: "rudder-cli sources events --help",
-		},
-		{
-			args: []string{"events", "nope"}, message: `unknown command "nope" for "rudder-cli sources events"`,
-			next: "rudder-cli sources events --help",
-		},
-		{
-			args: []string{"events", "list", "nope"}, message: `unknown argument "nope" for "rudder-cli sources events list"`,
-			next: "rudder-cli sources events list --help",
 		},
 		{
 			args: []string{"requests"}, noURL: true, message: `unknown command "requests" for "rudder-cli sources"`,
@@ -251,9 +191,9 @@ func TestReadErrorsInJSON(t *testing.T) {
 				`"next":"rudder-cli sources events --url ` + rec.srv.URL + ` --json"}}`,
 		},
 		{
-			args: []string{"events", "list", "-j", "--url", rec.srv.URL, "--limit", "0"},
+			args: []string{"events", "-j", "--url", rec.srv.URL, "--limit", "0"},
 			want: `{"error":{"status":null,"code":"usage","message":"--limit must be 1 to 1000, got 0","param":null,` +
-				`"details":null,"next":"rudder-cli sources events list --url ` + rec.srv.URL + ` --help"}}`,
+				`"details":null,"next":"rudder-cli sources events --url ` + rec.srv.URL + ` --help"}}`,
 		},
 		{
 			args: []string{"events", "--json", "--url", closed},
@@ -285,8 +225,6 @@ func TestReadsRefuseA200FromAnotherServer(t *testing.T) {
 	for _, args := range [][]string{
 		{"events"},
 		{"events", "--json"},
-		{"events", "list"},
-		{"events", "list", "--json"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			t.Parallel()
@@ -314,80 +252,26 @@ func closedURL(t *testing.T) string {
 	return url
 }
 
-// The summary is the server's object; the CLI adds the --url it used to
-// every rudder-cli next, so the command runs as printed.
-func TestEventsPrintsTheSummary(t *testing.T) {
-	t.Parallel()
-	rec := newRecorder(t, http.StatusOK, summaryHeader, summaryBody)
-	u := rec.srv.URL
-
-	stdout, stderr, err := execute("sources", "events", "--url", u, "--json")
-
-	require.NoError(t, err)
-	require.Empty(t, stderr)
-	want := strings.NewReplacer(
-		`"next":"rudder-cli sources events --since 41`, `"next":"rudder-cli sources events --url `+u+` --since 41`,
-		`"next":"rudder-cli sources events --since 47`, `"next":"rudder-cli sources events --url `+u+` --since 47`,
-	).Replace(summaryBody)
-	require.Equal(t, want, stdout)
-
-	stdout, stderr, err = execute("sources", "events", "--url", u)
-
-	require.NoError(t, err)
-	require.Empty(t, stderr)
-	require.Equal(t, `Window after cursor 41; cursor now 47.
-
-ACCEPTED EVENTS  2
-  chatOpened             1
-  chatSuggestionClicked  1
-  Order Completed        0
-REJECTED EVENTS  1
-  Order Completed  1
-REQUESTS  3 (1 failed)
-CONTROL   1
-
-body_rejected (1): 1 request was rejected while the body was read.
-  Next: curl -fsS 'http://127.0.0.1:1/_dev/v1/requests?since=41&failed=true&view=compact'
-filtered_empty (3): Requests arrived, but the filters match none.
-  Next: rudder-cli sources events --url `+u+` --since 41 --json
-
-Next: rudder-cli sources events --url `+u+` --since 47 --event 'Order Completed' --json
-`, stdout)
-}
-
-func TestEventsNotesEvictionAndTimeout(t *testing.T) {
-	t.Parallel()
-	body := strings.Replace(strings.Replace(summaryBody, `"evictedThrough":0`, `"evictedThrough":44`, 1),
-		`"timedOut":false,"waitedMs":0`, `"timedOut":true,"waitedMs":30001`, 1)
-	rec := newRecorder(t, http.StatusOK, summaryHeader, body)
-
-	stdout, stderr, err := execute("sources", "events", "--url", rec.srv.URL, "--since", "41", "--wait", "30s")
-
-	require.NoError(t, err, "a wait that runs out is a successful read")
-	require.Equal(t, "note: requests up to seq 44 were evicted; the window starts after them\n", stderr)
-	require.True(t, strings.HasPrefix(stdout, "Window after cursor 41; cursor now 47. The wait ran out after 30.0s.\n"), stdout)
-}
-
 const streamBody = `{"type":"track","event":"Order Completed","userId":"u1","originalTimestamp":"2026-09-30T12:00:00.000Z","properties":{"total":42,"note":"a` + "\\u001b[31m" + `b"}}
 {"type":"page","name":"Home","anonymousId":"a1","sentAt":"2026-09-30T12:00:01.000Z"}
 {"userId":"u2","event":"Signed Up"}
 `
 
-func TestEventsListPrintsTheStream(t *testing.T) {
+func TestEventsPrintsTheStream(t *testing.T) {
 	t.Parallel()
 	header := streamHeader.Clone()
 	header.Set("X-Dev-Has-More", "true")
 	header.Set("X-Dev-Cursor", "61")
 	rec := newRecorder(t, http.StatusOK, header, streamBody)
 
-	stdout, stderr, err := execute("sources", "events", "list", "--url", rec.srv.URL, "--json")
+	stdout, stderr, err := execute("sources", "events", "--url", rec.srv.URL, "--json")
 
 	require.NoError(t, err)
 	require.Equal(t, streamBody, stdout, "the server's bytes as they are")
 	require.Equal(t, "more events: continue with --since 61\n", stderr)
 }
 
-func TestEventsListTables(t *testing.T) {
+func TestEventsTables(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name string
@@ -429,7 +313,7 @@ PROPERTIES.TOTAL  EVENT
 			t.Parallel()
 			rec := newRecorder(t, http.StatusOK, streamHeader, streamBody)
 
-			stdout, stderr, err := execute(append([]string{"sources", "events", "list", "--url", rec.srv.URL}, tc.args...)...)
+			stdout, stderr, err := execute(append([]string{"sources", "events", "--url", rec.srv.URL}, tc.args...)...)
 
 			require.NoError(t, err)
 			require.Empty(t, stderr)
@@ -438,21 +322,22 @@ PROPERTIES.TOTAL  EVENT
 	}
 }
 
-func TestEventsListTableEdges(t *testing.T) {
+func TestEventsTableEdges(t *testing.T) {
 	t.Parallel()
 	rec := newRecorder(t, http.StatusOK, streamHeader, "")
 
-	stdout, _, err := execute("sources", "events", "list", "--url", rec.srv.URL, "--since", "57")
+	stdout, _, err := execute("sources", "events", "--url", rec.srv.URL, "--since", "57")
 
 	require.NoError(t, err)
-	require.Equal(t, "0 events after cursor 57; run rudder-cli sources events --url "+rec.srv.URL+" --since 57 for the diagnosis\n", stdout)
+	require.Equal(t, "0 events after cursor 57; refused requests: curl -fsS '"+rec.srv.URL+
+		"/_dev/v1/requests?since=57&failed=true&view=compact'\n", stdout)
 
-	// The diagnosis reads the same window, so a time since goes along too.
-	stdout, _, err = execute("sources", "events", "list", "--url", rec.srv.URL, "--since", "2026-09-30T12:00:00Z")
+	// The requests read the same window, so a time since goes along too.
+	stdout, _, err = execute("sources", "events", "--url", rec.srv.URL, "--since", "2026-09-30T12:00:00Z")
 
 	require.NoError(t, err)
-	require.Equal(t, "0 events since 2026-09-30T12:00:00Z; run rudder-cli sources events --url "+rec.srv.URL+
-		" --since 2026-09-30T12:00:00Z for the diagnosis\n", stdout)
+	require.Equal(t, "0 events since 2026-09-30T12:00:00Z; refused requests: curl -fsS '"+rec.srv.URL+
+		"/_dev/v1/requests?since=2026-09-30T12%3A00%3A00Z&failed=true&view=compact'\n", stdout)
 
 	header := streamHeader.Clone()
 	header.Set("X-Dev-Has-More", "true")
@@ -460,7 +345,7 @@ func TestEventsListTableEdges(t *testing.T) {
 	long := `{"type":"track","event":"` + strings.Repeat("x", 100) + `","userId":"u"}` + "\n"
 	rec = newRecorder(t, http.StatusOK, header, long)
 
-	stdout, stderr, err := execute("sources", "events", "list", "--url", rec.srv.URL)
+	stdout, stderr, err := execute("sources", "events", "--url", rec.srv.URL)
 
 	require.NoError(t, err)
 	require.Empty(t, stderr, "the table names the next cursor itself")
@@ -486,11 +371,11 @@ func TestReadCommandsImportNoServerInternals(t *testing.T) {
 
 // A captured name comes from any page that can post to the listener, so a
 // terminal escape in it prints as text.
-func TestEventsListEscapesControlCharacters(t *testing.T) {
+func TestEventsEscapesControlCharacters(t *testing.T) {
 	t.Parallel()
 	rec := newRecorder(t, http.StatusOK, streamHeader, `{"event":"a\u001b[2Jb\u009bc","userId":"u"}`+"\n")
 
-	stdout, _, err := execute("sources", "events", "list", "--url", rec.srv.URL)
+	stdout, _, err := execute("sources", "events", "--url", rec.srv.URL)
 
 	require.NoError(t, err)
 	require.Contains(t, stdout, `a\u001b[2Jb\u009bc`)
@@ -504,9 +389,9 @@ func TestReadCommandsTakeTheURLFromTheEnvironment(t *testing.T) {
 	flag := newRecorder(t, http.StatusOK, streamHeader, "")
 	t.Setenv(urlEnv, env.srv.URL)
 
-	_, _, err := execute("sources", "events", "list")
+	_, _, err := execute("sources", "events")
 	require.NoError(t, err)
-	_, _, err = execute("sources", "events", "list", "--url", flag.srv.URL)
+	_, _, err = execute("sources", "events", "--url", flag.srv.URL)
 	require.NoError(t, err)
 
 	require.Equal(t, []string{"/_dev/v1/events"}, env.sent())

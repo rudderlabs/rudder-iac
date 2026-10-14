@@ -21,7 +21,7 @@ var (
 	removedCommands = []string{"summary", "exec", "stop", "cursor", "info", "send", "reset", "guide", "requests"}
 	removedFlags    = []string{
 		"expect", "jq", "detach", "include", "summary", "seq", "state-file", "idle-exit", "quiet",
-		"max-bytes", "status-code", "kind", "failed",
+		"max-bytes", "status-code", "kind", "failed", "wait", "min",
 	}
 )
 
@@ -70,7 +70,7 @@ func TestHelpTree(t *testing.T) {
 			require.True(t, strings.HasPrefix(line, "$ rudder-cli "), "%s: %q", c.CommandPath(), line)
 		}
 	})
-	require.Equal(t, []string{"sources", "sources events", "sources events list", "sources listen"}, paths)
+	require.Equal(t, []string{"sources", "sources events", "sources listen"}, paths)
 }
 
 // Every command line in the help and the guide runs against the real
@@ -84,7 +84,7 @@ func TestHelpCommandsParse(t *testing.T) {
 		lines = append(lines, commandLines(c.Long)...)
 	})
 	guide := commandLines(devlisten.Guide)
-	require.Greater(t, len(guide), 15, "the guide shows the commands it describes")
+	require.Greater(t, len(guide), 10, "the guide shows the commands it describes")
 	lines = append(lines, guide...)
 
 	for _, line := range lines {

@@ -339,7 +339,7 @@ func (h *Handler) diagnose(win window, all, filtered counts, q *eventsQuery, sta
 	if reqs > 0 && all.Requests.Failed == 0 {
 		add("all_accepted", reqs,
 			"Every request that arrived was accepted. This says nothing about events that never came: read byEvent.",
-			"rudder-cli sources events list --since "+since+q.args()+" --json")
+			"rudder-cli sources events --since "+since+q.args()+" --json")
 	}
 	if (q.filtered() || len(q.writeKeys) > 0) && reqs > 0 && filtered.Requests.Total == 0 && filtered.Control.Total == 0 {
 		add("filtered_empty", reqs,

@@ -6,19 +6,14 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/http/httptest"
-	"net/http/httputil"
-	neturl "net/url"
 	"os"
 	"os/exec"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/tidwall/gjson"
 )
 
 // devRead runs a read command of the binary and returns stdout, stderr and
@@ -69,8 +64,7 @@ func post(t *testing.T, url, body string) int {
 	return resp.StatusCode
 }
 
-// A read command prints what curl of the same URL prints. The
-// summary differs only in the --url the CLI adds to each next.
+// sources events prints what curl of the same URL prints.
 func TestSourcesListenEventsMatchCurl(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
@@ -85,74 +79,26 @@ func TestSourcesListenEventsMatchCurl(t *testing.T) {
 		args  []string
 		query string
 	}{
-		{args: []string{"list", "--json"}, query: ""},
-		{args: []string{"list", "--json", "--event", "Order Completed", "--fields", "properties"}, query: "?event=Order+Completed&fields=properties"},
-		{args: []string{"list", "--json", "--view", "compact", "--limit", "1"}, query: "?limit=1&view=compact"},
+		{args: []string{"--json"}, query: ""},
+		{args: []string{"--json", "--event", "Order Completed", "--fields", "properties"}, query: "?event=Order+Completed&fields=properties"},
+		{args: []string{"--json", "--view", "compact", "--limit", "1"}, query: "?limit=1&view=compact"},
 	} {
 		stdout, _, code := devRead(t, append(tc.args, "--url", url)...)
 		require.Equal(t, 0, code)
 		require.Equal(t, curl(t, url+"/_dev/v1/events"+tc.query), stdout, tc.args)
 	}
-
-	stdout, stderr, code := devRead(t, "--url", url, "--event", "Order Completed", "--json")
-	require.Equal(t, 0, code, stderr)
-	want := strings.ReplaceAll(curl(t, url+"/_dev/v1/events?event=Order+Completed&view=counts"),
-		`"next":"rudder-cli sources events `, `"next":"rudder-cli sources events --url `+url+` `)
-	require.Equal(t, want, stdout)
-	require.Contains(t, stdout, `"byEvent":{"Order Completed":2}`)
-	require.Contains(t, stdout, `"rejected":{"events":1,"byEvent":{"Order Completed":1}}`)
-}
-
-// A read that waits gets the event that arrives after it started.
-func TestSourcesListenEventsWaitsForANewEvent(t *testing.T) {
-	t.Parallel()
-	p := startListen(t)
-	listener := p.url()
-	require.Equal(t, http.StatusOK, post(t, listener+"/v1/track", `{"userId":"u","event":"Before"}`))
-
-	// The binary's start time varies under load, so a proxy reports when
-	// the read reaches the listener, and the post follows that.
-	target, err := neturl.Parse(listener)
-	require.NoError(t, err)
-	forward := httputil.NewSingleHostReverseProxy(target)
-	reading := make(chan struct{})
-	var once sync.Once
-	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		once.Do(func() { close(reading) })
-		forward.ServeHTTP(w, r)
-	}))
-	t.Cleanup(proxy.Close)
-	go func() {
-		<-reading
-		time.Sleep(300 * time.Millisecond)
-		req, _ := http.NewRequest(http.MethodPost, listener+"/v1/track", strings.NewReader(`{"userId":"u","event":"After"}`))
-		req.SetBasicAuth("dev", "")
-		// No require here: it may not run off the test goroutine. A lost
-		// post fails the read below.
-		resp, err := http.DefaultClient.Do(req)
-		if err == nil {
-			_ = resp.Body.Close()
-		}
-	}()
-
-	stdout, stderr, code := devRead(t, "--url", proxy.URL, "--since", "1", "--wait", "10s", "--json")
-
-	require.Equal(t, 0, code, stderr)
-	require.Contains(t, stdout, `"timedOut":false`)
-	require.Contains(t, stdout, `"byEvent":{"After":1}`)
-	require.GreaterOrEqual(t, gjson.Get(stdout, "waitedMs").Int(), int64(250), "the read waited for the post")
 }
 
 // --json is read wherever it appears, also after the flag that failed.
 func TestSourcesListenEventsErrorsInJSON(t *testing.T) {
 	t.Parallel()
-	stdout, stderr, code := devRead(t, "list", "--wait", "30s", "--json")
+	stdout, stderr, code := devRead(t, "--limit", "0", "--json")
 
 	require.Equal(t, 1, code)
 	require.Empty(t, stdout)
-	require.Equal(t, `{"error":{"status":null,"code":"usage","message":"--wait and --min belong to sources events: `+
-		`sources events list reads what is there","param":null,"details":null,`+
-		`"next":"rudder-cli sources events --url http://127.0.0.1:4321 --wait 30s --json"}}`+"\n", stderr)
+	require.Equal(t, `{"error":{"status":null,"code":"usage","message":"no listener URL: pass --url or set `+
+		`RUDDERSTACK_DEV_URL to the url of the ready line","param":null,"details":null,`+
+		`"next":"rudder-cli sources events --url http://127.0.0.1:4321"}}`+"\n", stderr)
 }
 
 // SIGTERM with a blocked upload and a long-poll exits 0 in under 2 s.

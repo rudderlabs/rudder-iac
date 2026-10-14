@@ -289,7 +289,7 @@ func TestSinceAsATime(t *testing.T) {
 func TestEventsParameterErrors(t *testing.T) {
 	t.Parallel()
 	const (
-		listHelp   = "rudder-cli sources events list --help"
+		listHelp   = "rudder-cli sources events --help"
 		eventsHelp = "rudder-cli sources events --help"
 	)
 	for _, tc := range []struct {
@@ -525,7 +525,7 @@ func TestDiagnosis(t *testing.T) {
 				{
 					Code: "all_accepted", Count: 1,
 					Message: "Every request that arrived was accepted. This says nothing about events that never came: read byEvent.",
-					Next:    "rudder-cli sources events list --since 0 --event 'order completed' --user-id u --json",
+					Next:    "rudder-cli sources events --since 0 --event 'order completed' --user-id u --json",
 				},
 				{
 					Code: "filtered_empty", Count: 1,

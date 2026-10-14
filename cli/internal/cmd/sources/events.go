@@ -109,119 +109,40 @@ func (o *readOptions) validate(cmd *cobra.Command) *usageError {
 
 func newCmdEvents() *cobra.Command {
 	var (
-		opts    readOptions
-		wait    string
-		atLeast int
-	)
-	cmd := &cobra.Command{
-		Use:   "events",
-		Short: "Count and diagnose captured events",
-		Long: heredoc.Doc(`
-			Print the summary of what arrived: accepted events by name (byEvent), events in rejected
-			requests (rejected), requests, write keys, control requests, SDK families, a diagnosis, and
-			the cursor. Filters narrow every count; the diagnosis covers the whole window. Each --event
-			NAME and --write-key KEY you pass is listed with 0 when nothing arrived, so a check is one
-			jq -e call. all_accepted describes what arrived, not what did not.
-
-			nothing_received: the listener never received a request. nothing_new: no request after
-			your cursor. filtered_empty: requests arrived, your filters match none.
-
-			--wait holds the call until --min matching accepted events exist, at most 110s. Every
-			successful read exits 0, also when --wait runs out (timedOut is true in the JSON); errors
-			exit 1. A request's reason, headers and body are on URL/_dev/v1/requests and on the review
-			page.
-		`),
-		Example: heredoc.Doc(`
-			$ rudder-cli sources events --url http://127.0.0.1:4321
-
-			# Assert a count in CI
-			$ rudder-cli sources events --url "$url" --since "$cur" --event 'Order Completed' --json | jq -e '.summary.byEvent["Order Completed"] == 1'
-
-			# Wait up to 30s for an event the app sends later
-			$ rudder-cli sources events --url "$url" --since "$cur" --event 'Order Completed' --wait 30s --json
-
-			# A fresh cursor
-			$ rudder-cli sources events --url "$url" --json | jq .cursor
-		`),
-		Args: groupArgs,
-		RunE: func(cmd *cobra.Command, _ []string) (err error) {
-			defer func() { track("sources events", err) }()
-			base, e := opts.listenerURL(cmd)
-			if e == nil {
-				e = opts.validate(cmd)
-			}
-			q := opts.query(cmd.Flags())
-			q.Set("view", "counts")
-			timeout := clientMargin
-			if e == nil && cmd.Flags().Changed("wait") {
-				d, err := devlisten.ParseWait(wait)
-				if err != nil {
-					e = &usageError{message: "--wait: " + err.Error(), next: cmd.CommandPath() + " --help"}
-				}
-				q.Set("wait", wait)
-				timeout += d
-			}
-			if e == nil && cmd.Flags().Changed("min") {
-				if atLeast < 1 {
-					e = &usageError{message: fmt.Sprintf("--min must be 1 or more, got %d", atLeast), next: cmd.CommandPath() + " --help"}
-				}
-				q.Set("min", strconv.Itoa(atLeast))
-			}
-			if e != nil {
-				e.next = withURL(e.next, base)
-				return fail(cmd, e)
-			}
-			if opts.timeout > 0 {
-				timeout = opts.timeout
-			}
-			return readSummary(cmd, &opts, base, q, timeout)
-		},
-	}
-	f := cmd.Flags()
-	addReadFlags(f, &opts)
-	f.DurationVar(&opts.timeout, "timeout", 0, "Give up on the listener after this long (default --wait plus 5s)")
-	f.StringVar(&wait, "wait", "0s", "Hold the call until --min matching accepted events exist, at most 110s")
-	f.IntVar(&atLeast, "min", 1, "The number of matching accepted events --wait waits for")
-
-	cmd.AddCommand(newCmdEventsList())
-	return cmd
-}
-
-func newCmdEventsList() *cobra.Command {
-	var (
 		opts   readOptions
 		limit  int
 		view   string
 		fields []string
 	)
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "Print captured events as the SDK sent them",
+		Use:   "events",
+		Short: "Print stored events as the SDK sent them",
 		Long: heredoc.Doc(`
-			Print the accepted events after a cursor. With --json the output is NDJSON: one event per
-			line, exactly as the SDK sent it, with nothing added. Without --json it is a table.
+			Print the accepted events a listener started with --store holds, after a cursor. With --json
+			the output is NDJSON: one event per line, exactly as the SDK sent it, with nothing added.
+			Without --json it is a table.
 			--view compact drops the SDK's auto-collected context; --fields PATH keeps only that dotted
 			path (repeat it; it cannot be combined with --view).
 
-			The stream carries no cursor. Take it from the ready line or from sources events --json. At
-			most --limit events per page; when more are left, stderr names the --since to continue
-			from. Events of rejected requests are not in the stream: sources events counts them.
+			The stream carries no cursor. Take it from the ready line. At most --limit events per page;
+			when more are left, stderr names the --since to continue from. Events of rejected requests
+			are not in the stream: read them on URL/_dev/v1/requests or the review page.
 		`),
 		Example: heredoc.Doc(`
-			$ rudder-cli sources events list --url http://127.0.0.1:4321 --since 5m
+			$ rudder-cli sources events --url http://127.0.0.1:4321 --since 5m
 
 			# The properties of one event
-			$ rudder-cli sources events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json
+			$ rudder-cli sources events --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json
 
 			# Check a property type (guard the empty stream)
-			$ rudder-cli sources events list --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json | jq -e -s 'length > 0 and all(.[]; .properties.total | type == "number")'
+			$ rudder-cli sources events --url "$url" --since "$cur" --event 'Order Completed' --fields properties --json | jq -e -s 'length > 0 and all(.[]; .properties.total | type == "number")'
 
 			# How many events
-			$ rudder-cli sources events list --url "$url" --since "$cur" --json | wc -l
+			$ rudder-cli sources events --url "$url" --since "$cur" --json | wc -l
 		`),
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {
-			defer func() { track("sources events list", err) }()
+			defer func() { track("sources events", err) }()
 			base, e := opts.listenerURL(cmd)
 			if e == nil {
 				e = opts.validate(cmd)
@@ -263,8 +184,6 @@ func newCmdEventsList() *cobra.Command {
 func checkListFlags(cmd *cobra.Command, limit int, view string, fields []string) *usageError {
 	help := cmd.CommandPath() + " --help"
 	switch {
-	case view == "counts":
-		return &usageError{message: "--view counts is the summary, which sources events prints", next: "rudder-cli sources events --json"}
 	case !slices.Contains([]string{"list", "compact", "full"}, view):
 		return &usageError{message: fmt.Sprintf("--view must be list, compact or full, got %q", view), next: help}
 	case len(fields) > 0 && cmd.Flags().Changed("view"):
@@ -304,7 +223,7 @@ func withURL(next, base string) string {
 	if base == "" {
 		return next
 	}
-	for _, path := range []string{"rudder-cli sources events list", "rudder-cli sources events"} {
+	for _, path := range []string{"rudder-cli sources events", "rudder-cli sources events"} {
 		if rest, ok := strings.CutPrefix(next, path); ok && (rest == "" || rest[0] == ' ') {
 			return path + " --url " + shellWord(base) + rest
 		}

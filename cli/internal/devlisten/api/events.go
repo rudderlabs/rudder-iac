@@ -39,7 +39,7 @@ func eventsHelp(query url.Values) string {
 	if query.Get("view") == "counts" {
 		return "rudder-cli sources events --help"
 	}
-	return "rudder-cli sources events list --help"
+	return "rudder-cli sources events --help"
 }
 
 func (h *Handler) serverChanged(w http.ResponseWriter) {
