@@ -12,7 +12,7 @@ func NewCmdHello() *cobra.Command {
 		Short: "Print a hello-world greeting",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Fprintln(cmd.OutOrStdout(), "Hello, World!")
+			fmt.Fprintln(cmd.OutOrStdout(), "Hello Foo!")
 		},
 	}
 }

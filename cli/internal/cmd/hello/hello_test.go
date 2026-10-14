@@ -13,7 +13,7 @@ func TestHelloPrintsGreeting(t *testing.T) {
 	cmd.SetOut(output)
 
 	require.NoError(t, cmd.Execute())
-	require.Equal(t, "Hello, World!\n", output.String())
+	require.Equal(t, "Hello Foo!\n", output.String())
 }
 
 func TestHelloRejectsPositionalArguments(t *testing.T) {
