@@ -478,7 +478,7 @@
     if (evicted > 0) {
       dropEvicted(evicted);
       showNotice('evicted', 'warn', `The listener dropped its oldest ${plural(evicted, 'request')} ` +
-        'to stay within its memory limit. The requests list no longer shows them. ' +
+        'to stay within its memory limit. The counts above leave them out. The requests list no longer shows them. ' +
         'The events list keeps the events it already shows until the page reloads.');
     }
     updateCount();
