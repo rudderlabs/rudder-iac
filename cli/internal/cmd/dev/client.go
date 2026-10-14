@@ -245,7 +245,10 @@ func verdict(cmd *cobra.Command, opts *readOptions, base string, r readResult) e
 				next: again(cmd, base, r.evictedThrough),
 			})
 		}
-		fmt.Fprintln(cmd.ErrOrStderr(), "note: "+message)
+		// With --json, stderr holds one JSON error, so the note gives way to it.
+		if !opts.json || r.waitTimeout == nil {
+			fmt.Fprintln(cmd.ErrOrStderr(), "note: "+message)
+		}
 	}
 	if r.waitTimeout != nil {
 		return fail(cmd, r.waitTimeout)

@@ -489,6 +489,14 @@ func TestEventsFailsWhenTheWaitRunsOut(t *testing.T) {
 	require.Equal(t, "note: requests up to seq 44 were evicted, so this window is incomplete\n"+
 		"Error: --wait ran out after 30.0s: 2 of --min 1 matching accepted events arrived\n"+
 		"Next: rudder-cli dev events --url "+rec.srv.URL+" --since 41 --allow-partial --wait 30s\n", stderr)
+
+	// With --json, stderr holds the one JSON error and no note.
+	_, stderr, err = execute("dev", "events", "--url", rec.srv.URL, "--since", "41", "--wait", "30s", "--allow-partial", "--json")
+
+	require.ErrorAs(t, err, &silent)
+	var got struct{ Error struct{ Code string } }
+	require.NoError(t, json.Unmarshal([]byte(stderr), &got), stderr)
+	require.Equal(t, "wait_timeout", got.Error.Code)
 }
 
 // A listener that does not answer in time is unreachable, whatever --wait

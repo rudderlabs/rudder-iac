@@ -118,10 +118,13 @@ exact and case-sensitive.
 
 ## Check with jq
 
-The CLI exits 0 on a read of an empty window too. The check is `jq -e`: true
-exits 0, false exits 1.
+The CLI exits 0 on a read of an empty window too. It exits 1 when the window
+lost requests to the memory limit, or when a wait ran out. The check is `jq -e`:
+true exits 0, false exits 1. Set `pipefail`, or the pipeline drops the CLI's exit 1
+and a short count passes.
 
 ```sh
+$ set -o pipefail
 # exactly one accepted Order Completed
 $ rudder-cli dev events --url "$url" --since "$cur" --event 'Order Completed' --json | jq -e '.summary.byEvent["Order Completed"] == 1'
 # nothing refused: read it without filters, because filters narrow the counts
@@ -208,7 +211,9 @@ Two reads print their result and then exit 1. A `--wait` that ran out before
 `--min` matching events arrived is `wait_timeout`; `timedOut` is true in the JSON. A
 window that lost requests to the listener's limit is `events_evicted`, on
 `dev events` and on `dev events list`; `--allow-partial` accepts it, prints a
-`note:` line on stderr and exits 0. An error goes to
+`note:` line on stderr and exits 0. The default window starts at cursor 0, so
+after the first eviction a read without `--since` always fails: pass the cursor
+you took before the test. An error goes to
 stderr with a `next` command that fixes it: one JSON object with `--json`, else an
 `Error:` line and a `Next:` line. The CLI never retries.
 

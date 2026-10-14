@@ -542,6 +542,8 @@
   function renderDiagnosis(items) {
     $('notices').querySelectorAll('[data-diagnosis]').forEach((n) => n.remove());
     for (const d of items) {
+      // The page shows its own notice for evicted requests.
+      if (d.code === 'events_evicted') continue;
       const [level, text, action] = diagnosisText(d);
       const node = notice(level, text, ACTIONS[action]);
       node.dataset.diagnosis = d.code;
