@@ -290,7 +290,8 @@ func (h *Handler) diagnose(rd reading, all, filtered counts, q *eventsQuery) []d
 			"curl -fsS -u '"+key+":' -H 'Content-Type: application/json' -d '{\"event\":\"dev check\",\"userId\":\"dev\"}' '"+
 				h.cfg.Identity.URL+"/v1/track'")
 	}
-	if received && reqs == 0 {
+	// An empty window that lost requests is not empty because nothing came.
+	if received && reqs == 0 && !rd.lost {
 		add("nothing_new", 0,
 			fmt.Sprintf("No request after cursor %d; the listener holds %d. The app sent before the cursor, or has not sent yet.",
 				win.since, stats.Requests),

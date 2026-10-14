@@ -931,3 +931,22 @@ func TestReadsDiagnoseOneMomentOfTheStore(t *testing.T) {
 		})
 	}
 }
+
+// A window whose event requests were all evicted is not a window the app
+// never sent to, so it does not say nothing_new.
+func TestAWindowEmptiedByEvictionIsNotNothingNew(t *testing.T) {
+	t.Parallel()
+	st := store.NewWithLimits(1, 64<<20)
+	h := New(st, testConfig("127.0.0.1"))
+	track(t, st, `{"userId":"u","event":"e"}`)
+	r := httptest.NewRequest(http.MethodOptions, "/v1/batch", nil)
+	r.Header.Set("Origin", "http://localhost:3000")
+	r.Header.Set("Access-Control-Request-Method", "POST")
+	ingest.New(st, nil, "test").ServeHTTP(httptest.NewRecorder(), r)
+	require.Equal(t, uint64(1), st.Stats().EvictedThrough)
+
+	got := codes(summaryOf(t, h, "since=0").Summary.Diagnosis)
+
+	require.Contains(t, got, "events_evicted")
+	require.NotContains(t, got, "nothing_new")
+}
