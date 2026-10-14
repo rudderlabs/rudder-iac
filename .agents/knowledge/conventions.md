@@ -293,3 +293,8 @@
 - Customer.io device-mode-v2 requiredness counts only an explicit `sdk_version.web: v2`. The nested `v2` default fills only an `sdk_version` block the spec carries, so an omitted block is sent absent, and upstream's `allOf` conditionals and the web SDK both read an absent version as v1. Treating it as `v2` during validation rejects existing web device-mode destinations that upstream accepts.
 - Attach the conditional `write_key` requirement to the top-level `WriteKey` pointer and register it with `CallEvenIfNull`; validating only nested `write_key.web` cannot catch a completely omitted `write_key` block.
 - Customer.io `write_key.web` uses plain `pattern=single_line_100`: upstream's pattern has no template branch, so a template is judged as a literal and gets no length exemption.
+
+## DBX-API-7 — Hello Command And Telemetry Registration
+
+- `cli/internal/cmd/root.go` keeps a `trackedCommands` list that must stay in agreement with the commands whose `RunE` calls `telemetry.TrackCommand`; `TestTrackedCommandsMatchRunEReporters` enforces this. A new command that tracks telemetry must be added to `trackedCommands`, and one that does not must stay out of it.
+- `rudder-cli hello claude` (`cli/internal/cmd/hello`, `NewCmdHello`) is a toy command that deliberately skips `telemetry.TrackCommand` and is therefore absent from `trackedCommands`. It accepts only the name `claude` (case-insensitive via `strings.EqualFold`) and prints `Hello, Claude!` to `cmd.OutOrStdout()`. The single-name restriction followed the plan and may be loosened later.

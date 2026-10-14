@@ -50,6 +50,13 @@ func TestPreRunFailuresAreTrackedUnderCommandPath(t *testing.T) {
 	}
 }
 
+func TestHelloCommandIsRegistered(t *testing.T) {
+	c, args, err := rootCmd.Find([]string{"hello", "claude"})
+	require.NoError(t, err)
+	assert.Equal(t, "hello", c.Name())
+	assert.Equal(t, []string{"claude"}, args)
+}
+
 // trackedCommands decides which commands report input that cobra rejects. A
 // command that tracks itself but is missing from the list would lose that
 // report; a listed command that does not track itself would send failures with
