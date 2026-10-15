@@ -1,0 +1,80 @@
+name: install script
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "install.sh"
+      - ".github/workflows/install-script.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: shellcheck install.sh
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: shellcheck
+        run: |
+          shellcheck --version
+          shellcheck install.sh
+
+  install:
+    name: install on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-latest is arm64; macos-15-intel runs the Darwin_x86_64 archive.
+        os: [ubuntu-latest, macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: install the latest release
+        env:
+          RUDDER_CLI_INSTALL_DIR: ${{ runner.temp }}/latest
+        run: |
+          sh install.sh
+          export PATH="$RUDDER_CLI_INSTALL_DIR:$PATH"
+          rudder-cli --version
+
+      - name: install a pinned release
+        env:
+          RUDDER_CLI_VERSION: "0.27.0"
+          RUDDER_CLI_INSTALL_DIR: ${{ runner.temp }}/pinned
+        run: |
+          sh install.sh
+          "$RUDDER_CLI_INSTALL_DIR/rudder-cli" --version | grep -Fx "rudder-cli version 0.27.0"
+
+      - name: fail on a release that does not exist
+        env:
+          RUDDER_CLI_VERSION: "9.9.9"
+          RUDDER_CLI_INSTALL_DIR: ${{ runner.temp }}/missing
+        run: |
+          if sh install.sh; then
+            echo "install.sh exited 0 for a release that does not exist"
+            exit 1
+          fi
+          test ! -e "$RUDDER_CLI_INSTALL_DIR"
