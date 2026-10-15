@@ -9,4 +9,4 @@ spec:
   config:
     project: acme-analytics-prod
     location: EU
-    credentials: "{{ .BQ_CREDENTIALS }}"
+    credentials: '{{ .BQ_CREDENTIALS }}'

@@ -117,13 +117,13 @@ func TestImportScaffoldsSecretsViaVarSubstitution(t *testing.T) {
 		importer.ImportOptions{},
 	))
 
-	// The generated spec carries an unquoted variable reference, not a mask.
+	// The generated spec carries a single-quoted variable reference, not a mask.
 	// The handler names the variable from the resource's identity
 	// (BOOK_<id>_...), normalized to the substitution grammar.
 	const wantVar = "BOOK_THE_HOBBIT_ACCESS_KEY"
 	specBytes, err := os.ReadFile(filepath.Join(testDir, "imported", "books", "books.yaml"))
 	require.NoError(t, err)
-	assert.Contains(t, string(specBytes), "accessKey: {{ ."+wantVar+" }}\n")
+	assert.Contains(t, string(specBytes), "accessKey: '{{ ."+wantVar+" }}'\n")
 	assert.NotContains(t, string(specBytes), "(unknown)")
 
 	// The var file scaffolds an unfilled (null) placeholder for exactly that

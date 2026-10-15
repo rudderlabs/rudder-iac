@@ -7,6 +7,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewCmdValidateAcceptsVarFile(t *testing.T) {
+	t.Parallel()
+
+	flag := NewCmdValidate().Flags().Lookup("var-file")
+	require.NotNil(t, flag, "data-graphs validate must accept --var-file")
+	assert.Equal(t, "stringArray", flag.Value.Type())
+}
+
 func TestNewCmdValidatePreRunValidatesModeBeforeDependencies(t *testing.T) {
 	t.Parallel()
 

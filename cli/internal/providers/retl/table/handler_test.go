@@ -18,6 +18,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 )
 
 // fakeStore is an in-memory RETL source API. It mirrors the server behaviour
@@ -31,6 +34,9 @@ type fakeStore struct {
 	calls    []string
 	failOn   string
 	failWith error
+	// connections a source is wired to, keyed by source id. Empty means the
+	// source is unconnected, which is what most lifecycle cases assume.
+	connections map[string][]retlClient.RETLConnection
 }
 
 func newFakeStore(existing ...retlClient.RETLSource) *fakeStore {
@@ -39,6 +45,13 @@ func newFakeStore(existing ...retlClient.RETLSource) *fakeStore {
 		f.sources[s.ID] = &s
 	}
 	return f
+}
+
+func (f *fakeStore) ListConnections(_ context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
+	if err := f.record("list-connections:" + req.SourceID); err != nil {
+		return nil, err
+	}
+	return &retlClient.RETLConnectionsPage{Data: f.connections[req.SourceID]}, nil
 }
 
 func (f *fakeStore) record(call string) error {
@@ -615,8 +628,24 @@ func TestImport(t *testing.T) {
 		_, err := h.Import(context.Background(), r.ID(), r.Data(), "src-remote")
 
 		require.NoError(t, err)
-		assert.Equal(t, []string{"get:src-remote", "setExternalId:src-remote", "update:src-remote"}, store.calls)
+		assert.Equal(t, []string{"get:src-remote", "list-connections:src-remote", "setExternalId:src-remote", "update:src-remote"}, store.calls)
 		assert.Equal(t, retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"}, store.sources["src-remote"].Config)
+	})
+
+	// Importing a spec with another table would move a source a destination
+	// reads from, which an update is not allowed to do either.
+	t.Run("refuses to move a connected source before claiming it", func(t *testing.T) {
+		t.Parallel()
+		diverged := remoteUsers()
+		diverged.Config = retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "staging", Table: "users"}
+		store := newFakeStore(diverged)
+		store.connections = map[string][]retlClient.RETLConnection{"src-remote": {{ID: "conn-1"}}}
+		h, r := loadResource(t, store, warehouseSpec())
+
+		_, err := h.Import(context.Background(), r.ID(), r.Data(), "src-remote")
+
+		require.ErrorContains(t, err, `schema "staging" -> "public"`)
+		assert.Equal(t, []string{"get:src-remote", "list-connections:src-remote"}, store.calls)
 	})
 
 	t.Run("refuses a source_definition mismatch before claiming the source", func(t *testing.T) {
@@ -816,4 +845,102 @@ func TestUnsupportedOperations(t *testing.T) {
 	_, err := h.FetchImportData(context.Background(), specs.ImportIds{LocalID: "users", RemoteID: "src-1"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "single-source import is not supported for retl-source-table")
+}
+
+// realPlan computes the plan the syncer would: the stored side comes from the
+// remote source through MapRemoteToState and StateToGraph, which keeps the
+// state Input only, and the desired side from the spec. The state is returned
+// beside the plan because CheckPlan needs it for the remote id.
+func realPlan(t *testing.T, store *fakeStore, desired *specs.Spec) (*planner.Plan, *state.State, *table.Handler) {
+	t.Helper()
+
+	h, r := loadResource(t, store, desired)
+	remote, err := h.LoadResourcesFromRemote(context.Background())
+	require.NoError(t, err)
+	st, err := h.MapRemoteToState(remote)
+	require.NoError(t, err)
+
+	target := resources.NewGraph()
+	target.AddResource(r)
+	return planner.New("ws-1").Plan(syncer.StateToGraph(st), target), st, h
+}
+
+// The webapp blocks schema/table edits once a destination is syncing from the
+// source, because the destination started against the old table's shape. The
+// CLI used to let both through (DEX-960). Every case here runs the real path
+// from remote source to plan, because the stored side of a plan carries the
+// state Input and the remote id is only in the state Output.
+func TestCheckPlan(t *testing.T) {
+	t.Parallel()
+
+	const urn = "retl-source-table:users-table"
+	remoteSource := retlClient.RETLSource{
+		ID:                   "src-1",
+		Name:                 "Users",
+		Config:               retlClient.RETLTableConfig{PrimaryKey: "id", Schema: "public", Table: "users"},
+		IsEnabled:            true,
+		SourceType:           retlClient.TableSourceType,
+		SourceDefinitionName: "postgres",
+		AccountID:            "acc-123",
+		ExternalID:           "users-table",
+	}
+	connected := func() *fakeStore {
+		store := newFakeStore(remoteSource)
+		store.connections = map[string][]retlClient.RETLConnection{"src-1": {{ID: "conn-1"}, {ID: "conn-2", ExternalID: "my-connection"}}}
+		return store
+	}
+
+	t.Run("refuses a schema or table change on a connected source", func(t *testing.T) {
+		t.Parallel()
+		store := connected()
+		plan, st, h := realPlan(t, store, withField(withField(warehouseSpec(), "schema", "PUBLIC"), "table", "OTHER"))
+		require.Contains(t, plan.Diff.UpdatedResources, urn)
+
+		err := h.CheckPlan(context.Background(), plan.Diff, st)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `schema "public" -> "PUBLIC"`)
+		assert.Contains(t, err.Error(), `table "users" -> "OTHER"`)
+		// A webapp connection has only its id; a managed one is named as the project names it.
+		assert.Contains(t, err.Error(), "connections: conn-1, my-connection)", "the message must name the blocking connections")
+		assert.NotContains(t, err.Error(), "conn-2")
+		assert.Contains(t, err.Error(), "delete the connection first")
+		assert.Equal(t, []string{"list:table:true", "list-connections:src-1"}, store.calls)
+	})
+
+	// primary_key stays editable on a connected source, as it does in the webapp.
+	t.Run("allows a primary_key change on a connected source", func(t *testing.T) {
+		t.Parallel()
+		store := connected()
+		plan, st, h := realPlan(t, store, withField(warehouseSpec(), "primary_key", "email"))
+		require.Contains(t, plan.Diff.UpdatedResources, urn)
+
+		err := h.CheckPlan(context.Background(), plan.Diff, st)
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"list:table:true"}, store.calls, "an unchanged table needs no connection lookup")
+	})
+
+	// The same edit on an unconnected source is the user's to make.
+	t.Run("allows a schema change on an unconnected source", func(t *testing.T) {
+		t.Parallel()
+		store := newFakeStore(remoteSource)
+		plan, st, h := realPlan(t, store, withField(warehouseSpec(), "schema", "PUBLIC"))
+
+		err := h.CheckPlan(context.Background(), plan.Diff, st)
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"list:table:true", "list-connections:src-1"}, store.calls)
+	})
+
+	t.Run("ignores a plan with no update", func(t *testing.T) {
+		t.Parallel()
+		store := connected()
+		plan, st, h := realPlan(t, store, warehouseSpec())
+
+		err := h.CheckPlan(context.Background(), plan.Diff, st)
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{"list:table:true"}, store.calls)
+	})
 }

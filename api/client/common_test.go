@@ -241,3 +241,38 @@ func TestAPIError_BlockedByConnections(t *testing.T) {
 		})
 	}
 }
+
+func TestAPIError_BlockedByAccountUsage(t *testing.T) {
+	tests := []struct {
+		name     string
+		apiError *client.APIError
+		want     bool
+	}{
+		{
+			name:     "public accounts API refusal",
+			apiError: &client.APIError{HTTPStatusCode: 409, Message: "This account can't be removed because it is being used by sources: src-1."},
+			want:     true,
+		},
+		{
+			name:     "checks ErrorMessage when Message is empty",
+			apiError: &client.APIError{HTTPStatusCode: 409, ErrorMessage: "This account can't be removed because it is being used by sources: src-1."},
+			want:     true,
+		},
+		{
+			name:     "unrelated conflict",
+			apiError: &client.APIError{HTTPStatusCode: 409, Message: "external id already claimed"},
+			want:     false,
+		},
+		{
+			name:     "right words, status other than 409",
+			apiError: &client.APIError{HTTPStatusCode: 400, Message: "This account can't be removed because it is being used by sources: src-1."},
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.apiError.BlockedByAccountUsage())
+		})
+	}
+}

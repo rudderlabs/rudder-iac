@@ -97,7 +97,7 @@ provides the variable wins.
 | 2 | Variable files | `--var-file file.yaml` (later file wins over earlier — see below) |
 | 3 (lowest) | Inline default | `{{ .VAR \| default }}` |
 
-If a variable is found in none of these and has no default, the apply/validate **fails**
+If a variable is found in none of these and has no default, the project-loading command **fails**
 (see [Error handling](#error-handling)).
 
 ### Environment variables
@@ -168,6 +168,10 @@ The `--var-file` flag and substitution apply to:
 - `rudder-cli validate`
 - `rudder-cli migrate`
 - `rudder-cli import workspace`
+- `rudder-cli transformations test`
+- `rudder-cli data-graphs validate`
+- `rudder-cli retl-sources validate`
+- `rudder-cli retl-sources preview`
 
 They are **not** available on `destroy` or `import retl-sources`, which do not load local specs.
 Even without `--var-file`, `RUDDER_*` environment variables are always picked up by the commands
@@ -197,6 +201,18 @@ Recommendation:
   An unquoted value containing these can break YAML parsing or change the document's meaning.
 - **Leave it unquoted** only when you intentionally want the value to keep its native type
   (a number or boolean from a variable file or env var).
+
+Which quote to use depends on what the value can contain, because the value is inserted
+verbatim:
+
+| Reference | Breaks when the value contains | Fix |
+|---|---|---|
+| `"{{ .VAR }}"` | `"` or `\` | none inside the value, so use single quotes |
+| `'{{ .VAR }}'` | `'` | double each `'` in the variable (`it''s`, written unquoted in the var file) |
+
+Specs written by `import workspace` use single quotes, so a JSON value such as a service
+account key works as is (JSON has no `'`), while a password with an apostrophe needs its
+`'` doubled.
 
 ---
 
