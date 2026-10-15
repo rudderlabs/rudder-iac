@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCmdTimePrintsCurrentLocalTime(t *testing.T) {
+func TestCmdTimePrintsCurrentLocalTimeInColor(t *testing.T) {
 	fixedTime := time.Date(2026, time.March, 14, 15, 9, 26, 0, time.FixedZone("UTC-7", -7*60*60))
 	cmd := newCmdTime(func() time.Time { return fixedTime })
 	var output bytes.Buffer
@@ -18,7 +19,7 @@ func TestCmdTimePrintsCurrentLocalTime(t *testing.T) {
 	err := cmd.Execute()
 
 	require.NoError(t, err)
-	assert.Equal(t, "2026-03-14T15:09:26-07:00\n", output.String())
+	assert.Equal(t, ui.Color("2026-03-14T15:09:26-07:00", ui.ColorBlue)+"\n", output.String())
 }
 
 func TestNewCmdTimeMetadata(t *testing.T) {
