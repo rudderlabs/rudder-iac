@@ -35,6 +35,10 @@ type ExperimentalConfig struct {
 	// RETLTableSupport registers the retl-source-table spec kind with the RETL
 	// provider.
 	RETLTableSupport bool `mapstructure:"retlTableSupport"`
+
+	// DevListen shows and enables the `dev` command group: a local listener that
+	// captures the events an app sends, and the commands that read them.
+	DevListen bool `mapstructure:"devListen"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

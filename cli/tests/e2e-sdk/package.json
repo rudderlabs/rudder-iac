@@ -1,0 +1,15 @@
+{
+  "name": "dev-listen-sdk-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A fixture app and real RudderStack SDKs sending to a built rudder-cli dev listen.",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@rudderstack/analytics-js": "3.34.3",
+    "@rudderstack/rudder-sdk-node": "3.0.13",
+    "playwright": "1.63.0"
+  }
+}

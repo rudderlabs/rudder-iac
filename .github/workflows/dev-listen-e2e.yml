@@ -1,0 +1,199 @@
+name: dev-listen-e2e
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "cli/internal/devlisten/**"
+      - "cli/internal/cmd/dev/**"
+      - "cli/internal/cmd/root.go"
+      - "cli/internal/config/experimental.go"
+      - "cli/cmd/rudder-cli/**"
+      - "cli/tests/command_dev*_test.go"
+      - "cli/tests/main_test.go"
+      - "cli/tests/binary.go"
+      - "cli/tests/helpers.go"
+      - "cli/tests/e2e-ui/**"
+      - "cli/tests/e2e-sdk/**"
+      - "cli/Dockerfile"
+      - "go.mod"
+      - "go.sum"
+      - "Makefile"
+      - ".github/workflows/dev-listen-e2e.yml"
+  pull_request:
+    # Keep in sync with the push filter above.
+    paths:
+      - "cli/internal/devlisten/**"
+      - "cli/internal/cmd/dev/**"
+      - "cli/internal/cmd/root.go"
+      - "cli/internal/config/experimental.go"
+      - "cli/cmd/rudder-cli/**"
+      - "cli/tests/command_dev*_test.go"
+      - "cli/tests/main_test.go"
+      - "cli/tests/binary.go"
+      - "cli/tests/helpers.go"
+      - "cli/tests/e2e-ui/**"
+      - "cli/tests/e2e-sdk/**"
+      - "cli/Dockerfile"
+      - "go.mod"
+      - "go.sum"
+      - "Makefile"
+      - ".github/workflows/dev-listen-e2e.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.sha }}
+  cancel-in-progress: true
+
+permissions: {}
+
+# The dev listen tests need no account, no secret and no network beyond the
+# runner: every listener runs on loopback or in a local container.
+env:
+  RUDDERSTACK_CLI_TELEMETRY_DISABLED: "true"
+
+jobs:
+  cli:
+    name: dev listen e2e and fuzz
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read # actions/checkout
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: go.mod
+      # TestMain builds the binary once. The tests set the gate variables for
+      # each listener they start.
+      - name: dev listen e2e
+        run: go test -race -count=1 ./cli/tests -run TestDevListen -v
+      - name: fuzz the body reader
+        run: go test ./cli/internal/devlisten/ingest -run '^$' -fuzz '^FuzzBody$' -fuzztime 30s
+      - name: fuzz the query scan
+        run: go test ./cli/internal/devlisten/ingest -run '^$' -fuzz '^FuzzQueryValue$' -fuzztime 30s
+      # A fuzz failure writes the failing input here. Keep it to replay locally.
+      - name: upload failing fuzz inputs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-failing-inputs
+          path: cli/internal/devlisten/ingest/testdata/fuzz
+          if-no-files-found: ignore
+
+  image:
+    name: dev listen in the Docker image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read # actions/checkout
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: go.mod
+      # The same build that docker.yml publishes, kept local: nothing is pushed.
+      - name: build the image
+        run: make docker-build VERSION=dev-listen-e2e
+      - name: run dev listen in the image
+        env:
+          RUDDER_CLI_IMAGE: rudderlabs/rudder-cli:dev-listen-e2e
+        run: go test -count=1 ./cli/tests -run TestDevListenInADockerContainer -v
+
+  page:
+    name: dev listen review page (Playwright)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read # actions/checkout
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cli/tests/e2e-ui/package-lock.json
+      # make test-e2e-ui installs the browser without its system libraries,
+      # which take root. These steps run the same recipe with them, once.
+      - name: build rudder-cli
+        run: make build
+      - name: install Chromium and its system libraries
+        working-directory: cli/tests/e2e-ui
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: page tests
+        working-directory: cli/tests/e2e-ui
+        run: RUDDER_CLI_BIN="$GITHUB_WORKSPACE/bin/rudder-cli" npx playwright test
+      - name: upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-traces
+          path: cli/tests/e2e-ui/test-results
+          if-no-files-found: ignore
+
+  sdk:
+    name: dev listen with a fixture app and real SDKs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read # actions/checkout
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            cli/tests/e2e-sdk/go/go.sum
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cli/tests/e2e-sdk/package-lock.json
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: cli/tests/e2e-sdk/requirements.txt
+      - name: build rudder-cli
+        run: make build
+      - name: install the SDKs, Chromium and its system libraries
+        working-directory: cli/tests/e2e-sdk
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          pip install -r requirements.txt
+      # Ten runs against a fresh listener each, then one run with a defect
+      # that the byte check must catch.
+      - name: fixture app, 10 runs
+        run: PATH="$GITHUB_WORKSPACE/bin:$PATH" bash cli/tests/e2e-sdk/driver.sh
+      - name: Node, Python, Go and JS v3 SDKs
+        run: PATH="$GITHUB_WORKSPACE/bin:$PATH" bash cli/tests/e2e-sdk/sdk.sh
