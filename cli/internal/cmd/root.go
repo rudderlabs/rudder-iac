@@ -20,6 +20,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/migrate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/validate"
 	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
+	schemaCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/schema"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/transformations"
@@ -100,6 +101,7 @@ func init() {
 
 	rootCmd.AddCommand(typer.NewCmdTyper())
 	rootCmd.AddCommand(transformations.NewCmdTransformations())
+	rootCmd.AddCommand(schemaCmd.NewCmdSchema())
 
 	datagraphCmd = datagraphPkg.NewCmdDataGraph()
 	rootCmd.AddCommand(datagraphCmd)

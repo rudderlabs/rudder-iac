@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/schema/editor"
 )
 
 // FormattableEntity represents an importable entity with content and path.
@@ -34,6 +36,8 @@ func Write(_ context.Context, baseDir string, formatters formatter.Formatters, d
 			return fmt.Errorf("formatting %s: %w", path, err)
 		}
 
+		content = withEditorHeader(datum.Content, content)
+
 		err = writeFile(path, content)
 		if err != nil {
 			return fmt.Errorf("writing %s: %w", path, err)
@@ -41,6 +45,18 @@ func Write(_ context.Context, baseDir string, formatters formatter.Formatters, d
 	}
 
 	return nil
+}
+
+// withEditorHeader prepends a yaml-language-server modeline to a formatted spec
+// so editors validate imported/scaffolded files against the generated schema.
+// Only content backed by a *specs.Spec with a known kind is annotated; anything
+// else (e.g. code files) is returned unchanged.
+func withEditorHeader(content any, formatted []byte) []byte {
+	spec, ok := content.(*specs.Spec)
+	if !ok || spec.Kind == "" {
+		return formatted
+	}
+	return editor.EnsureHeader(formatted, editor.DefaultSchemaRef(spec.Kind))
 }
 
 // writeFile writes content to a file, but fails if the file already exists.
@@ -66,6 +82,8 @@ func OverwriteFile(formatters formatter.Formatters, entity FormattableEntity) er
 	if err != nil {
 		return fmt.Errorf("formatting %s: %w", entity.RelativePath, err)
 	}
+
+	formatted = withEditorHeader(entity.Content, formatted)
 
 	if err := os.WriteFile(entity.RelativePath, formatted, 0644); err != nil {
 		return fmt.Errorf("writing file %s: %w", entity.RelativePath, err)

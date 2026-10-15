@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -256,5 +257,54 @@ func TestOverwriteFile(t *testing.T) {
 		err := OverwriteFile(formatters, entity)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "writing file")
+	})
+}
+
+func TestWriteAddsEditorHeaderForSpecs(t *testing.T) {
+	t.Run("prepends schema modeline when content is a spec", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			tmpDir = t.TempDir()
+			ctx    = context.Background()
+		)
+
+		formatters := formatter.Setup(stubFormatter{exts: []string{"yaml"}, out: []byte("kind: transformation\n")})
+
+		entities := []FormattableEntity{{
+			Content:      &specs.Spec{Kind: "transformation"},
+			RelativePath: "t.yaml",
+		}}
+
+		require.NoError(t, Write(ctx, tmpDir, formatters, entities))
+
+		got, err := os.ReadFile(filepath.Join(tmpDir, "t.yaml"))
+		require.NoError(t, err)
+		assert.Equal(t,
+			"# yaml-language-server: $schema=.rudder/schemas/transformation.schema.json\nkind: transformation\n",
+			string(got),
+		)
+	})
+
+	t.Run("leaves non-spec content untouched", func(t *testing.T) {
+		t.Parallel()
+
+		var (
+			tmpDir = t.TempDir()
+			ctx    = context.Background()
+		)
+
+		formatters := formatter.Setup(stubFormatter{exts: []string{"yaml"}, out: []byte("plain")})
+
+		entities := []FormattableEntity{{
+			Content:      map[string]any{"k": "v"},
+			RelativePath: "p.yaml",
+		}}
+
+		require.NoError(t, Write(ctx, tmpDir, formatters, entities))
+
+		got, err := os.ReadFile(filepath.Join(tmpDir, "p.yaml"))
+		require.NoError(t, err)
+		assert.Equal(t, "plain", string(got))
 	})
 }
