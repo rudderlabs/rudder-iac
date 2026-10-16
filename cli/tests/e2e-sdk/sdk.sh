@@ -17,10 +17,11 @@ node node.mjs "$url"
 (cd go && go run . "$url")
 node jsv3.mjs "$url"
 
-rudder-cli dev events --url "$url" --server-id "$sid" --since "$cur" --event 'SDK Probe' --min 4 --wait 30s --json |
-  jq -e '.timedOut == false and .summary.byEvent["SDK Probe"] == 4 and ([.summary.byWriteKey["node","python","go","jsv3"].events] | all(. == 1))'
-rudder-cli dev events --url "$url" --since "$cur" --json |
-  jq -e '.summary.requests.failed == 0'
-rudder-cli dev events list --url "$url" --since "$cur" --event 'SDK Probe' --fields properties --json |
-  jq -e -s 'length == 4 and ([.[].properties.sdk] | sort) == ["go","jsv3","node","python"] and all(.[]; .properties.n == 1)'
+wait_for 4 'SDK Probe'
+if grep '^refused:' "$log" >&2; then exit 1; fi
+jq -e -s '[.[] | select(.event == "SDK Probe")] |
+  length == 4 and ([.[].properties.sdk] | sort) == ["go","jsv3","node","python"] and all(.[]; .properties.n == 1)' "$events"
+# stdout has no write key, so the per-key check reads the store.
+curl -fsS "$url/_dev/v1/events?view=counts&since=$cur" |
+  jq -e '[.summary.byWriteKey["node","python","go","jsv3"].events] | all(. == 1)'
 echo "all four SDKs: ok"

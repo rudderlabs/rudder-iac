@@ -1,4 +1,4 @@
-package dev
+package sources
 
 import (
 	"regexp"
@@ -21,7 +21,7 @@ var (
 	removedCommands = []string{"summary", "exec", "stop", "cursor", "info", "send", "reset", "guide", "requests"}
 	removedFlags    = []string{
 		"expect", "jq", "detach", "include", "summary", "seq", "state-file", "idle-exit", "quiet",
-		"max-bytes", "status-code", "kind", "failed",
+		"max-bytes", "status-code", "kind", "failed", "wait", "min",
 	}
 )
 
@@ -35,11 +35,11 @@ func walk(c *cobra.Command, visit func(*cobra.Command)) {
 func TestDevHelpPrintsTheGuide(t *testing.T) {
 	t.Parallel()
 
-	stdout, _, err := execute("dev", "--help")
+	stdout, _, err := execute("sources", "--help")
 
 	require.NoError(t, err)
 	require.True(t, strings.HasPrefix(stdout, strings.TrimRightFunc(devlisten.Guide, unicode.IsSpace)+"\n"),
-		"dev --help starts with the guide that /_dev/v1/guide serves")
+		"sources --help starts with the guide that /_dev/v1/guide serves")
 	require.Contains(t, stdout, "Available Commands:")
 }
 
@@ -47,7 +47,7 @@ func TestHelpTree(t *testing.T) {
 	t.Parallel()
 
 	var paths []string
-	walk(NewCmdDev(), func(c *cobra.Command) {
+	walk(NewCmdSources(), func(c *cobra.Command) {
 		paths = append(paths, c.CommandPath())
 		for _, name := range append([]string{c.Name()}, c.Aliases...) {
 			require.NotContains(t, removedCommands, name, c.CommandPath())
@@ -56,7 +56,7 @@ func TestHelpTree(t *testing.T) {
 			require.Nil(t, c.Flags().Lookup(name), "%s --%s", c.CommandPath(), name)
 			require.Nil(t, c.InheritedFlags().Lookup(name), "%s --%s", c.CommandPath(), name)
 		}
-		if c.Name() == "dev" {
+		if c.Name() == "sources" {
 			return
 		}
 		require.NotEmpty(t, c.Short, c.CommandPath())
@@ -70,7 +70,7 @@ func TestHelpTree(t *testing.T) {
 			require.True(t, strings.HasPrefix(line, "$ rudder-cli "), "%s: %q", c.CommandPath(), line)
 		}
 	})
-	require.Equal(t, []string{"dev", "dev events", "dev events list", "dev listen"}, paths)
+	require.Equal(t, []string{"sources", "sources events", "sources listen"}, paths)
 }
 
 // Every command line in the help and the guide runs against the real
@@ -79,21 +79,21 @@ func TestHelpCommandsParse(t *testing.T) {
 	t.Parallel()
 
 	var lines []string
-	walk(NewCmdDev(), func(c *cobra.Command) {
+	walk(NewCmdSources(), func(c *cobra.Command) {
 		lines = append(lines, commandLines(c.Example)...)
 		lines = append(lines, commandLines(c.Long)...)
 	})
 	guide := commandLines(devlisten.Guide)
-	require.Greater(t, len(guide), 15, "the guide shows the commands it describes")
+	require.Greater(t, len(guide), 10, "the guide shows the commands it describes")
 	lines = append(lines, guide...)
 
 	for _, line := range lines {
 		args := splitShell(line)
-		if len(args) == 0 || args[0] != "dev" {
+		if len(args) == 0 || args[0] != "sources" {
 			continue
 		}
 		root := &cobra.Command{Use: "rudder-cli"}
-		root.AddCommand(NewCmdDev())
+		root.AddCommand(NewCmdSources())
 		c, rest, err := root.Find(args)
 		require.NoError(t, err, line)
 		c.InitDefaultHelpFlag()
@@ -205,10 +205,10 @@ func TestSplitShell(t *testing.T) {
 	t.Parallel()
 
 	for line, want := range map[string][]string{
-		`dev events --event 'Order Completed' --json | jq -e .`: {"dev", "events", "--event", "Order Completed", "--json"},
-		`dev listen --port 0 > ready.json 2> listen.log &`:      {"dev", "listen", "--port", "0"},
-		`dev events list --url "$url" --since "$cur"`:           {"dev", "events", "list", "--url", "$url", "--since", "$cur"},
-		`dev events --json)`: {"dev", "events", "--json"},
+		`sources events --event 'Order Completed' --json | jq -e .`: {"sources", "events", "--event", "Order Completed", "--json"},
+		`sources listen --port 0 > ready.json 2> listen.log &`:      {"sources", "listen", "--port", "0"},
+		`sources events list --url "$url" --since "$cur"`:           {"sources", "events", "list", "--url", "$url", "--since", "$cur"},
+		`sources events --json)`:                                    {"sources", "events", "--json"},
 	} {
 		require.Equal(t, want, splitShell(line), line)
 	}

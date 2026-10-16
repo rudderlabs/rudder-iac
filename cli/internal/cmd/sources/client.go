@@ -1,15 +1,12 @@
-package dev
+package sources
 
 import (
-	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -41,14 +38,14 @@ func get(cmd *cobra.Command, base string, q url.Values, timeout time.Duration) (
 		if errors.Is(err, context.DeadlineExceeded) {
 			message = fmt.Sprintf("the listener at %s did not answer within %s", base, timeout)
 		}
-		return nil, nil, fail(cmd, &usageError{code: "server_unreachable", message: message, next: "rudder-cli dev listen --help"})
+		return nil, nil, fail(cmd, &usageError{code: "server_unreachable", message: message, next: "rudder-cli sources listen --help"})
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, nil, fail(cmd, &usageError{
 			code: "server_unreachable", message: "reading the answer of " + base + ": " + err.Error(),
-			next: "rudder-cli dev listen --help",
+			next: "rudder-cli sources listen --help",
 		})
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -59,8 +56,8 @@ func get(cmd *cobra.Command, base string, q url.Values, timeout time.Duration) (
 	if resp.Header.Get("X-Dev-Server-Id") == "" {
 		return nil, nil, fail(cmd, &usageError{
 			code:    "server_unreachable",
-			message: base + " answered HTTP 200, not as dev listen answers; check the url of the ready line",
-			next:    "rudder-cli dev listen --help",
+			message: base + " answered HTTP 200, not as sources listen answers; check the url of the ready line",
+			next:    "rudder-cli sources listen --help",
 		})
 	}
 	return resp, body, nil
@@ -73,8 +70,8 @@ func serverError(cmd *cobra.Command, base string, status int, body []byte) error
 	if !e.IsObject() || !e.Get("code").Exists() {
 		return fail(cmd, &usageError{
 			code:    "server_unreachable",
-			message: fmt.Sprintf("%s answered HTTP %d, not as dev listen answers; check the url of the ready line", base, status),
-			next:    "rudder-cli dev listen --help",
+			message: fmt.Sprintf("%s answered HTTP %d, not as sources listen answers; check the url of the ready line", base, status),
+			next:    "rudder-cli sources listen --help",
 		})
 	}
 	next := withURL(e.Get("next").String(), base)
@@ -98,36 +95,6 @@ func trimNewline(b []byte) []byte {
 	return b
 }
 
-// readSummary prints the summary, then fails a read that cannot back a
-// check: a window that lost requests, or a wait that ran out.
-func readSummary(cmd *cobra.Command, opts *readOptions, base string, q url.Values, timeout time.Duration) error {
-	_, body, err := get(cmd, base, q, timeout)
-	if err != nil {
-		return err
-	}
-	if err := writeSummary(cmd, opts, base, body); err != nil {
-		return err
-	}
-	return verdict(cmd, opts, base, readResult{
-		lost:           gjson.GetBytes(body, `summary.diagnosis.#(code=="`+devlisten.CodeEvicted+`")`).Exists(),
-		evictedThrough: gjson.GetBytes(body, "evictedThrough").String(),
-		waitTimeout:    waitTimeout(cmd, body, base, q, opts.since),
-	})
-}
-
-// waitTimeout is the error of a wait that ran out, or nil.
-func waitTimeout(cmd *cobra.Command, body []byte, base string, q url.Values, since string) *usageError {
-	if !gjson.GetBytes(body, "timedOut").Bool() {
-		return nil
-	}
-	return &usageError{
-		code: "wait_timeout",
-		message: fmt.Sprintf("--wait ran out after %.1fs: %d of --min %s matching accepted events arrived",
-			gjson.GetBytes(body, "waitedMs").Float()/1000, gjson.GetBytes(body, "summary.events.total").Int(), cmp.Or(q.Get("min"), "1")),
-		next: again(cmd, base, since),
-	}
-}
-
 // again is the command line the caller ran, with --url filled in and --since
 // replaced, so a next command asks the same question of the same listener.
 func again(cmd *cobra.Command, base, since string) string {
@@ -148,42 +115,6 @@ func again(cmd *cobra.Command, base, since string) string {
 		}
 	})
 	return strings.Join(words, " ")
-}
-
-// writeSummary prints the summary object as the server wrote it, with the
-// URL added to every rudder-cli next, or as text.
-func writeSummary(cmd *cobra.Command, opts *readOptions, base string, body []byte) error {
-	if !opts.json {
-		var s summaryText
-		if err := json.Unmarshal(body, &s); err != nil {
-			return fail(cmd, &usageError{
-				code: "server_unreachable", message: "the summary does not parse: " + err.Error(),
-				next: "rudder-cli dev listen --help",
-			})
-		}
-		s.Next = withURL(s.Next, base)
-		for i := range s.Summary.Diagnosis {
-			s.Summary.Diagnosis[i].Next = withURL(s.Summary.Diagnosis[i].Next, base)
-		}
-		return s.render(cmd.OutOrStdout())
-	}
-
-	paths := []string{"next"}
-	for i := range gjson.GetBytes(body, "summary.diagnosis.#").Int() {
-		paths = append(paths, "summary.diagnosis."+strconv.FormatInt(i, 10)+".next")
-	}
-	for _, path := range paths {
-		next := gjson.GetBytes(body, path)
-		if !next.Exists() {
-			continue
-		}
-		// SetBytes keeps the other keys and their order as they are.
-		if out, err := sjson.SetBytes(body, path, withURL(next.String(), base)); err == nil {
-			body = out
-		}
-	}
-	_, err := cmd.OutOrStdout().Write(body)
-	return err
 }
 
 // readStream prints the stream, then fails a window that lost requests.
@@ -221,37 +152,28 @@ func writeStream(cmd *cobra.Command, opts *readOptions, base string, header http
 	}
 	return renderStream(cmd.OutOrStdout(), body, streamTable{since: opts.since, base: base, more: more, view: view, fields: fields})
 }
-
 // readResult is what a read says about its own output. The listener
 // decides which windows lost requests; the CLI only reads its answer.
 type readResult struct {
 	lost           bool
 	evictedThrough string
-	waitTimeout    *usageError
 }
 
-// verdict runs after the output is written. It fails a read whose output
-// cannot back a check: a count that came out short, unless the caller
-// accepted the loss, or a wait that ran out. The loss comes first, because
-// it can explain a short count.
+// verdict runs after the output is written. It fails a read whose window
+// lost requests, unless the caller accepted the loss.
 func verdict(cmd *cobra.Command, opts *readOptions, base string, r readResult) error {
-	if r.lost {
-		message := "requests up to seq " + r.evictedThrough + " were evicted, so this window is incomplete"
-		if !opts.allowPartial {
-			return fail(cmd, &usageError{
-				code:    devlisten.CodeEvicted,
-				message: message + "; pass --allow-partial to accept it",
-				// The window after the newest evicted request is complete.
-				next: again(cmd, base, r.evictedThrough),
-			})
-		}
-		// With --json, stderr holds one JSON error, so the note gives way to it.
-		if !opts.json || r.waitTimeout == nil {
-			fmt.Fprintln(cmd.ErrOrStderr(), "note: "+message)
-		}
+	if !r.lost {
+		return nil
 	}
-	if r.waitTimeout != nil {
-		return fail(cmd, r.waitTimeout)
+	message := "requests up to seq " + r.evictedThrough + " were evicted, so this window is incomplete"
+	if !opts.allowPartial {
+		return fail(cmd, &usageError{
+			code:    devlisten.CodeEvicted,
+			message: message + "; pass --allow-partial to accept it",
+			// The window after the newest evicted request is complete.
+			next: again(cmd, base, r.evictedThrough),
+		})
 	}
+	fmt.Fprintln(cmd.ErrOrStderr(), "note: "+message)
 	return nil
 }

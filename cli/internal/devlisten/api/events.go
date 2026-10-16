@@ -37,9 +37,9 @@ func (h *Handler) events(w http.ResponseWriter, r *http.Request) {
 
 func eventsHelp(query url.Values) string {
 	if query.Get("view") == "counts" {
-		return "rudder-cli dev events --help"
+		return "rudder-cli sources events --help"
 	}
-	return "rudder-cli dev events list --help"
+	return "rudder-cli sources events --help"
 }
 
 func (h *Handler) serverChanged(w http.ResponseWriter) {
@@ -48,7 +48,7 @@ func (h *Handler) serverChanged(w http.ResponseWriter) {
 		Code:    "server_changed",
 		Message: "Another listener answers at this URL, or it restarted. Start again from a fresh cursor.",
 		Details: map[string]any{"serverId": h.cfg.Identity.ServerID, "startedAt": h.cfg.Identity.StartedAt},
-		Next:    "rudder-cli dev events --json",
+		Next:    "rudder-cli sources events --json",
 	}})
 }
 

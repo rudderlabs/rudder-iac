@@ -55,7 +55,7 @@ type Config struct {
 	AllowHosts []string
 	// Version is the CLI version.
 	Version string
-	// Guide is the Markdown guide that rudder-cli dev --help prints.
+	// Guide is the Markdown guide that rudder-cli sources --help prints.
 	Guide string
 	// UI serves the review page under UIPath, after the same guards as the
 	// query API.
@@ -118,15 +118,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case !h.hostAllowed(r.Host):
 		h.fail(w, http.StatusForbidden, "host_not_allowed",
 			"Host "+r.Host+" is not allowed. Use a loopback address, the bind address or a name given with --allow-host.",
-			"rudder-cli dev events --json")
+			"rudder-cli sources events --json")
 		return
 	case crossSite(r):
 		h.fail(w, http.StatusForbidden, "browser_origin",
-			"The query API refuses requests from other sites.", "rudder-cli dev events --json")
+			"The query API refuses requests from other sites.", "rudder-cli sources events --json")
 		return
 	case h.stopped.Err() != nil:
 		h.fail(w, http.StatusServiceUnavailable, "shutting_down", "The listener is shutting down.",
-			"rudder-cli dev listen --help")
+			"rudder-cli sources listen --help")
 		return
 	}
 
@@ -253,7 +253,7 @@ func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
 	}{
 		APIVersion:  h.cfg.Identity.APIVersion,
 		ServerID:    h.cfg.Identity.ServerID,
-		Description: "The query API of rudder-cli dev listen. It reads what the listener captured.",
+		Description: "The query API of rudder-cli sources listen. It reads what the listener captured.",
 		Next:        h.curl("info"),
 		Curl:        h.curl("info"),
 		Links: map[string]string{
@@ -280,9 +280,9 @@ func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
 				h.recordExample(),
 			},
 			{http.MethodGet, base + "info", []string{}, "The listener identity, the cursor and the store counts.", h.curl("info")},
-			{http.MethodGet, base + "guide", []string{}, "The guide that rudder-cli dev --help prints, as Markdown.", h.curl("guide")},
+			{http.MethodGet, base + "guide", []string{}, "The guide that rudder-cli sources --help prints, as Markdown.", h.curl("guide")},
 		},
-		Help: "rudder-cli dev --help",
+		Help: "rudder-cli sources --help",
 	})
 }
 
@@ -344,7 +344,7 @@ func (h *Handler) guide(w http.ResponseWriter, r *http.Request) {
 }
 
 // IsLoopback reports whether a bind address takes local connections only.
-// The bind is always an IP address, because dev listen rejects names.
+// The bind is always an IP address, because sources listen rejects names.
 func IsLoopback(bind string) bool {
 	ip := net.ParseIP(bind)
 	return ip != nil && ip.IsLoopback()

@@ -174,9 +174,9 @@ func TestGetAvailableExperimentalFlags(t *testing.T) {
 		"every ExperimentalConfig field should produce a flag")
 }
 
-func TestIsValidExperimentalFlag_DevListen(t *testing.T) {
+func TestIsValidExperimentalFlag_SourcesListen(t *testing.T) {
 	t.Parallel()
 
-	assert.True(t, IsValidExperimentalFlag("devListen"))
-	assert.Equal(t, "RUDDERSTACK_X_DEV_LISTEN", GetEnvironmentVariableName("devListen"))
+	assert.True(t, IsValidExperimentalFlag("sourcesListen"))
+	assert.Equal(t, "RUDDERSTACK_X_SOURCES_LISTEN", GetEnvironmentVariableName("sourcesListen"))
 }

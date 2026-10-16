@@ -1,4 +1,4 @@
-package dev
+package sources
 
 import (
 	"encoding/json"

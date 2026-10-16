@@ -17,7 +17,7 @@ import (
 )
 
 // sdk sends one request through the real ingestion handler, so the records
-// under test are the records dev listen keeps. An empty key sends no
+// under test are the records sources listen keeps. An empty key sends no
 // Authorization header.
 func sdk(t *testing.T, st *store.Store, method, target, key, body string, allow ...string) int {
 	t.Helper()
@@ -289,8 +289,8 @@ func TestSinceAsATime(t *testing.T) {
 func TestEventsParameterErrors(t *testing.T) {
 	t.Parallel()
 	const (
-		listHelp   = "rudder-cli dev events list --help"
-		eventsHelp = "rudder-cli dev events --help"
+		listHelp   = "rudder-cli sources events --help"
+		eventsHelp = "rudder-cli sources events --help"
 	)
 	for _, tc := range []struct {
 		query string
@@ -369,7 +369,7 @@ func TestEventsServerChanged(t *testing.T) {
 		require.Equal(t, http.StatusConflict, w.Code)
 		e := decodeError(t, w)
 		require.Equal(t, "server_changed", e.Error.Code)
-		require.Equal(t, "rudder-cli dev events --json", e.Error.Next)
+		require.Equal(t, "rudder-cli sources events --json", e.Error.Next)
 		require.Equal(t, map[string]any{"serverId": "9f3ac1d2b7e4c601", "startedAt": "2026-09-30T12:00:00Z"}, e.Error.Details)
 	}
 	require.Equal(t, http.StatusOK, get(h, "/_dev/v1/events?serverId=9f3ac1d2b7e4c601", nil).Code)
@@ -402,7 +402,7 @@ func TestSummary(t *testing.T) {
 		`"diagnosis":[{"code":"body_rejected","count":1,`+
 		`"message":"1 request was rejected while the body was read: bad gzip, empty body, invalid JSON, wrong batch shape, no identity, or too large. Read rejection.reason.",`+
 		`"next":"curl -fsS 'http://127.0.0.1:4321/_dev/v1/requests?since=0&failed=true&view=compact'"}]},`+
-		`"next":"rudder-cli dev events --since 3 --event chatOpened --event 'Order Completed' --event 'chat*' --json"}`+"\n",
+		`"next":"rudder-cli sources events --since 3 --event chatOpened --event 'Order Completed' --event 'chat*' --json"}`+"\n",
 		w.Body.String())
 
 	unfiltered := get(h, "/_dev/v1/events?view=counts&since=0", nil).Body.String()
@@ -508,7 +508,7 @@ func TestDiagnosis(t *testing.T) {
 			want: []diagnosis{{
 				Code: "nothing_new", Count: 0,
 				Message: "No request after cursor 2; the listener holds 2. The app sent before the cursor, or has not sent yet.",
-				Next:    "rudder-cli dev events --since 0 --json",
+				Next:    "rudder-cli sources events --since 0 --json",
 			}},
 		},
 		{
@@ -521,17 +521,17 @@ func TestDiagnosis(t *testing.T) {
 				{
 					Code: "no_browser_traffic", Count: 1,
 					Message: "If the app also runs a browser SDK, the browser did not reach the listener: no browser request, config request or preflight arrived.",
-					Next:    "rudder-cli dev listen --help",
+					Next:    "rudder-cli sources listen --help",
 				},
 				{
 					Code: "all_accepted", Count: 1,
 					Message: "Every request that arrived was accepted. This says nothing about events that never came: read byEvent.",
-					Next:    "rudder-cli dev events list --since 0 --event 'order completed' --user-id u --json",
+					Next:    "rudder-cli sources events --since 0 --event 'order completed' --user-id u --json",
 				},
 				{
 					Code: "filtered_empty", Count: 1,
 					Message: "Requests arrived, but the filters match none. Names are exact and case-sensitive.",
-					Next:    "rudder-cli dev events --since 0 --json",
+					Next:    "rudder-cli sources events --since 0 --json",
 				},
 			},
 		},
@@ -550,7 +550,7 @@ func TestDiagnosis(t *testing.T) {
 				{
 					Code: "nothing_new", Count: 0,
 					Message: "No request after cursor 1; the listener holds 1. The app sent before the cursor, or has not sent yet.",
-					Next:    "rudder-cli dev events --since 0 --json",
+					Next:    "rudder-cli sources events --since 0 --json",
 				},
 				{
 					Code: "preflight_only", Count: 1,
@@ -590,7 +590,7 @@ func TestDiagnosis(t *testing.T) {
 				{
 					Code: "no_browser_traffic", Count: 2,
 					Message: "If the app also runs a browser SDK, the browser did not reach the listener: no browser request, config request or preflight arrived.",
-					Next:    "rudder-cli dev listen --help",
+					Next:    "rudder-cli sources listen --help",
 				},
 				{
 					Code: "body_rejected", Count: 1,
@@ -809,14 +809,14 @@ func TestReadsSignalAWindowThatLostRequests(t *testing.T) {
 			Code: "events_evicted", Count: 1,
 			Message: "1 request was evicted from this window: the listener keeps the last 3 requests or 64 MiB. " +
 				"The counts and the events are incomplete.",
-			Next: "rudder-cli dev events --since 2 --event Kept --json",
+			Next: "rudder-cli sources events --since 2 --event Kept --json",
 		}, summaryOf(t, h, "since=1&event=Kept").Summary.Diagnosis[0])
 		// A time does not say how many requests the window lost.
 		require.Equal(t, diagnosis{
 			Code: "events_evicted", Count: 0,
 			Message: "Requests were evicted from this window: the listener keeps the last 3 requests or 64 MiB. " +
 				"The counts and the events are incomplete.",
-			Next: "rudder-cli dev events --since 2 --json",
+			Next: "rudder-cli sources events --since 2 --json",
 		}, summaryOf(t, h, "since=5m").Summary.Diagnosis[0])
 	})
 }

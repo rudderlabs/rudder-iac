@@ -88,7 +88,7 @@ func (h *Handler) summary(w http.ResponseWriter, r *http.Request, q *eventsQuery
 		switch {
 		case errors.Is(err, ErrShuttingDown):
 			h.fail(w, http.StatusServiceUnavailable, "shutting_down", "The listener is shutting down.",
-				"rudder-cli dev listen --help")
+				"rudder-cli sources listen --help")
 			return
 		case r.Context().Err() != nil:
 			return
@@ -107,7 +107,7 @@ func (h *Handler) summary(w http.ResponseWriter, r *http.Request, q *eventsQuery
 		TimedOut:       q.wait > 0 && filtered.Events.Total < q.min,
 		WaitedMs:       waited.Milliseconds(),
 		Summary:        filtered,
-		Next:           "rudder-cli dev events --since " + strconv.FormatUint(rd.cursor, 10) + q.args() + " --json",
+		Next:           "rudder-cli sources events --since " + strconv.FormatUint(rd.cursor, 10) + q.args() + " --json",
 	})
 }
 
@@ -296,7 +296,7 @@ func (h *Handler) diagnose(rd reading, all, filtered counts, q *eventsQuery) []d
 		add("nothing_new", 0,
 			fmt.Sprintf("No request after cursor %d; the listener holds %d. The app sent before the cursor, or has not sent yet.",
 				win.since, stats.Requests),
-			"rudder-cli dev events --since 0 --json")
+			"rudder-cli sources events --since 0 --json")
 	}
 	if control.Preflight > 0 && control.SourceConfig == 0 && reqs == 0 && !rd.lost {
 		add("preflight_only", control.Preflight,
@@ -317,7 +317,7 @@ func (h *Handler) diagnose(rd reading, all, filtered counts, q *eventsQuery) []d
 		control.SourceConfig == 0 && control.Preflight == 0 {
 		add("no_browser_traffic", reqs,
 			"If the app also runs a browser SDK, the browser did not reach the listener: no browser request, config request or preflight arrived.",
-			"rudder-cli dev listen --help")
+			"rudder-cli sources listen --help")
 	}
 	if n := all.Requests.ByStage["auth"]; n > 0 {
 		add("auth_rejected", n,
@@ -343,12 +343,12 @@ func (h *Handler) diagnose(rd reading, all, filtered counts, q *eventsQuery) []d
 	if reqs > 0 && all.Requests.Failed == 0 && !rd.lost {
 		add("all_accepted", reqs,
 			"Every request that arrived was accepted. This says nothing about events that never came: read byEvent.",
-			"rudder-cli dev events list --since "+since+q.args()+" --json")
+			"rudder-cli sources events --since "+since+q.args()+" --json")
 	}
 	if (q.filtered() || len(q.writeKeys) > 0) && reqs > 0 && filtered.Requests.Total == 0 && filtered.Control.Total == 0 {
 		add("filtered_empty", reqs,
 			"Requests arrived, but the filters match none. Names are exact and case-sensitive.",
-			"rudder-cli dev events --since "+since+" --json")
+			"rudder-cli sources events --since "+since+" --json")
 	}
 	return out
 }
@@ -371,7 +371,7 @@ func evicted(rd reading, q *eventsQuery) diagnosisItem {
 		Message: fmt.Sprintf("%s evicted from this window: the listener keeps the last %d requests or %d MiB. "+
 			"The counts and the events are incomplete.", subject, rd.stats.MaxRequests, rd.stats.MaxBytes>>20),
 		// The window after the newest evicted request is complete.
-		Next: "rudder-cli dev events --since " + strconv.FormatUint(rd.stats.EvictedThrough, 10) + q.args() + " --json",
+		Next: "rudder-cli sources events --since " + strconv.FormatUint(rd.stats.EvictedThrough, 10) + q.args() + " --json",
 	}
 }
 
