@@ -41,7 +41,7 @@ match_behavior:
                     maximum: 120
     invalid:
       - example_id: "ct-cfg-legacy-invalid-format"
-        title: "String config with invalid format value (legacy)"
+        title: "String config with invalid format (legacy)"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -59,14 +59,14 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/types/0/config/format"
             severity: "error"
-            message_contains: "invalid_format"
+            message_contains: "'format' must be one of: [date-time, date, time, email, uuid, hostname, ipv4, ipv6]"
   # Current spec version (rudder/v1).
   - applies_to:
       - kind: "custom-types"
         version: "rudder/v1"
     valid:
       - example_id: "ct-cfg-v1-valid-string"
-        title: "Valid v1 string config with pattern"
+        title: "Valid string config with pattern"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -82,7 +82,7 @@ match_behavior:
                     enum: ["active", "inactive"]
     invalid:
       - example_id: "ct-cfg-v1-invalid-format"
-        title: "v1 string config with invalid format value"
+        title: "v1 string config with invalid format"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -100,4 +100,4 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/types/0/config/format"
             severity: "error"
-            message_contains: "not_a_valid_format"
+            message_contains: "'format' must be one of: [date-time, date, time, email, uuid, hostname, ipv4, ipv6]"

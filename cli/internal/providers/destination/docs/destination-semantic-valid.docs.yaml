@@ -15,7 +15,7 @@ match_behavior:
             spec:
               id: webhook-prod
               display_name: Production Webhook
-              type: WEBHOOK
+              type: webhook
               definition_version: 1
               transformation: "#transformation:my-transformation"
               config:
@@ -42,14 +42,14 @@ match_behavior:
             spec:
               id: webhook-prod
               display_name: Production Webhook
-              type: WEBHOOK
+              type: webhook
               definition_version: 1
               transformation: "#transformation:ghost"
               config:
                 webhook_url: "https://example.com/hook"
         expected_diagnostics:
           - file: "destination.yaml"
-            reference: "/transformation"
+            reference: "/spec/transformation"
             severity: "error"
             message_contains: "not found in the project"
       - example_id: "destination-semantic-duplicate-display-name"
@@ -63,7 +63,7 @@ match_behavior:
             spec:
               id: webhook-a
               display_name: Shared Name
-              type: WEBHOOK
+              type: webhook
               definition_version: 1
               config:
                 webhook_url: "https://example.com/hook-a"
@@ -75,16 +75,16 @@ match_behavior:
             spec:
               id: webhook-b
               display_name: Shared Name
-              type: WEBHOOK
+              type: webhook
               definition_version: 1
               config:
                 webhook_url: "https://example.com/hook-b"
         expected_diagnostics:
           - file: "destination-a.yaml"
-            reference: "/display_name"
+            reference: "/spec/display_name"
             severity: "error"
             message_contains: "duplicate display_name"
           - file: "destination-b.yaml"
-            reference: "/display_name"
+            reference: "/spec/display_name"
             severity: "error"
             message_contains: "duplicate display_name"

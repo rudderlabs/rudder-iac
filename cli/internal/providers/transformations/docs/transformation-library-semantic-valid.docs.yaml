@@ -5,7 +5,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "transformation-library-semantic-valid-unique-import-name"
-        title: "Transformation library with a unique import_name across all libraries"
+        title: "Transformation library with unique import_name"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -22,9 +22,10 @@ match_behavior:
                     export function round(value) {
                       return Math.round(value);
                     }
+        description: A single library whose import_name no other library claims validates cleanly.
     invalid:
       - example_id: "transformation-library-semantic-valid-duplicate-import-name"
-        title: "Two transformation libraries sharing the same import_name"
+        title: "Duplicate transformation library import_name"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -54,3 +55,4 @@ match_behavior:
             reference: "/import_name"
             severity: "error"
             message_contains: "import_name 'mathUtils' is duplicate"
+        description: Two libraries declaring the same import_name collide in the resource graph and fail validation.

@@ -42,7 +42,7 @@ match_behavior:
                     maximum: 120
     invalid:
       - example_id: "prop-cfg-legacy-invalid-format"
-        title: "String property config with invalid format value (legacy)"
+        title: "String property config with invalid format (legacy)"
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -60,14 +60,14 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/properties/0/propConfig/format"
             severity: "error"
-            message_contains: "not_valid"
+            message_contains: "'format' must be one of: [date-time, date, time, email, uuid, hostname, ipv4, ipv6]"
   # Current spec version (rudder/v1).
   - applies_to:
       - kind: "properties"
         version: "rudder/v1"
     valid:
       - example_id: "prop-cfg-v1-valid-string"
-        title: "Valid v1 string property config"
+        title: "Valid string property config"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -84,7 +84,7 @@ match_behavior:
                     min_length: 5
     invalid:
       - example_id: "prop-cfg-v1-invalid-format"
-        title: "v1 string property config with invalid format value"
+        title: "v1 string property config with invalid format"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -102,4 +102,4 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/properties/0/propConfig/format"
             severity: "error"
-            message_contains: "totally_wrong"
+            message_contains: "'format' must be one of: [date-time, date, time, email, uuid, hostname, ipv4, ipv6]"

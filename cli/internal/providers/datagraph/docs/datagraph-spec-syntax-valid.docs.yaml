@@ -5,7 +5,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "dg-spec-syntax-valid-entity-event"
-        title: "Valid data-graph spec with entity and event models"
+        title: "Valid Data Graph spec with entity and event models"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -36,7 +36,7 @@ match_behavior:
                       target_join_key: user_id
     invalid:
       - example_id: "dg-spec-syntax-missing-account-id"
-        title: "Data-graph missing required account_id"
+        title: "Data Graph missing required account_id"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -51,7 +51,7 @@ match_behavior:
             severity: "error"
             message_contains: "'account_id' is required"
       - example_id: "dg-spec-syntax-entity-missing-primary-id"
-        title: "Entity model missing required primary_id field"
+        title: "Entity model missing required primary_id"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -72,7 +72,7 @@ match_behavior:
             severity: "error"
             message_contains: "'primary_id' is required for entity models"
       - example_id: "dg-spec-syntax-event-missing-timestamp"
-        title: "Event model missing required timestamp field"
+        title: "Event model missing required timestamp"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -93,7 +93,7 @@ match_behavior:
             severity: "error"
             message_contains: "'timestamp' is required for event models"
       - example_id: "dg-spec-syntax-invalid-table-format"
-        title: "Model table must be a 3-part catalog.schema.table reference"
+        title: "Model table must use catalog.schema.table format"
         files:
           spec.yaml: |
             version: rudder/v1

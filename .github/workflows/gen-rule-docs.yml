@@ -51,6 +51,7 @@ jobs:
           # explicitly rather than inherited from the make target's defaults or
           # a repo variable: the setting belongs to the workflow that depends
           # on it.
+          RUDDERSTACK_X_IMPORT_MERGE: 'true'
           RUDDERSTACK_X_RETL_TABLE_SUPPORT: 'true'
           RUDDERSTACK_X_RETL_CONNECTION_SUPPORT: 'true'
 

@@ -5,7 +5,7 @@ match_behavior:
         version: "rudder/v1"
     valid:
       - example_id: "transformation-semantic-valid-no-imports"
-        title: "Transformation with no library imports is valid"
+        title: "Transformation without library imports is valid"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -22,9 +22,10 @@ match_behavior:
                       event.properties.processed = true;
                       return event;
                     }
+        description: Code that imports nothing has no library references to resolve, so the rule passes.
     invalid:
       - example_id: "transformation-semantic-valid-missing-library"
-        title: "Transformation importing a library that does not exist in the graph"
+        title: "Transformation imports a missing library"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -47,3 +48,4 @@ match_behavior:
             reference: "/code"
             severity: "error"
             message_contains: "'mathUtils' imported library not found"
+        description: The code imports a library handle with no matching library resource in the project, so the import cannot be resolved.

@@ -25,8 +25,8 @@ match_behavior:
                   type: string
     invalid:
       - example_id: "ct-sem-legacy-duplicate-name"
-        title: "Duplicate custom type name across files (legacy)"
-        description: "Two custom types with the same name in the resource graph trigger this error."
+        title: "Duplicate custom type names across files (legacy)"
+        description: "Duplicate custom type names in the resource graph fail validation."
         files:
           spec.yaml: |
             version: rudder/0.1
@@ -35,7 +35,17 @@ match_behavior:
               name: my-custom-types
             spec:
               types:
-                - id: address_v2
+                - id: address
+                  name: Address
+                  type: object
+          spec2.yaml: |
+            version: rudder/0.1
+            kind: custom-types
+            metadata:
+              name: my-custom-types-2
+            spec:
+              types:
+                - id: address_copy
                   name: Address
                   type: object
         expected_diagnostics:
@@ -44,6 +54,10 @@ match_behavior:
             severity: "error"
             message_contains: "duplicate name 'Address' within kind 'custom-types'"
   # Current spec version (rudder/v1).
+          - file: "spec2.yaml"
+            reference: "/types/0/name"
+            severity: "error"
+            message_contains: "duplicate name 'Address' within kind 'custom-types'"
   - applies_to:
       - kind: "custom-types"
         version: "rudder/v1"
@@ -66,8 +80,8 @@ match_behavior:
                   type: string
     invalid:
       - example_id: "ct-sem-v1-duplicate-name"
-        title: "Duplicate custom type name across files (v1)"
-        description: "Two custom types with the same name in the resource graph trigger this error."
+        title: "Duplicate custom type names across files (v1)"
+        description: "Duplicate custom type names in the resource graph fail validation."
         files:
           spec.yaml: |
             version: rudder/v1
@@ -76,11 +90,25 @@ match_behavior:
               name: my-custom-types
             spec:
               types:
-                - id: address_v2
+                - id: address
+                  name: Address
+                  type: object
+          spec2.yaml: |
+            version: rudder/v1
+            kind: custom-types
+            metadata:
+              name: my-custom-types-2
+            spec:
+              types:
+                - id: address_copy
                   name: Address
                   type: object
         expected_diagnostics:
           - file: "spec.yaml"
+            reference: "/types/0/name"
+            severity: "error"
+            message_contains: "duplicate name 'Address' within kind 'custom-types'"
+          - file: "spec2.yaml"
             reference: "/types/0/name"
             severity: "error"
             message_contains: "duplicate name 'Address' within kind 'custom-types'"
