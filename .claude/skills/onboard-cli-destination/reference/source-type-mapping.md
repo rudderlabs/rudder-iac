@@ -94,7 +94,7 @@ To reproduce the values from upstream (`$TYPE` is the local type, except
 `linkedin_ads`, whose upstream directory is `linkedIn_ads`):
 
 ```sh
-REF=develop
+REF=main
 raw() { gh api "repos/rudderlabs/rudder-integrations-config/contents/src/configurations/destinations/$1?ref=$REF" -H 'Accept: application/vnd.github.raw'; }
 
 # db-config: warehouse support, its modes and the two rETL fields.

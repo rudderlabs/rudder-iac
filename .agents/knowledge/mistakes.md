@@ -98,3 +98,9 @@
 - CI failed when `cli/tests/command_destinations_apply_test.go` added `https://webhooks.example.com/rudder` to `destinationRawSecrets`, because that value is a prefix of non-secret HTTP destination fixture URLs such as `https://webhooks.example.com/rudder/events`.
 - The same substring guard can collide on short or common dummy secret values, such as numeric HubSpot hub IDs that also appear in legitimate non-secret output like event names or pixel IDs.
 - Durable mitigation: raw-secret guard values must not be substrings of legitimate non-secret destination config; use long, unique dummy strings or distinct dummy secret domains/paths for webhook/destination secret variables.
+
+## INT-7268 — Semantic PR Title And Single-Commit Validation
+
+- The semantic PR workflow accepts `doc` but not `docs`; documentation-only PR titles or commit messages using `docs(scope): ...` fail with `Unknown release type "docs"`, so use `doc(scope): ...`.
+- Correcting only the PR title does not fix a one-commit PR whose commit message still has an invalid type: with `validateSingleCommit: true`, the workflow validates that lone commit too and reports that it is not semantic.
+- Publish a valid semantic commit message initially, or add a semantic follow-up commit when already-pushed history cannot safely be rewritten.
