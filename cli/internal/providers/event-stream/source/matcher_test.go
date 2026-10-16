@@ -46,6 +46,16 @@ func TestMatcher(t *testing.T) {
 		assert.Equal(t, "web-source", local.ID())
 	})
 
+	t.Run("matches a name differing only in case, as the server does", func(t *testing.T) {
+		t.Parallel()
+		scope := scopeWith(localSource("orders", "orders"))
+
+		local := m.Match(scope, remoteSource("src-1", "Orders"))
+
+		require.NotNil(t, local)
+		assert.Equal(t, "orders", local.ID())
+	})
+
 	t.Run("no match for different name", func(t *testing.T) {
 		t.Parallel()
 		scope := scopeWith(localSource("web-source", "Web Source"))
