@@ -106,7 +106,9 @@ type deps struct {
 
 // Deps defines the dependencies initialized globally for Rudder CLI
 type Deps interface {
-	// Client returns the RudderStack API client instance, configured with authentication and base URL
+	// Client returns the RudderStack API client instance, configured with the base URL.
+	// Deps from NewOfflineDeps carry a placeholder token, so calls through their
+	// client fail authentication.
 	Client() *client.Client
 
 	// Providers returns the initialized Providers struct containing all provider instances
@@ -147,7 +149,23 @@ func NewDeps() (Deps, error) {
 		return nil, err
 	}
 
-	c, err := setupClient(v)
+	return newDeps(config.GetConfig().Auth.AccessToken)
+}
+
+// NewOfflineDeps builds the same providers as NewDeps (so it observes the same
+// registered rules) for commands that must never contact the API, such as
+// validate, which is expected to run in CI without credentials. It skips the
+// access-token check and gives the client a placeholder token because client.New
+// rejects an empty one; any API call made through it fails auth, which surfaces
+// an accidental network dependency instead of hiding it.
+func NewOfflineDeps() (Deps, error) {
+	return newDeps("offline")
+}
+
+// newDeps is the single construction path for NewDeps and NewOfflineDeps, so a
+// client option or provider added here reaches both.
+func newDeps(token string) (Deps, error) {
+	c, err := setupClient(token, v)
 	if err != nil {
 		return nil, fmt.Errorf("setup client: %w", err)
 	}
@@ -171,50 +189,22 @@ func NewDeps() (Deps, error) {
 // Composition is the only part that needs the app's machinery, so it lives
 // here in the composition root; the provider-in, catalog-out assembly lives in
 // package ruledoc where it can be tested without credentials. Generation makes
-// no network calls, so it skips the access-token check NewDeps enforces.
+// no network calls, so it uses the offline deps.
 //
 // verrs carries catalog validation failures (e.g. a registered rule with no
 // authored fragment); a non-nil error means the catalog could not be assembled
 // at all. generatedAt is injected so callers own the timestamp.
 func GenerateRuleCatalog(generatedAt string) (docs.DocumentedRules, []error, error) {
-	cp, err := newCompositeProvider()
+	d, err := NewOfflineDeps()
 	if err != nil {
-		return docs.DocumentedRules{}, nil, fmt.Errorf("building composite provider: %w", err)
+		return docs.DocumentedRules{}, nil, fmt.Errorf("building offline deps: %w", err)
 	}
 
-	return ruledoc.Build(cp, GetVersion(), generatedAt)
-}
-
-// newCompositeProvider builds the composite provider without requiring
-// credentials. It is used only by GenerateRuleCatalog: rule-doc generation
-// enumerates rules and reads authored fragments but makes no network calls, so
-// it skips the auth check NewDeps enforces and feeds client.New a placeholder
-// token (an empty token is rejected outright, which would otherwise break
-// generation in CI where no credentials are configured). It shares
-// composeProviders with NewDeps so the documented rule set stays identical to
-// the one project validation observes — they can't drift.
-func newCompositeProvider() (provider.Provider, error) {
-	cfg := config.GetConfig()
-
-	c, err := client.New(
-		"rule-doc-generation", // unused: generation makes no API calls
-		client.WithBaseURL(cfg.APIURL),
-		client.WithUserAgent("rudder-cli/"+v),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("setup client: %w", err)
-	}
-
-	cp, _, err := composeProviders(c)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize composite provider: %w", err)
-	}
-
-	return cp, nil
+	return ruledoc.Build(d.CompositeProvider(), GetVersion(), generatedAt)
 }
 
 // composeProviders builds the provider set and aggregates it into a composite
-// provider. Shared by NewDeps and newCompositeProvider so every consumer
+// provider. Shared by NewDeps and NewOfflineDeps so every consumer
 // observes the same providers (and therefore the same registered rules).
 func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 	rawProviders, providerMap, err := setupProviders(c)
@@ -222,7 +212,7 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 		return nil, nil, fmt.Errorf("failed to initialize providers: %w", err)
 	}
 
-	cp, err := provider.NewCompositeProvider(providerMap)
+	cp, err := provider.NewCompositeProvider(providerMap, providerOrder...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize composite provider: %w", err)
 	}
@@ -230,13 +220,41 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 	return cp, rawProviders, nil
 }
 
-func setupClient(version string) (*client.Client, error) {
+func setupClient(token, version string) (*client.Client, error) {
 	cfg := config.GetConfig()
 	return client.New(
-		cfg.Auth.AccessToken,
+		token,
 		client.WithBaseURL(cfg.APIURL),
 		client.WithUserAgent("rudder-cli/"+version),
 	)
+}
+
+// providerOrder is the order the composite aggregates import --merge matchers
+// in. A matcher that consults another provider's matches only finds them if
+// that provider's matchers ran first, so a provider comes after everything it
+// depends on. providerEdges records those dependencies, and a test keeps the
+// two in step: a new cross-provider reference is a one-line addition there.
+var providerOrder = []string{
+	"account",
+	"transformations",
+	"datacatalog",
+	"destination",
+	"datagraph",
+	"eventstream",
+	"retl",
+}
+
+// providerEdges maps each provider to the providers whose matches its
+// matchers consult or whose resources its specs reference.
+var providerEdges = map[string][]string{
+	// transformation: "#transformation:<id>"
+	"destination": {"transformations"},
+	// connections resolve their destination endpoint (matcher);
+	// sources reference a tracking plan
+	"eventstream": {"destination", "datacatalog"},
+	// connections resolve their destination endpoint (matcher);
+	// sources reference an account: "#account:<id>"
+	"retl": {"destination", "account"},
 }
 
 func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider, error) {

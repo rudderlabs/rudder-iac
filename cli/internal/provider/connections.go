@@ -36,10 +36,17 @@ func ExplainBlockingEventStreamConnections(err error) error {
 }
 
 func explainBlockingConnections(err error, remedy string) error {
+	return explainBlocked(err, (*client.APIError).BlockedByConnections,
+		"connections this run is not managing are never removed with it", remedy)
+}
+
+// explainBlocked appends the reason and remedy to an API refusal that blocked
+// recognizes. The backend's own message stays first and still unwraps.
+func explainBlocked(err error, blocked func(*client.APIError) bool, reason, remedy string) error {
 	var apiErr *client.APIError
-	if !errors.As(err, &apiErr) || !apiErr.BlockedByConnections() {
+	if !errors.As(err, &apiErr) || !blocked(apiErr) {
 		return err
 	}
 
-	return fmt.Errorf("%w: connections this run is not managing are never removed with it. %s", err, remedy)
+	return fmt.Errorf("%w: %s. %s", err, reason, remedy)
 }

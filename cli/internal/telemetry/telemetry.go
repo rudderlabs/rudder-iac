@@ -3,6 +3,7 @@ package telemetry
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/google/uuid"
 	"github.com/rudderlabs/analytics-go/v4"
@@ -10,9 +11,14 @@ import (
 )
 
 var (
-	once sync.Once
-	v    string
+	once  sync.Once
+	v     string
+	ready atomic.Bool
 )
+
+// Ready reports whether Initialise ran with telemetry enabled, which is the
+// point where the config's opt-out setting has been read.
+func Ready() bool { return ready.Load() }
 
 func Initialise(version string) {
 	once.Do(func() {
@@ -22,6 +28,7 @@ func Initialise(version string) {
 		}
 
 		v = version
+		ready.Store(true)
 
 		if config.GetConfig().Telemetry.AnonymousID == "" {
 			anonymousID := uuid.New().String()

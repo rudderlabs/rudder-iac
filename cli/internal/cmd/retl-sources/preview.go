@@ -11,10 +11,13 @@ import (
 )
 
 func newCmdPreview() *cobra.Command {
-	var location string
-	var limit int
-	var jsonOutput bool
-	var interactive bool
+	var (
+		location    string
+		limit       int
+		jsonOutput  bool
+		interactive bool
+		varFiles    []string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "preview <external-id>",
@@ -25,27 +28,26 @@ func newCmdPreview() *cobra.Command {
 			$ rudder-cli retl-sources preview my-model --location ./project --limit 5
 			$ rudder-cli retl-sources preview my-model --interactive=false
 			$ rudder-cli retl-sources preview my-model --json
+			$ rudder-cli retl-sources preview my-model --var-file prod.vars.yaml
 		`),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return fmt.Errorf("retl-source external id is required")
-			}
-			externalID := args[0]
-
-			var err error
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
-				telemetry.TrackCommand("retl-sources preview", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "json", V: jsonOutput},
 					{K: "interactive", V: interactive},
 					{K: "limit", V: limit},
 				}...)
 			}()
 
+			if len(args) == 0 {
+				return fmt.Errorf("retl-source external id is required")
+			}
+			externalID := args[0]
+
 			// The request carries limit unchanged while the SQL uses max(limit, 1),
 			// so a negative value would disagree; checked below the defer so it is tracked.
 			if limit < 0 {
-				err = fmt.Errorf("--limit cannot be negative, got %d", limit)
-				return err
+				return fmt.Errorf("--limit cannot be negative, got %d", limit)
 			}
 
 			d, err := app.NewDeps()
@@ -53,7 +55,12 @@ func newCmdPreview() *cobra.Command {
 				return err
 			}
 
-			p := d.NewProject()
+			projectOpts, err := app.NewProjectOptions(varFiles)
+			if err != nil {
+				return err
+			}
+
+			p := d.NewProject(projectOpts...)
 			if err := p.Load(location); err != nil {
 				return fmt.Errorf("loading project: %w", err)
 			}
@@ -85,6 +92,7 @@ func newCmdPreview() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the project directory")
+	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output preview rows as JSON")
 	cmd.Flags().IntVar(&limit, "limit", 10, "Number of rows to preview")
 	cmd.Flags().BoolVar(&interactive, "interactive", true, "Enable interactive table display")

@@ -256,3 +256,9 @@
 - Fixtures that leave `connection_mode` out are themselves coverage: the field is optional, and something has to exercise a destination applying without it.
 - The firebase connection fixture (`testdata/connections/*/destination-firebase.yaml`) must name its source type under `connection_mode`. DEX-848 removed `use_native_sdk`, so `connection_mode` is the only block `validateSourceTypeSettings` can accept — an empty config there fails the connect-time check for the android source.
 - Mixed-mode destinations should use valid per-source `connection_mode` values while preserving existing source-type metadata; upstream `amp`, `shopify`, `warehouse`, and `cloud_source` source tokens remain excluded unless a known exception such as `customerio_audience` applies.
+
+## RUD-3189 — Project-Loading Commands Support Variable Files
+
+- Every CLI command under `cli/internal/cmd` that constructs a project with `Deps.NewProject` and then calls `Project.Load` should expose the shared repeatable `--var-file` flag, build options with `app.NewProjectOptions(varFiles)`, and pass those options to `NewProject` before loading. This keeps substitution behavior aligned across apply, validate, transformations test, data-graphs validate, and RETL source validate/preview; bare `NewProject()` calls in project-loading commands are a regression signal.
+- When one command prints a pasteable invocation of another command, preserve project-load context in the hint. In particular, `retl-sources validate` forwards each `--var-file` to its suggested `retl-sources preview` command in original precedence order and shell-quotes each path.
+- Var-file paths may contain environment or secret context and must not be sent to telemetry or logs. If telemetry is needed, record only the number of files rather than their paths.

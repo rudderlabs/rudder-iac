@@ -4,10 +4,11 @@ on:
     branches:
       - main
       - "release/*"
-    # Docs cannot change Go behaviour. Safe only while this workflow is NOT a required
-    # status check: the org ruleset master-branch-protection (id 4378086) carries only
-    # deletion, non_fast_forward and pull_request rules. If it is ever made required, a
-    # skipped run leaves the PR pending forever and this must become a job-level gate.
+    # Docs cannot change Go behaviour, so a docs-only push skips the whole workflow.
+    # Pull requests can't: "unit tests" and "e2e tests (live control plane)" are
+    # required status checks on main, and a workflow that never runs never reports
+    # them, which leaves the pull request blocked. They gate the jobs instead; see the
+    # changes job.
     paths-ignore:
       - "**/*.md"
       - "docs/**"
@@ -16,12 +17,6 @@ on:
   pull_request:
     branches:
       - main
-    # Keep in sync with the push filter above; Actions does not support YAML anchors.
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
-      - ".claude/**"
-      - ".agents/**"
 
 # Supersession, keyed per PR: a new commit cancels the older run of that same PR
 # instead of letting every intermediate commit spend a full e2e suite against the live
@@ -43,8 +38,45 @@ permissions:
   contents: read
 
 jobs:
+  # A skipped job still reports its required check as passing; a skipped workflow
+  # reports nothing. So a docs-only pull request runs this job, and the test jobs
+  # below skip on its answer.
+  changes:
+    name: "detect code changes"
+    # A push run has already passed the workflow-level filter. With this job skipped,
+    # its output is empty and the test jobs below still run.
+    if: github.event_name == 'pull_request'
+    runs-on: "ubuntu-24.04"
+    permissions:
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      # The files API lists a rename under its new path only, so the old path is
+      # checked too: moving a Go file under docs/ still runs the tests. The patterns
+      # mirror the push filter; keep the two in sync.
+      - name: list changed files
+        id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)')
+          grep -qvE '(\.md$|^docs/|^\.claude/|^\.agents/)' <<< "$files" && code=true || code=false
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   unit:
     name: "unit tests"
+    needs: changes
+    # Skips only on an explicit "false". If the changes job fails, its output is empty
+    # and the tests still run, so a broken filter can't wave a pull request through.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: "ubuntu-24.04"
     steps:
       - name: Harden the runner (Audit all outbound calls)
@@ -96,11 +128,14 @@ jobs:
 
   e2e:
     name: "e2e tests (live control plane)"
+    needs: changes
+    # Same gate as the unit job.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: "ubuntu-24.04"
     timeout-minutes: 30
     # Keep the push run as the final verification of the tree that actually landed.
-    # A pull request's merge ref can become stale when main advances, and this workflow
-    # is not a required status check, so its PR run cannot replace the post-merge run.
+    # A pull request's merge ref can become stale when main advances, so its PR run
+    # cannot replace the post-merge run.
     #
     # The mutex over the single shared workspace. These tests open with a workspace-wide
     # destroy and count-guard their snapshots over every managed resource, so two must
