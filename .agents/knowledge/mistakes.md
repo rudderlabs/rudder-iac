@@ -98,3 +98,9 @@
 - CI failed when `cli/tests/command_destinations_apply_test.go` added `https://webhooks.example.com/rudder` to `destinationRawSecrets`, because that value is a prefix of non-secret HTTP destination fixture URLs such as `https://webhooks.example.com/rudder/events`.
 - The same substring guard can collide on short or common dummy secret values, such as numeric HubSpot hub IDs that also appear in legitimate non-secret output like event names or pixel IDs.
 - Durable mitigation: raw-secret guard values must not be substrings of legitimate non-secret destination config; use long, unique dummy strings or distinct dummy secret domains/paths for webhook/destination secret variables.
+
+## DEX-1001 — Documentation PR Semantic Title Failure
+
+- The semantic pull-request workflow accepts the singular type `doc`, not `docs`; documentation PR titles and commits should use `doc: ...`.
+- For a one-commit PR, the workflow validates both the commit and its match with the PR title. Changing only a rejected `docs: ...` PR title to `doc: ...` still fails while the commit retains the old prefix.
+- If branch history must not be force-pushed, add a second conventional commit so the PR is no longer subject to the single-commit title-match path.

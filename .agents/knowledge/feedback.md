@@ -59,3 +59,11 @@
 - Keep Attentive Tag verified-destination promotion branches scoped to the registry-gating change only; do not bundle unrelated shared live-backend/catalog E2E tolerance work into the same PR.
 - Treat transient live-backend or shared-catalog E2E failures as retry/manual-CI issues for this promotion; durable fixes for stale shared E2E workspace resources belong in their own PR.
 - Before continuing work on a force-pushed Attentive Tag promotion PR, align with the exact remote PR head rather than merging from an old local checkout so reset workaround commits are not resurrected.
+
+## DEX-1001 — Preserve Supported Agent Rules
+
+<!-- session: 2026-09-25 -->
+
+- Keep `.cursor/rules`, `cli/.cursor/rules`, and `.clinerules/` intact during agent-guidance cleanup; Claude is not the repository's only supported agent path, so consolidating `AGENTS.md` with `CLAUDE.md` must not remove the Cursor or Cline guidance.
+- In `README.md`, use `https://www.rudderstack.com/docs/dev-tools/rudder-cli/validations/` for the validation rules page; the former `validation-rules/` path returns 404.
+- Keep the `README.md` Docker section runnable by including the access-token environment variable, authentication and project volume mounts, and the `validate -l /project` command rather than showing only the image entrypoint.
