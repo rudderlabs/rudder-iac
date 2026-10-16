@@ -4,6 +4,7 @@
 
 - [⚠️ Work in Progress](#️-work-in-progress)
 - [Installation](#installation)
+  - [Install script](#install-script)
   - [MacOS](#macos)
     - [Apple Silicon](#apple-silicon)
     - [Intel-based](#intel-based)
@@ -18,6 +19,24 @@
 > Please note that this tool is currently a work in progress. We are actively developing and improving it, and as such, there may be frequent changes and updates. We do not guarantee backwards compatibility at this stage.
 
 ## Installation
+
+### Install script
+
+On macOS and Linux (amd64 and arm64), the install script downloads the latest release, verifies its
+SHA-256 checksum and installs `rudder-cli` into `~/.local/bin`. It never uses `sudo`.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/scripts/install.sh | sh
+```
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `RUDDER_CLI_VERSION` | latest release | Version to install, with or without a leading `v`. |
+| `RUDDER_CLI_INSTALL_DIR` | `$HOME/.local/bin` | Directory to install into. The script warns if it is not on `PATH`. |
+| `RUDDER_CLI_DOWNLOAD_URL` | `https://github.com/rudderlabs/rudder-iac/releases/download` | Base URL of the release assets, laid out as `<base>/v<version>/<asset>`. For a mirror. |
+
+Running the script again with the same version changes nothing. Run `make test-install-script` to test
+the script against a stubbed `curl`.
 
 ### MacOS
 
