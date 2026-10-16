@@ -184,6 +184,38 @@ func TestVariantsWire(t *testing.T) {
 			want: someVariantSent(`, "someVariantType": {"someNumber": 3.5, "someString": "case_2_a"}`),
 		},
 		{
+			name: "variant: SomeVariantType Case2A sends its own match value",
+			call: func() error {
+				p := someVariant
+				p.SomeVariantType = examples.CustomTypeSomeVariantTypeCaseCase2A{SomeNumber: 3.5}
+				return ex.TrackSomeVariantEvent(id, p)
+			},
+			want: someVariantSent(`, "someVariantType": {"someString": "case_2_a", "someNumber": 3.5}`),
+		},
+		{
+			name: "variant: SomeVariantType Case2B, the same case's other match value, sends case_2_b",
+			call: func() error {
+				p := someVariant
+				p.SomeVariantType = examples.CustomTypeSomeVariantTypeCaseCase2B{SomeNumber: 1.5, SomeInteger: examples.Ptr[int64](2)}
+				return ex.TrackSomeVariantEvent(id, p)
+			},
+			want: someVariantSent(`, "someVariantType": {"someString": "case_2_b", "someNumber": 1.5, "someInteger": 2}`),
+		},
+		{
+			name: "variant: Coded 1 sends the mixed enum's integer",
+			call: func() error {
+				return ex.TrackCodedEvent(id, examples.TrackCodedEventProperties{Coded: examples.CustomTypeCodedCase1{}})
+			},
+			want: trackJSON(exMeta, "Coded Event", `{"coded": {"code": 1}}`),
+		},
+		{
+			name: "variant: Coded A sends the mixed enum's string",
+			call: func() error {
+				return ex.TrackCodedEvent(id, examples.TrackCodedEventProperties{Coded: examples.CustomTypeCodedCaseA{}})
+			},
+			want: trackJSON(exMeta, "Coded Event", `{"coded": {"code": "a"}}`),
+		},
+		{
 			name: "default: Event With Variants Default sends the enum value it holds",
 			call: func() error {
 				return ref.TrackEventWithVariants(refID, ruddertyper.TrackEventWithVariantsPropertiesDefault{
@@ -252,6 +284,11 @@ func TestVariantsWire(t *testing.T) {
 			errIs: examples.ErrInvalidValue,
 		},
 		{
+			name:  "nil: a nil required variant field of an open struct returns ErrInvalidValue",
+			call:  func() error { return ex.TrackCodedEvent(id, examples.TrackCodedEventProperties{}) },
+			errIs: examples.ErrInvalidValue,
+		},
+		{
 			name: "nil: a nil variant array item returns ErrInvalidValue",
 			call: func() error {
 				p := someVariant
@@ -315,6 +352,24 @@ func TestVariantsWire(t *testing.T) {
 			},
 			want: trackJSON(exMeta, "Some Variant Event", `{"shipping": {"address": {"city": "Pune"}, "coupon": "SAVE"}}`),
 		},
+		{
+			name: "empty: an empty optional slice sends []",
+			call: func() error {
+				p := mobile
+				p.Tags = []string{}
+				return ref.TrackEventWithVariants(refID, p)
+			},
+			want: mobileSent(`, "tags": []`),
+		},
+		{
+			name: "empty: an empty optional map sends {}",
+			call: func() error {
+				p := mobile
+				p.PageContext = ruddertyper.CustomTypePageContextDefault{PageType: "other", PageData: map[string]any{}}
+				return ref.TrackEventWithVariants(refID, p)
+			},
+			want: mobileSent(`, "page_context": {"page_type": "other", "page_data": {}}`),
+		},
 	}
 
 	assertWireRows(t, func(client analytics.Client) {
@@ -339,6 +394,8 @@ func TestVariantsDiscriminator(t *testing.T) {
 	assert.Equal(t, ruddertyper.NewPropertyFeatureFlagString("beta"), ruddertyper.CustomTypeFeatureConfigCaseBeta{}.Discriminator())
 	assert.Equal(t, examples.NewNullable(examples.PropertyStageValueDraft), examples.CustomTypeReleaseCaseDraft{}.Discriminator())
 	assert.Equal(t, examples.NewNullable(examples.PropertyStageValueLive), examples.CustomTypeReleaseCaseLive{}.Discriminator())
+	assert.Equal(t, examples.PropertyCode1(), examples.CustomTypeCodedCase1{}.Discriminator())
+	assert.Equal(t, examples.PropertyCodeA(), examples.CustomTypeCodedCaseA{}.Discriminator())
 	assert.Equal(t, methodOK("express", true), methodOK(examples.CustomTypeShippingCaseExpress{}.Discriminator()))
 	assert.Equal(t, methodOK("", false), methodOK(examples.CustomTypeShippingAbsent{}.Discriminator()))
 }

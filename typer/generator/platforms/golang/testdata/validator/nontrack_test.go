@@ -41,6 +41,14 @@ func TestNonTrackWire(t *testing.T) {
 			want: messageJSON(exMeta, "identify", `, "traits": {"email": "a@b.c", "plan": "pro"}`),
 		},
 		{
+			name: "examples: identify with only an anonymous ID sends anonymousId and no userId",
+			call: func() error {
+				return ex.Identify(examples.Identity{AnonymousID: "anon-42"}, &examples.IdentifyTraits{Email: "a@b.c"})
+			},
+			want: `{"type": "identify", "channel": "server", "anonymousId": "anon-42", "traits": {"email": "a@b.c"},
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
 			name: "identitysections: identify on context.traits sends context.traits, whose keys win over the caller's, and keeps the caller's other keys",
 			call: func() error {
 				return sections.Identify(sectionsID, &identitysections.IdentifyTraits{Email: "new@b.c"},
@@ -239,6 +247,11 @@ func TestNonTrackWire(t *testing.T) {
 			name: "examples: group with nil traits sends no traits, and ignores WithCategory",
 			call: func() error { return ex.Group(id, "g1", nil, examples.WithCategory("Products")) },
 			want: messageJSON(exMeta, "group", `, "groupId": "g1"`),
+		},
+		{
+			name:  "examples: group with an empty group ID returns the SDK's FieldError",
+			call:  func() error { return ex.Group(id, "", &examples.GroupTraits{CompanyName: "Acme"}) },
+			errIs: analytics.FieldError{Type: "analytics.Group", Name: "GroupId", Value: ""},
 		},
 		{
 			name: "examples: WithCategory on an open case adds properties.category",

@@ -231,3 +231,63 @@ func TestHoistedNameCollision(t *testing.T) {
 		}},
 	}, ctx.Payloads)
 }
+
+// A hoisted property's description documents the field's type: the struct of
+// an object, or the union of object and another type, whose Object struct is
+// only one member and does not repeat it.
+func TestHoistedDescription(t *testing.T) {
+	var (
+		leaf = &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"x": {Property: plan.Property{Name: "x", Types: []plan.PropertyType{plan.PrimitiveTypeString}}}}}
+		p    = trackPlan()
+	)
+	p.Rules[0].Schema.Properties = map[string]plan.PropertySchema{
+		"foo": {
+			Property: plan.Property{Name: "foo", Description: "the foo object", Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+			Schema:   leaf,
+		},
+		"bar": {
+			Property: plan.Property{Name: "bar", Description: "the bar value", Types: []plan.PropertyType{plan.PrimitiveTypeObject, plan.PrimitiveTypeString}},
+			Schema:   leaf,
+		},
+	}
+
+	ctx, err := newContext(p, "", "ruddertyper")
+	require.NoError(t, err)
+
+	x := []GoField{{Name: "X", Key: "x", Type: "*PropertyX", Pointer: true}}
+	assert.Equal(t, []GoDecl{
+		{Struct: &GoStruct{
+			Name:         "TrackSomeEventProperties",
+			Doc:          "TrackSomeEventProperties holds the properties of \"Some Event\".",
+			Payload:      "Properties",
+			DeclaredKeys: []string{"bar", "foo"},
+			Fields: []GoField{
+				{Name: "Bar", Key: "bar", Type: "*TrackSomeEventPropertiesBar", Pointer: true},
+				{Name: "Foo", Key: "foo", Type: "*TrackSomeEventPropertiesFoo", Pointer: true},
+			},
+		}},
+		{Union: &GoUnion{
+			Name: "TrackSomeEventPropertiesBar",
+			Doc: "TrackSomeEventPropertiesBar is the value in TrackSomeEventProperties.Bar: a string or object.\n" +
+				"Build it with one of the NewTrackSomeEventPropertiesBar* functions.\n" +
+				"Null is not a member, so the zero value cannot be sent.\n\n" +
+				"the bar value",
+			Members: []GoUnionMember{
+				{Name: "NewTrackSomeEventPropertiesBarString", Doc: "returns a string value.", Type: "string"},
+				{Name: "NewTrackSomeEventPropertiesBarObject", Doc: "returns an object value.", Type: "TrackSomeEventPropertiesBarObject"},
+			},
+		}},
+		{Struct: &GoStruct{
+			Name:         "TrackSomeEventPropertiesBarObject",
+			Doc:          "TrackSomeEventPropertiesBarObject is the object in TrackSomeEventProperties.Bar.",
+			DeclaredKeys: []string{"x"},
+			Fields:       x,
+		}},
+		{Struct: &GoStruct{
+			Name:         "TrackSomeEventPropertiesFoo",
+			Doc:          "TrackSomeEventPropertiesFoo is the object in TrackSomeEventProperties.Foo.\n\nthe foo object",
+			DeclaredKeys: []string{"x"},
+			Fields:       x,
+		}},
+	}, ctx.Payloads)
+}
