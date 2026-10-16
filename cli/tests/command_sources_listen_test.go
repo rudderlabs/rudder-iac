@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"io"
 	"net"
@@ -37,33 +38,42 @@ func (b *lockedBuffer) String() string {
 }
 
 type listenProcess struct {
-	cmd    *exec.Cmd
-	ready  map[string]any
-	stderr *lockedBuffer
-	exited chan error
+	cmd   *exec.Cmd
+	ready map[string]any
+	// stdout holds the events; stderr holds every stderr line but the ready line.
+	stdout, stderr *lockedBuffer
+	exited         chan error
 }
 
 func (p *listenProcess) url() string { return p.ready["url"].(string) }
 
-func devListenCommand(t *testing.T, args ...string) *exec.Cmd {
-	cmd := exec.Command(cliBinPath, append([]string{"dev", "listen"}, args...)...)
+func sourcesListenCommand(t *testing.T, args ...string) *exec.Cmd {
+	cmd := exec.Command(cliBinPath, append([]string{"sources", "listen"}, args...)...)
 	cmd.Env = append(os.Environ(),
 		"HOME="+t.TempDir(),
 		"RUDDERSTACK_CLI_EXPERIMENTAL=true",
-		"RUDDERSTACK_X_DEV_LISTEN=true",
+		"RUDDERSTACK_X_SOURCES_LISTEN=true",
 		"RUDDERSTACK_CLI_TELEMETRY_DISABLED=true",
 	)
 	return cmd
 }
 
-// startListen runs the binary as a script would and waits for the ready line.
+// startListen runs the binary with --store, as the read commands need, and
+// waits for the ready line.
 func startListen(t *testing.T, args ...string) *listenProcess {
 	t.Helper()
-	cmd := devListenCommand(t, args...)
-	stdout, err := cmd.StdoutPipe()
+	return startStream(t, append([]string{"--store"}, args...)...)
+}
+
+// startStream runs the binary as a script would and waits for the ready line
+// on stderr.
+func startStream(t *testing.T, args ...string) *listenProcess {
+	t.Helper()
+	cmd := sourcesListenCommand(t, args...)
+	stderr, err := cmd.StderrPipe()
 	require.NoError(t, err)
-	p := &listenProcess{cmd: cmd, stderr: &lockedBuffer{}, exited: make(chan error, 1)}
-	cmd.Stderr = p.stderr
+	p := &listenProcess{cmd: cmd, stdout: &lockedBuffer{}, stderr: &lockedBuffer{}, exited: make(chan error, 1)}
+	cmd.Stdout = p.stdout
 	require.NoError(t, cmd.Start())
 	t.Cleanup(func() {
 		_ = cmd.Process.Kill()
@@ -72,14 +82,25 @@ func startListen(t *testing.T, args ...string) *listenProcess {
 
 	lines := make(chan []byte, 1)
 	go func() {
-		line, _ := bufio.NewReader(stdout).ReadBytes('\n')
-		lines <- line
-		_, _ = io.Copy(io.Discard, stdout)
+		r := bufio.NewReader(stderr)
+		for {
+			line, err := r.ReadBytes('\n')
+			if bytes.HasPrefix(line, []byte(`{"ready":true`)) {
+				lines <- line
+				break
+			}
+			_, _ = p.stderr.Write(line)
+			if err != nil {
+				lines <- nil
+				break
+			}
+		}
+		_, _ = io.Copy(p.stderr, r)
 		p.exited <- cmd.Wait()
 	}()
 	select {
 	case line := <-lines:
-		require.NoError(t, json.Unmarshal(line, &p.ready), "stdout %q, stderr %q", line, p.stderr.String())
+		require.NoError(t, json.Unmarshal(line, &p.ready), "ready %q, stderr %q", line, p.stderr.String())
 	case <-time.After(10 * time.Second):
 		t.Fatal("no ready line")
 	}
@@ -96,12 +117,12 @@ func (p *listenProcess) stop(t *testing.T, sig os.Signal) (int, time.Duration) {
 		p.exited <- nil
 		return p.cmd.ProcessState.ExitCode(), time.Since(began)
 	case <-time.After(10 * time.Second):
-		t.Fatal("dev listen did not stop")
+		t.Fatal("sources listen did not stop")
 		return 0, 0
 	}
 }
 
-func TestDevListenServesUntilASignal(t *testing.T) {
+func TestSourcesListenServesUntilASignal(t *testing.T) {
 	t.Parallel()
 	for _, sig := range []os.Signal{os.Interrupt, syscall.SIGTERM} {
 		t.Run(sig.String(), func(t *testing.T) {
@@ -141,7 +162,7 @@ func TestDevListenServesUntilASignal(t *testing.T) {
 	}
 }
 
-func TestDevListenStopsWithAStalledUpload(t *testing.T) {
+func TestSourcesListenStopsWithAStalledUpload(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
 	conn, err := net.Dial("tcp", strings.TrimPrefix(p.url(), "http://"))
@@ -157,7 +178,7 @@ func TestDevListenStopsWithAStalledUpload(t *testing.T) {
 	require.Less(t, took, 2*time.Second)
 }
 
-func TestDevListenInstancesShareNothing(t *testing.T) {
+func TestSourcesListenInstancesShareNothing(t *testing.T) {
 	t.Parallel()
 	a, b := startListen(t), startListen(t)
 
@@ -165,7 +186,7 @@ func TestDevListenInstancesShareNothing(t *testing.T) {
 	require.NotEqual(t, a.ready["serverId"], b.ready["serverId"])
 
 	port := strconv.Itoa(int(a.ready["port"].(float64)))
-	out, err := devListenCommand(t, "--port", port).Output()
+	out, err := sourcesListenCommand(t, "--port", port).Output()
 	var exit *exec.ExitError
 	require.ErrorAs(t, err, &exit)
 	require.Equal(t, 1, exit.ExitCode())
@@ -179,15 +200,42 @@ func TestDevListenInstancesShareNothing(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal([]byte(lines[len(lines)-1]), &failure), string(exit.Stderr))
 	require.Equal(t, "port_in_use", failure.Error.Code)
-	require.Equal(t, "rudder-cli dev listen --port 0", failure.Error.Next)
+	require.Equal(t, "rudder-cli sources listen --port 0", failure.Error.Next)
+}
+
+func TestSourcesListenPrintsEventsAndKeepsNothingByDefault(t *testing.T) {
+	t.Parallel()
+	p := startStream(t, "--write-key", "web")
+	require.NotContains(t, p.ready, "cursor")
+	require.NotContains(t, p.ready, "ui")
+
+	for key, body := range map[string]string{
+		"web":   `{"batch":[{"type":"track","event":"A","userId":"u1"},{"type":"track","event":"B","userId":"u1"}]}`,
+		"other": `{"event":"C","userId":"u1"}`,
+	} {
+		req, err := http.NewRequest(http.MethodPost, p.url()+"/v1/batch", strings.NewReader(body))
+		require.NoError(t, err)
+		req.SetBasicAuth(key, "")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+	}
+	resp, err := http.Get(p.url() + "/_dev/v1/info")
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+	code, _ := p.stop(t, syscall.SIGTERM)
+	require.Equal(t, 0, code, p.stderr.String())
+	require.Equal(t, `{"type":"track","event":"A","userId":"u1"}`+"\n"+`{"type":"track","event":"B","userId":"u1"}`+"\n",
+		p.stdout.String())
+	require.Contains(t, p.stderr.String(), "refused: 401 POST /v1/batch: ")
 }
 
 // A DNS-rebinding page reaches a container listener under its own name.
-func TestDevListenChecksTheHostOnAWildcardBind(t *testing.T) {
+func TestSourcesListenChecksTheHostOnAWildcardBind(t *testing.T) {
 	t.Parallel()
 	p := startListen(t, "--bind", "0.0.0.0", "--allow-host", "dev-listen")
-	// stdout and stderr are copied by separate goroutines, so the warning can
-	// land after the ready line even though the child writes it first.
 	require.Eventually(t, func() bool {
 		return strings.Contains(p.stderr.String(), "warning: listening on 0.0.0.0:")
 	}, 5*time.Second, 10*time.Millisecond)

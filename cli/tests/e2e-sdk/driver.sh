@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs the fixture app against a fresh listener RUNS times (default 10) and
-# asserts counts, failures and bytes with jq -e. Then it runs the app once
+# asserts counts, failures and bytes on its stdout with jq -e. Then it runs the app once
 # with DEFECT=wrong-type and requires the byte check to fail, which proves the
 # check can fail. Run `npm ci` and `npx playwright install chromium` here first.
 set -euo pipefail
@@ -20,10 +20,11 @@ run_app() {
   node backend.mjs "$url"
 }
 
-# sent_is_right is the byte check: one Suggestion Sent, position a number.
+# sent_is_right is the byte check on stdout: one Suggestion Sent, position a
+# number.
 sent_is_right() {
-  rudder-cli dev events list --url "$url" --since "$cur" --event 'Suggestion Sent' --fields properties --json |
-    jq -e -s 'length == 1 and .[0].properties.position == 2 and .[0].properties.edited == false'
+  jq -e -s '[.[] | select(.event == "Suggestion Sent")] |
+    length == 1 and .[0].properties.position == 2 and .[0].properties.edited == false' "$events"
 }
 
 stop() {
@@ -37,14 +38,17 @@ for run in $(seq "${RUNS:-10}"); do
   start_listener
   run_app none
 
-  rudder-cli dev events --url "$url" --server-id "$sid" --since "$cur" \
-    --event 'Suggestion Shown' --event 'Suggestion Clicked' --event 'Suggestion Sent' --event 'Order Completed' \
-    --min 4 --wait 30s --json |
-    jq -e '.timedOut == false and ([.summary.byEvent[]] | all(. == 1)) and .summary.rejected.events == 0'
-  # Filters narrow every count, so the failure and control checks run without them.
-  rudder-cli dev events --url "$url" --since "$cur" --json |
-    jq -e '.summary.requests.failed == 0 and .summary.control.sourceConfig >= 1'
+  wait_for 4 'Suggestion Shown' 'Suggestion Clicked' 'Suggestion Sent' 'Order Completed'
+  for name in 'Suggestion Shown' 'Suggestion Clicked' 'Suggestion Sent' 'Order Completed'; do
+    [ "$(count "$name")" -eq 1 ] || { echo "want one $name, got $(count "$name")" >&2; exit 1; }
+  done
+  if grep '^refused:' "$log" >&2; then exit 1; fi
+  # stdout carries events only; the SDK's config call is a control request.
+  curl -fsS "$url/_dev/v1/events?view=counts&since=$cur" | jq -e '.summary.control.sourceConfig >= 1'
   sent_is_right
+  # The store holds the same events as stdout.
+  rudder-cli sources events --url "$url" --server-id "$sid" --since "$cur" --event 'Suggestion Sent' --json |
+    jq -e -s 'length == 1'
 
   stop
   echo "run $run: ok"
@@ -52,8 +56,7 @@ done
 
 start_listener
 run_app wrong-type
-rudder-cli dev events --url "$url" --since "$cur" --event 'Suggestion Sent' --min 1 --wait 30s --json |
-  jq -e '.timedOut == false'
+wait_for 1 'Suggestion Sent'
 if sent_is_right; then
   echo "the byte check did not catch DEFECT=wrong-type" >&2
   exit 1

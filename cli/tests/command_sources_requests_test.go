@@ -13,7 +13,7 @@ import (
 
 // The rejection hint of the summary is a curl line that runs and returns
 // the refused request with its reason; its events link back by messageId.
-func TestDevListenRequests(t *testing.T) {
+func TestSourcesListenRequests(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
 	url := p.url()
@@ -36,7 +36,7 @@ func TestDevListenRequests(t *testing.T) {
 }
 
 // The ready line links the review page, and the page loads with its policy.
-func TestDevListenServesTheReviewPage(t *testing.T) {
+func TestSourcesListenServesTheReviewPage(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
 	ui := p.ready["ui"].(string)
@@ -51,13 +51,13 @@ func TestDevListenServesTheReviewPage(t *testing.T) {
 	}
 }
 
-// dev --help prints the guide that the listener serves, so an agent reads
+// sources --help prints the guide that the listener serves, so an agent reads
 // the same text from either.
-func TestDevListenHelpIsTheGuide(t *testing.T) {
+func TestSourcesListenHelpIsTheGuide(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
-	cmd := exec.Command(cliBinPath, "dev", "--help")
-	cmd.Env = append(os.Environ(), "HOME="+t.TempDir(), "RUDDERSTACK_CLI_EXPERIMENTAL=true", "RUDDERSTACK_X_DEV_LISTEN=true")
+	cmd := exec.Command(cliBinPath, "sources", "--help")
+	cmd.Env = append(os.Environ(), "HOME="+t.TempDir(), "RUDDERSTACK_CLI_EXPERIMENTAL=true", "RUDDERSTACK_X_SOURCES_LISTEN=true")
 	help, err := cmd.Output()
 	require.NoError(t, err)
 

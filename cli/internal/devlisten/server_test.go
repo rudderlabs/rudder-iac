@@ -20,8 +20,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/api"
 )
 
+// start runs a listener with the store on, as most tests read the query API.
 func start(t *testing.T, cfg Config) *Server {
 	t.Helper()
+	cfg.Store = true
 	s, err := Start(cfg)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = s.Close(context.Background()) })
@@ -60,7 +62,7 @@ func TestStartReportsItsIdentity(t *testing.T) {
 			WriteKey:       "dev",
 			WriteKeyPolicy: "any",
 		},
-		Cursor: 0,
+		Cursor: new(uint64),
 		UI:     url + "/_dev/ui/",
 	}, ready)
 	require.Equal(t, time.UTC, ready.StartedAt.Location())
@@ -156,7 +158,7 @@ func TestServerRoutesIngestionAndTheQueryAPI(t *testing.T) {
 	require.Equal(t, uint64(1), info.Cursor)
 	require.Equal(t, 1, info.Store["requests"])
 	require.Equal(t, 1, info.Store["events"])
-	require.Equal(t, uint64(1), s.Ready().Cursor)
+	require.Equal(t, uint64(1), *s.Ready().Cursor)
 }
 
 // The page and its files pass the guards of the query API, carry the page

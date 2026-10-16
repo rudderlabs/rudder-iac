@@ -1,14 +1,12 @@
-package dev
+package sources
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -37,14 +35,14 @@ func get(cmd *cobra.Command, base string, q url.Values, timeout time.Duration) (
 		if errors.Is(err, context.DeadlineExceeded) {
 			message = fmt.Sprintf("the listener at %s did not answer within %s", base, timeout)
 		}
-		return nil, nil, fail(cmd, &usageError{code: "server_unreachable", message: message, next: "rudder-cli dev listen --help"})
+		return nil, nil, fail(cmd, &usageError{code: "server_unreachable", message: message, next: "rudder-cli sources listen --help"})
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, nil, fail(cmd, &usageError{
 			code: "server_unreachable", message: "reading the answer of " + base + ": " + err.Error(),
-			next: "rudder-cli dev listen --help",
+			next: "rudder-cli sources listen --help",
 		})
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -55,8 +53,8 @@ func get(cmd *cobra.Command, base string, q url.Values, timeout time.Duration) (
 	if resp.Header.Get("X-Dev-Server-Id") == "" {
 		return nil, nil, fail(cmd, &usageError{
 			code:    "server_unreachable",
-			message: base + " answered HTTP 200, not as dev listen answers; check the url of the ready line",
-			next:    "rudder-cli dev listen --help",
+			message: base + " answered HTTP 200, not as sources listen answers; check the url of the ready line",
+			next:    "rudder-cli sources listen --help",
 		})
 	}
 	return resp, body, nil
@@ -69,8 +67,8 @@ func serverError(cmd *cobra.Command, base string, status int, body []byte) error
 	if !e.IsObject() || !e.Get("code").Exists() {
 		return fail(cmd, &usageError{
 			code:    "server_unreachable",
-			message: fmt.Sprintf("%s answered HTTP %d, not as dev listen answers; check the url of the ready line", base, status),
-			next:    "rudder-cli dev listen --help",
+			message: fmt.Sprintf("%s answered HTTP %d, not as sources listen answers; check the url of the ready line", base, status),
+			next:    "rudder-cli sources listen --help",
 		})
 	}
 	next := withURL(e.Get("next").String(), base)
@@ -94,48 +92,6 @@ func trimNewline(b []byte) []byte {
 	return b
 }
 
-// readSummary prints the summary object as the server wrote it, with the
-// URL added to every rudder-cli next, or as text.
-func readSummary(cmd *cobra.Command, opts *readOptions, base string, q url.Values, timeout time.Duration) error {
-	_, body, err := get(cmd, base, q, timeout)
-	if err != nil {
-		return err
-	}
-	noteEviction(cmd, opts.since, gjson.GetBytes(body, "evictedThrough").Uint())
-
-	if !opts.json {
-		var s summaryText
-		if err := json.Unmarshal(body, &s); err != nil {
-			return fail(cmd, &usageError{
-				code: "server_unreachable", message: "the summary does not parse: " + err.Error(),
-				next: "rudder-cli dev listen --help",
-			})
-		}
-		s.Next = withURL(s.Next, base)
-		for i := range s.Summary.Diagnosis {
-			s.Summary.Diagnosis[i].Next = withURL(s.Summary.Diagnosis[i].Next, base)
-		}
-		return s.render(cmd.OutOrStdout())
-	}
-
-	paths := []string{"next"}
-	for i := range gjson.GetBytes(body, "summary.diagnosis.#").Int() {
-		paths = append(paths, "summary.diagnosis."+strconv.FormatInt(i, 10)+".next")
-	}
-	for _, path := range paths {
-		next := gjson.GetBytes(body, path)
-		if !next.Exists() {
-			continue
-		}
-		// SetBytes keeps the other keys and their order as they are.
-		if out, err := sjson.SetBytes(body, path, withURL(next.String(), base)); err == nil {
-			body = out
-		}
-	}
-	_, err = cmd.OutOrStdout().Write(body)
-	return err
-}
-
 // readStream prints the stream as the server wrote it, or as a table. The
 // cursor to continue from goes to stderr, so stdout stays one event per line.
 func readStream(cmd *cobra.Command, opts *readOptions, base string, q url.Values, timeout time.Duration, view string, fields []string) error {
@@ -157,14 +113,4 @@ func readStream(cmd *cobra.Command, opts *readOptions, base string, q url.Values
 		more = cursor
 	}
 	return renderStream(cmd.OutOrStdout(), body, streamTable{since: opts.since, base: base, more: more, view: view, fields: fields})
-}
-
-// noteEviction warns that the window lost requests to the store budget, so
-// a count may be short.
-func noteEviction(cmd *cobra.Command, since string, evictedThrough uint64) {
-	cursor, err := strconv.ParseUint(since, 10, 64)
-	if err != nil || evictedThrough <= cursor {
-		return
-	}
-	fmt.Fprintf(cmd.ErrOrStderr(), "note: requests up to seq %d were evicted; the window starts after them\n", evictedThrough)
 }

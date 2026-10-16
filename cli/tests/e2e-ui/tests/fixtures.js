@@ -11,22 +11,26 @@ const bin = process.env.RUDDER_CLI_BIN || path.resolve(__dirname, '../../../../b
 
 async function startListener() {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-listen-page-'));
-  const child = spawn(bin, ['dev', 'listen'], {
+  const child = spawn(bin, ['sources', 'listen', '--store'], {
     env: {
       ...process.env,
       HOME: home,
       RUDDERSTACK_CLI_EXPERIMENTAL: 'true',
-      RUDDERSTACK_X_DEV_LISTEN: 'true',
+      RUDDERSTACK_X_SOURCES_LISTEN: 'true',
       RUDDERSTACK_CLI_TELEMETRY_DISABLED: 'true',
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    // The page tests read the store, so the events on stdout are not needed.
+    stdio: ['ignore', 'ignore', 'pipe'],
   });
   let stderr = '';
   child.stderr.on('data', (chunk) => { stderr += chunk; });
   const exited = new Promise((resolve) => child.once('exit', resolve));
   const line = await Promise.race([
-    new Promise((resolve) => readline.createInterface({ input: child.stdout }).once('line', resolve)),
-    exited.then(() => { throw new Error(`dev listen exited before its ready line: ${stderr}`); }),
+    new Promise((resolve) => {
+      const lines = readline.createInterface({ input: child.stderr });
+      lines.on('line', (l) => { if (l.startsWith('{"ready":true')) { lines.close(); resolve(l); } });
+    }),
+    exited.then(() => { throw new Error(`sources listen exited before its ready line: ${stderr}`); }),
     new Promise((_, reject) => setTimeout(() => reject(new Error(`no ready line: ${stderr}`)), 15_000)),
   ]);
   const ready = JSON.parse(line);
