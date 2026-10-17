@@ -20,6 +20,14 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 )
 
+func TestRootCommandIncludesTime(t *testing.T) {
+	command, args, err := rootCmd.Find([]string{"time"})
+
+	require.NoError(t, err)
+	assert.Equal(t, "time", command.Name())
+	assert.Empty(t, args)
+}
+
 // A pre-run failure is reported under the command's path with stage "pre_run".
 func TestPreRunFailuresAreTrackedUnderCommandPath(t *testing.T) {
 	// Every PreRunE below fails: either on flag validation or on the missing token.

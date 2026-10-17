@@ -262,3 +262,9 @@
 - Every CLI command under `cli/internal/cmd` that constructs a project with `Deps.NewProject` and then calls `Project.Load` should expose the shared repeatable `--var-file` flag, build options with `app.NewProjectOptions(varFiles)`, and pass those options to `NewProject` before loading. This keeps substitution behavior aligned across apply, validate, transformations test, data-graphs validate, and RETL source validate/preview; bare `NewProject()` calls in project-loading commands are a regression signal.
 - When one command prints a pasteable invocation of another command, preserve project-load context in the hint. In particular, `retl-sources validate` forwards each `--var-file` to its suggested `retl-sources preview` command in original precedence order and shell-quotes each path.
 - Var-file paths may contain environment or secret context and must not be sent to telemetry or logs. If telemetry is needed, record only the number of files rather than their paths.
+
+## DBX-API-2 — Dependency-Free Leaf Command Construction
+
+- Top-level leaf commands that need no application dependencies can be registered directly in `cli/internal/cmd/root.go`; they do not need app initialization or telemetry plumbing solely to join the root command tree.
+- Keep command output testable by writing through Cobra's `OutOrStdout`, rejecting unexpected positional arguments with `cobra.NoArgs`, and injecting nondeterministic inputs behind an unexported constructor. The `time` command uses package name `timecmd`, injects `func() time.Time` for deterministic tests, and exposes `NewCmdTime` with `time.Now` for production.
+- Timestamp output preserves the clock value's own timezone offset and uses RFC3339 formatting rather than forcing UTC, so local timezone awareness remains explicit and stable.

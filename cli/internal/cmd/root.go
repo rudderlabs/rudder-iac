@@ -22,6 +22,7 @@ import (
 	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
 	sourcescmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/sources"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	timecmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/time"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/typer"
@@ -88,6 +89,7 @@ func init() {
 	rootCmd.AddCommand(workspace.NewCmdWorkspace())
 	rootCmd.AddCommand(importcmd.NewCmdImport())
 	rootCmd.AddCommand(retlsource.NewCmdRetlSources())
+	rootCmd.AddCommand(timecmd.NewCmdTime())
 
 	rootCmd.AddCommand(apply.NewCmdApply())
 	rootCmd.AddCommand(validate.NewCmdValidate())
