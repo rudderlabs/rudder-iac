@@ -49,6 +49,23 @@ func TestConfigDefaults(t *testing.T) {
 	}, registered.ConfigDefaults())
 }
 
+func TestConfigDefaultsSliceDefaults(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredWithConfig(t, func() any {
+		return &struct {
+			Events  []string `mapstructure:"events" default:"[]"`
+			Schemas []string `mapstructure:"schemas" default:"[\"EMAIL\"]"`
+		}{}
+	})
+
+	// []any, not []string: the same shape an API response converts to.
+	assert.Equal(t, map[string]any{
+		"events":  []any{},
+		"schemas": []any{"EMAIL"},
+	}, registered.ConfigDefaults())
+}
+
 func TestConfigDefaultsReturnsCopy(t *testing.T) {
 	t.Parallel()
 
@@ -266,13 +283,24 @@ func TestRegisterRejectsInvalidDefaults(t *testing.T) {
 			wantErr: `config key "ratio": unsupported kind float64 for a default tag`,
 		},
 		{
-			name: "unsupported field kind",
+			name: "slice default that is not JSON",
 			newConfig: func() any {
 				return &struct {
 					Events []string `mapstructure:"events" default:"a,b"`
 				}{}
 			},
-			wantErr: `config key "events": unsupported kind slice for a default tag`,
+			wantErr: `config key "events": invalid slice default "a,b"`,
+		},
+		{
+			// Unimplemented: a map default is indistinguishable from the nested
+			// per-field defaults ApplyDefaults merges.
+			name: "map field kind",
+			newConfig: func() any {
+				return &struct {
+					Overrides map[string]string `mapstructure:"overrides" default:"{}"`
+				}{}
+			},
+			wantErr: `config key "overrides": unsupported kind map for a default tag`,
 		},
 	}
 

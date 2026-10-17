@@ -70,10 +70,10 @@ type slackConfig struct {
 	WebhookURL               string                   `mapstructure:"webhook_url" validate:"required,pattern=slack_webhook_url"`
 	IncomingWebhooksType     string                   `mapstructure:"incoming_webhooks_type" validate:"omitempty,oneof=legacy modern" default:"legacy"`
 	IdentifyTemplate         string                   `mapstructure:"identify_template" validate:"omitempty,pattern=single_line_1000"`
-	EventChannelSettings     []eventChannelSetting    `mapstructure:"event_channel_settings" validate:"omitempty,dive"`
-	EventTemplateSettings    []eventTemplateSetting   `mapstructure:"event_template_settings" validate:"omitempty,dive"`
-	WhitelistedTraitSettings []string                 `mapstructure:"whitelisted_trait_settings" validate:"omitempty,dive,pattern=single_line_100"`
-	DenyListOfEvents         []string                 `mapstructure:"deny_list_of_events" validate:"omitempty,dive,pattern=single_line_100"`
+	EventChannelSettings     []eventChannelSetting    `mapstructure:"event_channel_settings" validate:"omitempty,dive" default:"[]"`
+	EventTemplateSettings    []eventTemplateSetting   `mapstructure:"event_template_settings" validate:"omitempty,dive" default:"[]"`
+	WhitelistedTraitSettings []string                 `mapstructure:"whitelisted_trait_settings" validate:"omitempty,dive,pattern=single_line_100" default:"[]"`
+	DenyListOfEvents         []string                 `mapstructure:"deny_list_of_events" validate:"omitempty,dive,pattern=single_line_100" default:"[]"`
 	ConnectionMode           common.ConnectionMode    `mapstructure:"connection_mode"`
 	ConsentManagement        common.ConsentManagement `mapstructure:"consent_management"`
 }
