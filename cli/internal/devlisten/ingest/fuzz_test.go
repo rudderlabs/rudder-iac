@@ -21,11 +21,12 @@ func FuzzBody(f *testing.F) {
 	f.Add(gz(f, `{"userId":"u1"}`)[:20], true, false)
 	f.Add([]byte(`{"batch":[{"userId":"u1"},1]}`), false, true)
 	f.Add([]byte(""), false, false)
+	f.Add([]byte(batchOf(10_001)), false, true)
 
 	answers := map[string]bool{"ok": true}
 	for _, e := range []gwError{
 		errUncompress, errRequestBodyTooLarge, errRequestBodyNil, errRequestBodyReadFailed, errInvalidJSON,
-		errNotRudderEvent, errEmptyBatch, errNonIdentifiable,
+		errNotRudderEvent, errEmptyBatch, errNonIdentifiable, errTooManyEvents,
 	} {
 		answers[e.message+"\n"] = true
 	}
