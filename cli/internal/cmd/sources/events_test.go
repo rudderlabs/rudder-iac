@@ -406,8 +406,9 @@ func TestEventsTableFieldsThroughAList(t *testing.T) {
 		want string
 	}{
 		{name: "multiple values", body: `{"properties":{"products":[{"sku":"a"},{"sku":"b"}]}}`, want: `["a","b"]`},
-		{name: "missing keys and non-objects", body: `{"properties":{"products":[{"sku":"a"},{},"x",null,3]}}`, want: `["a"]`},
-		{name: "no selected values", body: `{"properties":{"products":[{},"x",null,3]}}`, want: `[]`},
+		{name: "missing keys and non-objects keep their place", body: `{"properties":{"products":[{"sku":"a"},{},"x",null,3]}}`, want: `["a",null,"x",null,3]`},
+		{name: "no selected values", body: `{"properties":{"products":[{},"x",null,3]}}`, want: `[null,"x",null,3]`},
+		{name: "a list inside a list stays as sent", body: `{"properties":{"products":[[{"sku":"a","x":1}]]}}`, want: `[[{"sku":"a","x":1}]]`},
 		{name: "empty list", body: `{"properties":{"products":[]}}`, want: `[]`},
 		{name: "missing path", body: `{}`, want: ""},
 		{name: "scalar path", body: `{"properties":{"products":{"sku":"a"}}}`, want: "a"},

@@ -100,11 +100,20 @@ func (t streamTable) row(ev gjson.Result) []string {
 // selects nothing by accident.
 func lookup(ev gjson.Result, path string) gjson.Result {
 	if ev.IsArray() {
+		// The API's field selection keeps every element, so the table does
+		// too: an object takes the rest of the path, anything else stays as
+		// sent, and a missing key shows null to keep the positions.
 		var values []string
 		for _, item := range ev.Array() {
+			if !item.IsObject() {
+				values = append(values, item.Raw)
+				continue
+			}
 			if v := lookup(item, path); v.Exists() {
 				values = append(values, v.Raw)
+				continue
 			}
+			values = append(values, "null")
 		}
 		return gjson.Parse("[" + strings.Join(values, ",") + "]")
 	}
