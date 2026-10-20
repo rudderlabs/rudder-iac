@@ -144,6 +144,19 @@ func TestComposeProvidersGatesRETLTableSupport(t *testing.T) {
 	}
 }
 
+func TestNewDestinationRegistryDoesNotSupportCustomActivation(t *testing.T) {
+	t.Parallel()
+
+	registry, err := newDestinationRegistry(config.Config{
+		ExperimentalFlags: config.ExperimentalConfig{UnverifiedDestinations: true},
+	})
+	require.NoError(t, err)
+
+	assert.False(t, registry.IsSupported("custom_audience"))
+	_, err = registry.GetByAPIType("CUSTOM_AUDIENCE", 1)
+	require.ErrorContains(t, err, "not found")
+}
+
 func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
 	t.Parallel()
 
