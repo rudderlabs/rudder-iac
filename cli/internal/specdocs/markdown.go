@@ -35,20 +35,6 @@ func RenderDestinationMarkdown(w io.Writer, doc DestinationDoc) error {
 		p.row(code(f.Key), code(f.Type), requiredCell(f), defaultCell(f), allowedCell(f), secretCell(f))
 	}
 
-	if len(doc.Patterns) > 0 {
-		p.line("")
-		p.line("## Patterns")
-		p.line("")
-		for _, name := range slices.Sorted(maps.Keys(doc.Patterns)) {
-			pattern := doc.Patterns[name]
-			text := fmt.Sprintf("- %s: %s. Matches %s", code(name), pattern.Message, code(pattern.Regex))
-			if pattern.Reject != "" {
-				text += ", and must not match " + code(pattern.Reject)
-			}
-			p.line(text + ".")
-		}
-	}
-
 	p.line("")
 	p.line("## Connection modes")
 	p.line("")
@@ -64,6 +50,20 @@ func RenderDestinationMarkdown(w io.Writer, doc DestinationDoc) error {
 			required = append(required, fmt.Sprintf("%s: %s", mode, codeList(modes.RequiredKeys[mode], ", ")))
 		}
 		p.row(code(token), codeList(modes.Modes, ", "), strings.Join(required, "; "))
+	}
+
+	if len(doc.Patterns) > 0 {
+		p.line("")
+		p.line("## Patterns")
+		p.line("")
+		for _, name := range slices.Sorted(maps.Keys(doc.Patterns)) {
+			pattern := doc.Patterns[name]
+			text := fmt.Sprintf("- %s: %s. Matches %s", code(name), pattern.Message, code(pattern.Regex))
+			if pattern.Reject != "" {
+				text += ", and must not match " + code(pattern.Reject)
+			}
+			p.line(text + ".")
+		}
 	}
 
 	if len(doc.CustomValidators) > 0 {

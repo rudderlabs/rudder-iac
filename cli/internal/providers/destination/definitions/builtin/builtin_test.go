@@ -1,4 +1,4 @@
-package builtin_test
+package builtin
 
 import (
 	"slices"
@@ -7,34 +7,32 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/builtin"
 )
 
 func TestNewRegistryRegistersTheTable(t *testing.T) {
 	t.Parallel()
 
 	var verified, all []string
-	for _, entry := range builtin.Entries() {
+	for _, entry := range entries {
 		def := entry.NewDefinition()
 		all = append(all, def.Type)
 		if entry.Verified {
 			verified = append(verified, def.Type)
 		}
-		assert.Equal(t, entry.Verified, builtin.IsVerified(def.Type, def.Version), def.Type)
+		assert.Equal(t, entry.Verified, IsVerified(def.Type, def.Version), def.Type)
 	}
 	slices.Sort(verified)
 	slices.Sort(all)
 
-	off, err := builtin.NewRegistry(false)
+	off, err := NewRegistry(false)
 	require.NoError(t, err)
 	assert.Equal(t, verified, off.SupportedTypes())
 
-	on, err := builtin.NewRegistry(true)
+	on, err := NewRegistry(true)
 	require.NoError(t, err)
 	assert.Equal(t, all, on.SupportedTypes())
 
-	assert.False(t, builtin.IsVerified("not_a_type", 1))
+	assert.False(t, IsVerified("not_a_type", 1))
 }
 
 // Registration describes every config model, so a definition whose tags the
@@ -44,7 +42,7 @@ func TestEveryDefinitionDescribesItsSecrets(t *testing.T) {
 	t.Parallel()
 
 	for _, includeUnverified := range []bool{false, true} {
-		registry, err := builtin.NewRegistry(includeUnverified)
+		registry, err := NewRegistry(includeUnverified)
 		require.NoError(t, err)
 
 		for _, registered := range registry.Definitions() {

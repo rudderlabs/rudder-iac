@@ -123,11 +123,6 @@ var entries = []Entry{
 	{NewDefinition: zendesk.NewDefinition},
 }
 
-// Entries returns the table.
-func Entries() []Entry {
-	return append([]Entry(nil), entries...)
-}
-
 // NewRegistry registers the verified definitions and, with includeUnverified,
 // the unverified ones too.
 func NewRegistry(includeUnverified bool) (*definitions.Registry, error) {

@@ -13,11 +13,6 @@ Each key goes under `spec.config`. `[]` marks the items of a list. A nested key 
 | `connection_mode` | `map<sourceToken,string>` |  |  | see connection modes |  |
 | `consent_management` | `map<sourceToken,array<object>>` |  |  |  |  |
 
-## Patterns
-
-- `single_line_1000`: must be at most 1000 characters and must not contain line breaks. Matches `^(.{0,1000})$`.
-- `webhook_url`: must be a public http(s) domain URL and must not use localhost or ngrok. Matches `^(https?://)([a-zA-Z0-9-]{1,63}\.)+[a-zA-Z]{2,}(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5]\d{4}|[1-9]\d{1,3}))?(/.*)?$`, and must not match `^https?://([a-zA-Z0-9-]*\.ngrok\.io|localhost|.*\.localhost)`.
-
 ## Connection modes
 
 `connection_mode` needs an entry for each connected source token, set to one of the modes below. A mode with required keys needs those keys in the config.
@@ -25,6 +20,11 @@ Each key goes under `spec.config`. `[]` marks the items of a list. A nested key 
 | source token | modes | required keys |
 | --- | --- | --- |
 | `web` | `cloud` |  |
+
+## Patterns
+
+- `single_line_1000`: must be at most 1000 characters and must not contain line breaks. Matches `^(.{0,1000})$`.
+- `webhook_url`: must be a public http(s) domain URL and must not use localhost or ngrok. Matches `^(https?://)([a-zA-Z0-9-]{1,63}\.)+[a-zA-Z]{2,}(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5]\d{4}|[1-9]\d{1,3}))?(/.*)?$`, and must not match `^https?://([a-zA-Z0-9-]*\.ngrok\.io|localhost|.*\.localhost)`.
 
 ## Spec template
 
