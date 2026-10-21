@@ -37,7 +37,11 @@ type DestinationDoc struct {
 	Patterns         map[string]Pattern         `json:"patterns"`
 	CustomValidators []string                   `json:"customValidators"`
 	// SpecTemplate is a destination spec holding the keys every spec of this
-	// type needs, present when the document names both a source and an ID.
+	// type needs, present when the document names both a source and an ID. It
+	// leaves out keys required only by a requiredIf or requiredUnless rule;
+	// such a rule on a key the spec omits is checked against that key's
+	// default, so a caller also adds the keys whose conditions the defaults
+	// meet.
 	SpecTemplate string `json:"specTemplate,omitempty"`
 }
 
@@ -56,7 +60,10 @@ type ConnectionModes struct {
 
 // Field is one config key. Required holds only for top-level keys; a nested
 // key's own required rule applies once its parent block or list item is
-// written, which RequiredWhenParentPresent says.
+// written, which RequiredWhenParentPresent says. Var is a secret's variable
+// name and Slot the text a spec writes for it; in both, "<N>" stands for the
+// item's zero-based index in a list on the key's path, so item 0 of
+// headers[].to is SHOP_HEADERS_0_TO.
 type Field struct {
 	Key                       string      `json:"key"`
 	Type                      string      `json:"type"`
@@ -103,6 +110,9 @@ type DestinationList struct {
 	Destinations  []DestinationSummary `json:"destinations"`
 }
 
+// DestinationSummary is one type in the listing. SourceTypes holds source
+// tokens, the keys of connectionModes, not the source spec types --source
+// takes; `docs source` maps one to the other.
 type DestinationSummary struct {
 	Type               string            `json:"type"`
 	DisplayName        string            `json:"displayName"`

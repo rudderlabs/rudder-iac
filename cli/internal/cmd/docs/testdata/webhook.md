@@ -2,7 +2,7 @@
 
 Narrowed to `javascript` sources, which connect as source token `web`.
 
-Each key goes under `spec.config`. `[]` marks the items of a list. A nested key marked required is required once its parent block or list item is written, and a nested default applies only once its parent block is written. A pattern applies to literal values; a key that takes a template also accepts a `{{ path || fallback }}` template in its place.
+Each key goes under `spec.config`. `[]` marks the items of a list. A nested key marked required is required once its parent block or list item is written, and a nested default applies only once its parent block is written. A pattern applies to literal values; a key that takes a template also accepts a `{{ path || fallback }}` template in its place. In a secret's variable name, `<N>` stands for the item's position in its list, counting from 0.
 
 | key | type | required | default | allowed values or pattern | secret |
 | --- | --- | --- | --- | --- | --- |
@@ -27,6 +27,8 @@ Each key goes under `spec.config`. `[]` marks the items of a list. A nested key 
 - `webhook_url`: must be a public http(s) domain URL and must not use localhost or ngrok. Matches `^(https?://)([a-zA-Z0-9-]{1,63}\.)+[a-zA-Z]{2,}(:(6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5]\d{4}|[1-9]\d{1,3}))?(/.*)?$`, and must not match `^https?://([a-zA-Z0-9-]*\.ngrok\.io|localhost|.*\.localhost)`.
 
 ## Spec template
+
+Replace each `null` with a value. The template leaves out keys required only by a condition. A condition on a key the spec leaves out is checked against that key's default, so also add any key whose `if` condition the defaults meet.
 
 ```yaml
 version: rudder/v1

@@ -386,6 +386,57 @@ func mapKeys[V any](m map[string]V) []string {
 	return keys
 }
 
+// The JSON contract carries what the walker reads about nested required keys
+// and open enums, not only the Markdown cells.
+func TestDescribeCarriesNestedRequiredAndOpenEnums(t *testing.T) {
+	t.Parallel()
+
+	docs, _ := newDestinations(t)
+
+	bq := fieldsByKey(describe(t, docs, specdocs.DescribeOptions{Type: "bq"}))
+	assert.Equal(t, specdocs.Field{Key: "exclude_window.start_time", Type: "string", RequiredWhenParentPresent: true},
+		bq["exclude_window.start_time"])
+	assert.Equal(t, specdocs.Field{Key: "exclude_window.end_time", Type: "string", RequiredWhenParentPresent: true},
+		bq["exclude_window.end_time"])
+
+	braze := fieldsByKey(describe(t, docs, specdocs.DescribeOptions{Type: "braze"}))
+	assert.Equal(t, specdocs.Field{
+		Key:      "data_center",
+		Type:     "string",
+		Required: true,
+		Enum: []any{
+			"US-01", "US-02", "US-03", "US-04", "US-05", "US-06", "US-07", "US-08",
+			"EU-01", "EU-02", "EU-03", "AU-01",
+		},
+		OpenEnum:        true,
+		AcceptsTemplate: true,
+	}, braze["data_center"])
+}
+
+func fieldsByKey(doc specdocs.DestinationDoc) map[string]specdocs.Field {
+	fields := make(map[string]specdocs.Field, len(doc.Fields))
+	for _, f := range doc.Fields {
+		fields[f.Key] = f
+	}
+	return fields
+}
+
+func TestMarkdownExplainsTheListIndexOnlyWhenUsed(t *testing.T) {
+	t.Parallel()
+
+	docs, _ := newDestinations(t)
+	const note = "`<N>` stands for the item's position in its list, counting from 0."
+
+	var webhook, am bytes.Buffer
+	require.NoError(t, specdocs.RenderDestinationMarkdown(&webhook,
+		describe(t, docs, specdocs.DescribeOptions{Type: "webhook", ID: "shop-webhook"})))
+	require.NoError(t, specdocs.RenderDestinationMarkdown(&am,
+		describe(t, docs, specdocs.DescribeOptions{Type: "am", ID: "shop-amplitude"})))
+
+	assert.Contains(t, webhook.String(), note)
+	assert.NotContains(t, am.String(), note)
+}
+
 func TestDescribeMarksUnverifiedTypes(t *testing.T) {
 	t.Parallel()
 

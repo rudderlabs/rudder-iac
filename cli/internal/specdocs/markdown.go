@@ -23,10 +23,14 @@ func RenderDestinationMarkdown(w io.Writer, doc DestinationDoc) error {
 		p.linef("Narrowed to `%s` sources, which connect as source token `%s`.", doc.Source.Type, doc.Source.Token)
 		p.line("")
 	}
-	p.line("Each key goes under `spec.config`. `[]` marks the items of a list. A nested key marked required " +
+	intro := "Each key goes under `spec.config`. `[]` marks the items of a list. A nested key marked required " +
 		"is required once its parent block or list item is written, and a nested default applies only once " +
 		"its parent block is written. A pattern applies to literal values; a key that takes a template " +
-		"also accepts a `{{ path || fallback }}` template in its place.")
+		"also accepts a `{{ path || fallback }}` template in its place."
+	if slices.ContainsFunc(doc.Fields, func(f Field) bool { return strings.Contains(f.Var, listIndex) }) {
+		intro += " In a secret's variable name, " + code(listIndex) + " stands for the item's position in its list, counting from 0."
+	}
+	p.line(intro)
 	p.line("")
 
 	p.line("| key | type | required | default | allowed values or pattern | secret |")
@@ -77,6 +81,10 @@ func RenderDestinationMarkdown(w io.Writer, doc DestinationDoc) error {
 	if doc.SpecTemplate != "" {
 		p.line("")
 		p.line("## Spec template")
+		p.line("")
+		p.line("Replace each `null` with a value. The template leaves out keys required only by a condition. " +
+			"A condition on a key the spec leaves out is checked against that key's default, so also add any " +
+			"key whose `if` condition the defaults meet.")
 		p.line("")
 		p.line("```yaml")
 		p.write(doc.SpecTemplate)
