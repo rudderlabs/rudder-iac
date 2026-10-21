@@ -12,31 +12,42 @@ type candidate struct {
 	aliases []string
 }
 
-// suggest returns the candidates input most likely meant: a name that equals
-// it once case and punctuation are ignored, a name that contains it or is
-// contained in it, or a value a typo or two away.
+// suggest returns the candidates input most likely meant: first the names that
+// equal it once case and punctuation are ignored, so a caller taking the first
+// suggestion gets one of them, then the names that contain it or are contained
+// in it, and the values a typo or two away.
 func suggest(input string, candidates []candidate) []string {
 	needle := normalize(input)
-	out := []string{}
 	if needle == "" {
-		return out
+		return []string{}
 	}
 
+	var exact, near []string
 	for _, c := range candidates {
-		if matches(needle, c) {
-			out = append(out, c.value)
+		switch {
+		case equals(needle, c):
+			exact = append(exact, c.value)
+		case matches(needle, c):
+			near = append(near, c.value)
 		}
 	}
-	slices.Sort(out)
-	return slices.Compact(out)
+	slices.Sort(exact)
+	slices.Sort(near)
+	return append(append([]string{}, slices.Compact(exact)...), slices.Compact(near)...)
+}
+
+func equals(needle string, c candidate) bool {
+	for _, name := range append([]string{c.value}, c.aliases...) {
+		if normalize(name) == needle {
+			return true
+		}
+	}
+	return false
 }
 
 func matches(needle string, c candidate) bool {
 	for _, name := range append([]string{c.value}, c.aliases...) {
 		hay := normalize(name)
-		if hay == needle {
-			return true
-		}
 		if len(needle) >= 3 && strings.Contains(hay, needle) {
 			return true
 		}
