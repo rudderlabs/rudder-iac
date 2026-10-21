@@ -33,13 +33,23 @@ func TestRequiredCellReadsEveryRule(t *testing.T) {
 	assert.Equal(t, "yes", requiredCell(Field{Required: true}))
 	assert.Equal(t, "yes, once its parent is written", requiredCell(Field{RequiredWhenParentPresent: true}))
 	assert.Equal(t,
-		"if `a` is `true` and `b` is `x`; unless `c` is `y`; if `d` or `e` is set; not with `f`; checked by `g_required`",
+		"if `a` is `true` and `b` is `x`; unless `c` is `y`; if `d` or `e` is set; not with `f`; "+
+			"not if `h` is `false` and `i` is `z`; checked by `g_required`",
 		requiredCell(Field{
 			RequiredIf:     []Condition{{Key: "a", Value: true}, {Key: "b", Value: "x"}},
 			RequiredUnless: []Condition{{Key: "c", Value: "y"}},
 			RequiredWith:   []string{"d", "e"},
 			ExcludedWith:   []string{"f"},
+			ExcludedIf:     []Condition{{Key: "h", Value: false}, {Key: "i", Value: "z"}},
 			CheckedBy:      []string{"g_required"},
 		}),
 	)
+}
+
+func TestAllowedCellReadsLimits(t *testing.T) {
+	t.Parallel()
+
+	two, eight := 2, 8
+	assert.Equal(t, "pattern `short`, or a template; at least 2; at most 8",
+		allowedCell(Field{Pattern: "short", AcceptsTemplate: true, Min: &two, Max: &eight}))
 }

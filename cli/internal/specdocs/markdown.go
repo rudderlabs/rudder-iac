@@ -152,6 +152,9 @@ func requiredCell(f Field) string {
 	if len(f.ExcludedWith) > 0 {
 		parts = append(parts, "not with "+codeList(f.ExcludedWith, " or "))
 	}
+	if len(f.ExcludedIf) > 0 {
+		parts = append(parts, "not if "+conditionsText(f.ExcludedIf, " and "))
+	}
 	if len(f.CheckedBy) > 0 {
 		parts = append(parts, "checked by "+codeList(f.CheckedBy, ", "))
 	}
@@ -199,6 +202,9 @@ func allowedCell(f Field) string {
 			text += ", or a template"
 		}
 		parts = append(parts, text)
+	}
+	if f.Min != nil {
+		parts = append(parts, fmt.Sprintf("at least %d", *f.Min))
 	}
 	if f.Max != nil {
 		parts = append(parts, fmt.Sprintf("at most %d", *f.Max))

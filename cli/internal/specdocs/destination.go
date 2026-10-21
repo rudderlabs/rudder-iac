@@ -64,6 +64,7 @@ type Field struct {
 	RequiredUnless            []Condition `json:"requiredUnless,omitempty"`
 	RequiredWith              []string    `json:"requiredWith,omitempty"`
 	ExcludedWith              []string    `json:"excludedWith,omitempty"`
+	ExcludedIf                []Condition `json:"excludedIf,omitempty"`
 	CheckedBy                 []string    `json:"checkedBy,omitempty"`
 	Enum                      []any       `json:"enum,omitempty"`
 	OpenEnum                  bool        `json:"openEnum,omitempty"`
@@ -71,6 +72,7 @@ type Field struct {
 	DefaultRequiresParent     bool        `json:"defaultRequiresParent,omitempty"`
 	Pattern                   string      `json:"pattern,omitempty"`
 	AcceptsTemplate           bool        `json:"acceptsTemplate,omitempty"`
+	Min                       *int        `json:"min,omitempty"`
 	Max                       *int        `json:"max,omitempty"`
 	OnlyForSourceTypes        []string    `json:"onlyForSourceTypes,omitempty"`
 	Secret                    bool        `json:"secret,omitempty"`
@@ -78,8 +80,9 @@ type Field struct {
 	Slot                      string      `json:"slot,omitempty"`
 }
 
-// Condition is one key and value of a requiredIf or requiredUnless rule.
-// requiredIf applies when every condition holds, requiredUnless unless any does.
+// Condition is one key and value of a requiredIf, requiredUnless or excludedIf
+// rule. requiredIf and excludedIf apply when every condition holds,
+// requiredUnless unless any does.
 type Condition struct {
 	Key   string `json:"key"`
 	Value any    `json:"value"`
@@ -319,11 +322,13 @@ func docField(f definitions.Field, id string) Field {
 		RequiredUnless:     docConditions(f.RequiredUnless),
 		RequiredWith:       f.RequiredWith,
 		ExcludedWith:       f.ExcludedWith,
+		ExcludedIf:         docConditions(f.ExcludedIf),
 		CheckedBy:          f.CheckedBy,
 		Enum:               f.Enum,
 		OpenEnum:           f.OpenEnum,
 		Pattern:            f.Pattern,
 		AcceptsTemplate:    f.AcceptsTemplate,
+		Min:                f.Min,
 		Max:                f.Max,
 		OnlyForSourceTypes: f.OnlyForSourceTypes,
 		Secret:             f.Secret,

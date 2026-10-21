@@ -40,6 +40,8 @@ type describeConfig struct {
 	UseAuth           *bool                    `mapstructure:"use_auth" default:"false"`
 	AuthKey           string                   `mapstructure:"auth_key" validate:"required_if=UseAuth true Region eu,max=20"`
 	Fallback          string                   `mapstructure:"fallback" validate:"required_unless=Region us,required_with=AuthKey"`
+	Prefix            string                   `mapstructure:"prefix" validate:"omitempty,min=2,max=8"`
+	LegacyToken       string                   `mapstructure:"legacy_token" validate:"excluded_if=UseAuth false Region us"`
 	Headers           []describeHeader         `mapstructure:"headers" validate:"omitempty,dive"`
 	Filtering         *describeFiltering       `mapstructure:"filtering"`
 	SDKVersion        *describeSDK             `mapstructure:"sdk_version"`
@@ -121,6 +123,15 @@ func TestDescribeReadsTheConfigModel(t *testing.T) {
 				Type:           "string",
 				RequiredUnless: []definitions.Condition{{Key: "region", Value: "us"}},
 				RequiredWith:   []string{"auth_key"},
+			},
+			{Key: "prefix", Type: "string", Min: intPtr(2), Max: intPtr(8)},
+			{
+				Key:  "legacy_token",
+				Type: "string",
+				ExcludedIf: []definitions.Condition{
+					{Key: "use_auth", Value: false},
+					{Key: "region", Value: "us"},
+				},
 			},
 			{Key: "headers[].from", Type: "string", Required: true, Pattern: "describe_short", AcceptsTemplate: true},
 			{Key: "headers[].to", Type: "string", Pattern: "describe_short", Secret: true},
@@ -223,10 +234,10 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 			name: "a rule neither described nor registered",
 			newConfig: func() any {
 				return &struct {
-					Name string `mapstructure:"name" validate:"omitempty,min=3"`
+					Name string `mapstructure:"name" validate:"omitempty,len=3"`
 				}{}
 			},
-			wantErr: `config key "name": validate rule "min" is neither described nor one of the definition's ConfigValidateFuncs`,
+			wantErr: `config key "name": validate rule "len" is neither described nor one of the definition's ConfigValidateFuncs`,
 		},
 		{
 			name: "an unregistered pattern",

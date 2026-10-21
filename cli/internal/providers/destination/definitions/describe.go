@@ -56,6 +56,8 @@ type Field struct {
 	RequiredWith []string
 	// ExcludedWith forbids the key when any of these keys is set.
 	ExcludedWith []string
+	// ExcludedIf forbids the key when every condition holds.
+	ExcludedIf []Condition
 	// CheckedBy names the definition's custom validators on this key.
 	CheckedBy []string
 	// Enum holds the allowed values, typed like the field (or its items).
@@ -74,7 +76,9 @@ type Field struct {
 	// AcceptsTemplate is set when the key also takes a `{{ path || fallback }}`
 	// template, which the pattern does not have to match.
 	AcceptsTemplate bool
-	// Max is the `max` rule: a length for strings and lists, a value for numbers.
+	// Min and Max are the `min` and `max` rules: a length for strings and
+	// lists, a value for numbers.
+	Min *int
 	Max *int
 	// OnlyForSourceTypes lists the source tokens the key is valid for; empty
 	// means every source type.
@@ -88,7 +92,8 @@ func (f Field) Nested() bool {
 	return strings.Contains(f.Key, ".")
 }
 
-// Condition is one `key value` pair of a required_if or required_unless rule.
+// Condition is one `key value` pair of a required_if, required_unless or
+// excluded_if rule.
 type Condition struct {
 	Key   string
 	Value any
@@ -131,14 +136,21 @@ func (f Field) clone() Field {
 	f.RequiredUnless = slices.Clone(f.RequiredUnless)
 	f.RequiredWith = slices.Clone(f.RequiredWith)
 	f.ExcludedWith = slices.Clone(f.ExcludedWith)
+	f.ExcludedIf = slices.Clone(f.ExcludedIf)
 	f.CheckedBy = slices.Clone(f.CheckedBy)
 	f.Enum = slices.Clone(f.Enum)
 	f.OnlyForSourceTypes = slices.Clone(f.OnlyForSourceTypes)
-	if f.Max != nil {
-		limit := *f.Max
-		f.Max = &limit
-	}
+	f.Min = cloneInt(f.Min)
+	f.Max = cloneInt(f.Max)
 	return f
+}
+
+func cloneInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
 }
 
 func cloneStringSlices(in map[string][]string) map[string][]string {
@@ -323,8 +335,8 @@ func describedPerItem(name string) bool {
 // what earns it an entry next to the keys it holds.
 func (f Field) constrained() bool {
 	return f.Required || len(f.RequiredIf) > 0 || len(f.RequiredUnless) > 0 ||
-		len(f.RequiredWith) > 0 || len(f.ExcludedWith) > 0 || len(f.CheckedBy) > 0 ||
-		len(f.Enum) > 0 || f.Pattern != "" || f.Max != nil
+		len(f.RequiredWith) > 0 || len(f.ExcludedWith) > 0 || len(f.ExcludedIf) > 0 || len(f.CheckedBy) > 0 ||
+		len(f.Enum) > 0 || f.Pattern != "" || f.Min != nil || f.Max != nil
 }
 
 // ruleScope is what a rule needs to resolve its parameters: go-playground
@@ -349,15 +361,18 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 		return nil
 	case "required":
 		field.Required = true
-	case "required_if", "required_unless":
+	case "required_if", "required_unless", "excluded_if":
 		conditions, err := scope.conditions(param)
 		if err != nil {
 			return fmt.Errorf("%s: %w", name, err)
 		}
-		if name == "required_if" {
+		switch name {
+		case "required_if":
 			field.RequiredIf = append(field.RequiredIf, conditions...)
-		} else {
+		case "required_unless":
 			field.RequiredUnless = append(field.RequiredUnless, conditions...)
+		default:
+			field.ExcludedIf = append(field.ExcludedIf, conditions...)
 		}
 	case "required_with", "excluded_with":
 		keys, err := scope.keys(strings.Fields(param))
@@ -390,12 +405,16 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 		if name == "dynamic_or_pattern" {
 			field.AcceptsTemplate = true
 		}
-	case "max":
+	case "min", "max":
 		limit, err := strconv.Atoi(param)
 		if err != nil {
-			return fmt.Errorf("max: invalid limit %q", param)
+			return fmt.Errorf("%s: invalid limit %q", name, param)
 		}
-		field.Max = &limit
+		if name == "min" {
+			field.Min = &limit
+		} else {
+			field.Max = &limit
+		}
 	default:
 		if !slices.Contains(w.customTags, name) {
 			return fmt.Errorf("validate rule %q is neither described nor one of the definition's ConfigValidateFuncs", name)
@@ -405,8 +424,8 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 	return nil
 }
 
-// conditions reads a required_if or required_unless parameter, a list of
-// `Field value` pairs.
+// conditions reads a required_if, required_unless or excluded_if parameter, a
+// list of `Field value` pairs.
 func (s ruleScope) conditions(param string) ([]Condition, error) {
 	parts := strings.Fields(param)
 	if len(parts) == 0 || len(parts)%2 != 0 {
