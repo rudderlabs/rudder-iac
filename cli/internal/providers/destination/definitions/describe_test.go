@@ -134,7 +134,7 @@ func TestDescribeReadsTheConfigModel(t *testing.T) {
 			},
 			{
 				Key: "sdk_version.web", Type: "integer", Enum: []any{int64(1), int64(2)},
-				Default: float64(2), HasDefault: true, OnlyForSourceTypes: []string{"web"},
+				Default: int64(2), HasDefault: true, OnlyForSourceTypes: []string{"web"},
 			},
 			{Key: "auth", Type: "object", RequiredIf: []definitions.Condition{{Key: "use_auth", Value: true}}},
 			{Key: "auth.token", Type: "string", Required: true, CheckedBy: []string{"describe_token_check"}},

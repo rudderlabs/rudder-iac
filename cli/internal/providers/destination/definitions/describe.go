@@ -223,7 +223,7 @@ func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructF
 	field.OnlyForSourceTypes = slices.Clone(gate)
 	field.Secret = slices.Contains(w.secretKeys, dotted)
 	if value, ok := lookupDefault(w.defaults, dotted); ok {
-		field.Default, field.HasDefault = value, true
+		field.Default, field.HasDefault = describedDefault(fieldType, value), true
 	}
 
 	ownRules, itemRules := splitDive(structField.Tag.Get("validate"))
@@ -551,6 +551,16 @@ func describeType(typ reflect.Type) string {
 	default:
 		return "any"
 	}
+}
+
+// describedDefault turns an integer default back into int64. buildConfigDefaults
+// keeps integers as float64 to compare with decoded config, while Enum and
+// condition values hold int64, and a Go caller should be able to compare them.
+func describedDefault(typ reflect.Type, value any) any {
+	if number, ok := value.(float64); ok && describeType(typ) == "integer" {
+		return int64(number)
+	}
+	return value
 }
 
 // lookupDefault finds a scalar default by dotted key in the nested defaults
