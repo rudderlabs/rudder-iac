@@ -50,6 +50,8 @@ func (p *Provider) SupportedMatchPatterns() []vrules.MatchPattern {
 func (p *Provider) SyntacticRules() []vrules.Rule {
 	return []vrules.Rule{
 		NewSpecSyntaxValidRule(p.registry),
+		NewSecretReferenceRule(p.registry),
+		NewSecretReferenceUniqueRule(p.registry),
 	}
 }
 

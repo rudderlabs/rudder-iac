@@ -24,6 +24,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -121,8 +122,31 @@ func loadExample(t *testing.T, registry *definitions.Registry, files map[string]
 	require.NoError(t, err)
 
 	recorder := &diagnosticsRecorder{}
-	err = project.New(cp, project.WithLoader(exampleFiles(files)), project.WithRenderer(recorder)).Load("example")
+	err = project.New(cp,
+		project.WithLoader(exampleFiles(files)),
+		project.WithRenderer(recorder),
+		project.WithSubstitutor(varsubst.NewSubstitutor(exampleVariables)),
+	).Load("example")
 	return recorder.diagnostics, err
+}
+
+// exampleVariables stands in for the var file a project passes with
+// --var-file. The examples write account and destination secrets as
+// references, as destination/secret-reference asks, and validate substitutes
+// them before the destination config is checked against its patterns.
+var exampleVariables = variables{
+	"PG_PASSWORD":                            "example-password",
+	"MY_GOOGLEADS_DESTINATION_CONVERSION_ID": "AW-123456789",
+	"MY_PIXEL_DESTINATION_PIXEL_ID":          "123456789012345",
+	"MY_CUSTOMERIO_AUDIENCE_API_KEY":         "example-api-key",
+	"MY_CUSTOMERIO_AUDIENCE_APP_API_KEY":     "example-app-api-key",
+}
+
+type variables map[string]string
+
+func (v variables) Resolve(name string) (string, bool) {
+	value, ok := v[name]
+	return value, ok
 }
 
 // assertExpectedDiagnostics requires the example to produce exactly its
