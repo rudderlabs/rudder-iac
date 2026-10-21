@@ -151,26 +151,44 @@ partial=""
 installed=$("$dir/$BIN" --version) || fail "installed $dir/$BIN but it failed to run${installed:+: $installed}"
 echo "Installed $installed at $dir/$BIN"
 
-# A PATH entry may end in a slash, and then some shells print the binary as dir//rudder-cli.
+# Which binary a plain 'rudder-cli' starts in this shell. A PATH entry may end
+# in a slash, and then some shells print the binary as dir//rudder-cli.
+found=$(command -v "$BIN" || true)
+other=""
+case "$found" in
+  "$dir/$BIN" | "$dir//$BIN") ;;
+  /*)
+    other_dir=${found%/*}
+    other_dir=${other_dir%/}
+    # </dev/null keeps the other copy from reading the rest of a piped script.
+    other_version=$("$found" --version </dev/null 2>/dev/null) || other_version=""
+    other="$other_dir/$BIN${other_version:+ ($other_version)}"
+    ;;
+esac
+
+case "${SHELL:-}" in
+  */zsh) profile=".zshrc" ;;
+  */bash) profile=".bashrc" ;;
+  *) profile=".profile" ;;
+esac
+path_line="export PATH=\"$dir:\$PATH\""
+
 case ":$PATH:" in
   *":$dir:"* | *":$dir/:"*)
-    found=$(command -v "$BIN" || true)
-    case "$found" in
-      "$dir/$BIN" | "$dir//$BIN") ;;
-      *)
-        echo
-        echo "Warning: $found comes earlier on your PATH, so '$BIN' runs that copy. Remove it or move $dir ahead of it."
-        ;;
-    esac
+    if [ -n "$other" ]; then
+      echo
+      echo "Warning: '$BIN' runs $other, not $dir/$BIN, because $other_dir comes before $dir on your PATH."
+      echo "To put the new one first, add this line to the end of ~/$profile, then open a new terminal:"
+      echo "  $path_line"
+      echo "To use it in this terminal, run the same line, or run $dir/$BIN directly."
+    fi
     ;;
   *)
-    case "${SHELL:-}" in
-      */zsh) profile=".zshrc" ;;
-      */bash) profile=".bashrc" ;;
-      *) profile=".profile" ;;
-    esac
     echo
-    echo "$dir is not on your PATH. Add this line to ~/$profile, then open a new terminal:"
-    echo "  export PATH=\"$dir:\$PATH\""
+    echo "$dir is not on your PATH. Add this line to the end of ~/$profile, then open a new terminal:"
+    echo "  $path_line"
+    if [ -n "$other" ]; then
+      echo "Until then, '$BIN' runs $other. To use the new one in this terminal, run the same line, or run $dir/$BIN directly."
+    fi
     ;;
 esac

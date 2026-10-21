@@ -68,6 +68,17 @@ jobs:
           sh install.sh
           "$RUDDER_CLI_INSTALL_DIR/rudder-cli" --version | grep -Fx "rudder-cli version 0.27.0"
 
+      - name: name the copy that runs when another one comes first on PATH
+        env:
+          RUDDER_CLI_INSTALL_DIR: ${{ runner.temp }}/latest
+          OLDER_DIR: ${{ runner.temp }}/pinned
+        run: |
+          PATH="$OLDER_DIR:$RUDDER_CLI_INSTALL_DIR:$PATH" sh install.sh | tee "$RUNNER_TEMP/earlier.txt"
+          grep -F "Warning: 'rudder-cli' runs $OLDER_DIR/rudder-cli (rudder-cli version 0.27.0), not $RUDDER_CLI_INSTALL_DIR/rudder-cli," "$RUNNER_TEMP/earlier.txt"
+          grep -Fx "  export PATH=\"$RUDDER_CLI_INSTALL_DIR:\$PATH\"" "$RUNNER_TEMP/earlier.txt"
+          PATH="$OLDER_DIR:$PATH" RUDDER_CLI_INSTALL_DIR="$RUNNER_TEMP/off-path" sh install.sh | tee "$RUNNER_TEMP/off-path.txt"
+          grep -F "Until then, 'rudder-cli' runs $OLDER_DIR/rudder-cli (rudder-cli version 0.27.0)." "$RUNNER_TEMP/off-path.txt"
+
       - name: fail on a release that does not exist
         env:
           RUDDER_CLI_VERSION: "9.9.9"
