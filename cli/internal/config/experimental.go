@@ -35,6 +35,10 @@ type ExperimentalConfig struct {
 	// RETLTableSupport registers the retl-source-table spec kind with the RETL
 	// provider.
 	RETLTableSupport bool `mapstructure:"retlTableSupport"`
+
+	// SourcesListen shows and enables the `sources` command group: a local listener that
+	// captures the events an app sends, and the commands that read them.
+	SourcesListen bool `mapstructure:"sourcesListen"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

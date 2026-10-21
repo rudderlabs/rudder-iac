@@ -202,6 +202,18 @@ Recommendation:
 - **Leave it unquoted** only when you intentionally want the value to keep its native type
   (a number or boolean from a variable file or env var).
 
+Which quote to use depends on what the value can contain, because the value is inserted
+verbatim:
+
+| Reference | Breaks when the value contains | Fix |
+|---|---|---|
+| `"{{ .VAR }}"` | `"` or `\` | none inside the value, so use single quotes |
+| `'{{ .VAR }}'` | `'` | double each `'` in the variable (`it''s`, written unquoted in the var file) |
+
+Specs written by `import workspace` use single quotes, so a JSON value such as a service
+account key works as is (JSON has no `'`), while a password with an apostrophe needs its
+`'` doubled.
+
 ---
 
 ## Error handling
