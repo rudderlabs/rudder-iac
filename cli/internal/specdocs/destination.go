@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
@@ -384,9 +386,18 @@ func slot(varName string) string {
 	return "'" + secret.Reference(varName) + "'"
 }
 
-// validateID checks the variable names id produces. A list index is a number,
-// so "0" stands in for it here.
+// idAdvice is the rule both checks on an ID add up to.
+const idAdvice = "use an ID of 2 to 100 letters, digits, underscores and hyphens that does not start with a digit"
+
+// validateID checks what id becomes: the template's display_name, and the
+// secret variable names. A list index is a number, so "0" stands in for it
+// here.
 func validateID(id string, fields []definitions.Field) error {
+	if !funcs.MatchPattern(destination.DisplayNamePattern, id) {
+		pattern, _ := funcs.LookupPattern(destination.DisplayNamePattern)
+		return invalidID(id, fmt.Sprintf("--id %q is also the spec's display_name, which %s; %s", id, pattern.Message, idAdvice))
+	}
+
 	names := []string{secret.VariableName(id)}
 	for _, f := range fields {
 		if f.Secret {
@@ -397,18 +408,18 @@ func validateID(id string, fields []definitions.Field) error {
 		if varsubst.IsValidVariableName(name) {
 			continue
 		}
-		e := &Error{
-			Code: CodeInvalidID,
-			Message: fmt.Sprintf("--id %q gives the secret variable name %q, which does not match ^[A-Za-z_][A-Za-z0-9_]*$; "+
-				"use an ID of letters, digits, underscores and hyphens that does not start with a digit", id, name),
-			Suggestions: []string{},
-		}
-		if fixed := suggestID(id); fixed != "" {
-			e.Suggestions = []string{fixed}
-		}
-		return e
+		return invalidID(id, fmt.Sprintf("--id %q gives the secret variable name %q, which does not match ^[A-Za-z_][A-Za-z0-9_]*$; %s",
+			id, name, idAdvice))
 	}
 	return nil
+}
+
+func invalidID(id, message string) error {
+	e := &Error{Code: CodeInvalidID, Message: message, Suggestions: []string{}}
+	if fixed := suggestID(id); fixed != "" {
+		e.Suggestions = []string{fixed}
+	}
+	return e
 }
 
 // suggestID lower-cases id, turns every other character into a hyphen and
@@ -424,7 +435,7 @@ func suggestID(id string) string {
 		}
 	}
 	fixed := strings.TrimLeft(b.String(), "-0123456789")
-	if fixed == "" || !varsubst.IsValidVariableName(secret.VariableName(fixed)) {
+	if !funcs.MatchPattern(destination.DisplayNamePattern, fixed) || !varsubst.IsValidVariableName(secret.VariableName(fixed)) {
 		return ""
 	}
 	return fixed

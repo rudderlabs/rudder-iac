@@ -12,11 +12,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/builtin"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/specdocs"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
 func newDestinations(t *testing.T) (*specdocs.Destinations, *definitions.Registry) {
@@ -191,13 +194,14 @@ func TestSpecTemplateFailsOnlyOnItsNullKeys(t *testing.T) {
 }
 
 // Across every type and source, a template only ever leaves keys for the
-// caller to fill: whatever it writes itself must already pass. Keys it leaves
-// out may still be required by a condition, which the caller resolves from
-// the fields' requiredIf rules.
+// caller to fill: whatever it writes itself must already pass the same rule
+// validate runs, envelope included. Keys it leaves out may still be required
+// by a condition, which the caller resolves from the fields' requiredIf rules.
 func TestSpecTemplateWritesNothingInvalid(t *testing.T) {
 	t.Parallel()
 
 	docs, registry := newDestinations(t)
+	rule := destination.NewSpecSyntaxValidRule(registry)
 
 	for _, registered := range registry.Definitions() {
 		for _, sourceType := range source.SourceTypes() {
@@ -210,15 +214,51 @@ func TestSpecTemplateWritesNothingInvalid(t *testing.T) {
 
 			spec := templateSpec(t, doc.SpecTemplate)
 			toFill := append(spec.nullKeys(), spec.slotKeys()...)
-			for _, configErr := range registered.ValidateConfig(spec.config) {
-				key, _, _ := strings.Cut(strings.TrimPrefix(configErr.Path, "/"), "/")
+			for _, result := range validateSpec(rule, spec) {
+				configKey, inConfig := strings.CutPrefix(result.Reference, "/spec/config/")
+				if !assert.True(t, inConfig, "%s from %s: %s %s", registered.Type, sourceType, result.Reference, result.Message) {
+					continue
+				}
+				key, _, _ := strings.Cut(configKey, "/")
 				if slices.Contains(toFill, key) {
 					continue
 				}
-				assert.NotContains(t, spec.config, key, "%s from %s: %s", registered.Type, sourceType, configErr.Message)
+				assert.NotContains(t, spec.config, key, "%s from %s: %s", registered.Type, sourceType, result.Message)
 			}
 		}
 	}
+}
+
+// Every ID docs accepts writes a template the spec rule accepts, and every ID
+// that would not is rejected up front.
+func TestIDsMatchTheSpecRule(t *testing.T) {
+	t.Parallel()
+
+	docs, registry := newDestinations(t)
+	rule := destination.NewSpecSyntaxValidRule(registry)
+
+	for _, id := range []string{"yes", "on", "null", "-x", "Foo_Bar", "ab", strings.Repeat("a", 100)} {
+		doc := describe(t, docs, specdocs.DescribeOptions{Type: "webhook", Source: "javascript", ID: id})
+		spec := templateSpec(t, doc.SpecTemplate)
+		spec.config["webhook_url"] = "https://hooks.example.com/rudder"
+		assert.Empty(t, validateSpec(rule, spec), id)
+	}
+
+	for _, id := range []string{"a", "_", strings.Repeat("a", 101), "ıdshop", "my shop", "my.shop", "9shop"} {
+		_, err := docs.Describe(specdocs.DescribeOptions{Type: "webhook", Source: "javascript", ID: id})
+		var docErr *specdocs.Error
+		if assert.ErrorAs(t, err, &docErr, id) {
+			assert.Equal(t, specdocs.CodeInvalidID, docErr.Code, id)
+		}
+	}
+}
+
+func validateSpec(rule vrules.Rule, spec parsedTemplate) []vrules.ValidationResult {
+	return rule.Validate(&vrules.ValidationContext{
+		Spec:    spec.document["spec"].(map[string]any),
+		Kind:    destination.DestinationSpecKind,
+		Version: specs.SpecVersionV1,
+	})
 }
 
 type parsedTemplate struct {
@@ -443,8 +483,19 @@ func TestDescribeErrors(t *testing.T) {
 			want: &specdocs.Error{
 				Code: specdocs.CodeInvalidID,
 				Message: `--id "9.Shop" gives the secret variable name "9.SHOP", which does not match ^[A-Za-z_][A-Za-z0-9_]*$; ` +
-					"use an ID of letters, digits, underscores and hyphens that does not start with a digit",
+					"use an ID of 2 to 100 letters, digits, underscores and hyphens that does not start with a digit",
 				Suggestions: []string{"shop"},
+			},
+		},
+		{
+			name: "an ID the display_name rule rejects",
+			opts: specdocs.DescribeOptions{Type: "webhook", ID: "ıdshop"},
+			want: &specdocs.Error{
+				Code: specdocs.CodeInvalidID,
+				Message: `--id "ıdshop" is also the spec's display_name, which must be 2-100 characters and contain only ` +
+					"letters, digits, underscores, spaces, periods, and hyphens; " +
+					"use an ID of 2 to 100 letters, digits, underscores and hyphens that does not start with a digit",
+				Suggestions: []string{"dshop"},
 			},
 		},
 	}
