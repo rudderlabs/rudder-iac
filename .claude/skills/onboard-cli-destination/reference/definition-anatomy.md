@@ -120,6 +120,7 @@ Register(); `RegisteredDefinition.GatedKeyPaths()` returns
 
 Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 
+- `DisplayName` must not be empty.
 - `NewConfig` must return a pointer to struct.
 - Every `SourceTypes` entry must exist in the local→API source-type mapping.
 - `ConnectionModes` keys ⊆ `SourceTypes`, and every source type must have modes.
@@ -139,6 +140,15 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 - Gated properties: source types ⊆ `SourceTypes`, local key must exist on the
   config struct, no duplicates, and the property must carry a local key
   (`Gated(Discriminator(...))` is rejected).
+- Every `SecretKeys` path must resolve to a string field, through nested
+  objects and lists of objects.
+- Every `validate` rule on the config struct must be one that
+  `(*RegisteredDefinition).Describe` reads (`required`, `required_if`,
+  `required_unless`, `required_with`, `excluded_with`, `oneof`,
+  `dynamic_or_oneof`, `pattern`, `dynamic_or_pattern`, `max`, `dive`,
+  `omitempty`) or a tag in the definition's `ConfigValidateFuncs`. Named
+  patterns must be registered. This keeps `rudder-cli docs destination` able to
+  describe every definition.
 
 ## Validation semantics to remember
 
@@ -170,18 +180,17 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
    `LocalJSON`/`APIJSON`; include a consent case with boundary-mapped source
    types (`android_kotlin` ↔ `androidKotlin`, `react_native` ↔ `reactnative`).
 
-## Registration in dependencies.go
+## Registration in the builtin table
+
+`newDestinationRegistry` registers the entries of the table in
+`cli/internal/providers/destination/definitions/builtin/builtin.go`: the
+verified ones always, the rest only under `UnverifiedDestinations`.
 
 ```go
-func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
-    registry := definitions.NewRegistry()
-    if err := registry.Register(s3.NewDefinition()); err != nil {
-        return nil, fmt.Errorf("registering s3 destination definition: %w", err)
-    }
-    if cfg.ExperimentalFlags.UnverifiedDestinations {
-        // Append the new definition here, same pattern.
-    }
-    return registry, nil
+var entries = []Entry{
+    {NewDefinition: s3.NewDefinition, Verified: true},
+    // ...
+    {NewDefinition: <pkg>.NewDefinition}, // the new definition, unverified
 }
 ```
 

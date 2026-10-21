@@ -18,9 +18,10 @@ for it.
 
 1. `cli/internal/providers/destination/definitions/<type>/definition.go`
 2. `cli/internal/providers/destination/definitions/<type>/definition_test.go`
-3. Registration in `cli/internal/app/dependencies.go` (`newDestinationRegistry`),
-   always inside the `UnverifiedDestinations` block, plus the matching
-   `dependencies_test.go` flag-matrix expectation
+3. Registration in the builtin table
+   (`cli/internal/providers/destination/definitions/builtin/builtin.go`),
+   always as an unverified entry, plus the matching `dependencies_test.go`
+   flag-matrix expectation
 4. Destination e2e fixtures and expected snapshots for each meaningful config
    variation, or a documented deferral reason when a live snapshot cannot be
    captured safely
@@ -101,7 +102,9 @@ to extract from each file.
 
 ### Step 3: Refuse duplicates
 
-Check `newDestinationRegistry` in `cli/internal/app/dependencies.go`. If the
+Check the builtin table in
+`cli/internal/providers/destination/definitions/builtin/builtin.go`, which
+`newDestinationRegistry` and `rudder-cli docs destination` both read. If the
 `(APIType, Version)` pair is already registered, stop and report.
 
 ### Step 4: Write definition.go
@@ -184,25 +187,25 @@ Mechanical rules:
   every source type on `firebase`. Say so in a comment on the config struct,
   or the omission reads as an oversight to the next reader.
 
-### Step 5: Register in dependencies.go
+### Step 5: Register in the builtin table
 
 **Every newly onboarded destination registers as unverified.** Add the import
-and one block inside `newDestinationRegistry`, within the
-`cfg.ExperimentalFlags.UnverifiedDestinations` branch — never the verified
-section above it:
+and one entry to the `entries` table in
+`cli/internal/providers/destination/definitions/builtin/builtin.go`, among the
+unverified entries and without `Verified: true`:
 
 ```go
-if cfg.ExperimentalFlags.UnverifiedDestinations {
-    // ... existing unverified registrations, kept alphabetical by type ...
-    if err := registry.Register(<pkg>.NewDefinition()); err != nil {
-        return nil, fmt.Errorf("registering <type> destination definition: %w", err)
-    }
+var entries = []Entry{
+    // ... verified entries, then the existing unverified ones ...
+    {NewDefinition: <pkg>.NewDefinition},
 }
 ```
 
-The unconditional verified section is reserved for definitions already proven
+The definition must set `DisplayName`, the product name from integrations-config
+`db-config.json` `displayName`; registration rejects an empty one. The verified
+entries are reserved for definitions already proven
 against a live stack — `bqstream`, `s3`, `http`, `active_campaign`,
-`attentive_tag` and `bq` today. Promotion into it is a separate, deliberate
+`attentive_tag` and `bq` today. Marking an entry verified is a separate, deliberate
 change after that verification; it is never part of the onboarding PR, no matter
 how simple the destination looks.
 
