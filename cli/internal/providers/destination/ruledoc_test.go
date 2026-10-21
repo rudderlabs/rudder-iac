@@ -14,39 +14,20 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/am"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/braze"
-	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/webhook"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
 
-func secretTestRegistry(t *testing.T) *definitions.Registry {
-	t.Helper()
-
-	registry := definitions.NewRegistry()
-	for _, definition := range []*definitions.DestinationDefinition{
-		am.NewDefinition(),
-		braze.NewDefinition(),
-		httpdest.NewDefinition(),
-		webhook.NewDefinition(),
-	} {
-		require.NoError(t, registry.Register(definition))
-	}
-	return registry
-}
-
 // TestSecretReferenceRuleDocs loads the secret reference fragments' examples
 // as projects, so a fragment cannot drift from what validate reports. The
 // other destination fragments predate this check and write `type: WEBHOOK`,
-// which validate rejects; #931 fixes them.
+// which validate rejects, so they are not loaded yet.
 func TestSecretReferenceRuleDocs(t *testing.T) {
 	t.Parallel()
 
-	registry := secretTestRegistry(t)
+	registry := destination.SecretRuleRegistry(t)
 	p := destination.NewProvider(nil, registry)
 
 	syntactic, semantic := p.SyntacticRules(), p.SemanticRules()
@@ -65,7 +46,7 @@ func TestSecretReferenceRuleDocs(t *testing.T) {
 				t.Run(example.ExampleID, func(t *testing.T) {
 					t.Parallel()
 
-					diagnostics, err := loadFiles(t, registry, example.Files, nil)
+					diagnostics, err := loadFiles(t, registry, example.Files, filledVarFile)
 					assert.NoError(t, err)
 					assert.Empty(t, diagnostics, "unexpected diagnostics:\n%s", describe(diagnostics))
 				})
@@ -74,7 +55,7 @@ func TestSecretReferenceRuleDocs(t *testing.T) {
 				t.Run(example.ExampleID, func(t *testing.T) {
 					t.Parallel()
 
-					diagnostics, err := loadFiles(t, registry, example.Files, nil)
+					diagnostics, err := loadFiles(t, registry, example.Files, filledVarFile)
 					assert.NoError(t, err, "warnings alone must not fail the load")
 					assertExpectedDiagnostics(t, entry.RuleID, example, diagnostics)
 				})
@@ -82,6 +63,16 @@ func TestSecretReferenceRuleDocs(t *testing.T) {
 		}
 	}
 	require.NotZero(t, examples, "no rule doc example ran")
+}
+
+// filledVarFile stands in for the var file validate is given: every variable
+// resolves, to a value each secret key's pattern accepts.
+var filledVarFile = varsubst.NewSubstitutor(anyVariable{})
+
+type anyVariable struct{}
+
+func (anyVariable) Resolve(string) (string, bool) {
+	return "fake-variable-value", true
 }
 
 // loadFiles runs files through project.Load, the path validate takes.

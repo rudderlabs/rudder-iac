@@ -28,7 +28,7 @@ func renderLoad(t *testing.T, files map[string]string, variables map[string]stri
 	t.Helper()
 
 	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
-		"destination": destination.NewProvider(nil, secretTestRegistry(t)),
+		"destination": destination.NewProvider(nil, destination.SecretRuleRegistry(t)),
 	})
 	require.NoError(t, err)
 
