@@ -17,6 +17,10 @@ import (
 const (
 	formatMarkdown = "md"
 	formatJSON     = "json"
+
+	// unknownValue is what telemetry reports in place of a value the user
+	// typed that the CLI does not recognise.
+	unknownValue = "unknown"
 )
 
 func NewCmdDocs() *cobra.Command {
@@ -56,6 +60,13 @@ func formatFlags(cmd *cobra.Command) func() (string, error) {
 		}
 		return format, nil
 	}
+}
+
+func reportedFormat(format string) string {
+	if format == formatMarkdown || format == formatJSON {
+		return format
+	}
+	return unknownValue
 }
 
 // fail reports a specdocs input error. Under JSON the error document goes to

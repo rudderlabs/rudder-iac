@@ -40,35 +40,34 @@ func newCmdDestination() *cobra.Command {
 			destType = args[0]
 		}
 		format, formatErr := resolveFormat()
-
-		registry, err := builtin.NewRegistry(true)
-		if err != nil {
-			return fmt.Errorf("building destination registry: %w", err)
-		}
+		registry, registryErr := builtin.NewRegistry(true)
 
 		defer func() {
-			// Only registered types and source types are reported, so free
-			// text a user typed never reaches telemetry; the ID never does.
+			// Only registered types and known source types are reported, so
+			// free text a user typed never reaches telemetry; the ID never does.
 			reportedType := ""
 			if destType != "" {
-				reportedType = "unknown"
-				if registry.IsSupported(destType) {
+				reportedType = unknownValue
+				if registry != nil && registry.IsSupported(destType) {
 					reportedType = destType
 				}
 			}
 			reportedSource := source
 			if source != "" && !specdocs.IsSourceType(source) {
-				reportedSource = "unknown"
+				reportedSource = unknownValue
 			}
 			telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 				{K: "type", V: reportedType},
-				{K: "format", V: format},
+				{K: "format", V: reportedFormat(format)},
 				{K: "source", V: reportedSource},
 				{K: "listing", V: destType == ""},
 				{K: "has_id", V: id != ""},
 			}...)
 		}()
 
+		if registryErr != nil {
+			return fmt.Errorf("building destination registry: %w", registryErr)
+		}
 		if formatErr != nil {
 			return formatErr
 		}

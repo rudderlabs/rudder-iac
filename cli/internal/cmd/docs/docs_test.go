@@ -231,6 +231,7 @@ func TestTelemetryNeverCarriesFreeText(t *testing.T) {
 	_, _, _ = run(t, "docs", "destination", "webhook", "--source", "javascript", "--id", "secret-id")
 	_, _, _ = run(t, "docs", "destination", "--json")
 	_, _, _ = run(t, "docs", "source")
+	_, _, _ = run(t, "docs", "source", "--format", "private-text")
 
 	assert.Equal(t, []telemetrytest.Call{
 		{
@@ -267,6 +268,11 @@ func TestTelemetryNeverCarriesFreeText(t *testing.T) {
 		{
 			Command: "docs source",
 			Extras:  []telemetry.KV{{K: "format", V: "md"}},
+		},
+		{
+			Command: "docs source",
+			Errored: true,
+			Extras:  []telemetry.KV{{K: "format", V: "unknown"}},
 		},
 	}, *calls)
 }

@@ -27,7 +27,7 @@ func newCmdSource() *cobra.Command {
 	cmd.RunE = func(cmd *cobra.Command, _ []string) (err error) {
 		format, err := resolveFormat()
 		defer func() {
-			telemetry.TrackCommand(telemetry.CommandName(cmd), err, telemetry.KV{K: "format", V: format})
+			telemetry.TrackCommand(telemetry.CommandName(cmd), err, telemetry.KV{K: "format", V: reportedFormat(format)})
 		}()
 		if err != nil {
 			return err

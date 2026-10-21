@@ -171,6 +171,9 @@ func defaultCell(f Field) string {
 		return ""
 	}
 	text := code(fmt.Sprint(f.Default))
+	if f.Default == "" {
+		text = code(`""`)
+	}
 	if f.DefaultRequiresParent {
 		text += " once its parent is written"
 	}
