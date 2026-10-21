@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
@@ -29,6 +30,11 @@ func NewCmdDocs() *cobra.Command {
 		Short: "Print reference documentation generated from this rudder-cli",
 		Long: "Prints reference documentation generated from the code compiled into this rudder-cli, " +
 			"so it describes exactly what this version accepts. It needs no login and makes no API call.",
+		Example: heredoc.Doc(`
+			$ rudder-cli docs source
+			$ rudder-cli docs destination --source javascript
+			$ rudder-cli docs destination webhook --source javascript --id storefront-webhook --json
+		`),
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()

@@ -135,11 +135,6 @@ func NewDestinations(registry *definitions.Registry, verified func(destType stri
 	return &Destinations{registry: registry, verified: verified}
 }
 
-// Types returns the documented destination types, sorted.
-func (d *Destinations) Types() []string {
-	return d.registry.SupportedTypes()
-}
-
 // ListOptions narrow the listing.
 type ListOptions struct {
 	CLIVersion string
