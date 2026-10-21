@@ -92,6 +92,33 @@ func TestSecretReferenceReportedWhenSubstitutionFails(t *testing.T) {
 	assert.NotContains(t, out, "fake-literal-amplitude-key")
 }
 
+// A literal beside an undefined reference gets a secret-reference warning and
+// a substitution error on the same line. The error prints the line as written,
+// so it takes the warning's masked line.
+func TestSubstitutionErrorMasksSecretLine(t *testing.T) {
+	t.Parallel()
+
+	out, err := renderLoad(t, map[string]string{"amplitude.yaml": `version: rudder/v1
+kind: destination
+metadata:
+  name: shop-amplitude
+spec:
+  id: shop-amplitude
+  display_name: Shop Amplitude
+  type: am
+  definition_version: 1
+  enabled: true
+  config:
+    api_key: 'fake-literal-prefix{{ .UNDEF }}'
+    residency_server: standard
+`}, nil)
+	require.ErrorContains(t, err, "variable substitution failed")
+
+	assert.Contains(t, out, `error[project/var-substitution]: undefined variable "UNDEF"`)
+	assert.Equal(t, 2, strings.Count(out, "   12 | api_key: ***\n"), out)
+	assert.NotContains(t, out, "fake-literal-prefix")
+}
+
 func TestSecretReferenceReportedWhenSubstitutionSucceeds(t *testing.T) {
 	t.Parallel()
 

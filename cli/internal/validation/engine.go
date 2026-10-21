@@ -147,12 +147,13 @@ func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.
 				}
 
 				diagnostics = append(diagnostics, Diagnostic{
-					RuleID:   rule.ID(),
-					Severity: rule.Severity(),
-					Message:  result.Message,
-					File:     filePath,
-					Position: position,
-					Examples: rule.Examples(),
+					RuleID:    rule.ID(),
+					Severity:  rule.Severity(),
+					Message:   result.Message,
+					File:      filePath,
+					Position:  position,
+					Sensitive: result.Sensitive,
+					Examples:  rule.Examples(),
 				})
 			}
 		}
@@ -238,12 +239,13 @@ func (e *validationEngine) runValidationRules(
 				return nil, err
 			}
 			diagnostics = append(diagnostics, Diagnostic{
-				RuleID:   rule.ID(),
-				Severity: rule.Severity(),
-				Message:  result.Message,
-				File:     path,
-				Position: position,
-				Examples: rule.Examples(),
+				RuleID:    rule.ID(),
+				Severity:  rule.Severity(),
+				Message:   result.Message,
+				File:      path,
+				Position:  position,
+				Sensitive: result.Sensitive,
+				Examples:  rule.Examples(),
 			})
 		}
 	}
@@ -300,12 +302,13 @@ func (e *validationEngine) ValidateSources(ctx context.Context, sources map[stri
 					return nil, err
 				}
 				diagnostics = append(diagnostics, Diagnostic{
-					RuleID:   rule.ID(),
-					Severity: rule.Severity(),
-					Message:  result.Message,
-					File:     filePath,
-					Position: position,
-					Examples: rule.Examples(),
+					RuleID:    rule.ID(),
+					Severity:  rule.Severity(),
+					Message:   result.Message,
+					File:      filePath,
+					Position:  position,
+					Sensitive: result.Sensitive,
+					Examples:  rule.Examples(),
 				})
 			}
 		}

@@ -211,7 +211,7 @@ func (p *project) Load(location string) error {
 	if p.substitutor != nil {
 		substituted, subDiags, hasUndefined := p.substituteSpecs(rawSpecs)
 		if subDiags.HasErrors() {
-			if err := p.render(slices.Concat(sourceDiags, subDiags)); err != nil {
+			if err := p.render(slices.Concat(sourceDiags, maskSensitiveLines(subDiags, sourceDiags))); err != nil {
 				return err
 			}
 			// An undefined variable almost always means a var file was not
