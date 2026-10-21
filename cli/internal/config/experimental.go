@@ -9,6 +9,10 @@ import (
 	"github.com/spf13/viper"
 )
 
+// ExperimentalEnvVar turns experimental mode on. Without it every experimental
+// flag reads as false, whatever its own variable says.
+const ExperimentalEnvVar = "RUDDERSTACK_CLI_EXPERIMENTAL"
+
 // ExperimentalConfig defines all available experimental flags
 // All flags default to false for safety - explicit opt-in required
 type ExperimentalConfig struct {

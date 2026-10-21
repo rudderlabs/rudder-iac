@@ -1,0 +1,400 @@
+{
+  "schemaVersion": 1,
+  "cliVersion": "1.2.3",
+  "type": "am",
+  "displayName": "Amplitude",
+  "apiType": "AM",
+  "definitionVersion": 1,
+  "verified": true,
+  "source": {
+    "type": "javascript",
+    "token": "web"
+  },
+  "connectionModes": {
+    "web": {
+      "modes": [
+        "cloud",
+        "device"
+      ],
+      "requiredKeys": {}
+    }
+  },
+  "secretKeys": [
+    "api_secret",
+    "api_key"
+  ],
+  "fields": [
+    {
+      "key": "api_key",
+      "type": "string",
+      "required": true,
+      "pattern": "single_line_100",
+      "acceptsTemplate": true,
+      "secret": true,
+      "var": "STOREFRONT_AMPLITUDE_API_KEY",
+      "slot": "'{{ .STOREFRONT_AMPLITUDE_API_KEY }}'"
+    },
+    {
+      "key": "api_secret",
+      "type": "string",
+      "pattern": "single_line_100",
+      "acceptsTemplate": true,
+      "secret": true,
+      "var": "STOREFRONT_AMPLITUDE_API_SECRET",
+      "slot": "'{{ .STOREFRONT_AMPLITUDE_API_SECRET }}'"
+    },
+    {
+      "key": "group_type_trait",
+      "type": "string",
+      "pattern": "single_line_100",
+      "acceptsTemplate": true
+    },
+    {
+      "key": "group_value_trait",
+      "type": "string",
+      "pattern": "single_line_100",
+      "acceptsTemplate": true
+    },
+    {
+      "key": "track_all_pages",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "track_categorized_pages",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "track_named_pages",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "use_user_defined_page_event_name",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "user_provided_page_event_string",
+      "type": "string",
+      "pattern": "single_line_200",
+      "acceptsTemplate": true
+    },
+    {
+      "key": "traits_to_increment",
+      "type": "array<string>",
+      "pattern": "single_line_100",
+      "acceptsTemplate": true
+    },
+    {
+      "key": "traits_to_set_once",
+      "type": "array<string>",
+      "pattern": "single_line_100",
+      "acceptsTemplate": true
+    },
+    {
+      "key": "traits_to_append",
+      "type": "array<string>",
+      "pattern": "single_line_100",
+      "acceptsTemplate": true
+    },
+    {
+      "key": "traits_to_prepend",
+      "type": "array<string>",
+      "pattern": "single_line_100",
+      "acceptsTemplate": true
+    },
+    {
+      "key": "enable_enhanced_user_operations",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "version_name",
+      "type": "string",
+      "pattern": "single_line_100",
+      "acceptsTemplate": true
+    },
+    {
+      "key": "map_device_brand",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "track_products_once",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "track_revenue_per_product",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "use_user_defined_screen_event_name",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "key": "user_provided_screen_event_string",
+      "type": "string",
+      "pattern": "single_line_200",
+      "acceptsTemplate": true
+    },
+    {
+      "key": "event_filtering.whitelist",
+      "type": "array<string>",
+      "excludedWith": [
+        "event_filtering.blacklist"
+      ],
+      "pattern": "single_line_100",
+      "acceptsTemplate": true
+    },
+    {
+      "key": "event_filtering.blacklist",
+      "type": "array<string>",
+      "excludedWith": [
+        "event_filtering.whitelist"
+      ],
+      "pattern": "single_line_100",
+      "acceptsTemplate": true
+    },
+    {
+      "key": "sdk_version.web",
+      "type": "integer",
+      "enum": [
+        1,
+        2
+      ],
+      "default": 2,
+      "defaultRequiresParent": true,
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "proxy_server_url.web",
+      "type": "string",
+      "pattern": "am_proxy_server_url",
+      "acceptsTemplate": true,
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "prefer_anonymous_id_for_device_id.web",
+      "type": "boolean",
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "device_id_from_url_param.web",
+      "type": "boolean",
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "force_https.web",
+      "type": "boolean",
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "track_gclid.web",
+      "type": "boolean",
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "track_referrer.web",
+      "type": "boolean",
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "save_params_referrer_once_per_session.web",
+      "type": "boolean",
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "track_utm_properties.web",
+      "type": "boolean",
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "unset_params_referrer_on_new_session.web",
+      "type": "boolean",
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "batch_events.web",
+      "type": "boolean",
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "attribution.web",
+      "type": "boolean",
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "track_new_campaigns.web",
+      "type": "boolean",
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "auto_capture.page_views.web",
+      "type": "boolean",
+      "default": false,
+      "defaultRequiresParent": true,
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "auto_capture.page_url_enrichment.web",
+      "type": "boolean",
+      "default": false,
+      "defaultRequiresParent": true,
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "auto_capture.web_vitals.web",
+      "type": "boolean",
+      "default": false,
+      "defaultRequiresParent": true,
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "auto_capture.file_downloads.web",
+      "type": "boolean",
+      "default": false,
+      "defaultRequiresParent": true,
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "auto_capture.frustration_interactions.web",
+      "type": "boolean",
+      "default": false,
+      "defaultRequiresParent": true,
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "auto_capture.network_tracking.web",
+      "type": "boolean",
+      "default": false,
+      "defaultRequiresParent": true,
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "auto_capture.element_interactions.web",
+      "type": "boolean",
+      "default": false,
+      "defaultRequiresParent": true,
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "auto_capture.form_interactions.web",
+      "type": "boolean",
+      "default": false,
+      "defaultRequiresParent": true,
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "event_upload_period_millis.web",
+      "type": "string",
+      "pattern": "am_numeric_string_100",
+      "acceptsTemplate": true,
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "event_upload_threshold.web",
+      "type": "string",
+      "pattern": "am_numeric_string_100",
+      "acceptsTemplate": true,
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "track_session_events.web",
+      "type": "boolean",
+      "default": false,
+      "defaultRequiresParent": true,
+      "onlyForSourceTypes": [
+        "web"
+      ]
+    },
+    {
+      "key": "connection_mode",
+      "type": "map<sourceToken,string>"
+    },
+    {
+      "key": "consent_management",
+      "type": "map<sourceToken,array<object>>"
+    },
+    {
+      "key": "residency_server",
+      "type": "string",
+      "required": true,
+      "enum": [
+        "standard",
+        "EU"
+      ]
+    }
+  ],
+  "patterns": {
+    "am_numeric_string_100": {
+      "regex": "^([0-9]{0,100})$",
+      "message": "must contain only digits and be at most 100 characters"
+    },
+    "am_proxy_server_url": {
+      "regex": "^.*$",
+      "reject": "^http://|^.*\\.ngrok\\.io.*$",
+      "message": "must not start with http:// and must not contain .ngrok.io"
+    },
+    "single_line_100": {
+      "regex": "^(.{0,100})$",
+      "message": "must be at most 100 characters and must not contain line breaks"
+    },
+    "single_line_200": {
+      "regex": "^(.{0,200})$",
+      "message": "must be at most 200 characters and must not contain line breaks"
+    }
+  },
+  "customValidators": [],
+  "specTemplate": "version: rudder/v1\nkind: destination\nmetadata:\n  name: storefront-amplitude\nspec:\n  id: storefront-amplitude\n  display_name: storefront-amplitude\n  type: am\n  definition_version: 1\n  enabled: true\n  config:\n    api_key: '{{ .STOREFRONT_AMPLITUDE_API_KEY }}'\n    residency_server: null\n    connection_mode:\n      web: cloud\n"
+}
