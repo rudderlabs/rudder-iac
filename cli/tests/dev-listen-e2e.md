@@ -17,9 +17,9 @@ What the end-to-end tests of `rudder-cli sources listen` check, where each one r
 | `TestSourcesListenCapturesParallelWritersExactly` | same | 150 requests from six writers are all captured, with strictly increasing sequence numbers. |
 | `TestSourcesListenEvictsOldestRequestsAndSaysSo` | same | After 10,050 requests the store holds exactly 10,000 and reports `evicted` and `evictedThrough`. |
 | `TestSourcesListenKeepsCapturesWhenOversizedPostsArrive` | same | 40 refused 2 MB posts must not push out earlier captures. Passes because the record keeps only the first 1 KiB of a body that never reached the parser, such as one over the size cap, one with a corrupt gzip stream, or one refused at the route or auth step (`store/record.go`). A body that parsed and failed, such as truncated JSON, is kept whole. Accepted requests are still kept whole, so large accepted posts can evict older captures by design. |
-| `hostile events` (2 tests) | `e2e-ui/tests/xss.spec.js` | Eight script and markup payloads in every rendered field, the event type included, never run and never become elements. The page requests nothing outside `/_dev/` while the test opens every row of both tabs. The export is NDJSON. |
+| `hostile events` (2 tests) | `e2e-ui/tests/xss.spec.js` | Eight script and markup payloads in every rendered field, the event type included, never run and never become elements in the list or in any detail. The page requests nothing outside `/_dev/` while the test opens every row of both tabs. The export is NDJSON. |
 
-The Go tests take about 15 s with `-race`. They need no network, account or secret.
+The Go tests take about 12 s with `-race`, because `DropsASlowHeader` and `CapsInFlightRequests` wait out the listener's 10 s read timeouts. They need no network, account or secret.
 
 ## Runs nightly (`dev-listen-nightly.yml`)
 

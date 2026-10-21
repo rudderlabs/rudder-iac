@@ -52,30 +52,32 @@ test.describe('hostile events', () => {
     });
     await open(page, listener);
 
+    // Each payload makes two events, from the batch and the track, and three
+    // requests, the refused one included.
+    const rowsPerTab = { Events: PAYLOADS.length * 2, Requests: PAYLOADS.length * 3 };
     // Lists show the newest row first, so opening only the top row would skip
     // most payloads. Open every row of both tabs.
     for (const tab of ['Events', 'Requests']) {
       await page.getByRole('tab', { name: tab }).click();
       const rows = page.locator('#list-body tr:not([hidden])');
-      await expect(rows.first()).toBeVisible();
-      const count = await rows.count();
-      expect(count).toBeGreaterThanOrEqual(PAYLOADS.length * 2);
-      for (let i = 0; i < count; i++) {
+      await expect(rows).toHaveCount(rowsPerTab[tab]);
+      for (let i = 0; i < rowsPerTab[tab]; i++) {
         await rows.nth(i).click();
         // Both details load the request async and drop the result when the
         // next click lands. The Events tab shows "Reading the request that
-        // carried it…" and the Requests tab "Reading…". Wait for each load, so
-        // the checks below run after the last detail has rendered.
+        // carried it…" and the Requests tab "Reading…". Wait for each load
+        // before checking the detail.
         await expect(page.locator('#detail').getByText(/^Reading/)).toHaveCount(0);
+        // Each click replaces the detail, so check it after every load.
+        // Payload text may appear, but only as text, never as elements. The
+        // page itself renders no image, SVG or script inside main.
+        await expect(page.locator('#evil-link')).toHaveCount(0);
+        await expect(page.locator('main img, main svg, main script')).toHaveCount(0);
       }
     }
 
     expect(dialog, 'no alert, confirm or prompt').toBeNull();
     expect(await page.evaluate(() => window.__pwned), 'payload script ran').toBeUndefined();
-    // Payload text may appear, but only as text, never as elements. The page
-    // itself renders no image, SVG or script inside main.
-    await expect(page.locator('#evil-link')).toHaveCount(0);
-    await expect(page.locator('main img, main svg, main script')).toHaveCount(0);
     expect(outside, 'requests outside /_dev/').toEqual([]);
   });
 
