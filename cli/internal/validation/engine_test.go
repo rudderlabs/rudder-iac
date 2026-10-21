@@ -745,3 +745,53 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 	})
 
 }
+
+const secretLinesYAML = `version: rudder/v0.1
+kind: properties
+metadata:
+  name: test-properties
+spec:
+  group: test-group
+  password: fake-password-value
+  headers:
+    - from: fake-header-value
+      to: X-Header
+`
+
+// A sensitive result's line keeps its key and loses its value, whether the
+// reference resolves exactly or falls back to its nearest ancestor.
+func TestValidationEngine_MasksSensitiveResults(t *testing.T) {
+	t.Parallel()
+
+	rule := &mockRule{
+		id:        "secret-rule",
+		severity:  rules.Error,
+		appliesTo: []rules.MatchPattern{rules.MatchAll()},
+		validateFn: func(*rules.ValidationContext) []rules.ValidationResult {
+			return []rules.ValidationResult{
+				{Reference: "/spec/group", Message: "plain"},
+				{Reference: "/spec/password", Message: "secret value", Sensitive: true},
+				{Reference: "/spec/headers/0/missing", Message: "secret list item", Sensitive: true},
+			}
+		},
+	}
+	registry := rules.NewRegistry(nil)
+	require.NoError(t, registry.RegisterSyntactic(rule))
+	engine, err := NewValidationEngine(registry, nil)
+	require.NoError(t, err)
+
+	diagnostics, err := engine.ValidateSyntax(context.Background(), map[string]*specs.RawSpec{
+		"/path/to/props.yaml": newRawSpec(t, secretLinesYAML),
+	})
+	require.NoError(t, err)
+
+	lines := make(map[string]string, len(diagnostics))
+	for _, d := range diagnostics {
+		lines[d.Message] = d.Position.LineText
+	}
+	assert.Equal(t, map[string]string{
+		"plain":            "group: test-group",
+		"secret value":     "password: ***",
+		"secret list item": "- from: ***",
+	}, lines)
+}

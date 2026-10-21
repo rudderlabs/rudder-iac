@@ -123,10 +123,13 @@ func (r *specSyntaxValidRule) Validate(ctx *vrules.ValidationContext) []vrules.V
 		return prefixSpecReferences(results)
 	}
 
+	secretKeys := def.SecretKeys()
 	for _, configErr := range def.ValidateConfig(spec.Config) {
 		results = append(results, vrules.ValidationResult{
 			Reference: "/config" + configErr.Path,
 			Message:   configErr.Message,
+			// Substitution has already run, so the line can show a real secret.
+			Sensitive: showsSecret(secretKeys, configErr.Path),
 		})
 	}
 

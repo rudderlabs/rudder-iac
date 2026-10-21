@@ -441,3 +441,47 @@ spec:
 		}
 	})
 }
+
+// TestPosition_WithValueMasked masks the line text the indexer builds for each
+// node kind, so the cases cannot drift from extractLineText.
+func TestPosition_WithValueMasked(t *testing.T) {
+	t.Parallel()
+
+	pi, err := NewPathIndexer([]byte(`config:
+  api_key: sk-fake-value
+  empty:
+  headers:
+    - from: X-Fake-Header
+      to: fake-header-value
+  tokens:
+    - fake-token
+  nested: {}
+`))
+	require.NoError(t, err)
+
+	cases := []struct {
+		path string
+		want string
+	}{
+		{path: "/config/api_key", want: "api_key: ***"},
+		{path: "/config/headers/0", want: "- from: ***"},
+		{path: "/config/headers/0/to", want: "to: ***"},
+		{path: "/config/tokens/0", want: "***"},
+		{path: "/config/empty", want: "empty: "},
+		{path: "/config/headers", want: "headers: [...]"},
+		{path: "/config", want: "config: {...}"},
+		{path: "/config/nested", want: "nested: {}"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.path, func(t *testing.T) {
+			t.Parallel()
+
+			pos, err := pi.PositionLookup(tc.path)
+			require.NoError(t, err)
+
+			masked := pos.WithValueMasked()
+			assert.Equal(t, Position{Line: pos.Line, Column: pos.Column, LineText: tc.want}, masked)
+		})
+	}
+}

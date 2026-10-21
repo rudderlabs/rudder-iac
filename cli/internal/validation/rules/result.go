@@ -23,6 +23,11 @@ type ValidationResult struct {
 	// that indicates where in the spec the issue was found
 	Reference string
 
+	// Sensitive marks a result whose line in the spec can show a secret value,
+	// such as a destination secret key or a list item holding one. The engine
+	// masks the value part of that line, so no renderer prints it.
+	Sensitive bool
+
 	// Examples provides valid and invalid usage examples for this validation result.
 	// This is useful for generating rich diagnostic information (e.g., JSONDiagnostic format)
 	Examples Examples

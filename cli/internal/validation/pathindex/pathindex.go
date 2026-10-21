@@ -3,6 +3,7 @@ package pathindex
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -38,6 +39,33 @@ type Position struct {
 	Line     int    // 1-indexed line number
 	Column   int    // 1-indexed column (caret position)
 	LineText string // Full text representation for error display
+}
+
+// MaskedValue stands in for a value that must not be printed.
+const MaskedValue = "***"
+
+// WithValueMasked returns the position with the value its line text shows
+// replaced by MaskedValue, keeping the key. It reads the forms extractLineText
+// builds: "key: value", "- key: value" for a list item, and a bare value for a
+// scalar list item. A line that shows a container ("key: {...}", "[...]")
+// holds no value and is returned unchanged.
+func (p Position) WithValueMasked() Position {
+	key, value, keyed := strings.Cut(p.LineText, ": ")
+	if !keyed {
+		value = p.LineText
+	}
+
+	switch value {
+	case "", "{}", "{...}", "[...]":
+		return p
+	}
+
+	if keyed {
+		p.LineText = key + ": " + MaskedValue
+		return p
+	}
+	p.LineText = MaskedValue
+	return p
 }
 
 // NewPathIndex creates a new PathIndex by parsing YAML content and building the position map

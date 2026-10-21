@@ -134,12 +134,9 @@ func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.
 			}
 
 			for _, result := range results {
-				position, err := pi.PositionLookup(result.Reference)
+				position, err := resultPosition(pi, result)
 				if err != nil {
-					if !errors.Is(err, pathindex.ErrPathNotFound) {
-						return nil, fmt.Errorf("getting position for reference %s: %w", result.Reference, err)
-					}
-					position = pi.NearestPosition(result.Reference)
+					return nil, err
 				}
 
 				diagnostics = append(diagnostics, Diagnostic{
@@ -147,7 +144,7 @@ func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.
 					Severity: rule.Severity(),
 					Message:  result.Message,
 					File:     filePath,
-					Position: *position,
+					Position: position,
 					Examples: rule.Examples(),
 				})
 			}
@@ -229,29 +226,42 @@ func (e *validationEngine) runValidationRules(
 		})
 
 		for _, result := range results {
-			position, err := pi.PositionLookup(result.Reference)
+			position, err := resultPosition(pi, result)
 			if err != nil {
-				if !errors.Is(
-					err,
-					pathindex.ErrPathNotFound,
-				) {
-					return nil, fmt.Errorf("getting position for reference %s: %w", result.Reference, err)
-				}
-
-				// if the error is ErrPathNotFound which is usually the case, we
-				// use the nearest position to the reference.
-				position = pi.NearestPosition(result.Reference)
+				return nil, err
 			}
 			diagnostics = append(diagnostics, Diagnostic{
 				RuleID:   rule.ID(),
 				Severity: rule.Severity(),
 				Message:  result.Message,
 				File:     path,
-				Position: *position,
+				Position: position,
 				Examples: rule.Examples(),
 			})
 		}
 	}
 
 	return diagnostics, nil
+}
+
+// resultPosition resolves a result's reference to its position in the file,
+// falling back to the nearest ancestor when the path does not exist. A
+// sensitive result has the value on its line masked here, before any renderer
+// sees it.
+func resultPosition(pi pathindex.PathIndexer, result rules.ValidationResult) (pathindex.Position, error) {
+	position, err := pi.PositionLookup(result.Reference)
+	if err != nil {
+		if !errors.Is(err, pathindex.ErrPathNotFound) {
+			return pathindex.Position{}, fmt.Errorf("getting position for reference %s: %w", result.Reference, err)
+		}
+
+		// if the error is ErrPathNotFound which is usually the case, we
+		// use the nearest position to the reference.
+		position = pi.NearestPosition(result.Reference)
+	}
+
+	if result.Sensitive {
+		return position.WithValueMasked(), nil
+	}
+	return *position, nil
 }
