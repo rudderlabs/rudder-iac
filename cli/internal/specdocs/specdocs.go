@@ -16,14 +16,21 @@ import (
 // SchemaVersion is the version of every JSON document this package emits.
 const SchemaVersion = 1
 
-// Error codes of an ErrorDoc.
+// Error codes of an ErrorDoc. A caller branches on the code; a new code is an
+// optional addition under SchemaVersion 1.
 const (
-	CodeUnknownType              = "unknown_type"
-	CodeUnknownSource            = "unknown_source"
-	CodeUnsupportedSource        = "unsupported_source"
-	CodeInvalidID                = "invalid_id"
+	// CodeUnknownType: the destination type is not compiled in.
+	CodeUnknownType = "unknown_type"
+	// CodeUnknownSource: --source is not a source spec type.
+	CodeUnknownSource = "unknown_source"
+	// CodeUnsupportedSource: the destination type does not accept --source.
+	CodeUnsupportedSource = "unsupported_source"
+	// CodeInvalidID: --id would write an invalid display_name or variable name.
+	CodeInvalidID = "invalid_id"
+	// CodeUnknownDefinitionVersion: the type has no such definition version.
 	CodeUnknownDefinitionVersion = "unknown_definition_version"
-	CodeMissingType              = "missing_type"
+	// CodeMissingType: --id or --definition-version was given without a type.
+	CodeMissingType = "missing_type"
 )
 
 // Error is an input the documents cannot be built for. It carries what a
@@ -48,6 +55,12 @@ type ErrorDoc struct {
 	Error         ErrorBody `json:"error"`
 }
 
+// ErrorBody says what was wrong and how to fix it. ValidTypes lists the
+// values accepted for the input the code names: destination types for
+// unknown_type and missing_type, source spec types for unknown_source, and
+// the source spec types the destination accepts for unsupported_source.
+// ValidVersions lists the type's definition versions for
+// unknown_definition_version.
 type ErrorBody struct {
 	Code          string   `json:"code"`
 	Message       string   `json:"message"`
