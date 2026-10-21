@@ -170,6 +170,8 @@ func TestInputErrorsWithJSON(t *testing.T) {
 		{args: []string{"docs", "destination", "adj", "--source", "javascript", "--json"}, wantCode: "unsupported_source"},
 		{args: []string{"docs", "destination", "webhook", "--id", "my.dest", "--json"}, wantCode: "invalid_id"},
 		{args: []string{"docs", "destination", "webhook", "--definition-version", "9", "--json"}, wantCode: "unknown_definition_version"},
+		{args: []string{"docs", "destination", "--id", "shop", "--json"}, wantCode: "missing_type"},
+		{args: []string{"docs", "destination", "--definition-version", "1", "--json"}, wantCode: "missing_type"},
 	}
 
 	for _, tc := range cases {
@@ -196,7 +198,8 @@ func TestFlagErrors(t *testing.T) {
 	require.Error(t, err)
 
 	_, _, err = run(t, "docs", "destination", "--id", "shop")
-	require.EqualError(t, err, "--id and --definition-version need a destination type")
+	require.EqualError(t, err, "--id and --definition-version need a destination type. "+
+		"Run `rudder-cli docs destination` to list the types.")
 
 	_, _, err = run(t, "docs", "destination", "webhook", "am")
 	require.Error(t, err)

@@ -92,7 +92,7 @@ func plainMessage(e *specdocs.Error) string {
 		message = e.Message + "; did you mean " + strings.Join(e.Suggestions, ", ") + "?"
 	}
 	switch e.Code {
-	case specdocs.CodeUnknownType:
+	case specdocs.CodeUnknownType, specdocs.CodeMissingType:
 		message += " Run `rudder-cli docs destination` to list the types."
 	case specdocs.CodeUnknownSource, specdocs.CodeUnsupportedSource:
 		if len(e.ValidTypes) > 0 {

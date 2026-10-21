@@ -23,6 +23,7 @@ const (
 	CodeUnsupportedSource        = "unsupported_source"
 	CodeInvalidID                = "invalid_id"
 	CodeUnknownDefinitionVersion = "unknown_definition_version"
+	CodeMissingType              = "missing_type"
 )
 
 // Error is an input the documents cannot be built for. It carries what a

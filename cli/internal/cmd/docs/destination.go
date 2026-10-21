@@ -80,7 +80,12 @@ func newCmdDestination() *cobra.Command {
 
 		if destType == "" {
 			if id != "" || version != 0 {
-				return fmt.Errorf("--id and --definition-version need a destination type")
+				return fail(out, format, cliVersion, &specdocs.Error{
+					Code:        specdocs.CodeMissingType,
+					Message:     "--id and --definition-version need a destination type",
+					Suggestions: []string{},
+					ValidTypes:  registry.SupportedTypes(),
+				})
 			}
 			list, err := docs.List(specdocs.ListOptions{CLIVersion: cliVersion, Source: source})
 			if err != nil {
