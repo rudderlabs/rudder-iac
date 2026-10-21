@@ -142,6 +142,9 @@ func TestRun(t *testing.T) {
 	t.Parallel()
 
 	legacy := map[string]*specs.Spec{"a.yaml": {Version: specs.SpecVersionV0_1}}
+	reportedFailure := fmt.Errorf("semantic validation failed: %w", project.ErrReported)
+	// The document holds the substitution diagnostics but not this hint.
+	varFileHint := errors.New("variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file")
 
 	tests := []struct {
 		name       string
@@ -168,22 +171,22 @@ func TestRun(t *testing.T) {
 		{
 			name:       "json: a validation failure is not printed again",
 			json:       true,
-			loadErr:    fmt.Errorf("semantic %w", project.ErrValidationFailed),
-			wantErr:    "validating project: semantic validation failed",
+			loadErr:    reportedFailure,
+			wantErr:    "validating project: semantic validation failed: already reported",
 			wantSilent: true,
 			wantStdout: "{doc}",
 		},
 		{
 			name:       "json: an error the document does not hold stays on the error path",
 			json:       true,
-			loadErr:    errors.New("variable substitution failed"),
-			wantErr:    "validating project: variable substitution failed",
+			loadErr:    varFileHint,
+			wantErr:    "validating project: " + varFileHint.Error(),
 			wantStdout: "{doc}",
 		},
 		{
 			name:       "text: a validation failure is returned for printing",
-			loadErr:    fmt.Errorf("semantic %w", project.ErrValidationFailed),
-			wantErr:    "validating project: semantic validation failed",
+			loadErr:    reportedFailure,
+			wantErr:    "validating project: semantic validation failed: already reported",
 			wantStdout: "{doc}",
 		},
 	}

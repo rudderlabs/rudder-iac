@@ -137,6 +137,8 @@ func TestNewProject_Load_Error(t *testing.T) {
 	err := p.Load("test_location")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "custom loader called")
+	// The text renderer printed nothing, so the caller still has to.
+	assert.NotErrorIs(t, err, project.ErrReported)
 }
 
 func TestProject_Load_Success(t *testing.T) {
@@ -384,7 +386,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 		substitutor varsubst.Substitutor
 		rawSpecs    map[string][]byte
 		wantErr     string // empty when Load should succeed
-		wantMatches bool   // the document holds the failure, so ErrValidationFailed applies
+		wantMatches bool   // the document holds the failure, so ErrReported applies
 		wantSpecs   map[string]*specs.Spec
 	}{
 		{
@@ -490,7 +492,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			err := proj.Load("test_dir")
 			if tc.wantErr != "" {
 				require.EqualError(t, err, tc.wantErr)
-				assert.Equal(t, tc.wantMatches, errors.Is(err, project.ErrValidationFailed))
+				assert.Equal(t, tc.wantMatches, errors.Is(err, project.ErrReported))
 			} else {
 				require.NoError(t, err)
 			}
@@ -634,7 +636,7 @@ func (p *providerWithErrorRules) SemanticRules() []rules.Rule {
 }
 
 // Under the JSON renderer every failed load must leave one document on stdout,
-// and the returned error must match ErrValidationFailed so the caller does not
+// and the returned error must match ErrReported so the caller does not
 // print the failure again. An empty diagnostics array has to mean "validated
 // clean", so a failure with no diagnostics of its own gets a load-failed one.
 func TestProject_Load_JSONRendererRecordsEveryFailure(t *testing.T) {
@@ -695,7 +697,7 @@ func TestProject_Load_JSONRendererRecordsEveryFailure(t *testing.T) {
 			err := proj.Load("test_dir")
 
 			require.EqualError(t, err, tc.wantErr)
-			assert.ErrorIs(t, err, project.ErrValidationFailed)
+			assert.ErrorIs(t, err, project.ErrReported)
 
 			var doc struct {
 				Diagnostics []struct {

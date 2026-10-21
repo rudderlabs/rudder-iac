@@ -174,23 +174,24 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 	}
 }
 
-// ErrValidationFailed marks a load that stopped because the specs have errors,
-// all of which were rendered. A caller that prints diagnostics itself uses it
-// to avoid printing the failure a second time.
-var ErrValidationFailed = errors.New("validation failed")
+// ErrReported marks a load error that the renderer's output already holds. A
+// caller uses it to avoid printing the failure a second time. It does not say
+// why the load failed: under the JSON renderer a missing --location matches it,
+// while under the text renderer the same error does not, because the caller
+// still has to print it. Classify a failure by its cause, not by ErrReported.
+var ErrReported = errors.New("already reported")
 
-// failure is a load error whose diagnostics were all rendered. It matches
-// ErrValidationFailed, so a caller whose renderer owns stdout does not print
-// the failure a second time, and it still unwraps to the cause.
-type failure struct{ cause error }
+// reported is a load error the renderer already wrote out. It matches
+// ErrReported and still unwraps to the cause.
+type reported struct{ cause error }
 
-func (e failure) Error() string   { return e.cause.Error() }
-func (e failure) Unwrap() []error { return []error{ErrValidationFailed, e.cause} }
+func (e reported) Error() string   { return e.cause.Error() }
+func (e reported) Unwrap() []error { return []error{ErrReported, e.cause} }
 
 // recordFailure renders the diagnostics carried so far and returns cause. A
 // renderer that implements FailureRenderer also records the cause in its
-// document, and the returned error then matches ErrValidationFailed. The text
-// renderer does not, because the caller prints the error.
+// document, and the returned error then matches ErrReported. The text renderer
+// does not, because the caller prints the error.
 func (p *project) recordFailure(carried validation.Diagnostics, cause error) error {
 	failureRenderer, ok := p.renderer.(renderer.FailureRenderer)
 	if !ok {
@@ -205,7 +206,7 @@ func (p *project) recordFailure(carried validation.Diagnostics, cause error) err
 	if err := failureRenderer.RenderFailure(carried, cause); err != nil {
 		return fmt.Errorf("rendering diagnostics: %w", err)
 	}
-	return failure{cause: cause}
+	return reported{cause: cause}
 }
 
 // Load loads the project specifications from the given location using the
@@ -234,7 +235,7 @@ func (p *project) Load(location string) error {
 			if hasUndefined {
 				return fmt.Errorf("variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file")
 			}
-			return failure{cause: errors.New("variable substitution failed")}
+			return reported{cause: errors.New("variable substitution failed")}
 		}
 		rawSpecs = substituted
 	}
@@ -275,7 +276,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		if err := p.render(slices.Concat(specDiags, syntaxDiags)); err != nil {
 			return err
 		}
-		return failure{cause: errors.New("syntax validation failed")}
+		return reported{cause: errors.New("syntax validation failed")}
 	}
 
 	// The syntax phase only stops the load on errors, so its warnings are carried
@@ -339,7 +340,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	}
 
 	if semanticDiags.HasErrors() {
-		return failure{cause: errors.New("semantic validation failed")}
+		return reported{cause: errors.New("semantic validation failed")}
 	}
 
 	return nil

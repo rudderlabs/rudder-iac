@@ -98,7 +98,7 @@ func run(cmd *cobra.Command, p project.Project, location string, jsonOutput bool
 		// which would break consumers that merge the streams. What the document
 		// lacks keeps its stderr message, such as the --var-file hint that
 		// accompanies a substitution failure.
-		if jsonOutput && errors.Is(err, project.ErrValidationFailed) {
+		if jsonOutput && errors.Is(err, project.ErrReported) {
 			return &cmderrors.SilentError{Err: wrapped}
 		}
 		return wrapped
