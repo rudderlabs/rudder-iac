@@ -6,6 +6,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -744,6 +745,174 @@ func TestValidationEngine_ProjectRules(t *testing.T) {
 		assert.Equal(t, []string{"/path/to/props.yaml"}, receivedPaths)
 	})
 
+}
+
+// mockSourceRule implements both Rule and SourceRule
+type mockSourceRule struct {
+	mockRule
+	validateSourcesFn func(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult
+}
+
+func (m *mockSourceRule) ValidateSources(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+	return m.validateSourcesFn(specs)
+}
+
+// sourceWithReferences is a properties spec as written. The unquoted
+// reference makes the group a flow mapping, so the spec does not decode until
+// substitution runs.
+const sourceWithReferences = `version: rudder/v0.1
+kind: properties
+metadata:
+  name: test-properties
+spec:
+  group: {{ .GROUP }}
+  token: '{{ .TOKEN }}'
+`
+
+func TestValidationEngine_ValidateSources(t *testing.T) {
+	t.Parallel()
+
+	t.Run("source rule reads matching specs as written", func(t *testing.T) {
+		t.Parallel()
+
+		var got map[string]*rules.ValidationContext
+		sr := &mockSourceRule{
+			mockRule: mockRule{
+				id:        "source-rule",
+				severity:  rules.Warning,
+				appliesTo: []rules.MatchPattern{rules.MatchKindVersion("properties", "rudder/v0.1")},
+			},
+			validateSourcesFn: func(contexts map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+				got = contexts
+				return map[string][]rules.ValidationResult{
+					"/path/to/props.yaml": {{Reference: "/spec/token", Message: "token as written"}},
+				}
+			},
+		}
+
+		registry := rules.NewRegistry(engineTestSupportedPatterns)
+		require.NoError(t, registry.RegisterSyntactic(sr))
+		engine, err := NewValidationEngine(registry, nil)
+		require.NoError(t, err)
+
+		sources := map[string]*specs.RawSpec{
+			"/path/to/props.yaml":  {Data: []byte(sourceWithReferences)},
+			"/path/to/events.yaml": {Data: []byte(validEventsYAML)},
+		}
+		diagnostics, err := engine.ValidateSources(context.Background(), sources)
+		require.NoError(t, err)
+
+		assert.Equal(t, map[string]*rules.ValidationContext{
+			"/path/to/props.yaml": {
+				FilePath: "/path/to/props.yaml",
+				FileName: "props.yaml",
+				Kind:     "properties",
+				Version:  "rudder/v0.1",
+				Source:   []byte(sourceWithReferences),
+			},
+		}, got)
+		assert.Equal(t, Diagnostics{{
+			RuleID:   "source-rule",
+			Severity: rules.Warning,
+			Message:  "token as written",
+			File:     "/path/to/props.yaml",
+			Position: pathindex.Position{Line: 7, Column: 3, LineText: "token: {{ .TOKEN }}"},
+			Examples: rules.Examples{},
+		}}, diagnostics)
+	})
+
+	t.Run("other rules do not run", func(t *testing.T) {
+		t.Parallel()
+
+		perSpec := &mockRule{
+			id:        "per-spec-rule",
+			severity:  rules.Error,
+			appliesTo: []rules.MatchPattern{rules.MatchAll()},
+			validateFn: func(*rules.ValidationContext) []rules.ValidationResult {
+				return []rules.ValidationResult{{Message: "should not appear"}}
+			},
+		}
+		registry := rules.NewRegistry(nil)
+		require.NoError(t, registry.RegisterSyntactic(perSpec))
+		engine, err := NewValidationEngine(registry, nil)
+		require.NoError(t, err)
+
+		diagnostics, err := engine.ValidateSources(context.Background(), map[string]*specs.RawSpec{
+			"/path/to/props.yaml": {Data: []byte(sourceWithReferences)},
+		})
+		require.NoError(t, err)
+		assert.Empty(t, diagnostics)
+	})
+
+	t.Run("source that is not YAML as written is indexed through placeholders", func(t *testing.T) {
+		t.Parallel()
+
+		// "/hook" after the unquoted reference is not YAML until substitution.
+		source := sourceWithReferences + "  url: {{ .HOST }}/hook\n"
+		sr := &mockSourceRule{
+			mockRule: mockRule{id: "source-rule", severity: rules.Warning, appliesTo: []rules.MatchPattern{rules.MatchKind("properties")}},
+			validateSourcesFn: func(map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+				return map[string][]rules.ValidationResult{
+					"/path/to/props.yaml": {{Reference: "/spec/token", Message: "token as written", Sensitive: true}},
+				}
+			},
+		}
+		registry := rules.NewRegistry(engineTestSupportedPatterns)
+		require.NoError(t, registry.RegisterSyntactic(sr))
+		engine, err := NewValidationEngine(registry, nil)
+		require.NoError(t, err)
+
+		diagnostics, err := engine.ValidateSources(context.Background(), map[string]*specs.RawSpec{
+			"/path/to/props.yaml": {Data: []byte(source)},
+		})
+		require.NoError(t, err)
+		require.Len(t, diagnostics, 1)
+		assert.Equal(t, pathindex.Position{Line: 7, Column: 3, LineText: "token: ***"}, diagnostics[0].Position)
+	})
+
+	t.Run("source that does not parse at all reports at its start", func(t *testing.T) {
+		t.Parallel()
+
+		sr := &mockSourceRule{
+			mockRule: mockRule{id: "source-rule", severity: rules.Warning, appliesTo: []rules.MatchPattern{rules.MatchAll()}},
+			validateSourcesFn: func(map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+				return map[string][]rules.ValidationResult{
+					"/path/to/broken.yaml": {{Reference: "/spec/token", Message: "token as written"}},
+				}
+			},
+		}
+		registry := rules.NewRegistry(nil)
+		require.NoError(t, registry.RegisterSyntactic(sr))
+		engine, err := NewValidationEngine(registry, nil)
+		require.NoError(t, err)
+
+		diagnostics, err := engine.ValidateSources(context.Background(), map[string]*specs.RawSpec{
+			"/path/to/broken.yaml": {Data: []byte("spec: [unclosed\n")},
+		})
+		require.NoError(t, err)
+		require.Len(t, diagnostics, 1)
+		assert.Equal(t, pathindex.StartingPosition, diagnostics[0].Position)
+	})
+
+	t.Run("results for an unknown file fail", func(t *testing.T) {
+		t.Parallel()
+
+		sr := &mockSourceRule{
+			mockRule: mockRule{id: "source-rule", severity: rules.Warning, appliesTo: []rules.MatchPattern{rules.MatchAll()}},
+			validateSourcesFn: func(map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+				return map[string][]rules.ValidationResult{"/elsewhere.yaml": {{Message: "x"}}}
+			},
+		}
+		registry := rules.NewRegistry(nil)
+		require.NoError(t, registry.RegisterSyntactic(sr))
+		engine, err := NewValidationEngine(registry, nil)
+		require.NoError(t, err)
+
+		_, err = engine.ValidateSources(context.Background(), map[string]*specs.RawSpec{
+			"/path/to/props.yaml": {Data: []byte(sourceWithReferences)},
+		})
+		require.ErrorContains(t, err, "unknown file: /elsewhere.yaml")
+	})
 }
 
 const secretLinesYAML = `version: rudder/v0.1

@@ -599,3 +599,118 @@ func TestProject_Load_RendersSyntacticWarnings(t *testing.T) {
 		})
 	}
 }
+
+// sourceRuleProvider adds a rule that reads specs as written, before
+// substitution, and warns on each spec that holds a variable reference.
+type sourceRuleProvider struct {
+	*testutils.MockProvider
+}
+
+func (p *sourceRuleProvider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{referenceWarningRule{}}
+}
+
+type referenceWarningRule struct{}
+
+func (referenceWarningRule) ID() string                      { return "test/source-warning" }
+func (referenceWarningRule) Severity() rules.Severity        { return rules.Warning }
+func (referenceWarningRule) Description() string             { return "a spec holds a variable reference" }
+func (referenceWarningRule) AppliesTo() []rules.MatchPattern { return fixtureMatchPatterns }
+func (referenceWarningRule) Examples() rules.Examples        { return rules.Examples{} }
+func (referenceWarningRule) Validate(*rules.ValidationContext) []rules.ValidationResult {
+	return nil
+}
+
+func (referenceWarningRule) ValidateSources(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+	results := make(map[string][]rules.ValidationResult)
+	for path, ctx := range specs {
+		if bytes.Contains(ctx.Source, []byte("{{ .")) {
+			results[path] = []rules.ValidationResult{{Reference: "/metadata/name", Message: "reference as written"}}
+		}
+	}
+	return results
+}
+
+// TestProject_Load_RendersSourceDiagnostics covers the rules that read specs
+// before substitution: substitution stops the load when a variable is
+// undefined, and their diagnostics must be rendered then too.
+func TestProject_Load_RendersSourceDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name      string
+		rawSpecs  map[string]string
+		wantErr   string
+		wantLines []string
+	}{
+		{
+			name: "substitution succeeds",
+			rawSpecs: map[string]string{
+				"a.yaml": "kind: Source\nversion: rudder/v1\nmetadata:\n  name: '{{ .NAME }}'\nspec:\n  k: v",
+			},
+			wantLines: []string{"warning[test/source-warning]: reference as written"},
+		},
+		{
+			name: "an undefined variable in another spec stops substitution",
+			rawSpecs: map[string]string{
+				"a.yaml": "kind: Source\nversion: rudder/v1\nmetadata:\n  name: '{{ .NAME }}'\nspec:\n  k: v",
+				"b.yaml": "kind: Source\nversion: rudder/v1\nmetadata:\n  name: '{{ .MISSING }}'\nspec:\n  k: v",
+			},
+			wantErr: "variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file",
+			// b.yaml's warning sits on the key, ahead of the token's error.
+			wantLines: []string{
+				"warning[test/source-warning]: reference as written",
+				"warning[test/source-warning]: reference as written",
+				"error[project/var-substitution]: undefined variable \"MISSING\"",
+			},
+		},
+		{
+			name: "syntax errors after substitution",
+			rawSpecs: map[string]string{
+				"a.yaml": "kind: Unknown\nversion: rudder/v1\nmetadata:\n  name: '{{ .NAME }}'\nspec:\n  k: v",
+				"b.yaml": "kind: Source\nversion: rudder/v1\nmetadata:\n  name: '{{ .NAME }}'\nspec:\n  k: v",
+			},
+			wantErr: "syntax validation failed",
+			wantLines: []string{
+				"error[project/spec-syntax-valid]: 'kind' must be one of [Source Destination]",
+				"warning[test/source-warning]: reference as written",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockProvider := &sourceRuleProvider{MockProvider: testutils.NewMockProvider(nil, nil)}
+			mockProvider.MatchPatterns = fixtureMatchPatterns
+			mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+				raw := make(map[string]*specs.RawSpec, len(tc.rawSpecs))
+				for path, data := range tc.rawSpecs {
+					raw[path] = &specs.RawSpec{Data: []byte(data)}
+				}
+				return raw, nil
+			}}
+
+			var buf bytes.Buffer
+			proj := project.New(mockProvider,
+				project.WithLoader(mockLoader),
+				project.WithSubstitutor(varsubst.NewSubstitutor(mapResolver{"NAME": "resolved_name"})),
+				project.WithRenderer(renderer.NewTextRenderer(&buf)),
+			)
+
+			err := proj.Load("test_dir")
+			if tc.wantErr != "" {
+				require.EqualError(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+
+			var rendered []string
+			for _, line := range strings.Split(buf.String(), "\n") {
+				if strings.HasPrefix(line, "warning[") || strings.HasPrefix(line, "error[") {
+					rendered = append(rendered, line)
+				}
+			}
+			assert.Equal(t, tc.wantLines, rendered)
+		})
+	}
+}

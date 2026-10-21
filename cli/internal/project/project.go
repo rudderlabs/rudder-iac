@@ -175,9 +175,10 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 }
 
 // Load loads the project specifications from the given location using the
-// configured SpecLoader, runs variable substitution if a substitutor is
-// configured, then runs the specs through the validation engine (syntax,
-// then semantic rules from RuleProvider).
+// configured SpecLoader, runs the rules that read specs as written, runs
+// variable substitution if a substitutor is configured, then runs the specs
+// through the validation engine (syntax, then semantic rules from
+// RuleProvider).
 func (p *project) Load(location string) error {
 	p.location = location
 
@@ -189,10 +190,28 @@ func (p *project) Load(location string) error {
 		return fmt.Errorf("failed to load specs using specLoader: %w", err)
 	}
 
+	registry, err := p.registry()
+	if err != nil {
+		return fmt.Errorf("setting up registry: %w", err)
+	}
+
+	engine, err := validation.NewValidationEngine(registry, log)
+	if err != nil {
+		return fmt.Errorf("initialising validation engine: %w", err)
+	}
+
+	// Rules about the variable references themselves read the specs as
+	// written, so they run before substitution replaces the references, and
+	// their diagnostics are rendered even when substitution then fails.
+	sourceDiags, err := engine.ValidateSources(context.Background(), rawSpecs)
+	if err != nil {
+		return fmt.Errorf("source validation: %w", err)
+	}
+
 	if p.substitutor != nil {
 		substituted, subDiags, hasUndefined := p.substituteSpecs(rawSpecs)
 		if subDiags.HasErrors() {
-			if err := p.render(subDiags); err != nil {
+			if err := p.render(slices.Concat(sourceDiags, subDiags)); err != nil {
 				return err
 			}
 			// An undefined variable almost always means a var file was not
@@ -205,28 +224,20 @@ func (p *project) Load(location string) error {
 		rawSpecs = substituted
 	}
 
-	return p.handleValidation(rawSpecs)
+	return p.handleValidation(engine, rawSpecs, sourceDiags)
 }
 
 // handleValidation orchestrates the two-phase validation workflow:
 // syntactic validation runs first to catch structural issues, and only if that passes,
 // we proceed to build the resource graph and run semantic validation.
 // This approach avoids expensive graph building when specs have basic syntax errors.
-func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
+// sourceDiags come from the rules that read the specs before substitution, and
+// are reported with the syntactic diagnostics.
+func (p *project) handleValidation(engine validation.ValidationEngine, rawSpecs map[string]*specs.RawSpec, sourceDiags validation.Diagnostics) error {
 	ctx := context.Background()
 
 	// Parse the raw specs into structured form before syntactic validation.
 	parsedRawSpecs, specDiags := p.parseSpecs(rawSpecs)
-
-	registry, err := p.registry()
-	if err != nil {
-		return fmt.Errorf("setting up registry: %w", err)
-	}
-
-	engine, err := validation.NewValidationEngine(registry, log)
-	if err != nil {
-		return fmt.Errorf("initialising validation engine: %w", err)
-	}
 
 	// At this point, rawspecs are successfully parsed as well and information
 	// parsed gets augmented to the base struct
@@ -234,6 +245,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	if err != nil {
 		return fmt.Errorf("syntactic validation: %w", err)
 	}
+	syntaxDiags = slices.Concat(sourceDiags, syntaxDiags)
 
 	// If any spec or syntax diagnostic errors exist, render the diagnostics and return
 	// Both of them are part of the syntax validation although done at different places.

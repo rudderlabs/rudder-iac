@@ -11,6 +11,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
+	"gopkg.in/yaml.v3"
 )
 
 // ValidationEngine is the main orchestrator for the two-phase validation framework.
@@ -28,6 +30,11 @@ type ValidationEngine interface {
 	// workspace-scoped rules via ValidationContext.WorkspaceID.
 	// Returns diagnostics for semantic errors (invalid references, dependency issues, etc.)
 	ValidateSemantic(ctx context.Context, rawSpecs map[string]*specs.RawSpec, graph *resources.Graph, workspaceID string) (Diagnostics, error)
+
+	// ValidateSources runs the rules that read specs as written (see
+	// rules.SourceRule). sources holds the specs before variable substitution,
+	// and positions point into those bytes.
+	ValidateSources(ctx context.Context, sources map[string]*specs.RawSpec) (Diagnostics, error)
 }
 
 type validationEngine struct {
@@ -244,11 +251,109 @@ func (e *validationEngine) runValidationRules(
 	return diagnostics, nil
 }
 
+// ValidateSources runs every registered rule that implements SourceRule, once,
+// with the sources whose kind and version match the rule. It reads kind and
+// version without substituting, so it reports on a spec whose variables are
+// not defined yet.
+func (e *validationEngine) ValidateSources(ctx context.Context, sources map[string]*specs.RawSpec) (Diagnostics, error) {
+	var sourceRules []rules.Rule
+	for _, rule := range e.registry.AllSyntacticRules() {
+		if _, ok := rule.(rules.SourceRule); ok {
+			sourceRules = append(sourceRules, rule)
+		}
+	}
+
+	if len(sourceRules) == 0 {
+		return nil, nil
+	}
+
+	contexts := make(map[string]*rules.ValidationContext, len(sources))
+	for path, source := range sources {
+		kind, version := sourceKindVersion(source.Data)
+		contexts[path] = &rules.ValidationContext{
+			FilePath: path,
+			FileName: filepath.Base(path),
+			Kind:     kind,
+			Version:  version,
+			Source:   source.Data,
+		}
+	}
+
+	diagnostics := make(Diagnostics, 0)
+	for _, rule := range sourceRules {
+		resultsMap := rule.(rules.SourceRule).ValidateSources(filterContextsByPatterns(contexts, rule.AppliesTo()))
+
+		for filePath, results := range resultsMap {
+			source, ok := sources[filePath]
+			if !ok {
+				return nil, fmt.Errorf("source rule %s returned results for unknown file: %s", rule.ID(), filePath)
+			}
+
+			pi, err := source.PathIndexer()
+			if err != nil {
+				pi = placeholderIndexer(source.Data)
+			}
+
+			for _, result := range results {
+				position, err := resultPosition(pi, result)
+				if err != nil {
+					return nil, err
+				}
+				diagnostics = append(diagnostics, Diagnostic{
+					RuleID:   rule.ID(),
+					Severity: rule.Severity(),
+					Message:  result.Message,
+					File:     filePath,
+					Position: position,
+					Examples: rule.Examples(),
+				})
+			}
+		}
+	}
+
+	diagnostics.Sort()
+	return diagnostics, nil
+}
+
+// sourceKindVersion reads kind and version from a spec as written. References
+// are swapped for placeholders first, because an unquoted one does not parse as
+// YAML until substitution runs. Unknown fields are skipped, so the rest of the
+// spec does not have to decode.
+func sourceKindVersion(data []byte) (kind, version string) {
+	replaced, _ := varsubst.ReplaceReferences(data)
+
+	var header struct {
+		Kind    string `yaml:"kind"`
+		Version string `yaml:"version"`
+	}
+	if err := yaml.Unmarshal(replaced, &header); err != nil {
+		return "", ""
+	}
+	return header.Kind, header.Version
+}
+
+// placeholderIndexer indexes a source that is not YAML as written, such as one
+// with an unquoted reference followed by more text. With the references swapped
+// for placeholders it parses, and the keys stay on their lines. It returns nil
+// when even that fails, which places results at the start of the file.
+func placeholderIndexer(data []byte) pathindex.PathIndexer {
+	replaced, _ := varsubst.ReplaceReferences(data)
+	pi, err := pathindex.NewPathIndexer(replaced)
+	if err != nil {
+		return nil
+	}
+	return pi
+}
+
 // resultPosition resolves a result's reference to its position in the file,
-// falling back to the nearest ancestor when the path does not exist. A
-// sensitive result has the value on its line masked here, before any renderer
-// sees it.
+// falling back to the nearest ancestor when the path does not exist, and to the
+// start of the file when there is no indexer. A sensitive result has the value
+// on its line masked here, before any renderer sees it.
 func resultPosition(pi pathindex.PathIndexer, result rules.ValidationResult) (pathindex.Position, error) {
+	if pi == nil {
+		return pathindex.StartingPosition, nil
+	}
+
 	position, err := pi.PositionLookup(result.Reference)
 	if err != nil {
 		if !errors.Is(err, pathindex.ErrPathNotFound) {

@@ -19,6 +19,11 @@ type ValidationContext struct {
 	// Rules can inspect this for syntactic validation before resource graph construction.
 	Spec map[string]any
 
+	// Source is the spec file as written, before variable substitution. Only
+	// rules implementing SourceRule receive it, and they receive no Spec or
+	// Metadata, since the source may not parse until substitution runs.
+	Source []byte
+
 	// Kind is the spec kind (e.g., "properties", "events", "tp", "custom-types")
 	Kind string
 
