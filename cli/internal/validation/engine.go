@@ -354,6 +354,10 @@ func resultPosition(pi pathindex.PathIndexer, result rules.ValidationResult) (pa
 		return pathindex.StartingPosition, nil
 	}
 
+	if result.Sensitive {
+		return *pi.MaskedPosition(result.Reference), nil
+	}
+
 	position, err := pi.PositionLookup(result.Reference)
 	if err != nil {
 		if !errors.Is(err, pathindex.ErrPathNotFound) {
@@ -363,10 +367,6 @@ func resultPosition(pi pathindex.PathIndexer, result rules.ValidationResult) (pa
 		// if the error is ErrPathNotFound which is usually the case, we
 		// use the nearest position to the reference.
 		position = pi.NearestPosition(result.Reference)
-	}
-
-	if result.Sensitive {
-		return position.WithValueMasked(), nil
 	}
 	return *position, nil
 }

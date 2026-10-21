@@ -186,6 +186,30 @@ spec:
 `,
 			wantLine: "   17 | ***\n",
 		},
+		{
+			// A scalar list item has no key, so the ": " in its value must not
+			// be read as one.
+			name: "http header list item holding a colon",
+			file: `version: rudder/v1
+kind: destination
+metadata:
+  name: shop-http
+spec:
+  id: shop-http
+  display_name: Shop HTTP
+  type: http
+  definition_version: 1
+  enabled: true
+  config:
+    api_url: https://example.com/events
+    auth: noAuth
+    method: POST
+    format: JSON
+    headers:
+      - 'Bearer: {{ .SECRET }}'
+`,
+			wantLine: "   17 | ***\n",
+		},
 	}
 
 	for _, tc := range cases {

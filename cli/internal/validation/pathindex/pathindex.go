@@ -21,11 +21,20 @@ type PathIndexer interface {
 	// For example: /a/b/c -> /a/b -> /a -> /
 	// Always succeeds since "/" (root) is guaranteed to exist at line 1, column 1.
 	NearestPosition(path string) *Position
+
+	// MaskedPosition is NearestPosition with the value the line text shows
+	// replaced by MaskedValue. The key stays, and a line that shows a
+	// container ("key: {...}", "[...]") is unchanged, since it holds no value.
+	MaskedPosition(path string) *Position
 }
 
 // PathIndex stores mapping from JSON Pointer paths to file positions
 type PathIndex struct {
 	positions map[string]Position
+	// maskedLineTexts holds each path's line text as MaskedPosition prints it.
+	// It is built with the index, because only the YAML node tells a scalar
+	// list item's bare value apart from a "key: value" line.
+	maskedLineTexts map[string]string
 }
 
 var StartingPosition = Position{
@@ -44,30 +53,6 @@ type Position struct {
 // MaskedValue stands in for a value that must not be printed.
 const MaskedValue = "***"
 
-// WithValueMasked returns the position with the value its line text shows
-// replaced by MaskedValue, keeping the key. It reads the forms extractLineText
-// builds: "key: value", "- key: value" for a list item, and a bare value for a
-// scalar list item. A line that shows a container ("key: {...}", "[...]")
-// holds no value and is returned unchanged.
-func (p Position) WithValueMasked() Position {
-	key, value, keyed := strings.Cut(p.LineText, ": ")
-	if !keyed {
-		value = p.LineText
-	}
-
-	switch value {
-	case "", "{}", "{...}", "[...]":
-		return p
-	}
-
-	if keyed {
-		p.LineText = key + ": " + MaskedValue
-		return p
-	}
-	p.LineText = MaskedValue
-	return p
-}
-
 // NewPathIndex creates a new PathIndex by parsing YAML content and building the position map
 func NewPathIndexer(content []byte) (PathIndexer, error) {
 	var node yaml.Node
@@ -76,12 +61,14 @@ func NewPathIndexer(content []byte) (PathIndexer, error) {
 	}
 
 	pi := &PathIndex{
-		positions: make(map[string]Position),
+		positions:       make(map[string]Position),
+		maskedLineTexts: make(map[string]string),
 	}
 
 	// Record root position "/" at line 1, column 1
 	// This serves as the ultimate fallback for NearestPosition
 	pi.positions["/"] = StartingPosition
+	pi.maskedLineTexts["/"] = StartingPosition.LineText
 
 	// Walk the YAML tree and build the index
 	pi.walkNode(&node, "", nil)
@@ -103,37 +90,45 @@ func (idx *PathIndex) PositionLookup(path string) (*Position, error) {
 // For example: /a/b/c -> /a/b -> /a -> /
 // Always succeeds since "/" (root) is guaranteed to exist at line 1, column 1.
 func (idx *PathIndex) NearestPosition(path string) *Position {
+	pos := idx.positions[idx.nearestPath(path)]
+	return &pos
+}
+
+// MaskedPosition is NearestPosition with the value the line text shows
+// replaced by MaskedValue.
+func (idx *PathIndex) MaskedPosition(path string) *Position {
+	nearest := idx.nearestPath(path)
+	pos := idx.positions[nearest]
+	pos.LineText = idx.maskedLineTexts[nearest]
+	return &pos
+}
+
+// nearestPath returns path when it is indexed, or else its nearest indexed
+// ancestor, falling back to the root "/".
+func (idx *PathIndex) nearestPath(path string) string {
 	// Try exact match first
-	if pos, err := idx.PositionLookup(path); err == nil {
-		return pos
+	if _, ok := idx.positions[path]; ok {
+		return path
 	}
 
 	// Walk up the path hierarchy
 	currentPath := path
 	for currentPath != "" && currentPath != "/" {
 		// Find the last slash and truncate
-		lastSlash := -1
-		for i := len(currentPath) - 1; i >= 0; i-- {
-			if currentPath[i] == '/' {
-				lastSlash = i
-				break
-			}
-		}
-
+		lastSlash := strings.LastIndex(currentPath, "/")
 		if lastSlash <= 0 {
 			// Reached root or no more slashes
 			break
 		}
 
 		currentPath = currentPath[:lastSlash]
-		if pos, err := idx.PositionLookup(currentPath); err == nil {
-			return pos
+		if _, ok := idx.positions[currentPath]; ok {
+			return currentPath
 		}
 	}
 
 	// Fall back to root position (always exists)
-	pos, _ := idx.PositionLookup("/")
-	return pos
+	return "/"
 }
 
 // walkNode recursively walks the YAML node tree and records positions
@@ -228,6 +223,27 @@ func (pi *PathIndex) recordPosition(
 	}
 
 	pi.positions[path] = pos
+	pi.maskedLineTexts[path] = maskedLineText(node, key, lineText)
+}
+
+// maskedLineText returns lineText, built by extractLineText, with the value it
+// shows replaced by MaskedValue. A scalar shows its value after its key, or
+// alone as a list item. A list item that is a mapping shows its first
+// property's value. Other lines show no value, and an empty value is left as
+// it is.
+func maskedLineText(node *yaml.Node, key *yaml.Node, lineText string) string {
+	switch {
+	case node.Kind == yaml.ScalarNode && node.Value != "":
+		if key != nil {
+			return fmt.Sprintf("%s: %s", key.Value, MaskedValue)
+		}
+		return MaskedValue
+
+	case node.Kind == yaml.MappingNode && key == nil && len(node.Content) >= 2 &&
+		node.Content[1].Kind == yaml.ScalarNode && node.Content[1].Value != "":
+		return fmt.Sprintf("- %s: %s", node.Content[0].Value, MaskedValue)
+	}
+	return lineText
 }
 
 // extractLineText constructs a readable text representation from the node

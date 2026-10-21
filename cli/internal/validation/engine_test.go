@@ -925,6 +925,8 @@ spec:
   headers:
     - from: fake-header-value
       to: X-Header
+  tokens:
+    - 'fake-token: value'
 `
 
 // A sensitive result's line keeps its key and loses its value, whether the
@@ -941,6 +943,7 @@ func TestValidationEngine_MasksSensitiveResults(t *testing.T) {
 				{Reference: "/spec/group", Message: "plain"},
 				{Reference: "/spec/password", Message: "secret value", Sensitive: true},
 				{Reference: "/spec/headers/0/missing", Message: "secret list item", Sensitive: true},
+				{Reference: "/spec/tokens/0", Message: "secret scalar list item", Sensitive: true},
 			}
 		},
 	}
@@ -959,8 +962,9 @@ func TestValidationEngine_MasksSensitiveResults(t *testing.T) {
 		lines[d.Message] = d.Position.LineText
 	}
 	assert.Equal(t, map[string]string{
-		"plain":            "group: test-group",
-		"secret value":     "password: ***",
-		"secret list item": "- from: ***",
+		"plain":                   "group: test-group",
+		"secret value":            "password: ***",
+		"secret list item":        "- from: ***",
+		"secret scalar list item": "***",
 	}, lines)
 }
