@@ -36,7 +36,7 @@ func (r *secretReferenceUniqueRule) Severity() vrules.Severity {
 }
 
 func (r *secretReferenceUniqueRule) Description() string {
-	return "a variable referenced by a destination secret key must not fill another secret key, since names built from an id and a key can collide"
+	return "a variable referenced by a destination secret key must not fill another secret key, since names built from an id and a key can collide; the check reads specs as written, before variable substitution"
 }
 
 func (r *secretReferenceUniqueRule) AppliesTo() []vrules.MatchPattern {
@@ -87,14 +87,27 @@ func (r *secretReferenceUniqueRule) ValidateSources(specs map[string]*vrules.Val
 	return results
 }
 
+// maxNamedLocations caps the other locations one message names. Each key that
+// shares a variable gets its own warning, so naming every other key would make
+// the output grow with the square of their number.
+const maxNamedLocations = 3
+
 func sharedVariableMessage(slot secretSlot, others []secretSlot) string {
-	locations := make([]string, 0, len(others))
-	for _, other := range others {
+	named := others
+	if len(others) > maxNamedLocations {
+		named = others[:maxNamedLocations-1]
+	}
+
+	locations := make([]string, 0, len(named)+1)
+	for _, other := range named {
 		locations = append(locations, fmt.Sprintf("secret key %q of %s", other.key, other.destination))
+	}
+	if rest := len(others) - len(named); rest > 0 {
+		locations = append(locations, fmt.Sprintf("%d other secret keys", rest))
 	}
 
 	return fmt.Sprintf(
-		"secret key %q of %s shares variable %s with %s; give each secret key its own variable unless they hold the same value",
+		"secret key %q of %s shares variable %s with %s; give each secret key its own variable",
 		slot.key, slot.destination, slot.variable, joinAnd(locations),
 	)
 }

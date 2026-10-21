@@ -24,7 +24,7 @@ func TestSecretReferenceUniqueRuleMetadata(t *testing.T) {
 func TestSecretReferenceUniqueRule(t *testing.T) {
 	t.Parallel()
 
-	const fix = "; give each secret key its own variable unless they hold the same value"
+	const fix = "; give each secret key its own variable"
 
 	cases := []struct {
 		name    string
@@ -102,6 +102,46 @@ func TestSecretReferenceUniqueRule(t *testing.T) {
 				"am2.yaml": {{
 					Reference: "/spec/config/api_key",
 					Message:   `secret key "api_key" of the destination in "am2.yaml" shares variable SHARED with secret key "api_key" of the destination in "am.yaml"` + fix,
+					Sensitive: true,
+				}},
+			},
+		},
+		{
+			// Each warning names at most three other keys.
+			name: "many keys sharing one variable",
+			sources: map[string][]byte{
+				"a.yaml": destinationSource("shop-a", "am", "    api_key: '{{ .SHARED }}'\n    api_secret: '{{ .SHARED }}'\n    residency_server: standard\n"),
+				"b.yaml": destinationSource("shop-b", "am", "    api_key: '{{ .SHARED }}'\n    api_secret: '{{ .SHARED }}'\n    residency_server: standard\n"),
+				"c.yaml": destinationSource("shop-c", "am", "    api_key: '{{ .SHARED }}'\n    residency_server: standard\n"),
+			},
+			want: map[string][]vrules.ValidationResult{
+				"a.yaml": {
+					{
+						Reference: "/spec/config/api_key",
+						Message:   `secret key "api_key" of destination "shop-a" shares variable SHARED with secret key "api_secret" of destination "shop-a", secret key "api_key" of destination "shop-b" and 2 other secret keys` + fix,
+						Sensitive: true,
+					},
+					{
+						Reference: "/spec/config/api_secret",
+						Message:   `secret key "api_secret" of destination "shop-a" shares variable SHARED with secret key "api_key" of destination "shop-a", secret key "api_key" of destination "shop-b" and 2 other secret keys` + fix,
+						Sensitive: true,
+					},
+				},
+				"b.yaml": {
+					{
+						Reference: "/spec/config/api_key",
+						Message:   `secret key "api_key" of destination "shop-b" shares variable SHARED with secret key "api_key" of destination "shop-a", secret key "api_secret" of destination "shop-a" and 2 other secret keys` + fix,
+						Sensitive: true,
+					},
+					{
+						Reference: "/spec/config/api_secret",
+						Message:   `secret key "api_secret" of destination "shop-b" shares variable SHARED with secret key "api_key" of destination "shop-a", secret key "api_secret" of destination "shop-a" and 2 other secret keys` + fix,
+						Sensitive: true,
+					},
+				},
+				"c.yaml": {{
+					Reference: "/spec/config/api_key",
+					Message:   `secret key "api_key" of destination "shop-c" shares variable SHARED with secret key "api_key" of destination "shop-a", secret key "api_secret" of destination "shop-a" and 2 other secret keys` + fix,
 					Sensitive: true,
 				}},
 			},

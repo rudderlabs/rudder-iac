@@ -31,7 +31,7 @@ func (r *secretReferenceRule) Severity() vrules.Severity {
 }
 
 func (r *secretReferenceRule) Description() string {
-	return "destination secret keys must hold one variable reference with no default, so no secret value is written in a spec"
+	return "destination secret keys must hold one variable reference with no default, so no secret value is written in a spec; the check reads specs as written, before variable substitution"
 }
 
 func (r *secretReferenceRule) AppliesTo() []vrules.MatchPattern {
@@ -67,6 +67,10 @@ func (r *secretReferenceRule) ValidateSources(specs map[string]*vrules.Validatio
 // secretReferenceMessage names the key and the variable to use, never the value.
 func secretReferenceMessage(slot secretSlot) string {
 	const fix = "set the value in a var file or a RUDDER_ environment variable"
+	if slot.defaulted != "" {
+		// The variable is already named, so only the default has to go.
+		return fmt.Sprintf("secret key %q must hold only a variable reference with no default; remove the default from the reference to %s and %s", slot.key, slot.defaulted, fix)
+	}
 	if slot.suggested == "" {
 		return fmt.Sprintf("secret key %q must hold only a variable reference with no default; %s", slot.key, fix)
 	}

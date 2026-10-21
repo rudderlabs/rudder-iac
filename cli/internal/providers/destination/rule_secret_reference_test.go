@@ -2,6 +2,7 @@ package destination
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -112,12 +113,12 @@ func TestSecretReferenceRule(t *testing.T) {
 			name:            "reference with a default",
 			id:              "shop-amplitude",
 			destinationType: "am",
-			config: `    api_key: '{{ .SHOP_AMPLITUDE_API_KEY | fake-amplitude-api-key }}'
+			config: `    api_key: '{{ .MY_AMPLITUDE_KEY | fake-amplitude-api-key }}'
     residency_server: standard
 `,
 			want: []vrules.ValidationResult{{
 				Reference: "/spec/config/api_key",
-				Message:   `secret key "api_key" must hold only a variable reference with no default, such as '{{ .SHOP_AMPLITUDE_API_KEY }}'` + fix,
+				Message:   `secret key "api_key" must hold only a variable reference with no default; remove the default from the reference to MY_AMPLITUDE_KEY and` + strings.TrimPrefix(fix, ";"),
 				Sensitive: true,
 			}},
 		},

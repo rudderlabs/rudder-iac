@@ -26,6 +26,9 @@ type secretSlot struct {
 	// variable is the variable the value references when the value is exactly
 	// one reference with no default, and empty otherwise.
 	variable string
+	// defaulted is the variable the value references when the value is
+	// exactly one reference with a default, and empty otherwise.
+	defaulted string
 	// suggested is the variable import would write for the key. It is empty
 	// when the spec id is empty, holds a reference, or makes no valid variable
 	// name.
@@ -83,8 +86,12 @@ func readSecretSlots(registry *definitions.Registry, file string, source []byte)
 			suggested:   referencedVariable(value.masked),
 		}
 		if s, ok := value.value.(string); ok {
-			if ref, ok := replaced.Reference(s); ok && !ref.HasDefault {
-				slot.variable = ref.Name
+			if ref, ok := replaced.Reference(s); ok {
+				if ref.HasDefault {
+					slot.defaulted = ref.Name
+				} else {
+					slot.variable = ref.Name
+				}
 			}
 		}
 		slots = append(slots, slot)
