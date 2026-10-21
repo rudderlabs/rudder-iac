@@ -2,6 +2,7 @@ package destination_test
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -117,6 +118,37 @@ spec:
 	assert.Contains(t, out, `error[project/var-substitution]: undefined variable "UNDEF"`)
 	assert.Equal(t, 2, strings.Count(out, "   12 | api_key: ***\n"), out)
 	assert.NotContains(t, out, "fake-literal-prefix")
+}
+
+// A shared variable's line holds only the reference, so neither the warning
+// nor a substitution error on that line is masked.
+func TestSharedVariableLineIsNotMasked(t *testing.T) {
+	t.Parallel()
+
+	const amplitude = `version: rudder/v1
+kind: destination
+metadata:
+  name: %[1]s
+spec:
+  id: %[1]s
+  display_name: %[1]s
+  type: am
+  definition_version: 1
+  enabled: true
+  config:
+    api_key: '{{ .SHARED }}'
+    residency_server: standard
+`
+	out, err := renderLoad(t, map[string]string{
+		"a.yaml": fmt.Sprintf(amplitude, "shop-a"),
+		"b.yaml": fmt.Sprintf(amplitude, "shop-b"),
+	}, nil)
+	require.ErrorContains(t, err, "variable substitution failed")
+
+	assert.Contains(t, out, "warning[destination/secret-reference-unique]")
+	assert.Contains(t, out, "   12 | api_key: {{ .SHARED }}\n")
+	assert.Contains(t, out, "   12 |     api_key: '{{ .SHARED }}'\n")
+	assert.NotContains(t, out, "***")
 }
 
 func TestSecretReferenceReportedWhenSubstitutionSucceeds(t *testing.T) {

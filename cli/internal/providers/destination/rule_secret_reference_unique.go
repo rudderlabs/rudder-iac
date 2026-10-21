@@ -75,12 +75,13 @@ func (r *secretReferenceUniqueRule) ValidateSources(specs map[string]*vrules.Val
 			return cmp.Or(cmp.Compare(a.file, b.file), cmp.Compare(a.reference, b.reference))
 		})
 
+		// Each slot holds exactly one reference, and the line is read before
+		// substitution, so it shows no secret and is not masked.
 		for i, slot := range slots {
 			others := slices.Concat(slots[:i], slots[i+1:])
 			results[slot.file] = append(results[slot.file], vrules.ValidationResult{
 				Reference: slot.reference,
 				Message:   sharedVariableMessage(slot, others),
-				Sensitive: true,
 			})
 		}
 	}

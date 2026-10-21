@@ -50,12 +50,10 @@ func TestSecretReferenceUniqueRule(t *testing.T) {
 				"am.yaml": {{
 					Reference: "/spec/config/api_key",
 					Message:   `secret key "api_key" of destination "shop-android" shares variable SHOP_ANDROID_API_KEY with secret key "android_api_key" of destination "shop"` + fix,
-					Sensitive: true,
 				}},
 				"braze.yaml": {{
 					Reference: "/spec/config/android_api_key",
 					Message:   `secret key "android_api_key" of destination "shop" shares variable SHOP_ANDROID_API_KEY with secret key "api_key" of destination "shop-android"` + fix,
-					Sensitive: true,
 				}},
 			},
 		},
@@ -70,18 +68,15 @@ func TestSecretReferenceUniqueRule(t *testing.T) {
 					{
 						Reference: "/spec/config/api_key",
 						Message:   `secret key "api_key" of destination "shop-amplitude" shares variable SHARED with secret key "api_secret" of destination "shop-amplitude" and secret key "headers[0].to" of destination "shop-webhook"` + fix,
-						Sensitive: true,
 					},
 					{
 						Reference: "/spec/config/api_secret",
 						Message:   `secret key "api_secret" of destination "shop-amplitude" shares variable SHARED with secret key "api_key" of destination "shop-amplitude" and secret key "headers[0].to" of destination "shop-webhook"` + fix,
-						Sensitive: true,
 					},
 				},
 				"webhook.yaml": {{
 					Reference: "/spec/config/headers/0/to",
 					Message:   `secret key "headers[0].to" of destination "shop-webhook" shares variable SHARED with secret key "api_key" of destination "shop-amplitude" and secret key "api_secret" of destination "shop-amplitude"` + fix,
-					Sensitive: true,
 				}},
 			},
 		},
@@ -97,12 +92,10 @@ func TestSecretReferenceUniqueRule(t *testing.T) {
 				"am.yaml": {{
 					Reference: "/spec/config/api_key",
 					Message:   `secret key "api_key" of the destination in "am.yaml" shares variable SHARED with secret key "api_key" of the destination in "am2.yaml"` + fix,
-					Sensitive: true,
 				}},
 				"am2.yaml": {{
 					Reference: "/spec/config/api_key",
 					Message:   `secret key "api_key" of the destination in "am2.yaml" shares variable SHARED with secret key "api_key" of the destination in "am.yaml"` + fix,
-					Sensitive: true,
 				}},
 			},
 		},
@@ -119,30 +112,25 @@ func TestSecretReferenceUniqueRule(t *testing.T) {
 					{
 						Reference: "/spec/config/api_key",
 						Message:   `secret key "api_key" of destination "shop-a" shares variable SHARED with secret key "api_secret" of destination "shop-a", secret key "api_key" of destination "shop-b" and 2 other secret keys` + fix,
-						Sensitive: true,
 					},
 					{
 						Reference: "/spec/config/api_secret",
 						Message:   `secret key "api_secret" of destination "shop-a" shares variable SHARED with secret key "api_key" of destination "shop-a", secret key "api_key" of destination "shop-b" and 2 other secret keys` + fix,
-						Sensitive: true,
 					},
 				},
 				"b.yaml": {
 					{
 						Reference: "/spec/config/api_key",
 						Message:   `secret key "api_key" of destination "shop-b" shares variable SHARED with secret key "api_key" of destination "shop-a", secret key "api_secret" of destination "shop-a" and 2 other secret keys` + fix,
-						Sensitive: true,
 					},
 					{
 						Reference: "/spec/config/api_secret",
 						Message:   `secret key "api_secret" of destination "shop-b" shares variable SHARED with secret key "api_key" of destination "shop-a", secret key "api_secret" of destination "shop-a" and 2 other secret keys` + fix,
-						Sensitive: true,
 					},
 				},
 				"c.yaml": {{
 					Reference: "/spec/config/api_key",
 					Message:   `secret key "api_key" of destination "shop-c" shares variable SHARED with secret key "api_key" of destination "shop-a", secret key "api_secret" of destination "shop-a" and 2 other secret keys` + fix,
-					Sensitive: true,
 				}},
 			},
 		},
