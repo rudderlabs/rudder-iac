@@ -177,15 +177,17 @@ func describeConfig(def *DestinationDefinition, configType reflect.Type, gated m
 		w.customTags = append(w.customTags, fn.Tag)
 	}
 
-	if err := w.walkStruct(configType, "", nil); err != nil {
+	if err := w.walkStruct(configType, "", nil, false); err != nil {
 		return nil, nil, err
 	}
 	return w.fields, w.patterns, nil
 }
 
 // walkStruct describes typ's fields under prefix. gate is the source-type gate
-// inherited from an enclosing gated block.
-func (w *configWalker) walkStruct(typ reflect.Type, prefix string, gate []string) error {
+// inherited from an enclosing gated block. alwaysChecked is set for a nested
+// block that is not a pointer, which go-playground validates even when the
+// spec leaves the block out.
+func (w *configWalker) walkStruct(typ reflect.Type, prefix string, gate []string, alwaysChecked bool) error {
 	typ = derefType(typ)
 	for i := 0; i < typ.NumField(); i++ {
 		structField := typ.Field(i)
@@ -201,14 +203,14 @@ func (w *configWalker) walkStruct(typ reflect.Type, prefix string, gate []string
 		if prefix != "" {
 			key = prefix + "." + name
 		}
-		if err := w.walkField(typ, structField, key, gate); err != nil {
+		if err := w.walkField(typ, structField, key, gate, alwaysChecked); err != nil {
 			return fmt.Errorf("config key %q: %w", key, err)
 		}
 	}
 	return nil
 }
 
-func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructField, key string, gate []string) error {
+func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructField, key string, gate []string, alwaysChecked bool) error {
 	var (
 		fieldType = derefType(structField.Type)
 		dotted    = strings.ReplaceAll(key, "[]", "")
@@ -231,6 +233,9 @@ func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructF
 			return err
 		}
 	}
+	if err := requiredMeansWritten(structField.Type, field, alwaysChecked); err != nil {
+		return err
+	}
 
 	var itemStruct reflect.Type
 	if fieldType.Kind() == reflect.Slice || fieldType.Kind() == reflect.Array {
@@ -245,6 +250,10 @@ func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructF
 		}
 		scope.valueType = derefType(fieldType.Elem())
 		for _, rule := range itemRules {
+			if name, _, _ := strings.Cut(rule, "="); !describedPerItem(name) && !slices.Contains(w.customTags, name) {
+				return fmt.Errorf("validate rule %q after dive would be described as a rule on the list; "+
+					"only oneof, dynamic_or_oneof, pattern and dynamic_or_pattern apply to each item", name)
+			}
 			if err := w.applyRule(&field, rule, scope); err != nil {
 				return err
 			}
@@ -256,15 +265,57 @@ func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructF
 		if field.constrained() {
 			w.fields = append(w.fields, field)
 		}
-		return w.walkStruct(fieldType, key, gate)
+		return w.walkStruct(fieldType, key, gate, structField.Type.Kind() != reflect.Pointer)
 	case itemStruct != nil:
 		if field.constrained() {
 			w.fields = append(w.fields, field)
 		}
-		return w.walkStruct(itemStruct, key+"[]", gate)
+		return w.walkStruct(itemStruct, key+"[]", gate, false)
 	default:
 		w.fields = append(w.fields, field)
 		return nil
+	}
+}
+
+// requiredMeansWritten fails a required rule the docs would misstate. The docs
+// say a required key must be written, and a nested one once its parent is.
+// go-playground instead checks a key inside a block that is not a pointer even
+// when the block is left out, and rejects the zero value of a bool or number
+// that is not a pointer, so `false` or `0` would fail a key the docs call
+// written.
+func requiredMeansWritten(goType reflect.Type, field Field, alwaysChecked bool) error {
+	if field.Required && alwaysChecked {
+		return fmt.Errorf("required inside a block that is not a pointer applies even when the spec leaves the block out; make the block a pointer")
+	}
+	requires := field.Required || len(field.RequiredIf) > 0 || len(field.RequiredUnless) > 0 || len(field.RequiredWith) > 0
+	if requires && zeroIsAValue(goType) {
+		return fmt.Errorf("a required rule on a %s that is not a pointer rejects %v, so it means non-zero, not written; make the field a pointer",
+			goType.Kind(), reflect.Zero(goType).Interface())
+	}
+	return nil
+}
+
+func zeroIsAValue(typ reflect.Type) bool {
+	switch typ.Kind() {
+	case reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return true
+	default:
+		return false
+	}
+}
+
+// describedPerItem reports whether a rule after dive is one Describe can
+// present as a rule on each item. Others, such as required or max, would read
+// as rules on the list itself.
+func describedPerItem(name string) bool {
+	switch name {
+	case "", "omitempty", "oneof", "dynamic_or_oneof", "pattern", "dynamic_or_pattern":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -286,6 +337,12 @@ type ruleScope struct {
 }
 
 func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) error {
+	// go-playground reads | as "or", quoted values as one parameter, and 0x2C
+	// and 0x7C as escaped commas and pipes. Describe splits parameters on
+	// spaces only, so it refuses these rather than misread them.
+	if strings.ContainsAny(rule, "|'") || strings.Contains(rule, "0x2C") || strings.Contains(rule, "0x7C") {
+		return fmt.Errorf("validate rule %q uses |, a quote or an escaped character, which Describe cannot read", rule)
+	}
 	name, param, _ := strings.Cut(rule, "=")
 	switch name {
 	case "", "omitempty":

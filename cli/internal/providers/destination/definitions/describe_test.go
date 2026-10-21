@@ -30,7 +30,7 @@ type describeSDK struct {
 }
 
 type describeAuth struct {
-	Token string `mapstructure:"token" validate:"describe_token_check"`
+	Token string `mapstructure:"token" validate:"required,describe_token_check"`
 }
 
 type describeConfig struct {
@@ -137,7 +137,7 @@ func TestDescribeReadsTheConfigModel(t *testing.T) {
 				Default: float64(2), HasDefault: true, OnlyForSourceTypes: []string{"web"},
 			},
 			{Key: "auth", Type: "object", RequiredIf: []definitions.Condition{{Key: "use_auth", Value: true}}},
-			{Key: "auth.token", Type: "string", CheckedBy: []string{"describe_token_check"}},
+			{Key: "auth.token", Type: "string", Required: true, CheckedBy: []string{"describe_token_check"}},
 			{Key: "connection_mode", Type: "map<sourceToken,string>"},
 			{Key: "consent_management", Type: "map<sourceToken,array<object>>"},
 		},
@@ -264,6 +264,72 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 				}{}
 			},
 			wantErr: `config key "size": oneof: invalid integer "big"`,
+		},
+		{
+			name: "required on each item of a list",
+			newConfig: func() any {
+				return &struct {
+					Tags []string `mapstructure:"tags" validate:"omitempty,dive,required"`
+				}{}
+			},
+			wantErr: `config key "tags": validate rule "required" after dive would be described as a rule on the list`,
+		},
+		{
+			name: "max on each item of a list",
+			newConfig: func() any {
+				return &struct {
+					Tags []string `mapstructure:"tags" validate:"omitempty,dive,max=5"`
+				}{}
+			},
+			wantErr: `config key "tags": validate rule "max" after dive would be described as a rule on the list`,
+		},
+		{
+			name: "required inside a block that is not a pointer",
+			newConfig: func() any {
+				return &struct {
+					Inner struct {
+						Must string `mapstructure:"must" validate:"required"`
+					} `mapstructure:"inner"`
+				}{}
+			},
+			wantErr: `config key "inner.must": required inside a block that is not a pointer applies even when the spec leaves the block out`,
+		},
+		{
+			name: "required on a bool that is not a pointer",
+			newConfig: func() any {
+				return &struct {
+					Flag bool `mapstructure:"flag" validate:"required"`
+				}{}
+			},
+			wantErr: `config key "flag": a required rule on a bool that is not a pointer rejects false`,
+		},
+		{
+			name: "required_if on a number that is not a pointer",
+			newConfig: func() any {
+				return &struct {
+					Flag *bool `mapstructure:"flag"`
+					Size int   `mapstructure:"size" validate:"required_if=Flag true"`
+				}{}
+			},
+			wantErr: `config key "size": a required rule on a int that is not a pointer rejects 0`,
+		},
+		{
+			name: "an or rule",
+			newConfig: func() any {
+				return &struct {
+					Mode string `mapstructure:"mode" validate:"omitempty,oneof=a b|eq=c"`
+				}{}
+			},
+			wantErr: `config key "mode": validate rule "oneof=a b|eq=c" uses |, a quote or an escaped character`,
+		},
+		{
+			name: "a quoted parameter",
+			newConfig: func() any {
+				return &struct {
+					Event string `mapstructure:"event" validate:"omitempty,oneof='Page View' Track"`
+				}{}
+			},
+			wantErr: `config key "event": validate rule "oneof='Page View' Track" uses |, a quote or an escaped character`,
 		},
 		{
 			name: "item rules on a list of objects",
