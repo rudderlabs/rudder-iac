@@ -86,6 +86,27 @@ func TestSecretReferenceUniqueRule(t *testing.T) {
 			},
 		},
 		{
+			// Ids that hold references, or none, read the same in every file,
+			// so each destination is named by its file instead.
+			name: "ids that do not tell destinations apart",
+			sources: map[string][]byte{
+				"am.yaml":  destinationSource("'{{ .DEST_ID }}'", "am", "    api_key: '{{ .SHARED }}'\n    residency_server: standard\n"),
+				"am2.yaml": destinationSource(`""`, "am", "    api_key: '{{ .SHARED }}'\n    residency_server: standard\n"),
+			},
+			want: map[string][]vrules.ValidationResult{
+				"am.yaml": {{
+					Reference: "/spec/config/api_key",
+					Message:   `secret key "api_key" of the destination in "am.yaml" shares variable SHARED with secret key "api_key" of the destination in "am2.yaml"` + fix,
+					Sensitive: true,
+				}},
+				"am2.yaml": {{
+					Reference: "/spec/config/api_key",
+					Message:   `secret key "api_key" of the destination in "am2.yaml" shares variable SHARED with secret key "api_key" of the destination in "am.yaml"` + fix,
+					Sensitive: true,
+				}},
+			},
+		},
+		{
 			// A reference with a default or with text around it already gets a
 			// secret-reference warning, so it is not counted here.
 			name: "only whole references count",

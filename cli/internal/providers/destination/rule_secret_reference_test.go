@@ -199,6 +199,50 @@ func TestSecretReferenceRule(t *testing.T) {
 			}},
 		},
 		{
+			// The id reads as a placeholder before substitution, which must
+			// not reach the suggested name.
+			name:            "id that holds a reference",
+			id:              "'{{ .DEST_ID }}'",
+			destinationType: "am",
+			config: `    api_key: fake-amplitude-api-key
+    residency_server: standard
+`,
+			want: []vrules.ValidationResult{{
+				Reference: "/spec/config/api_key",
+				Message:   `secret key "api_key" must hold only a variable reference with no default` + fix,
+				Sensitive: true,
+			}},
+		},
+		{
+			name:            "empty id",
+			id:              `""`,
+			destinationType: "am",
+			config: `    api_key: fake-amplitude-api-key
+    residency_server: standard
+`,
+			want: []vrules.ValidationResult{{
+				Reference: "/spec/config/api_key",
+				Message:   `secret key "api_key" must hold only a variable reference with no default` + fix,
+				Sensitive: true,
+			}},
+		},
+		{
+			// A spec cannot pass for a reference by holding the placeholder
+			// text that stands in for one.
+			name:            "literal that reads like a placeholder",
+			id:              "shop-amplitude",
+			destinationType: "am",
+			config: `    api_key: __rudder_variable_reference_0__
+    api_secret: '{{ .SHOP_AMPLITUDE_API_SECRET }}'
+    residency_server: standard
+`,
+			want: []vrules.ValidationResult{{
+				Reference: "/spec/config/api_key",
+				Message:   `secret key "api_key" must hold only a variable reference with no default, such as '{{ .SHOP_AMPLITUDE_API_KEY }}'` + fix,
+				Sensitive: true,
+			}},
+		},
+		{
 			name:            "unregistered type is left to the syntax rule",
 			id:              "shop-unknown",
 			destinationType: "not_a_type",
@@ -212,6 +256,60 @@ func TestSecretReferenceRule(t *testing.T) {
 			t.Parallel()
 
 			source := destinationSource(tc.id, tc.destinationType, tc.config)
+			rule := NewSecretReferenceRule(secretRuleRegistry(t)).(vrules.SourceRule)
+
+			results := rule.ValidateSources(sourceContexts(map[string][]byte{"dest.yaml": source}))
+			if tc.want == nil {
+				assert.Empty(t, results)
+				return
+			}
+			assert.Equal(t, map[string][]vrules.ValidationResult{"dest.yaml": tc.want}, results)
+		})
+	}
+}
+
+// definition_version decides which keys are secret. When it names no
+// registered version, the keys of every version of the type are checked, so a
+// literal is still reported. A type that is a reference cannot be read, and the
+// spec is skipped.
+func TestSecretReferenceRuleUnresolvedDefinition(t *testing.T) {
+	t.Parallel()
+
+	const header = `version: rudder/v1
+kind: destination
+metadata:
+  name: shop-amplitude
+spec:
+  id: shop-amplitude
+  display_name: Shop Amplitude
+`
+	const config = `  enabled: true
+  config:
+    api_key: fake-amplitude-api-key
+    residency_server: standard
+`
+	want := []vrules.ValidationResult{{
+		Reference: "/spec/config/api_key",
+		Message:   `secret key "api_key" must hold only a variable reference with no default, such as '{{ .SHOP_AMPLITUDE_API_KEY }}'; set the value in a var file or a RUDDER_ environment variable`,
+		Sensitive: true,
+	}}
+
+	cases := []struct {
+		name       string
+		definition string
+		want       []vrules.ValidationResult
+	}{
+		{name: "missing version", definition: "  type: am\n", want: want},
+		{name: "version that is a reference", definition: "  type: am\n  definition_version: {{ .VERSION }}\n", want: want},
+		{name: "unregistered version", definition: "  type: am\n  definition_version: 99\n", want: want},
+		{name: "type that is a reference", definition: "  type: '{{ .TYPE }}'\n  definition_version: 1\n"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			source := []byte(header + tc.definition + config)
 			rule := NewSecretReferenceRule(secretRuleRegistry(t)).(vrules.SourceRule)
 
 			results := rule.ValidateSources(sourceContexts(map[string][]byte{"dest.yaml": source}))

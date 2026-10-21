@@ -90,12 +90,12 @@ func (r *secretReferenceUniqueRule) ValidateSources(specs map[string]*vrules.Val
 func sharedVariableMessage(slot secretSlot, others []secretSlot) string {
 	locations := make([]string, 0, len(others))
 	for _, other := range others {
-		locations = append(locations, fmt.Sprintf("secret key %q of destination %q", other.key, other.specID))
+		locations = append(locations, fmt.Sprintf("secret key %q of %s", other.key, other.destination))
 	}
 
 	return fmt.Sprintf(
-		"secret key %q of destination %q shares variable %s with %s; give each secret key its own variable unless they hold the same value",
-		slot.key, slot.specID, slot.variable, joinAnd(locations),
+		"secret key %q of %s shares variable %s with %s; give each secret key its own variable unless they hold the same value",
+		slot.key, slot.destination, slot.variable, joinAnd(locations),
 	)
 }
 

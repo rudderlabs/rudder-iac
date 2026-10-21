@@ -323,13 +323,11 @@ func (e *validationEngine) ValidateSources(ctx context.Context, sources map[stri
 // YAML until substitution runs. Unknown fields are skipped, so the rest of the
 // spec does not have to decode.
 func sourceKindVersion(data []byte) (kind, version string) {
-	replaced, _ := varsubst.ReplaceReferences(data)
-
 	var header struct {
 		Kind    string `yaml:"kind"`
 		Version string `yaml:"version"`
 	}
-	if err := yaml.Unmarshal(replaced, &header); err != nil {
+	if err := yaml.Unmarshal(varsubst.ReplaceReferences(data).Data, &header); err != nil {
 		return "", ""
 	}
 	return header.Kind, header.Version
@@ -340,8 +338,7 @@ func sourceKindVersion(data []byte) (kind, version string) {
 // for placeholders it parses, and the keys stay on their lines. It returns nil
 // when even that fails, which places results at the start of the file.
 func placeholderIndexer(data []byte) pathindex.PathIndexer {
-	replaced, _ := varsubst.ReplaceReferences(data)
-	pi, err := pathindex.NewPathIndexer(replaced)
+	pi, err := pathindex.NewPathIndexer(varsubst.ReplaceReferences(data).Data)
 	if err != nil {
 		return nil
 	}

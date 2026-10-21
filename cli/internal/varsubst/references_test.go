@@ -53,9 +53,9 @@ func TestReplaceReferences(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data, refs := ReplaceReferences([]byte(tt.input))
-			assert.Equal(t, tt.wantData, string(data))
-			assert.Equal(t, tt.wantRefs, refs)
+			replaced := ReplaceReferences([]byte(tt.input))
+			assert.Equal(t, tt.wantData, string(replaced.Data))
+			assert.Equal(t, tt.wantRefs, replaced.References)
 		})
 	}
 }
@@ -68,43 +68,71 @@ func TestReplaceReferences_ParsesAsWritten(t *testing.T) {
 	var unparsed map[string]any
 	require.Error(t, yaml.Unmarshal(input, &unparsed))
 
-	data, refs := ReplaceReferences(input)
+	replaced := ReplaceReferences(input)
 	var parsed map[string]string
-	require.NoError(t, yaml.Unmarshal(data, &parsed))
+	require.NoError(t, yaml.Unmarshal(replaced.Data, &parsed))
 
-	_, ok := ReplacedReference(parsed["url"], refs)
+	_, ok := replaced.Reference(parsed["url"])
 	assert.False(t, ok, "a placeholder with text around it is not a whole reference")
+	assert.True(t, replaced.HoldsReference(parsed["url"]))
 
-	ref, ok := ReplacedReference(parsed["key"], refs)
+	ref, ok := replaced.Reference(parsed["key"])
 	assert.True(t, ok)
 	assert.Equal(t, Reference{Name: "KEY"}, ref)
 
-	ref, ok = ReplacedReference(parsed["quoted"], refs)
+	ref, ok = replaced.Reference(parsed["quoted"])
 	assert.True(t, ok)
 	assert.Equal(t, Reference{Name: "QUOTED", HasDefault: true}, ref)
 }
 
-func TestReplacedReference(t *testing.T) {
-	refs := []Reference{{Name: "A"}}
+func TestReplaced_Reference(t *testing.T) {
+	replaced := ReplaceReferences([]byte("a: '{{ .A }}'"))
 
 	tests := []struct {
-		name   string
-		value  string
-		want   Reference
-		wantOK bool
+		name         string
+		value        string
+		want         Reference
+		wantOK       bool
+		wantHoldsRef bool
 	}{
-		{name: "placeholder", value: "__rudder_variable_reference_0__", want: Reference{Name: "A"}, wantOK: true},
-		{name: "index out of range", value: "__rudder_variable_reference_1__"},
-		{name: "surrounding text", value: " __rudder_variable_reference_0__"},
+		{name: "placeholder", value: "__rudder_variable_reference_0__", want: Reference{Name: "A"}, wantOK: true, wantHoldsRef: true},
+		{name: "index out of range", value: "__rudder_variable_reference_1__", wantHoldsRef: true},
+		{name: "signed index", value: "__rudder_variable_reference_+0__", wantHoldsRef: true},
+		{name: "surrounding text", value: " __rudder_variable_reference_0__", wantHoldsRef: true},
 		{name: "literal", value: "sk-not-a-reference"},
 		{name: "unreplaced token", value: "{{ .A }}"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := ReplacedReference(tt.value, refs)
+			got, ok := replaced.Reference(tt.value)
 			assert.Equal(t, tt.wantOK, ok)
 			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.wantHoldsRef, replaced.HoldsReference(tt.value))
 		})
 	}
+}
+
+// A spec that already holds the placeholder text gets longer placeholders, so
+// its literal is never read as a reference.
+func TestReplaceReferences_LiteralPlaceholder(t *testing.T) {
+	input := []byte("literal: __rudder_variable_reference_0__\nref: '{{ .A }}'\n")
+
+	replaced := ReplaceReferences(input)
+	var parsed map[string]string
+	require.NoError(t, yaml.Unmarshal(replaced.Data, &parsed))
+
+	assert.Equal(t, "__rudder_variable_reference_0__", parsed["literal"])
+	_, ok := replaced.Reference(parsed["literal"])
+	assert.False(t, ok)
+	assert.False(t, replaced.HoldsReference(parsed["literal"]))
+
+	ref, ok := replaced.Reference(parsed["ref"])
+	assert.True(t, ok)
+	assert.Equal(t, Reference{Name: "A"}, ref)
+}
+
+func TestReplaced_HoldsReference_NoReferences(t *testing.T) {
+	replaced := ReplaceReferences([]byte("key: value"))
+	assert.False(t, replaced.HoldsReference("__rudder_variable_reference_0__"))
 }

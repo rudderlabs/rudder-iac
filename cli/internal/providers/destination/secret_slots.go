@@ -2,6 +2,7 @@ package destination
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -14,8 +15,10 @@ import (
 // secretSlot is the value of one destination secret key, as the spec is
 // written before variable substitution.
 type secretSlot struct {
-	file   string
-	specID string
+	file string
+	// destination names the spec in messages: its id, or its file when the id
+	// is empty or holds a reference, since such ids do not tell specs apart.
+	destination string
 	// key is the secret key with list indices, such as "headers[0].to".
 	key string
 	// reference is the JSON pointer to the value in the spec file.
@@ -24,33 +27,45 @@ type secretSlot struct {
 	// one reference with no default, and empty otherwise.
 	variable string
 	// suggested is the variable import would write for the key. It is empty
-	// when the spec id makes no valid variable name.
+	// when the spec id is empty, holds a reference, or makes no valid variable
+	// name.
 	suggested string
 }
 
 // readSecretSlots returns the secret key values of the destination spec in
-// source. A spec it cannot read, such as one with an unregistered type, has
-// none, and the syntax rule reports it. A key holding null or an empty string
-// is left out, since it holds no secret.
+// source. A spec it cannot read has none, and the syntax rule reports it. That
+// includes a spec whose type is unregistered or a reference, since the type
+// decides which keys are secret. A key holding null or an empty string is left
+// out, since it holds no secret.
 func readSecretSlots(registry *definitions.Registry, file string, source []byte) []secretSlot {
-	replaced, refs := varsubst.ReplaceReferences(source)
+	replaced := varsubst.ReplaceReferences(source)
 
-	spec, ok := readSourceSpec(replaced)
+	spec, ok := readSourceSpec(replaced.Data)
 	if !ok {
 		return nil
 	}
-	def, err := registry.Get(spec.destinationType, spec.definitionVersion)
-	if err != nil {
+	secretKeys := specSecretKeys(registry, spec)
+	if len(secretKeys) == 0 {
 		return nil
 	}
-	secretKeys := def.SecretKeys()
+
+	// An id holding a reference reads as a placeholder here, which would leak
+	// into the names and the messages, so it counts as no id.
+	id := spec.id
+	if replaced.HoldsReference(id) {
+		id = ""
+	}
+	destination := fmt.Sprintf("destination %q", id)
+	if id == "" {
+		destination = fmt.Sprintf("the destination in %q", file)
+	}
 
 	// MaskSecrets rewrites each secret value as the reference import writes for
 	// it, so masking a second copy of the config yields the suggested names
 	// without restating the naming rule here. A missing id, which the syntax
 	// rule reports, would give names with no prefix, so it gets none.
-	masked, _ := readSourceSpec(replaced)
-	if spec.id == "" || secret.MaskSecrets(masked.config, spec.id, secretKeys) != nil {
+	masked, _ := readSourceSpec(replaced.Data)
+	if id == "" || secret.MaskSecrets(masked.config, id, secretKeys) != nil {
 		masked.config = nil
 	}
 
@@ -61,20 +76,49 @@ func readSecretSlots(registry *definitions.Registry, file string, source []byte)
 		}
 
 		slot := secretSlot{
-			file:      file,
-			specID:    spec.id,
-			key:       value.key,
-			reference: "/spec/config" + value.reference,
-			suggested: referencedVariable(value.masked),
+			file:        file,
+			destination: destination,
+			key:         value.key,
+			reference:   "/spec/config" + value.reference,
+			suggested:   referencedVariable(value.masked),
 		}
 		if s, ok := value.value.(string); ok {
-			if ref, ok := varsubst.ReplacedReference(s, refs); ok && !ref.HasDefault {
+			if ref, ok := replaced.Reference(s); ok && !ref.HasDefault {
 				slot.variable = ref.Name
 			}
 		}
 		slots = append(slots, slot)
 	}
 	return slots
+}
+
+// specSecretKeys returns the secret keys of the definition the spec names.
+// When definition_version names no registered version, because it is missing,
+// a reference or wrong, the syntax rule reports that. The keys of every
+// registered version of the type are used then, so a literal secret is still
+// reported.
+func specSecretKeys(registry *definitions.Registry, spec sourceSpec) []string {
+	if def, err := registry.Get(spec.destinationType, spec.definitionVersion); err == nil {
+		return def.SecretKeys()
+	}
+
+	versions, err := registry.Versions(spec.destinationType)
+	if err != nil {
+		return nil
+	}
+	var secretKeys []string
+	for _, version := range versions {
+		def, err := registry.Get(spec.destinationType, version)
+		if err != nil {
+			continue
+		}
+		for _, key := range def.SecretKeys() {
+			if !slices.Contains(secretKeys, key) {
+				secretKeys = append(secretKeys, key)
+			}
+		}
+	}
+	return secretKeys
 }
 
 // sourceSpec holds the fields of a destination spec that locate its secrets.
@@ -169,7 +213,7 @@ func appendNestedSecretValues(values []secretValue, value, masked any, path []st
 // referencedVariable returns the variable a "{{ .NAME }}" reference names.
 func referencedVariable(value any) string {
 	token, _ := value.(string)
-	_, refs := varsubst.ReplaceReferences([]byte(token))
+	refs := varsubst.ReplaceReferences([]byte(token)).References
 	if len(refs) != 1 {
 		return ""
 	}

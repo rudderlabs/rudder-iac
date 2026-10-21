@@ -1,9 +1,10 @@
 package varsubst
 
 import (
+	"bytes"
 	"fmt"
-	"regexp"
 	"strconv"
+	"strings"
 )
 
 // Reference is a {{ .NAME }} token as written in spec bytes.
@@ -15,26 +16,43 @@ type Reference struct {
 	HasDefault bool
 }
 
-// placeholderRegex matches a whole placeholder that ReplaceReferences writes.
-// The form is a plain YAML string that a spec is unlikely to hold by chance.
-var placeholderRegex = regexp.MustCompile(`^__rudder_variable_reference_(\d+)__$`)
+// Replaced is spec bytes with every {{ .NAME }} reference swapped for a
+// numbered placeholder, as ReplaceReferences returns them.
+type Replaced struct {
+	// Data is the spec with each reference replaced by its placeholder.
+	Data []byte
+	// References lists the references in placeholder order.
+	References []Reference
+	// prefix starts every placeholder. It does not occur in the spec as
+	// written, so a literal is never read as a placeholder.
+	prefix string
+}
 
-func placeholder(index int) string {
-	return fmt.Sprintf("__rudder_variable_reference_%d__", index)
+// placeholderPrefix starts a placeholder. The form is a plain YAML string that
+// a spec is unlikely to hold, and ReplaceReferences lengthens it when the spec
+// holds it anyway.
+const placeholderPrefix = "__rudder_variable_reference_"
+
+func (r Replaced) placeholder(index int) string {
+	return fmt.Sprintf("%s%d__", r.prefix, index)
 }
 
 // ReplaceReferences returns a copy of data with every {{ .NAME }} token that
-// substitution would resolve swapped for a numbered placeholder, and the
-// references in placeholder order. Tokens in YAML comments and tokens with a
-// malformed name are left as they are, as substitution leaves them.
+// substitution would resolve swapped for a numbered placeholder. Tokens in YAML
+// comments and tokens with a malformed name are left as they are, as
+// substitution leaves them.
 //
 // It lets a caller read a spec as written: an unquoted token parses as a YAML
 // flow mapping, so a spec holding one may not parse until substitution runs,
 // while a placeholder parses as a plain string wherever the token stood.
-func ReplaceReferences(data []byte) ([]byte, []Reference) {
+func ReplaceReferences(data []byte) Replaced {
+	replaced := Replaced{prefix: placeholderPrefix}
+	for bytes.Contains(data, []byte(replaced.prefix)) {
+		replaced.prefix = "_" + replaced.prefix
+	}
+
 	var (
 		out  = make([]byte, 0, len(data))
-		refs []Reference
 		last int
 	)
 	for _, match := range varRegex.FindAllSubmatchIndex(data, -1) {
@@ -48,24 +66,34 @@ func ReplaceReferences(data []byte) ([]byte, []Reference) {
 		}
 
 		out = append(out, data[last:start]...)
-		out = append(out, placeholder(len(refs))...)
-		refs = append(refs, Reference{Name: name, HasDefault: match[4] != -1})
+		out = append(out, replaced.placeholder(len(replaced.References))...)
+		replaced.References = append(replaced.References, Reference{Name: name, HasDefault: match[4] != -1})
 		last = end
 	}
-	return append(out, data[last:]...), refs
+	replaced.Data = append(out, data[last:]...)
+	return replaced
 }
 
-// ReplacedReference returns the reference that value stands for when value is
-// exactly one placeholder written by ReplaceReferences, with nothing around it.
-// refs is the slice ReplaceReferences returned for the bytes value came from.
-func ReplacedReference(value string, refs []Reference) (Reference, bool) {
-	match := placeholderRegex.FindStringSubmatch(value)
-	if match == nil {
+// Reference returns the reference that value stands for when value is exactly
+// one placeholder, with nothing around it. value comes from parsing Data.
+func (r Replaced) Reference(value string) (Reference, bool) {
+	digits, ok := strings.CutPrefix(value, r.prefix)
+	if !ok {
 		return Reference{}, false
 	}
-	index, err := strconv.Atoi(match[1])
-	if err != nil || index >= len(refs) {
+	digits, ok = strings.CutSuffix(digits, "__")
+	if !ok {
 		return Reference{}, false
 	}
-	return refs[index], true
+	index, err := strconv.Atoi(digits)
+	if err != nil || index < 0 || index >= len(r.References) || r.placeholder(index) != value {
+		return Reference{}, false
+	}
+	return r.References[index], true
+}
+
+// HoldsReference reports whether value holds a placeholder, alone or with
+// text around it. value comes from parsing Data.
+func (r Replaced) HoldsReference(value string) bool {
+	return len(r.References) > 0 && strings.Contains(value, r.prefix)
 }
