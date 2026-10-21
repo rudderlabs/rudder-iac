@@ -2,7 +2,7 @@
 
 Every destination spec names a `type`, and that type decides which `config` keys the spec accepts. Each verified type documents those keys in a README in its own directory.
 
-The rules in this file apply to every type. The per-type READMEs cover only what's specific to that destination.
+The rules in this file apply to every type. The per-type READMEs cover only what's specific to that destination. Breaking changes between releases are listed in [BREAKING_CHANGES.md](BREAKING_CHANGES.md).
 
 ## Supported destination types
 
