@@ -225,3 +225,33 @@ spec:
 		})
 	}
 }
+
+// A config error on a key beside a secret prints that key's own line, which
+// holds no secret, so the value the user has to fix stays visible.
+func TestValidatePrintsLinesBesideSecrets(t *testing.T) {
+	t.Parallel()
+
+	out, err := renderLoad(t, map[string]string{"dest.yaml": `version: rudder/v1
+kind: destination
+metadata:
+  name: shop-http
+spec:
+  id: shop-http
+  display_name: Shop HTTP
+  type: http
+  definition_version: 1
+  enabled: true
+  config:
+    api_url: https://example.com/events
+    auth: noAuth
+    method: POST
+    format: JSON
+    headers:
+      - from: '{{ .SECRET }}'
+        to: 'X-Bad:Name'
+`}, map[string]string{"SECRET": "fake-header-secret"})
+	require.ErrorContains(t, err, "syntax validation failed")
+
+	assert.Contains(t, out, "   18 | to: X-Bad:Name\n")
+	assert.NotContains(t, out, "fake-header-secret")
+}

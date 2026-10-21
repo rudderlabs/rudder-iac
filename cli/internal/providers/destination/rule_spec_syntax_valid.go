@@ -129,7 +129,7 @@ func (r *specSyntaxValidRule) Validate(ctx *vrules.ValidationContext) []vrules.V
 			Reference: "/config" + configErr.Path,
 			Message:   configErr.Message,
 			// Substitution has already run, so the line can show a real secret.
-			Sensitive: showsSecret(secretKeys, configErr.Path),
+			Sensitive: showsSecret(secretKeys, spec.Config, configErr.Path),
 		})
 	}
 
