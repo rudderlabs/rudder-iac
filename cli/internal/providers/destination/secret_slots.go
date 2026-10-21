@@ -35,8 +35,8 @@ type secretSlot struct {
 // readSecretSlots returns the secret key values of the destination spec in
 // source. A spec it cannot read has none, and the syntax rule reports it. That
 // includes a spec whose type is unregistered or a reference, since the type
-// decides which keys are secret. A key holding null or an empty string is left
-// out, since it holds no secret.
+// decides which keys are secret. A key holding null, an empty string or a
+// value read from each event is left out, since it holds no secret.
 func readSecretSlots(registry *definitions.Registry, file string, source []byte) []secretSlot {
 	replaced := varsubst.ReplaceReferences(source)
 
@@ -71,7 +71,7 @@ func readSecretSlots(registry *definitions.Registry, file string, source []byte)
 
 	var slots []secretSlot
 	for _, value := range secretValues(spec.config, masked.config, secretKeys) {
-		if value.value == nil || value.value == "" {
+		if value.value == nil || value.value == "" || readsEvent(value.value) {
 			continue
 		}
 
@@ -119,6 +119,27 @@ func specSecretKeys(registry *definitions.Registry, spec sourceSpec) []string {
 		}
 	}
 	return secretKeys
+}
+
+// readsEvent reports whether value is one the destination reads from each
+// event at delivery, so it holds no secret: a JSONPath such as $.messageId, or
+// a template such as {{ message.userId || "" }} with an empty fallback. A
+// template with a fallback is still reported, since the fallback is a literal.
+func readsEvent(value any) bool {
+	s, ok := value.(string)
+	if !ok {
+		return false
+	}
+	if strings.HasPrefix(s, "$.") || strings.HasPrefix(s, "$[") {
+		return true
+	}
+	if !definitions.IsTemplateConfigValue(s) {
+		return false
+	}
+
+	// The template pattern takes the fallback after the last "||".
+	fallback := strings.TrimSpace(strings.TrimSuffix(s[strings.LastIndex(s, "||")+len("||"):], "}}"))
+	return fallback == "" || fallback == `""` || fallback == "''"
 }
 
 // sourceSpec holds the fields of a destination spec that locate its secrets.
