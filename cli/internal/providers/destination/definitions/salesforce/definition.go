@@ -61,11 +61,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "salesforce",
-		APIType:    "SALESFORCE",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"password", "initial_access_token"},
+		Type:        "salesforce",
+		DisplayName: "Salesforce",
+		APIType:     "SALESFORCE",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"password", "initial_access_token"},
 		NewConfig: func() any {
 			return &salesforceConfig{}
 		},

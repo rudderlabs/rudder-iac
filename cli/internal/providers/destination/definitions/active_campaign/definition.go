@@ -74,11 +74,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "active_campaign",
-		APIType:    "ACTIVE_CAMPAIGN",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"actid", "api_key", "event_key"},
+		Type:        "active_campaign",
+		DisplayName: "ActiveCampaign",
+		APIType:     "ACTIVE_CAMPAIGN",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"actid", "api_key", "event_key"},
 		NewConfig: func() any {
 			return &activeCampaignConfig{}
 		},

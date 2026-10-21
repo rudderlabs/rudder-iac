@@ -273,6 +273,7 @@ func TestRegistryRejectsNonSharedConsentModel(t *testing.T) {
 	registry := definitions.NewRegistry()
 	err := registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -295,6 +296,7 @@ func TestRegistryRejectsNonSharedConnectionModeModel(t *testing.T) {
 	registry := definitions.NewRegistry()
 	err := registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -344,9 +346,10 @@ func TestRegistryGetByAPIType(t *testing.T) {
 
 	registry := definitions.NewRegistry()
 	def := &definitions.DestinationDefinition{
-		Type:    "s3",
-		APIType: "S3",
-		Version: 1,
+		Type:        "s3",
+		DisplayName: "Test",
+		APIType:     "S3",
+		Version:     1,
 		NewConfig: func() any {
 			return &struct {
 				BucketName string `mapstructure:"bucket_name" validate:"required"`
@@ -386,9 +389,10 @@ func TestRegistryDuplicateAPITypeVersion(t *testing.T) {
 
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
-		Type:    "s3",
-		APIType: "S3",
-		Version: 1,
+		Type:        "s3",
+		DisplayName: "Test",
+		APIType:     "S3",
+		Version:     1,
 		NewConfig: func() any {
 			return &struct {
 				BucketName string `mapstructure:"bucket_name" validate:"required"`
@@ -397,9 +401,10 @@ func TestRegistryDuplicateAPITypeVersion(t *testing.T) {
 	}))
 
 	err := registry.Register(&definitions.DestinationDefinition{
-		Type:    "amazon_s3",
-		APIType: "S3",
-		Version: 1,
+		Type:        "amazon_s3",
+		DisplayName: "Test",
+		APIType:     "S3",
+		Version:     1,
 		NewConfig: func() any {
 			return &struct {
 				BucketName string `mapstructure:"bucket_name" validate:"required"`

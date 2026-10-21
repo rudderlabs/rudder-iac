@@ -84,11 +84,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "redis",
-		APIType:    "REDIS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"password", "ca_certificate"},
+		Type:        "redis",
+		DisplayName: "Redis",
+		APIType:     "REDIS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"password", "ca_certificate"},
 		NewConfig: func() any {
 			return &redisConfig{}
 		},

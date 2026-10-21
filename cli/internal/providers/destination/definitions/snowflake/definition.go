@@ -337,10 +337,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "snowflake",
-		APIType:    "SNOWFLAKE",
-		Version:    1,
-		Properties: properties,
+		Type:        "snowflake",
+		DisplayName: "Snowflake",
+		APIType:     "SNOWFLAKE",
+		Version:     1,
+		Properties:  properties,
 		// The full db-config secretKeys set, translated to snake_case. All eight
 		// are top-level, so none depend on nested secret-path support.
 		SecretKeys: []string{

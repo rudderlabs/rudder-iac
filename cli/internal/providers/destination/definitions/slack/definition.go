@@ -115,11 +115,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "slack",
-		APIType:    "SLACK",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{},
+		Type:        "slack",
+		DisplayName: "Slack",
+		APIType:     "SLACK",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{},
 		NewConfig: func() any {
 			return &slackConfig{}
 		},

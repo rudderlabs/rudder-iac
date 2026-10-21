@@ -118,6 +118,33 @@ func MatchPattern(name, value string) bool {
 	return registry.match(name, value)
 }
 
+// PatternInfo is what a named pattern checks: a value must match Regex and,
+// when Reject is set, must not match Reject. Message is the validation message.
+type PatternInfo struct {
+	Regex   string
+	Reject  string
+	Message string
+}
+
+// LookupPattern returns the named pattern as it was registered. Exposed so
+// generated documentation shows the regexes validation runs instead of a
+// hand-copied version of them.
+func LookupPattern(name string) (PatternInfo, bool) {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
+
+	pattern, ok := registry.patterns[name]
+	if !ok {
+		return PatternInfo{}, false
+	}
+
+	info := PatternInfo{Regex: pattern.String(), Message: registry.errors[name]}
+	if reject, ok := registry.rejects[name]; ok {
+		info.Reject = reject.String()
+	}
+	return info, true
+}
+
 // GetPatternValidator returns the global pattern validator that should be registered
 // in ValidateStruct. This validator handles all validate:"pattern=name" tags.
 func GetPatternValidator() rules.CustomValidateFunc {

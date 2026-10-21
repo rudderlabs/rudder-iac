@@ -69,10 +69,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "gtm",
-		APIType:    "GTM",
-		Version:    1,
-		Properties: properties,
+		Type:        "gtm",
+		DisplayName: "Google Tag Manager",
+		APIType:     "GTM",
+		Version:     1,
+		Properties:  properties,
 		NewConfig: func() any {
 			return &gtmConfig{}
 		},

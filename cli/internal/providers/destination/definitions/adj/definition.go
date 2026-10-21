@@ -112,10 +112,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "adj",
-		APIType:    "ADJ",
-		Version:    1,
-		Properties: properties,
+		Type:        "adj",
+		DisplayName: "Adjust",
+		APIType:     "ADJ",
+		Version:     1,
+		Properties:  properties,
 		// db-config declares no secretKeys. Terraform marks app_token Sensitive, but
 		// db-config is authoritative for write-only values: the API returns app_token,
 		// so wrapping it as a secret would make the destination diff on every apply

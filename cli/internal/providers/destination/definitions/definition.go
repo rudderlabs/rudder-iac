@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -20,6 +21,9 @@ var sourceTypeConfigKeys = []string{
 type DestinationDefinition struct {
 	// Type is the local YAML / registry key (e.g. "s3").
 	Type string
+	// DisplayName is the destination's product name (e.g. "Amazon S3"), which
+	// `rudder-cli docs destination` prints next to Type. Registration requires it.
+	DisplayName string
 	// APIType is the upstream API destination type (e.g. "S3").
 	// When empty at registration, it defaults to Type.
 	APIType         string
@@ -72,6 +76,10 @@ type RegisteredDefinition struct {
 	// configDefaults holds the config model's `default` tags keyed by local
 	// config key, applied to local specs via ApplyDefaults.
 	configDefaults map[string]any
+	// fields and patterns are the described config model, built once at
+	// registration so a definition Describe cannot read fails to register.
+	fields   []Field
+	patterns map[string]funcs.PatternInfo
 }
 
 // ValidateConfig validates config with its defaults applied, since that is what
@@ -258,12 +266,57 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 		return nil, fmt.Errorf("building config defaults: %w", err)
 	}
 
+	if err := validateSecretKeys(def, configType); err != nil {
+		return nil, fmt.Errorf("validating secret keys: %w", err)
+	}
+
+	fields, patterns, err := describeConfig(def, configType, keyPathSourceTypes, configDefaults)
+	if err != nil {
+		return nil, fmt.Errorf("describing config model: %w", err)
+	}
+
 	return &RegisteredDefinition{
 		DestinationDefinition: def,
 		configType:            configType,
 		keyPathSourceTypes:    keyPathSourceTypes,
 		configDefaults:        configDefaults,
+		fields:                fields,
+		patterns:              patterns,
 	}, nil
+}
+
+// validateSecretKeys requires every secret key to resolve to a string field,
+// stepping through nested objects and lists of objects. Apply, import and the
+// docs command all act on these paths, and a path the config model lacks
+// would leave a secret unmasked with nothing to flag it.
+func validateSecretKeys(def *DestinationDefinition, configType reflect.Type) error {
+	for _, key := range def.SecretKeys {
+		if err := resolveSecretKey(configType, key); err != nil {
+			return fmt.Errorf("secret key %q: %w", key, err)
+		}
+	}
+	return nil
+}
+
+func resolveSecretKey(configType reflect.Type, key string) error {
+	current := derefType(configType)
+	for _, segment := range strings.Split(key, ".") {
+		if current.Kind() == reflect.Slice || current.Kind() == reflect.Array {
+			current = derefType(current.Elem())
+		}
+		if current.Kind() != reflect.Struct {
+			return fmt.Errorf("%q is not inside an object or a list of objects", segment)
+		}
+		field, ok := structFieldsByMapstructureTag(current)[segment]
+		if !ok {
+			return fmt.Errorf("%q is not a config model field", segment)
+		}
+		current = derefType(field.Type)
+	}
+	if current.Kind() != reflect.String {
+		return fmt.Errorf("resolves to a %s field, not a string", current.Kind())
+	}
+	return nil
 }
 
 // validateConnectionRequiredKeys rejects entries for source types outside

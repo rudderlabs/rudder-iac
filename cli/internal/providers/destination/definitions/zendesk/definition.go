@@ -66,11 +66,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "zendesk",
-		APIType:    "ZENDESK",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"api_token"},
+		Type:        "zendesk",
+		DisplayName: "Zendesk",
+		APIType:     "ZENDESK",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"api_token"},
 		NewConfig: func() any {
 			return &zendeskConfig{}
 		},
