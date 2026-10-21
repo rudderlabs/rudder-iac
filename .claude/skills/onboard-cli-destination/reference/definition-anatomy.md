@@ -75,8 +75,9 @@ func NewDefinition() *definitions.DestinationDefinition {
     properties = append(properties, common.Properties(sourceTypes)...)
 
     return &definitions.DestinationDefinition{
-        Type:       "s3",       // lowercase(APIType), deterministic; equals the input localType
-        APIType:    "S3",       // upstream API type, derived from db-config.json "name" (Step 1)
+        Type:        "s3",        // lowercase(APIType), deterministic; equals the input localType
+        DisplayName: "Amazon S3", // db-config.json "displayName"; registration rejects an empty one
+        APIType:     "S3",        // upstream API type, derived from db-config.json "name" (Step 1)
         Version:    1,          // = terraform ConfigMeta.Version
         Properties: properties,
         SecretKeys: []string{"access_key_id", "access_key"}, // snake_case LOCAL keys
@@ -144,11 +145,19 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
   objects and lists of objects.
 - Every `validate` rule on the config struct must be one that
   `(*RegisteredDefinition).Describe` reads (`required`, `required_if`,
-  `required_unless`, `required_with`, `excluded_with`, `oneof`,
-  `dynamic_or_oneof`, `pattern`, `dynamic_or_pattern`, `max`, `dive`,
+  `required_unless`, `required_with`, `excluded_with`, `excluded_if`, `oneof`,
+  `dynamic_or_oneof`, `pattern`, `dynamic_or_pattern`, `min`, `max`, `dive`,
   `omitempty`) or a tag in the definition's `ConfigValidateFuncs`. Named
   patterns must be registered. This keeps `rudder-cli docs destination` able to
   describe every definition.
+- Registration also rejects rule shapes the docs would misstate:
+  - after `dive`, any rule but `oneof`, `dynamic_or_oneof`, `pattern`,
+    `dynamic_or_pattern` or a custom tag;
+  - `required` on a key inside a nested block that is not a pointer, since
+    go-playground checks it even when the spec leaves the block out;
+  - a `required*` rule on a `bool` or number that is not a pointer, since it
+    rejects `false` or `0`;
+  - `|`, a quoted value, or a `0x2C` or `0x7C` escape in a tag.
 
 ## Validation semantics to remember
 

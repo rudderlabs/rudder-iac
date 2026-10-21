@@ -202,22 +202,22 @@ var entries = []Entry{
 ```
 
 The definition must set `DisplayName`, the product name from integrations-config
-`db-config.json` `displayName`; registration rejects an empty one. The verified
-entries are reserved for definitions already proven
-against a live stack — `bqstream`, `s3`, `http`, `active_campaign`,
-`attentive_tag` and `bq` today. Marking an entry verified is a separate, deliberate
-change after that verification; it is never part of the onboarding PR, no matter
-how simple the destination looks.
+`db-config.json` `displayName`; registration rejects an empty one. The entries
+marked `Verified: true` are reserved for definitions already proven against a
+live stack. Marking an entry verified is a separate, deliberate change after
+that verification. It is never part of the onboarding PR, no matter how simple
+the destination looks.
 
 Then update the flag-matrix expectation in
 `cli/internal/app/dependencies_test.go`: add the new type to the
 `wantTypes` list of the unverified-destinations-enabled case only (`SupportedTypes()` is
 sorted, so insert alphabetically). The unverified-disabled case must keep only
 verified destinations; if adding the type there makes a test
-pass, the registration landed in the wrong block.
+pass, the entry was marked verified by mistake.
 
 Registration itself validates the definition (source types mapped, connection
-modes complete for every source type, consent field type). A broken definition
+modes complete for every source type, consent field type, and every validate
+rule one `rudder-cli docs destination` can describe). A broken definition
 fails every test that builds the registry — good early signal.
 
 ### Step 6: Write definition_test.go
