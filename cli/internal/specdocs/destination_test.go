@@ -1,6 +1,8 @@
 package specdocs_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strings"
@@ -265,6 +267,55 @@ func substituteSlots(config map[string]any, value string) map[string]any {
 		out[key] = v
 	}
 	return out
+}
+
+// A caller iterates the document's lists with jq or a JSON decoder, so none
+// may come out null, whatever the type declares.
+func TestListsAreNeverNull(t *testing.T) {
+	t.Parallel()
+
+	docs, registry := newDestinations(t)
+
+	for _, registered := range registry.Definitions() {
+		for _, opts := range []specdocs.DescribeOptions{
+			{Type: registered.Type, Version: registered.Version},
+			{Type: registered.Type, Version: registered.Version, ID: "dest-id"},
+		} {
+			doc := describeJSON(t, docs, opts)
+			for _, key := range []string{"secretKeys", "fields", "customValidators"} {
+				assert.IsType(t, []any{}, doc[key], "%s %s", registered.Type, key)
+			}
+			for token, modes := range doc["connectionModes"].(map[string]any) {
+				assert.IsType(t, []any{}, modes.(map[string]any)["modes"], "%s %s", registered.Type, token)
+			}
+		}
+	}
+
+	list, err := docs.List(specdocs.ListOptions{})
+	require.NoError(t, err)
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal(encode(t, list), &decoded))
+	for _, d := range decoded["destinations"].([]any) {
+		summary := d.(map[string]any)
+		assert.IsType(t, []any{}, summary["sourceTypes"], summary["type"])
+		assert.IsType(t, []any{}, summary["definitionVersions"], summary["type"])
+	}
+}
+
+func describeJSON(t *testing.T, docs *specdocs.Destinations, opts specdocs.DescribeOptions) map[string]any {
+	t.Helper()
+
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal(encode(t, describe(t, docs, opts)), &decoded))
+	return decoded
+}
+
+func encode(t *testing.T, v any) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	require.NoError(t, specdocs.WriteJSON(&buf, v))
+	return buf.Bytes()
 }
 
 func TestDescribeNarrowsToTheSource(t *testing.T) {

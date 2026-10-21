@@ -243,6 +243,11 @@ func (d *Destinations) Describe(opts DescribeOptions) (DestinationDoc, error) {
 	if !doc.Verified {
 		doc.Enable = unverifiedEnable()
 	}
+	// A definition may declare SecretKeys as an empty list, which copies to
+	// nil; the contract prints every list as an array, never null.
+	if doc.SecretKeys == nil {
+		doc.SecretKeys = []string{}
+	}
 
 	for _, f := range desc.Fields {
 		if source != nil && len(f.OnlyForSourceTypes) > 0 && !slices.Contains(f.OnlyForSourceTypes, source.Token) {
