@@ -178,7 +178,8 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 // caller uses it to avoid printing the failure a second time. It does not say
 // why the load failed: under the JSON renderer a missing --location matches it,
 // while under the text renderer the same error does not, because the caller
-// still has to print it. Classify a failure by its cause, not by ErrReported.
+// still has to print it. Do not use it to classify a failure, for example to
+// pick an exit code.
 var ErrReported = errors.New("already reported")
 
 // reported is a load error the renderer already wrote out. It matches

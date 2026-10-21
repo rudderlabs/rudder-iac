@@ -386,7 +386,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 		substitutor varsubst.Substitutor
 		rawSpecs    map[string][]byte
 		wantErr     string // empty when Load should succeed
-		wantMatches bool   // the document holds the failure, so ErrReported applies
+		wantMatches bool   // the rendered output holds the failure, so ErrReported applies
 		wantSpecs   map[string]*specs.Spec
 	}{
 		{

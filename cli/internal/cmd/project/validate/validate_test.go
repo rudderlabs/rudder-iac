@@ -138,11 +138,19 @@ func (f *fakeProject) Load(string) error {
 
 func (f *fakeProject) Specs() map[string]*specs.Spec { return f.specs }
 
+// reportedError stands in for a failure the project already rendered. Like the
+// real one it matches project.ErrReported, and its message is the one the CLI
+// prints.
+type reportedError struct{ msg string }
+
+func (e reportedError) Error() string        { return e.msg }
+func (e reportedError) Is(target error) bool { return target == project.ErrReported }
+
 func TestRun(t *testing.T) {
 	t.Parallel()
 
 	legacy := map[string]*specs.Spec{"a.yaml": {Version: specs.SpecVersionV0_1}}
-	reportedFailure := fmt.Errorf("semantic validation failed: %w", project.ErrReported)
+	reportedFailure := reportedError{msg: "semantic validation failed"}
 	// The document holds the substitution diagnostics but not this hint.
 	varFileHint := errors.New("variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file")
 
@@ -172,7 +180,7 @@ func TestRun(t *testing.T) {
 			name:       "json: a validation failure is not printed again",
 			json:       true,
 			loadErr:    reportedFailure,
-			wantErr:    "validating project: semantic validation failed: already reported",
+			wantErr:    "validating project: semantic validation failed",
 			wantSilent: true,
 			wantStdout: "{doc}",
 		},
@@ -186,7 +194,7 @@ func TestRun(t *testing.T) {
 		{
 			name:       "text: a validation failure is returned for printing",
 			loadErr:    reportedFailure,
-			wantErr:    "validating project: semantic validation failed: already reported",
+			wantErr:    "validating project: semantic validation failed",
 			wantStdout: "{doc}",
 		},
 	}
