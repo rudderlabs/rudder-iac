@@ -29,8 +29,9 @@ type devResponse struct {
 }
 
 // tryDo sends one request and returns the error instead of failing the test,
-// so goroutines can call it. It never follows redirects and never reuses a
-// connection, so one test cannot hold a listener slot for another.
+// so goroutines and require.Eventually conditions can call it. It never
+// follows redirects, so the test sees the listener's own answer, and it closes
+// the connection after the reply.
 func tryDo(method, url string, body []byte, mutate func(*http.Request)) (devResponse, error) {
 	req, err := http.NewRequest(method, url, bytes.NewReader(body))
 	if err != nil {
@@ -133,10 +134,14 @@ func TestSourcesListenCORSCoversIngestionOnly(t *testing.T) {
 	})
 	assert.Equal(t, "https://app.example", ingest.header.Get("Access-Control-Allow-Origin"))
 
+	// The listener answers, since Origin alone is no reason to refuse, but
+	// without Access-Control-Allow-Origin a browser keeps the answer from the
+	// page.
 	for _, path := range []string{"/_dev/v1/info", "/_dev/v1/events", "/_dev/v1/requests", "/_dev/ui/"} {
 		resp := devDo(t, http.MethodGet, p.url()+path, nil, func(r *http.Request) {
 			r.Header.Set("Origin", "https://evil.example")
 		})
+		assert.Equal(t, http.StatusOK, resp.status, path)
 		assert.Empty(t, resp.header.Get("Access-Control-Allow-Origin"), path)
 	}
 
@@ -174,10 +179,12 @@ func TestSourcesListenReviewPageIsLockedDown(t *testing.T) {
 	} {
 		conn, err := net.Dial("tcp", strings.TrimPrefix(p.url(), "http://"))
 		require.NoError(t, err)
+		require.NoError(t, conn.SetReadDeadline(time.Now().Add(10*time.Second)))
 		_, err = fmt.Fprintf(conn, "GET %s HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n", path)
 		require.NoError(t, err)
-		raw, _ := io.ReadAll(conn)
+		raw, err := io.ReadAll(conn)
 		_ = conn.Close()
+		require.NoError(t, err, "%s: the server should answer and close the connection", path)
 		first := strings.SplitN(string(raw), "\r\n", 2)[0]
 		assert.Contains(t, first, "404", path)
 		assert.NotContains(t, string(raw), "root:", path)
@@ -205,7 +212,7 @@ func TestSourcesListenMasksTheWriteKey(t *testing.T) {
 		r.Header.Set("AnonymousId", "anon")
 		r.Header.Set("Cookie", "session="+key)
 	})
-	devDo(t, http.MethodGet, p.url()+"/pixel/v1/track?writeKey="+key+"&anonymousId=a&event=px", nil, nil)
+	curl(t, p.url()+"/pixel/v1/track?writeKey="+key+"&anonymousId=a&event=px")
 
 	// A stored Authorization header holds the key as base64, not as plain text.
 	encoded := base64.StdEncoding.EncodeToString([]byte(key + ":"))
@@ -234,10 +241,10 @@ func TestSourcesListenKeepsTheBytesTheSDKSent(t *testing.T) {
 		`{"userId":"u","event":"bytes","properties":{"a":12345678901234567890,"b":0.1000000000000000055511151231257827,"c":1e308,"d":-0}}`,
 		`{"event":"bytes","userId":"u","properties":{"z":1,"a":2}}`,
 		`{"userId":"u","event":"bytes","properties":{"s":"\u0000é😀 \\ \/"}}`,
+		`{"userId":"u","event":"bytes","properties":{"k":1,"k":2}}`,
 	}
 	for _, payload := range payloads {
-		resp := devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(payload), postJSON)
-		require.Equal(t, http.StatusOK, resp.status, payload)
+		require.Equal(t, http.StatusOK, post(t, p.url()+"/v1/track", payload), payload)
 	}
 
 	got := curl(t, p.url()+"/_dev/v1/events?event=bytes")
@@ -336,9 +343,10 @@ func TestSourcesListenCapsInFlightRequests(t *testing.T) {
 		}
 		return false
 	}, 8*time.Second, 50*time.Millisecond, "one of nine stalled uploads should be refused")
-	assert.Equal(t, http.StatusOK, devDo(t, http.MethodGet, p.url()+"/_dev/v1/info", nil, nil).status,
-		"the query API must not share the ingestion cap")
-	assert.Equal(t, http.StatusOK, devDo(t, http.MethodGet, p.url()+"/_dev/ui/", nil, nil).status)
+	// The query API and the page do not share the ingestion cap, so both
+	// still answer.
+	curl(t, p.url()+"/_dev/v1/info")
+	curl(t, p.url()+"/_dev/ui/")
 
 	// The body must arrive within 10 s, so the slots come back on their own.
 	require.Eventually(t, func() bool {
@@ -408,7 +416,7 @@ func TestSourcesListenCapturesParallelWritersExactly(t *testing.T) {
 func TestSourcesListenEvictsOldestRequestsAndSaysSo(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
-	const total = 10050
+	const total, maxRequests = 10050, 10000
 
 	// One request at a time stays far below the in-flight cap, so none is
 	// refused. post drains each body, so the default client reuses one
@@ -418,23 +426,26 @@ func TestSourcesListenEvictsOldestRequestsAndSaysSo(t *testing.T) {
 		require.Equal(t, http.StatusOK, post(t, p.url()+"/v1/track", `{"userId":"u","event":"flood"}`))
 	}
 
-	var info struct {
-		Cursor int `json:"cursor"`
-		Store  struct {
-			Requests       int `json:"requests"`
-			Evicted        int `json:"evicted"`
-			EvictedThrough int `json:"evictedThrough"`
-			MaxRequests    int `json:"maxRequests"`
-		} `json:"store"`
+	type storeInfo struct {
+		Requests       int `json:"requests"`
+		Evicted        int `json:"evicted"`
+		EvictedThrough int `json:"evictedThrough"`
+		MaxRequests    int `json:"maxRequests"`
 	}
+	type listenerInfo struct {
+		Cursor int       `json:"cursor"`
+		Store  storeInfo `json:"store"`
+	}
+	var info listenerInfo
 	require.NoError(t, json.Unmarshal([]byte(curl(t, p.url()+"/_dev/v1/info")), &info))
-	assert.Equal(t, total, info.Cursor)
-	assert.Equal(t, info.Store.MaxRequests, info.Store.Requests, "a full store holds exactly its cap")
-	assert.Equal(t, total-info.Store.Requests, info.Store.Evicted)
-	assert.Equal(t, info.Store.Evicted, info.Store.EvictedThrough)
+	// A full store holds exactly its cap.
+	assert.Equal(t, listenerInfo{
+		Cursor: total,
+		Store:  storeInfo{Requests: maxRequests, Evicted: total - maxRequests, EvictedThrough: total - maxRequests, MaxRequests: maxRequests},
+	}, info)
 
 	list := curl(t, p.url()+"/_dev/v1/requests?since=0&limit=1&view=compact")
-	assert.Contains(t, list, fmt.Sprintf(`"evictedThrough":%d`, info.Store.EvictedThrough))
+	assert.Contains(t, list, fmt.Sprintf(`"evictedThrough":%d`, total-maxRequests))
 }
 
 // Any page open in the developer's browser can post to the listener. A page
@@ -444,8 +455,7 @@ func TestSourcesListenKeepsCapturesWhenOversizedPostsArrive(t *testing.T) {
 	t.Parallel()
 	p := startListen(t)
 	for _, name := range []string{"first", "second", "third"} {
-		resp := devDo(t, http.MethodPost, p.url()+"/v1/track", []byte(`{"userId":"u","event":"`+name+`"}`), postJSON)
-		require.Equal(t, http.StatusOK, resp.status)
+		require.Equal(t, http.StatusOK, post(t, p.url()+"/v1/track", `{"userId":"u","event":"`+name+`"}`))
 	}
 
 	oversized := []byte(`{"userId":"` + strings.Repeat("a", 2_100_000) + `"}`)
@@ -457,7 +467,7 @@ func TestSourcesListenKeepsCapturesWhenOversizedPostsArrive(t *testing.T) {
 		require.Equal(t, http.StatusRequestEntityTooLarge, resp.status)
 	}
 
-	events := devDo(t, http.MethodGet, p.url()+"/_dev/v1/events?since=0", nil, nil)
-	assert.Equal(t, 3, len(strings.Split(strings.TrimSpace(events.body), "\n")),
-		"40 refused 2 MB posts evicted the earlier captures: %s", events.body)
+	events := curl(t, p.url()+"/_dev/v1/events?since=0")
+	assert.Equal(t, 3, len(strings.Split(strings.TrimSpace(events), "\n")),
+		"40 refused 2 MB posts evicted the earlier captures: %s", events)
 }

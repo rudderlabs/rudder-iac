@@ -29,8 +29,8 @@ jobs:
       - uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
           go-version-file: go.mod
-      # Repeats expose slot leaks, port races and ordering bugs that one pass hides.
-      - name: hardening tests, 5 passes under the race detector
+      # Each run starts fresh listeners, so the repeats find flaky tests.
+      - name: sources listen tests, 5 passes under the race detector
         run: go test -race -count=5 ./cli/tests -run 'TestSourcesListen' -v
       - name: fuzz the body reader, 10 minutes
         run: go test ./cli/internal/devlisten/ingest -run '^$' -fuzz '^FuzzBody$' -fuzztime 10m
