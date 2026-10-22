@@ -25,8 +25,8 @@ var (
 	consentValuePattern         = regexp.MustCompile(ConsentValueRegex)
 )
 
-// ConsentProviders returns the values a consent entry's provider accepts.
-// ValidateConsentEntries and the docs command both read it.
+// ConsentProviders returns a copy of the provider values ValidateConsentEntries
+// accepts, for Describe to document.
 func ConsentProviders() []string {
 	return slices.Clone(consentProviders)
 }
