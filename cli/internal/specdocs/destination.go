@@ -240,7 +240,7 @@ func (d *Destinations) Describe(opts DescribeOptions) (DestinationDoc, error) {
 	}
 
 	if opts.ID != "" {
-		if err := validateID(opts.ID); err != nil {
+		if err := ValidateID(opts.ID); err != nil {
 			return DestinationDoc{}, err
 		}
 	}
@@ -407,10 +407,11 @@ func slot(varName string) string {
 // idAdvice is the rule both checks on an ID add up to.
 const idAdvice = "use an ID of 2 to 100 letters, digits, underscores and hyphens that does not start with a digit"
 
-// validateID checks what id becomes: the template's display_name, and the
-// secret variable names. Registration requires snake_case secret keys, which
-// only add valid characters to a name, so the ID's own part decides.
-func validateID(id string) error {
+// ValidateID returns the invalid_id error for an --id the spec cannot use, or
+// nil. It checks what id becomes: the template's display_name, and the secret
+// variable names. Registration requires snake_case secret keys, which only
+// add valid characters to a name, so the ID's own part decides.
+func ValidateID(id string) error {
 	if !funcs.MatchPattern(destination.DisplayNamePattern, id) {
 		pattern, _ := funcs.LookupPattern(destination.DisplayNamePattern)
 		return invalidID(fmt.Sprintf("--id %q is also the spec's display_name, which %s; %s", id, pattern.Message, idAdvice))

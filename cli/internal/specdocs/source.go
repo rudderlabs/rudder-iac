@@ -37,6 +37,13 @@ func sortedSourceTypes() []string {
 	return types
 }
 
+// ValidateSource returns the unknown_source error for a --source value that
+// is not a source spec type, or nil.
+func ValidateSource(sourceType string) error {
+	_, err := resolveSource(sourceType)
+	return err
+}
+
 // resolveSource accepts only a source spec's own type values. A token such
 // as "web" is rejected: SourceTypeToken maps every unknown value to "cloud",
 // so accepting tokens would silently mean something else.

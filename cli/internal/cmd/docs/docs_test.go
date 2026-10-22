@@ -187,6 +187,8 @@ func TestInputErrorsWithJSON(t *testing.T) {
 		destTypes   = supportedTypes(t)
 		sourceTypes = slices.Sorted(slices.Values(source.SourceTypes()))
 		idAdvice    = "use an ID of 2 to 100 letters, digits, underscores and hyphens that does not start with a digit"
+		// displayNameRule is the display_name pattern's message.
+		displayNameRule = "must be 2-100 characters and contain only letters, digits, underscores, spaces, periods, and hyphens"
 	)
 	cases := []struct {
 		name string
@@ -224,6 +226,44 @@ func TestInputErrorsWithJSON(t *testing.T) {
 					"android", "android_kotlin", "cordova", "dotnet", "flutter", "go", "ios", "ios_swift",
 					"java", "node", "php", "python", "react_native", "ruby", "rust", "unity",
 				},
+			},
+		},
+		{
+			name: "an empty --source, as an unset shell variable gives",
+			args: []string{"docs", "destination", "webhook", "--source", "", "--id", "shop", "--json"},
+			want: specdocs.Error{
+				Code:        "unknown_source",
+				Message:     `source type "" is not an event stream source spec type`,
+				Suggestions: []string{},
+				ValidTypes:  sourceTypes,
+			},
+		},
+		{
+			name: "a listing narrowed to an empty --source",
+			args: []string{"docs", "destination", "--source", "", "--json"},
+			want: specdocs.Error{
+				Code:        "unknown_source",
+				Message:     `source type "" is not an event stream source spec type`,
+				Suggestions: []string{},
+				ValidTypes:  sourceTypes,
+			},
+		},
+		{
+			name: "an empty --id",
+			args: []string{"docs", "destination", "webhook", "--source", "javascript", "--id", "", "--json"},
+			want: specdocs.Error{
+				Code:        "invalid_id",
+				Message:     `--id "" is also the spec's display_name, which ` + displayNameRule + "; " + idAdvice,
+				Suggestions: []string{},
+			},
+		},
+		{
+			name: "an empty --id without a type",
+			args: []string{"docs", "destination", "--id=", "--json"},
+			want: specdocs.Error{
+				Code:        "invalid_id",
+				Message:     `--id "" is also the spec's display_name, which ` + displayNameRule + "; " + idAdvice,
+				Suggestions: []string{},
 			},
 		},
 		{

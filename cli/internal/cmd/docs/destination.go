@@ -89,6 +89,13 @@ func newCmdDestination() *cobra.Command {
 				Message:    "the destination type argument is empty",
 				ValidTypes: registry.SupportedTypes(),
 			})
+		// specdocs reads an empty source or ID as the flag left out. An empty
+		// value given on purpose, such as an unset shell variable, would then
+		// print a document for every source, so it fails as a bad value.
+		case cmd.Flags().Changed("source") && source == "":
+			return fail(out, format, cliVersion, specdocs.ValidateSource(source))
+		case cmd.Flags().Changed("id") && id == "":
+			return fail(out, format, cliVersion, specdocs.ValidateID(id))
 		}
 
 		if destType == "" {
