@@ -983,7 +983,9 @@ func TestProject_Load_SetupFailureRendersCollectedDiagnostics(t *testing.T) {
 					for _, d := range doc.Diagnostics {
 						got = append(got, d.RuleID)
 					}
-					assert.Equal(t, tc.wantRules, got)
+					// require, so an empty array fails this run instead of
+					// panicking on the index below and stopping every test.
+					require.Equal(t, tc.wantRules, got)
 					assert.Contains(t, doc.Diagnostics[len(doc.Diagnostics)-1].Message, tc.wantMessage)
 					return
 				}
