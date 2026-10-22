@@ -172,37 +172,60 @@ func TestDescribeReadsTheConfigModel(t *testing.T) {
 	}, registered.Describe())
 }
 
-// A source token whose definition replaces the canonical consent check keeps
-// no consent entry rules, since only the override's code says what it accepts.
-func TestDescribeLeavesOutOverriddenConsentTokens(t *testing.T) {
+// A definition that replaces the canonical consent check for any source token
+// documents no consent entry rules, since only the override's code says what
+// it accepts. Narrowing them to the other tokens would read, under --source,
+// as if the overridden token took no consent entries.
+func TestDescribeLeavesOutConsentEntriesWhenOverridden(t *testing.T) {
 	t.Parallel()
 
 	override := func([]common.ConsentEntry) []common.ConsentValidationError { return nil }
-	consentKeys := func(t *testing.T, overrides map[string]common.ConsentValidator) map[string][]string {
-		t.Helper()
-
-		def := describeDefinition()
-		def.ConsentValidationOverrides = overrides
-		registry := definitions.NewRegistry()
-		require.NoError(t, registry.Register(def))
-		registered, err := registry.Get("describe", 1)
-		require.NoError(t, err)
-
-		keys := map[string][]string{}
-		for _, f := range registered.Describe().Fields {
-			if strings.HasPrefix(f.Key, "consent_management.") {
-				keys[f.Key] = f.OnlyForSourceTypes
-			}
-		}
-		return keys
+	cases := []struct {
+		name      string
+		overrides map[string]common.ConsentValidator
+		want      []string
+	}{
+		{
+			name: "no override",
+			want: []string{
+				"consent_management.<sourceToken>[].provider",
+				"consent_management.<sourceToken>[].resolution_strategy",
+				"consent_management.<sourceToken>[].consents",
+			},
+		},
+		{
+			name:      "an override on one source token",
+			overrides: map[string]common.ConsentValidator{"web": override},
+		},
+		{
+			name:      "an override on every source token",
+			overrides: map[string]common.ConsentValidator{"web": override, "cloud": override},
+		},
 	}
 
-	assert.Equal(t, map[string][]string{
-		"consent_management.<sourceToken>[].provider":            {"cloud"},
-		"consent_management.<sourceToken>[].resolution_strategy": {"cloud"},
-		"consent_management.<sourceToken>[].consents":            {"cloud"},
-	}, consentKeys(t, map[string]common.ConsentValidator{"web": override}))
-	assert.Empty(t, consentKeys(t, map[string]common.ConsentValidator{"web": override, "cloud": override}))
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			def := describeDefinition()
+			def.ConsentValidationOverrides = tc.overrides
+			registry := definitions.NewRegistry()
+			require.NoError(t, registry.Register(def))
+			registered, err := registry.Get("describe", 1)
+			require.NoError(t, err)
+			desc := registered.Describe()
+
+			var entryKeys []string
+			for _, f := range desc.Fields {
+				if strings.HasPrefix(f.Key, "consent_management.") {
+					entryKeys = append(entryKeys, f.Key)
+				}
+			}
+			assert.Equal(t, tc.want, entryKeys)
+			_, hasPattern := desc.Patterns[common.ConsentValuePattern]
+			assert.Equal(t, len(tc.want) > 0, hasPattern, "the consent_value pattern")
+		})
+	}
 }
 
 func TestDescribeReturnsACopy(t *testing.T) {

@@ -178,24 +178,22 @@ const SourceTokenKey = "<sourceToken>"
 // it cannot describe, so a rule added to a definition without teaching the
 // walker about it fails registration instead of going undocumented.
 type configWalker struct {
-	customTags       []string
-	gated            map[string][]string
-	defaults         map[string]any
-	secretKeys       []string
-	sourceTypes      []string
-	consentOverrides map[string]common.ConsentValidator
-	fields           []Field
-	patterns         map[string]funcs.PatternInfo
+	customTags        []string
+	gated             map[string][]string
+	defaults          map[string]any
+	secretKeys        []string
+	consentOverridden bool
+	fields            []Field
+	patterns          map[string]funcs.PatternInfo
 }
 
 func describeConfig(def *DestinationDefinition, configType reflect.Type, gated map[string][]string, defaults map[string]any) ([]Field, map[string]funcs.PatternInfo, error) {
 	w := &configWalker{
-		gated:            gated,
-		defaults:         defaults,
-		secretKeys:       def.SecretKeys,
-		sourceTypes:      def.SourceTypes,
-		consentOverrides: def.ConsentValidationOverrides,
-		patterns:         map[string]funcs.PatternInfo{},
+		gated:             gated,
+		defaults:          defaults,
+		secretKeys:        def.SecretKeys,
+		consentOverridden: len(def.ConsentValidationOverrides) > 0,
+		patterns:          map[string]funcs.PatternInfo{},
 	}
 	for _, fn := range def.ConfigValidateFuncs {
 		w.customTags = append(w.customTags, fn.Tag)
@@ -309,11 +307,13 @@ func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructF
 
 // describeConsentEntries describes the items of consent_management, which
 // common.ValidateConsentEntries checks in Go code rather than through
-// validate tags. A source token whose definition overrides that check is
-// left out, since only the override's code says what it accepts.
+// validate tags. A definition that overrides that check for any source token
+// gets no entry rules, since only the override's code says what it accepts.
+// Narrowing the rules to the other tokens would need a field that says
+// "described for", which OnlyForSourceTypes ("valid for") is not, and no
+// definition sets an override yet.
 func (w *configWalker) describeConsentEntries(key string, gate []string) error {
-	gate, described := w.consentGate(gate)
-	if !described {
+	if w.consentOverridden {
 		return nil
 	}
 
@@ -352,25 +352,6 @@ func (w *configWalker) describeConsentEntries(key string, gate []string) error {
 		},
 	)
 	return nil
-}
-
-// consentGate narrows gate to the source tokens the canonical consent check
-// applies to. It reports false when every token has an override.
-func (w *configWalker) consentGate(gate []string) ([]string, bool) {
-	if len(w.consentOverrides) == 0 {
-		return gate, true
-	}
-	tokens := gate
-	if len(tokens) == 0 {
-		tokens = w.sourceTypes
-	}
-	var canonical []string
-	for _, token := range tokens {
-		if _, overridden := w.consentOverrides[token]; !overridden {
-			canonical = append(canonical, token)
-		}
-	}
-	return canonical, len(canonical) > 0
 }
 
 func anyValues(values []string) []any {
