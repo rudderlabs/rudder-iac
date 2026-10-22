@@ -195,7 +195,7 @@ and one entry to the `entries` table in
 unverified entries and without `Verified: true`:
 
 ```go
-var entries = []Entry{
+var entries = []entry{
     // ... verified entries, then the existing unverified ones ...
     {NewDefinition: <pkg>.NewDefinition},
 }

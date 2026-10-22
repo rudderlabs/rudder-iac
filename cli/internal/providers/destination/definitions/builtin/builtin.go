@@ -60,8 +60,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/zendesk"
 )
 
-// Entry is one compiled destination definition.
-type Entry struct {
+// entry is one compiled destination definition.
+type entry struct {
 	NewDefinition func() *definitions.DestinationDefinition
 	// Verified definitions always register. The others register only behind
 	// the unverifiedDestinations experimental flag.
@@ -70,7 +70,7 @@ type Entry struct {
 
 // entries are in registration order: verified first, then unverified. Every
 // newly onboarded definition starts unverified.
-var entries = []Entry{
+var entries = []entry{
 	{NewDefinition: bqstream.NewDefinition, Verified: true},
 	{NewDefinition: s3.NewDefinition, Verified: true},
 	{NewDefinition: httpdest.NewDefinition, Verified: true},

@@ -206,7 +206,7 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 verified ones always, the rest only under `UnverifiedDestinations`.
 
 ```go
-var entries = []Entry{
+var entries = []entry{
     {NewDefinition: s3.NewDefinition, Verified: true},
     // ...
     {NewDefinition: <pkg>.NewDefinition}, // the new definition, unverified

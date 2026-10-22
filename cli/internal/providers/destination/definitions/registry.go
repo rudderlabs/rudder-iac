@@ -170,8 +170,9 @@ func (r *Registry) GetByAPIType(apiType string, version int64) (*RegisteredDefin
 	return registered, nil
 }
 
-// Definitions returns every registered definition in deterministic type and
-// version order so generated schema variants are stable.
+// Definitions returns every registered definition, ordered by type and then
+// version. The docs command reads it to suggest a type by display name, and
+// tests read it to cover every definition in a stable order.
 func (r *Registry) Definitions() []*RegisteredDefinition {
 	definitions := make([]*RegisteredDefinition, 0, len(r.byTypeVersion))
 	for _, definition := range r.byTypeVersion {
