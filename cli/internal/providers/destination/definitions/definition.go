@@ -266,13 +266,13 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 		return nil, fmt.Errorf("building config defaults: %w", err)
 	}
 
-	if err := validateSecretKeys(def, configType); err != nil {
-		return nil, fmt.Errorf("validating secret keys: %w", err)
-	}
-
 	fields, patterns, err := describeConfig(def, configType, keyPathSourceTypes, configDefaults)
 	if err != nil {
 		return nil, fmt.Errorf("describing config model: %w", err)
+	}
+
+	if err := validateSecretKeys(def.SecretKeys, fields); err != nil {
+		return nil, fmt.Errorf("validating secret keys: %w", err)
 	}
 
 	return &RegisteredDefinition{
@@ -285,36 +285,23 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 	}, nil
 }
 
-// validateSecretKeys requires every secret key to resolve to a string field,
-// stepping through nested objects and lists of objects. Apply, import and the
-// docs command all act on these paths, and a path the config model lacks
-// would leave a secret unmasked with nothing to flag it.
-func validateSecretKeys(def *DestinationDefinition, configType reflect.Type) error {
-	for _, key := range def.SecretKeys {
-		if err := resolveSecretKey(configType, key); err != nil {
-			return fmt.Errorf("secret key %q: %w", key, err)
-		}
+// validateSecretKeys requires every secret key to name a string field of the
+// described config, through nested objects and lists of objects. Apply, import
+// and the docs command all act on these paths, and a path the config model
+// lacks would leave a secret unmasked with nothing to flag it.
+func validateSecretKeys(secretKeys []string, fields []Field) error {
+	types := make(map[string]string, len(fields))
+	for _, f := range fields {
+		types[strings.ReplaceAll(f.Key, "[]", "")] = f.Type
 	}
-	return nil
-}
-
-func resolveSecretKey(configType reflect.Type, key string) error {
-	current := derefType(configType)
-	for _, segment := range strings.Split(key, ".") {
-		if current.Kind() == reflect.Slice || current.Kind() == reflect.Array {
-			current = derefType(current.Elem())
-		}
-		if current.Kind() != reflect.Struct {
-			return fmt.Errorf("%q is not inside an object or a list of objects", segment)
-		}
-		field, ok := structFieldsByMapstructureTag(current)[segment]
+	for _, key := range secretKeys {
+		fieldType, ok := types[key]
 		if !ok {
-			return fmt.Errorf("%q is not a config model field", segment)
+			return fmt.Errorf("secret key %q does not name a string field of the config model", key)
 		}
-		current = derefType(field.Type)
-	}
-	if current.Kind() != reflect.String {
-		return fmt.Errorf("resolves to a %s field, not a string", current.Kind())
+		if fieldType != "string" {
+			return fmt.Errorf("secret key %q names a field of type %s, not string", key, fieldType)
+		}
 	}
 	return nil
 }

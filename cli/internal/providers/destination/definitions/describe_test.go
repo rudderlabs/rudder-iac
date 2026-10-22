@@ -196,12 +196,14 @@ func TestRegisterRequiresSecretKeysToResolveToStrings(t *testing.T) {
 		wantErr    string
 	}{
 		{name: "through a list of objects", secretKeys: []string{"headers.to"}},
-		{name: "unknown key", secretKeys: []string{"api_token"}, wantErr: `secret key "api_token": "api_token" is not a config model field`},
-		{name: "unknown nested key", secretKeys: []string{"headers.value"}, wantErr: `secret key "headers.value": "value" is not a config model field`},
-		{name: "not a string", secretKeys: []string{"use_auth"}, wantErr: `secret key "use_auth": resolves to a bool field, not a string`},
-		{name: "a container", secretKeys: []string{"auth"}, wantErr: `secret key "auth": resolves to a struct field, not a string`},
-		{name: "into a list of strings", secretKeys: []string{"filtering.allow.x"}, wantErr: `"x" is not inside an object or a list of objects`},
-		{name: "into a map", secretKeys: []string{"connection_mode.web"}, wantErr: `"web" is not inside an object or a list of objects`},
+		{name: "unknown key", secretKeys: []string{"api_token"}, wantErr: `secret key "api_token" does not name a string field of the config model`},
+		{name: "unknown nested key", secretKeys: []string{"headers.value"}, wantErr: `secret key "headers.value" does not name a string field of the config model`},
+		{name: "not a string", secretKeys: []string{"use_auth"}, wantErr: `secret key "use_auth" names a field of type boolean, not string`},
+		{name: "a list of strings", secretKeys: []string{"filtering.allow"}, wantErr: `secret key "filtering.allow" names a field of type array<string>, not string`},
+		{name: "a container with a rule", secretKeys: []string{"auth"}, wantErr: `secret key "auth" names a field of type object, not string`},
+		{name: "a container without a rule", secretKeys: []string{"filtering"}, wantErr: `secret key "filtering" does not name a string field of the config model`},
+		{name: "into a list of strings", secretKeys: []string{"filtering.allow.x"}, wantErr: `secret key "filtering.allow.x" does not name a string field of the config model`},
+		{name: "into a map", secretKeys: []string{"connection_mode.web"}, wantErr: `secret key "connection_mode.web" does not name a string field of the config model`},
 	}
 
 	for _, tc := range cases {
