@@ -419,9 +419,9 @@ func TestSourcesListenEvictsOldestRequestsAndSaysSo(t *testing.T) {
 	const total, maxRequests = 10050, 10000
 
 	// One request at a time stays far below the in-flight cap, so none is
-	// refused. post drains each body, so the default client reuses one
-	// connection and 10,000 posts do not exhaust ports.
-	t.Cleanup(http.DefaultClient.CloseIdleConnections)
+	// refused. post drains each body, so the client reuses one connection
+	// and 10,000 posts do not exhaust ports.
+	t.Cleanup(listenClient.CloseIdleConnections)
 	for range total {
 		require.Equal(t, http.StatusOK, post(t, p.url()+"/v1/track", `{"userId":"u","event":"flood"}`))
 	}
