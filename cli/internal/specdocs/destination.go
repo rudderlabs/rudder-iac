@@ -14,14 +14,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
 
-const (
-	// listIndex stands in for a list item's index in a secret's variable
-	// name, which is only known once the spec writes the list.
-	listIndex = "<N>"
-	// sourceTokenKey stands in for a source token in a key under a map keyed
-	// by source token.
-	sourceTokenKey = "<sourceToken>"
-)
+// listIndex stands in for a list item's index in a secret's variable name,
+// which is only known once the spec writes the list.
+const listIndex = "<N>"
 
 // DestinationDoc documents one destination type for one definition version.
 type DestinationDoc struct {

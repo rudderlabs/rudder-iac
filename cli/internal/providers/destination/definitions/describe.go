@@ -170,8 +170,9 @@ var (
 	consentManagementType = reflect.TypeOf(common.ConsentManagement{})
 )
 
-// sourceTokenKey stands for a key of a map keyed by source token.
-const sourceTokenKey = "<sourceToken>"
+// SourceTokenKey stands for a source token in a Field.Key under a map keyed
+// by source token, such as consent_management.<sourceToken>[].provider.
+const SourceTokenKey = "<sourceToken>"
 
 // configWalker reads a config model's fields. It fails on any validate rule
 // it cannot describe, so a rule added to a definition without teaching the
@@ -323,7 +324,7 @@ func (w *configWalker) describeConsentEntries(key string, gate []string) error {
 	w.patterns[common.ConsentValuePattern] = pattern
 
 	var (
-		item     = key + "." + sourceTokenKey + "[]"
+		item     = key + "." + SourceTokenKey + "[]"
 		provider = item + ".provider"
 	)
 	w.fields = append(w.fields,

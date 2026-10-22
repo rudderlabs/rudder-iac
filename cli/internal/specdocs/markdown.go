@@ -6,6 +6,8 @@ import (
 	"maps"
 	"slices"
 	"strings"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 )
 
 // RenderDestinationMarkdown writes doc as Markdown. It reads only doc, so a
@@ -27,8 +29,8 @@ func RenderDestinationMarkdown(w io.Writer, doc DestinationDoc) error {
 		"is required once its parent block or list item is written, and a nested default applies only once " +
 		"its parent block is written. A pattern applies to literal values; a key that takes a template " +
 		"also accepts a `{{ path || fallback }}` template in its place."
-	if slices.ContainsFunc(doc.Fields, func(f Field) bool { return strings.Contains(f.Key, sourceTokenKey) }) {
-		intro += " " + code(sourceTokenKey) + " stands for a source token the type accepts, as in `connection_mode`."
+	if slices.ContainsFunc(doc.Fields, func(f Field) bool { return strings.Contains(f.Key, definitions.SourceTokenKey) }) {
+		intro += " " + code(definitions.SourceTokenKey) + " stands for a source token the type accepts, as in `connection_mode`."
 	}
 	if slices.ContainsFunc(doc.Fields, func(f Field) bool { return strings.Contains(f.Var, listIndex) }) {
 		intro += " In a secret's variable name, " + code(listIndex) + " stands for the item's position in its list, counting from 0."
