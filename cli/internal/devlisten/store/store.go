@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten/ingest"
 )
@@ -27,10 +28,14 @@ type Store struct {
 	bytes          int
 	seq            uint64
 	evictedThrough uint64
-	requests       int
-	events         int
-	control        int
-	evicted        int
+	// evictedAt is the latest ReceivedAt of an evicted record. A record gets
+	// its seq when its capture completes, so the newest evicted record is not
+	// always the one received last.
+	evictedAt time.Time
+	requests  int
+	events    int
+	control   int
+	evicted   int
 	// changed is closed on the next Capture. It is made only when a waiter
 	// asks for it, so a store without waiters allocates nothing per request.
 	changed chan struct{}
@@ -54,6 +59,12 @@ type Stats struct {
 }
 
 func New() *Store {
+	return NewWithLimits(maxRequests, maxBytes)
+}
+
+// NewWithLimits returns a store with its own budget. The listener uses New;
+// a small budget lets a test evict with a few requests.
+func NewWithLimits(maxRequests, maxBytes int) *Store {
 	return &Store{maxRequests: maxRequests, maxBytes: maxBytes}
 }
 
@@ -75,6 +86,9 @@ func (s *Store) Capture(c *ingest.Capture) {
 		s.count(oldest, -1)
 		s.evicted++
 		s.evictedThrough = oldest.Seq
+		if oldest.ReceivedAt.After(s.evictedAt) {
+			s.evictedAt = oldest.ReceivedAt
+		}
 	}
 	if s.changed != nil {
 		close(s.changed)
@@ -97,6 +111,11 @@ func (s *Store) count(rec *Record, sign int) {
 func (s *Store) Stats() Stats {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.stats()
+}
+
+// stats needs s.mu.
+func (s *Store) stats() Stats {
 	return Stats{
 		Requests:       s.requests,
 		Events:         s.events,
@@ -107,6 +126,27 @@ func (s *Store) Stats() Stats {
 		MaxRequests:    s.maxRequests,
 		MaxBytes:       s.maxBytes,
 	}
+}
+
+// Snapshot is the store at one moment. A reader that judges whether its
+// window is complete needs the records and the eviction state of the same
+// moment: read apart, a later eviction marks a complete answer as lossy.
+type Snapshot struct {
+	// Records are the records after the seq asked for, oldest first.
+	Records []*Record
+	Cursor  uint64
+	Stats   Stats
+	// EvictedAt is the latest time an evicted record was received. It is
+	// the zero time while Stats.EvictedThrough is 0.
+	EvictedAt time.Time
+}
+
+// Snapshot returns the records after seq with the cursor, the totals and
+// the eviction state they belong to.
+func (s *Store) Snapshot(seq uint64) Snapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return Snapshot{Records: s.after(seq), Cursor: s.seq, Stats: s.stats(), EvictedAt: s.evictedAt}
 }
 
 // Cursor returns the highest seq stored so far, 0 before the first request.
