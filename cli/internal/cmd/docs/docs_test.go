@@ -261,9 +261,50 @@ func TestInputErrorsWithJSON(t *testing.T) {
 			name: "an empty --id without a type",
 			args: []string{"docs", "destination", "--id=", "--json"},
 			want: specdocs.Error{
-				Code:        "invalid_id",
-				Message:     `--id "" is also the spec's display_name, which ` + displayNameRule + "; " + idAdvice,
+				Code:        "missing_type",
+				Message:     "--id and --definition-version need a destination type",
 				Suggestions: []string{},
+				ValidTypes:  destTypes,
+			},
+		},
+		{
+			name: "an unknown type with an empty --source",
+			args: []string{"docs", "destination", "bigquery", "--source", "", "--json"},
+			want: specdocs.Error{
+				Code:        "unknown_type",
+				Message:     `destination type "bigquery" is not supported`,
+				Suggestions: []string{"bq", "bqstream"},
+				ValidTypes:  destTypes,
+			},
+		},
+		{
+			name: "an unknown definition version with an empty --source",
+			args: []string{"docs", "destination", "webhook", "--definition-version", "9", "--source", "", "--json"},
+			want: specdocs.Error{
+				Code:          "unknown_definition_version",
+				Message:       `destination type "webhook" has no definition version 9`,
+				Suggestions:   []string{},
+				ValidVersions: []int64{1},
+			},
+		},
+		{
+			name: "definition version 0",
+			args: []string{"docs", "destination", "webhook", "--definition-version", "0", "--json"},
+			want: specdocs.Error{
+				Code:          "unknown_definition_version",
+				Message:       `destination type "webhook" has no definition version 0`,
+				Suggestions:   []string{},
+				ValidVersions: []int64{1},
+			},
+		},
+		{
+			name: "definition version 0 without a type",
+			args: []string{"docs", "destination", "--definition-version", "0", "--json"},
+			want: specdocs.Error{
+				Code:        "missing_type",
+				Message:     "--id and --definition-version need a destination type",
+				Suggestions: []string{},
+				ValidTypes:  destTypes,
 			},
 		},
 		{

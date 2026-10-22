@@ -41,6 +41,7 @@ func newCmdDestination() *cobra.Command {
 		if len(args) > 0 {
 			destType = args[0]
 		}
+		given := cmd.Flags().Changed
 		format, formatErr := resolveFormat()
 		registry, registryErr := builtin.NewRegistry(true)
 
@@ -89,24 +90,17 @@ func newCmdDestination() *cobra.Command {
 				Message:    "the destination type argument is empty",
 				ValidTypes: registry.SupportedTypes(),
 			})
-		// specdocs reads an empty source or ID as the flag left out. An empty
-		// value given on purpose, such as an unset shell variable, would then
-		// print a document for every source, so it fails as a bad value.
-		case cmd.Flags().Changed("source") && source == "":
-			return fail(out, format, cliVersion, specdocs.ValidateSource(source))
-		case cmd.Flags().Changed("id") && id == "":
-			return fail(out, format, cliVersion, specdocs.ValidateID(id))
 		}
 
 		if destType == "" {
-			if id != "" || version != 0 {
+			if given("id") || given("definition-version") {
 				return fail(out, format, cliVersion, &specdocs.Error{
 					Code:       specdocs.CodeMissingType,
 					Message:    "--id and --definition-version need a destination type",
 					ValidTypes: registry.SupportedTypes(),
 				})
 			}
-			list, err := docs.List(specdocs.ListOptions{CLIVersion: cliVersion, Source: source})
+			list, err := docs.List(specdocs.ListOptions{CLIVersion: cliVersion, Source: flagValue(cmd, "source", &source)})
 			if err != nil {
 				return fail(out, format, cliVersion, err)
 			}
@@ -119,9 +113,9 @@ func newCmdDestination() *cobra.Command {
 		doc, err := docs.Describe(specdocs.DescribeOptions{
 			CLIVersion: cliVersion,
 			Type:       destType,
-			Version:    version,
-			Source:     source,
-			ID:         id,
+			Version:    flagValue(cmd, "definition-version", &version),
+			Source:     flagValue(cmd, "source", &source),
+			ID:         flagValue(cmd, "id", &id),
 		})
 		if err != nil {
 			return fail(out, format, cliVersion, err)
@@ -136,4 +130,15 @@ func newCmdDestination() *cobra.Command {
 	cmd.Flags().StringVar(&id, "id", "", "Destination spec ID to name secret variables after")
 	cmd.Flags().Int64Var(&version, "definition-version", 0, "Definition version to describe (default: the latest)")
 	return cmd
+}
+
+// flagValue returns value when the flag was given and nil when it was left
+// out. specdocs checks every value it gets, so a flag given with its zero
+// value, such as --source "$SOURCE" with SOURCE unset, fails like any other
+// wrong value instead of reading as left out.
+func flagValue[T any](cmd *cobra.Command, name string, value *T) *T {
+	if !cmd.Flags().Changed(name) {
+		return nil
+	}
+	return value
 }

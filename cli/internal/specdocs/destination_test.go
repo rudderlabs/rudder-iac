@@ -32,6 +32,8 @@ func newDestinations(t *testing.T) (*specdocs.Destinations, *definitions.Registr
 	return specdocs.NewDestinations(registry), registry
 }
 
+func ptr[T any](v T) *T { return &v }
+
 func describe(t *testing.T, docs *specdocs.Destinations, opts specdocs.DescribeOptions) specdocs.DestinationDoc {
 	t.Helper()
 
@@ -50,7 +52,7 @@ func TestSecretVariablesMatchImport(t *testing.T) {
 	docs, registry := newDestinations(t)
 
 	for _, registered := range registry.Definitions() {
-		doc := describe(t, docs, specdocs.DescribeOptions{Type: registered.Type, Version: registered.Version, ID: id})
+		doc := describe(t, docs, specdocs.DescribeOptions{Type: registered.Type, Version: &registered.Version, ID: ptr(id)})
 
 		config := map[string]any{}
 		for _, key := range registered.SecretKeys() {
@@ -165,7 +167,7 @@ func TestSpecTemplateFailsOnlyOnItsNullKeys(t *testing.T) {
 		t.Run(tc.destType, func(t *testing.T) {
 			t.Parallel()
 
-			doc := describe(t, docs, specdocs.DescribeOptions{Type: tc.destType, Source: "javascript", ID: tc.id})
+			doc := describe(t, docs, specdocs.DescribeOptions{Type: tc.destType, Source: ptr("javascript"), ID: ptr(tc.id)})
 			spec := templateSpec(t, doc.SpecTemplate)
 			assert.Equal(t, map[string]any{
 				"version": "rudder/v1",
@@ -217,7 +219,7 @@ func TestFilledSpecTemplatesValidate(t *testing.T) {
 	for _, registered := range registry.Definitions() {
 		for _, sourceType := range sortedSourceTypes() {
 			doc, err := docs.Describe(specdocs.DescribeOptions{
-				Type: registered.Type, Version: registered.Version, Source: sourceType, ID: "dest-id",
+				Type: registered.Type, Version: &registered.Version, Source: ptr(sourceType), ID: ptr("dest-id"),
 			})
 			var docErr *specdocs.Error
 			if errors.As(err, &docErr) && docErr.Code == specdocs.CodeUnsupportedSource {
@@ -290,7 +292,7 @@ func TestSpecTemplateNotesCustomValidators(t *testing.T) {
 		t.Run(tc.destType, func(t *testing.T) {
 			t.Parallel()
 
-			doc := describe(t, docs, specdocs.DescribeOptions{Type: tc.destType, Source: "javascript", ID: "shop"})
+			doc := describe(t, docs, specdocs.DescribeOptions{Type: tc.destType, Source: ptr("javascript"), ID: ptr("shop")})
 			assert.True(t, strings.HasPrefix(doc.SpecTemplate, tc.want), "template starts:\n%s", doc.SpecTemplate[:min(len(doc.SpecTemplate), 400)])
 		})
 	}
@@ -448,7 +450,7 @@ func TestConsentBlockWrittenFromTheDocumentValidates(t *testing.T) {
 		t.Run(fmt.Sprintf("%s v%d", registered.Type, registered.Version), func(t *testing.T) {
 			t.Parallel()
 
-			doc := describeJSON(t, docs, specdocs.DescribeOptions{Type: registered.Type, Version: registered.Version})
+			doc := describeJSON(t, docs, specdocs.DescribeOptions{Type: registered.Type, Version: &registered.Version})
 			fields := map[string]map[string]any{}
 			for _, f := range doc["fields"].([]any) {
 				field := f.(map[string]any)
@@ -508,14 +510,14 @@ func TestIDsMatchTheSpecRule(t *testing.T) {
 	rule := destination.NewSpecSyntaxValidRule(registry)
 
 	for _, id := range []string{"yes", "on", "null", "-x", "Foo_Bar", "ab", strings.Repeat("a", 100)} {
-		doc := describe(t, docs, specdocs.DescribeOptions{Type: "webhook", Source: "javascript", ID: id})
+		doc := describe(t, docs, specdocs.DescribeOptions{Type: "webhook", Source: ptr("javascript"), ID: ptr(id)})
 		spec := templateSpec(t, doc.SpecTemplate)
 		spec.config["webhook_url"] = "https://hooks.example.com/rudder"
 		assert.Empty(t, validateSpec(rule, spec), id)
 	}
 
 	for _, id := range []string{"a", "_", strings.Repeat("a", 101), "ıdshop", "my shop", "my.shop", "9shop"} {
-		_, err := docs.Describe(specdocs.DescribeOptions{Type: "webhook", Source: "javascript", ID: id})
+		_, err := docs.Describe(specdocs.DescribeOptions{Type: "webhook", Source: ptr("javascript"), ID: ptr(id)})
 		var docErr *specdocs.Error
 		if assert.ErrorAs(t, err, &docErr, id) {
 			assert.Equal(t, specdocs.CodeInvalidID, docErr.Code, id)
@@ -585,8 +587,8 @@ func TestListsAreNeverNull(t *testing.T) {
 
 	for _, registered := range registry.Definitions() {
 		for _, opts := range []specdocs.DescribeOptions{
-			{Type: registered.Type, Version: registered.Version},
-			{Type: registered.Type, Version: registered.Version, ID: "dest-id"},
+			{Type: registered.Type, Version: &registered.Version},
+			{Type: registered.Type, Version: &registered.Version, ID: ptr("dest-id")},
 		} {
 			doc := describeJSON(t, docs, opts)
 			for _, key := range []string{"secretKeys", "fields", "customValidators"} {
@@ -630,7 +632,7 @@ func TestDescribeNarrowsToTheSource(t *testing.T) {
 
 	docs, _ := newDestinations(t)
 	all := describe(t, docs, specdocs.DescribeOptions{Type: "am"})
-	web := describe(t, docs, specdocs.DescribeOptions{Type: "am", Source: "javascript"})
+	web := describe(t, docs, specdocs.DescribeOptions{Type: "am", Source: ptr("javascript")})
 
 	assert.Equal(t, &specdocs.SourceRef{Type: "javascript", Token: "web"}, web.Source)
 	assert.Equal(t, []string{"web"}, mapKeys(web.ConnectionModes))
@@ -696,9 +698,9 @@ func TestMarkdownExplainsTheListIndexOnlyWhenUsed(t *testing.T) {
 
 	var webhook, am bytes.Buffer
 	require.NoError(t, specdocs.RenderDestinationMarkdown(&webhook,
-		describe(t, docs, specdocs.DescribeOptions{Type: "webhook", ID: "shop-webhook"})))
+		describe(t, docs, specdocs.DescribeOptions{Type: "webhook", ID: ptr("shop-webhook")})))
 	require.NoError(t, specdocs.RenderDestinationMarkdown(&am,
-		describe(t, docs, specdocs.DescribeOptions{Type: "am", ID: "shop-amplitude"})))
+		describe(t, docs, specdocs.DescribeOptions{Type: "am", ID: ptr("shop-amplitude")})))
 
 	assert.Contains(t, webhook.String(), note)
 	assert.NotContains(t, am.String(), note)
@@ -731,7 +733,7 @@ func TestListFiltersBySource(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, all.Destinations, len(registry.SupportedTypes()))
 
-	web, err := docs.List(specdocs.ListOptions{CLIVersion: "test", Source: "javascript"})
+	web, err := docs.List(specdocs.ListOptions{CLIVersion: "test", Source: ptr("javascript")})
 	require.NoError(t, err)
 	var webTypes []string
 	for _, d := range web.Destinations {
@@ -740,6 +742,12 @@ func TestListFiltersBySource(t *testing.T) {
 	}
 	assert.NotContains(t, webTypes, "adj")
 	assert.Contains(t, webTypes, "webhook")
+
+	// An empty source is not a source type, not a source left out.
+	_, err = docs.List(specdocs.ListOptions{CLIVersion: "test", Source: ptr("")})
+	var docErr *specdocs.Error
+	require.ErrorAs(t, err, &docErr)
+	assert.Equal(t, specdocs.CodeUnknownSource, docErr.Code)
 }
 
 func TestDescribeErrors(t *testing.T) {
@@ -764,7 +772,7 @@ func TestDescribeErrors(t *testing.T) {
 		},
 		{
 			name: "unknown version",
-			opts: specdocs.DescribeOptions{Type: "webhook", Version: 7},
+			opts: specdocs.DescribeOptions{Type: "webhook", Version: ptr[int64](7)},
 			want: &specdocs.Error{
 				Code:          specdocs.CodeUnknownDefinitionVersion,
 				Message:       `destination type "webhook" has no definition version 7`,
@@ -772,8 +780,36 @@ func TestDescribeErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "version 0",
+			opts: specdocs.DescribeOptions{Type: "webhook", Version: ptr[int64](0)},
+			want: &specdocs.Error{
+				Code:          specdocs.CodeUnknownDefinitionVersion,
+				Message:       `destination type "webhook" has no definition version 0`,
+				ValidVersions: []int64{1},
+			},
+		},
+		{
+			name: "the version before the source",
+			opts: specdocs.DescribeOptions{Type: "webhook", Version: ptr[int64](7), Source: ptr("")},
+			want: &specdocs.Error{
+				Code:          specdocs.CodeUnknownDefinitionVersion,
+				Message:       `destination type "webhook" has no definition version 7`,
+				ValidVersions: []int64{1},
+			},
+		},
+		{
+			name: "an empty source",
+			opts: specdocs.DescribeOptions{Type: "webhook", Source: ptr("")},
+			want: &specdocs.Error{
+				Code:        specdocs.CodeUnknownSource,
+				Message:     `source type "" is not an event stream source spec type`,
+				Suggestions: []string{},
+				ValidTypes:  sortedSourceTypes(),
+			},
+		},
+		{
 			name: "a token is not a source type",
-			opts: specdocs.DescribeOptions{Type: "webhook", Source: "web"},
+			opts: specdocs.DescribeOptions{Type: "webhook", Source: ptr("web")},
 			want: &specdocs.Error{
 				Code:        specdocs.CodeUnknownSource,
 				Message:     `source type "web" is not an event stream source spec type`,
@@ -783,7 +819,7 @@ func TestDescribeErrors(t *testing.T) {
 		},
 		{
 			name: "a source the type does not accept",
-			opts: specdocs.DescribeOptions{Type: "adj", Source: "javascript"},
+			opts: specdocs.DescribeOptions{Type: "adj", Source: ptr("javascript")},
 			want: &specdocs.Error{
 				Code:    specdocs.CodeUnsupportedSource,
 				Message: `destination type "adj" does not accept javascript sources, which connect as "web"`,
@@ -795,7 +831,7 @@ func TestDescribeErrors(t *testing.T) {
 		},
 		{
 			name: "an ID that makes an invalid variable name",
-			opts: specdocs.DescribeOptions{Type: "webhook", ID: "9.Shop"},
+			opts: specdocs.DescribeOptions{Type: "webhook", ID: ptr("9.Shop")},
 			want: &specdocs.Error{
 				Code: specdocs.CodeInvalidID,
 				Message: `--id "9.Shop" gives the secret variable name "9.SHOP", which does not match ^[A-Za-z_][A-Za-z0-9_]*$; ` +
@@ -803,8 +839,18 @@ func TestDescribeErrors(t *testing.T) {
 			},
 		},
 		{
+			name: "an empty ID",
+			opts: specdocs.DescribeOptions{Type: "webhook", Source: ptr("javascript"), ID: ptr("")},
+			want: &specdocs.Error{
+				Code: specdocs.CodeInvalidID,
+				Message: `--id "" is also the spec's display_name, which must be 2-100 characters and contain only ` +
+					"letters, digits, underscores, spaces, periods, and hyphens; " +
+					"use an ID of 2 to 100 letters, digits, underscores and hyphens that does not start with a digit",
+			},
+		},
+		{
 			name: "an ID the display_name rule rejects",
-			opts: specdocs.DescribeOptions{Type: "webhook", ID: "ıdshop"},
+			opts: specdocs.DescribeOptions{Type: "webhook", ID: ptr("ıdshop")},
 			want: &specdocs.Error{
 				Code: specdocs.CodeInvalidID,
 				Message: `--id "ıdshop" is also the spec's display_name, which must be 2-100 characters and contain only ` +

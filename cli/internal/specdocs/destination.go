@@ -146,15 +146,17 @@ func NewDestinations(registry *definitions.Registry) *Destinations {
 // ListOptions narrow the listing.
 type ListOptions struct {
 	CLIVersion string
-	// Source keeps only the types that accept this source spec type.
-	Source string
+	// Source keeps only the types that accept this source spec type. Nil
+	// keeps every type. An empty string is not a source type, so it fails
+	// like any other unknown source.
+	Source *string
 }
 
 // List lists every type, at its latest definition version.
 func (d *Destinations) List(opts ListOptions) (DestinationList, error) {
 	var token string
-	if opts.Source != "" {
-		ref, err := resolveSource(opts.Source)
+	if opts.Source != nil {
+		ref, err := resolveSource(*opts.Source)
 		if err != nil {
 			return DestinationList{}, err
 		}
@@ -201,20 +203,24 @@ func (d *Destinations) List(opts ListOptions) (DestinationList, error) {
 	return list, nil
 }
 
-// DescribeOptions pick the definition and what to fill in.
+// DescribeOptions pick the definition and what to fill in. Version, Source
+// and ID are optional, and nil leaves one out. Describe checks any value that
+// is set, so an empty Source or ID fails like any other wrong value, and so
+// does a Version of 0.
 type DescribeOptions struct {
 	CLIVersion string
 	Type       string
-	// Version is the definition version; zero means the latest.
-	Version int64
+	// Version is the definition version; nil means the latest.
+	Version *int64
 	// Source narrows the document to the keys and connection modes of one
 	// source spec type.
-	Source string
+	Source *string
 	// ID is the destination spec ID secret variable names derive from.
-	ID string
+	ID *string
 }
 
-// Describe documents one destination type.
+// Describe documents one destination type. It checks the type, the version,
+// the source and the ID in that order and returns the first error.
 func (d *Destinations) Describe(opts DescribeOptions) (DestinationDoc, error) {
 	registered, err := d.lookup(opts.Type, opts.Version)
 	if err != nil {
@@ -223,8 +229,8 @@ func (d *Destinations) Describe(opts DescribeOptions) (DestinationDoc, error) {
 	desc := registered.Describe()
 
 	var source *SourceRef
-	if opts.Source != "" {
-		ref, err := resolveSource(opts.Source)
+	if opts.Source != nil {
+		ref, err := resolveSource(*opts.Source)
 		if err != nil {
 			return DestinationDoc{}, err
 		}
@@ -234,10 +240,12 @@ func (d *Destinations) Describe(opts DescribeOptions) (DestinationDoc, error) {
 		source = &ref
 	}
 
-	if opts.ID != "" {
-		if err := ValidateID(opts.ID); err != nil {
+	var id string
+	if opts.ID != nil {
+		if err := validateID(*opts.ID); err != nil {
 			return DestinationDoc{}, err
 		}
+		id = *opts.ID
 	}
 
 	doc := DestinationDoc{
@@ -268,7 +276,7 @@ func (d *Destinations) Describe(opts DescribeOptions) (DestinationDoc, error) {
 		if source != nil && len(f.OnlyForSourceTypes) > 0 && !slices.Contains(f.OnlyForSourceTypes, source.Token) {
 			continue
 		}
-		field := docField(f, opts.ID)
+		field := docField(f, id)
 		if f.Pattern != "" {
 			pattern := desc.Patterns[f.Pattern]
 			doc.Patterns[f.Pattern] = Pattern{Regex: pattern.Regex, Reject: pattern.Reject, Message: pattern.Message}
@@ -276,8 +284,8 @@ func (d *Destinations) Describe(opts DescribeOptions) (DestinationDoc, error) {
 		doc.Fields = append(doc.Fields, field)
 	}
 
-	if source != nil && opts.ID != "" {
-		template, err := specTemplate(doc, opts.ID)
+	if source != nil && id != "" {
+		template, err := specTemplate(doc, id)
 		if err != nil {
 			return DestinationDoc{}, err
 		}
@@ -286,7 +294,8 @@ func (d *Destinations) Describe(opts DescribeOptions) (DestinationDoc, error) {
 	return doc, nil
 }
 
-func (d *Destinations) lookup(destType string, version int64) (*definitions.RegisteredDefinition, error) {
+// lookup finds the definition, at its latest version when version is nil.
+func (d *Destinations) lookup(destType string, version *int64) (*definitions.RegisteredDefinition, error) {
 	versions, err := d.registry.Versions(destType)
 	if err != nil {
 		return nil, &Error{
@@ -296,14 +305,15 @@ func (d *Destinations) lookup(destType string, version int64) (*definitions.Regi
 			ValidTypes:  d.registry.SupportedTypes(),
 		}
 	}
-	if version == 0 {
-		version = versions[len(versions)-1]
+	want := versions[len(versions)-1]
+	if version != nil {
+		want = *version
 	}
-	registered, err := d.registry.Get(destType, version)
+	registered, err := d.registry.Get(destType, want)
 	if err != nil {
 		return nil, &Error{
 			Code:          CodeUnknownDefinitionVersion,
-			Message:       fmt.Sprintf("destination type %q has no definition version %d", destType, version),
+			Message:       fmt.Sprintf("destination type %q has no definition version %d", destType, want),
 			ValidVersions: versions,
 		}
 	}
@@ -402,11 +412,10 @@ func slot(varName string) string {
 // idAdvice is the rule both checks on an ID add up to.
 const idAdvice = "use an ID of 2 to 100 letters, digits, underscores and hyphens that does not start with a digit"
 
-// ValidateID returns the invalid_id error for an --id the spec cannot use, or
-// nil. It checks what id becomes: the template's display_name, and the secret
-// variable names. Registration requires snake_case secret keys, which only
-// add valid characters to a name, so the ID's own part decides.
-func ValidateID(id string) error {
+// validateID checks what id becomes: the template's display_name, and the
+// secret variable names. Registration requires snake_case secret keys, which
+// only add valid characters to a name, so the ID's own part decides.
+func validateID(id string) error {
 	if !funcs.MatchPattern(destination.DisplayNamePattern, id) {
 		pattern, _ := funcs.LookupPattern(destination.DisplayNamePattern)
 		return invalidID(fmt.Sprintf("--id %q is also the spec's display_name, which %s; %s", id, pattern.Message, idAdvice))
