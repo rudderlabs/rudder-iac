@@ -264,6 +264,38 @@ func TestFilledSpecTemplatesValidate(t *testing.T) {
 // says it will.
 var customValidatorBranches = []string{"postgres", "snowflake"}
 
+// The template of a type with custom validators says up front that validate
+// may name keys it leaves out, which postgres and snowflake do. Parsing the
+// template as YAML drops comments, so the other template tests cannot see it.
+func TestSpecTemplateNotesCustomValidators(t *testing.T) {
+	t.Parallel()
+
+	const (
+		header = "# Replace each null with a value. A value you fill in can trigger another key's\n" +
+			"# requiredIf, requiredUnless or requiredWith rule, which then requires that key.\n"
+		note = "# A custom validator (checkedBy) can require more keys under conditions the\n" +
+			"# docs cannot state; validate names them.\n"
+	)
+	docs, _ := newDestinations(t)
+
+	cases := []struct {
+		destType string
+		want     string
+	}{
+		{destType: "postgres", want: header + note + "version: rudder/v1\n"},
+		{destType: "snowflake", want: header + note + "version: rudder/v1\n"},
+		{destType: "webhook", want: header + "version: rudder/v1\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.destType, func(t *testing.T) {
+			t.Parallel()
+
+			doc := describe(t, docs, specdocs.DescribeOptions{Type: tc.destType, Source: "javascript", ID: "shop"})
+			assert.True(t, strings.HasPrefix(doc.SpecTemplate, tc.want), "template starts:\n%s", doc.SpecTemplate[:min(len(doc.SpecTemplate), 400)])
+		})
+	}
+}
+
 // checkedByAt returns the custom validators on the field at a dotted config
 // path, matching list items by "[]".
 func checkedByAt(doc specdocs.DestinationDoc, path string) []string {
