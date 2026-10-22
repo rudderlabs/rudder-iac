@@ -2,7 +2,9 @@ package destination_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 
@@ -27,6 +29,13 @@ func (m mapResolver) Resolve(name string) (string, bool) {
 // returns validate's text output.
 func renderLoad(t *testing.T, files map[string]string, variables map[string]string) (string, error) {
 	t.Helper()
+	return renderLoadWith(t, renderer.NewTextRenderer, files, variables)
+}
+
+// renderLoadWith is renderLoad with the renderer validate picks for its
+// output flag, such as renderer.NewJSONRenderer for --json.
+func renderLoadWith(t *testing.T, newRenderer func(io.Writer) renderer.Renderer, files map[string]string, variables map[string]string) (string, error) {
+	t.Helper()
 
 	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
 		"destination": destination.NewProvider(nil, destination.SecretRuleRegistry(t)),
@@ -36,7 +45,7 @@ func renderLoad(t *testing.T, files map[string]string, variables map[string]stri
 	var out bytes.Buffer
 	err = project.New(cp,
 		project.WithLoader(memoryFiles(files)),
-		project.WithRenderer(renderer.NewTextRenderer(&out)),
+		project.WithRenderer(newRenderer(&out)),
 		project.WithSubstitutor(varsubst.NewSubstitutor(mapResolver(variables))),
 	).Load("example")
 	return out.String(), err
@@ -313,4 +322,148 @@ spec:
 
 	assert.Contains(t, out, "   18 | to: X-Bad:Name\n")
 	assert.NotContains(t, out, "fake-header-secret")
+}
+
+// validate --json prints no line text, so masking has nothing to do there,
+// but the secret warnings must still reach its diagnostics array with severity
+// warning, and no value from a spec or the var file may reach any field.
+func TestValidateJSONReportsSecretWarningsWithoutValues(t *testing.T) {
+	t.Parallel()
+
+	const (
+		literalKey = "fake-literal-amplitude-key"
+		varValue   = "fake-amplitude-secret-value"
+	)
+	longSecret := "fake-" + strings.Repeat("j", 100)
+
+	const sharedAmplitude = `version: rudder/v1
+kind: destination
+metadata:
+  name: %[1]s
+spec:
+  id: %[1]s
+  display_name: %[1]s
+  type: am
+  definition_version: 1
+  enabled: true
+  config:
+    api_key: '{{ .SHARED }}'
+    residency_server: standard
+`
+
+	cases := []struct {
+		name        string
+		files       map[string]string
+		variables   map[string]string
+		wantErr     string
+		want        []string // severity and ruleId of each diagnostic, in order
+		wantMessage string   // part of the first diagnostic's message
+	}{
+		{
+			name:        "literal secret",
+			files:       map[string]string{"amplitude.yaml": amplitudeWithLiteral},
+			variables:   map[string]string{"SHOP_AMPLITUDE_API_SECRET": varValue},
+			want:        []string{"warning destination/secret-reference"},
+			wantMessage: `secret key "api_key" must hold only a variable reference with no default, such as '{{ .SHOP_AMPLITUDE_API_KEY }}'`,
+		},
+		{
+			name: "one variable in two secret slots",
+			files: map[string]string{
+				"a.yaml": fmt.Sprintf(sharedAmplitude, "shop-a"),
+				"b.yaml": fmt.Sprintf(sharedAmplitude, "shop-b"),
+			},
+			variables: map[string]string{"SHARED": varValue},
+			want: []string{
+				"warning destination/secret-reference-unique",
+				"warning destination/secret-reference-unique",
+			},
+			wantMessage: "SHARED",
+		},
+		{
+			name: "undefined variables",
+			files: map[string]string{
+				"amplitude.yaml": amplitudeWithLiteral,
+				"webhook.yaml":   webhookWithUndefinedURL,
+			},
+			wantErr: "variable substitution failed",
+			want: []string{
+				"warning destination/secret-reference",
+				"error project/var-substitution",
+				"error project/var-substitution",
+			},
+			wantMessage: `secret key "api_key"`,
+		},
+		{
+			name: "config error on a substituted secret",
+			files: map[string]string{"http.yaml": `version: rudder/v1
+kind: destination
+metadata:
+  name: shop-http
+spec:
+  id: shop-http
+  display_name: Shop HTTP
+  type: http
+  definition_version: 1
+  enabled: true
+  config:
+    api_url: https://example.com/events
+    auth: noAuth
+    method: POST
+    format: JSON
+    headers:
+      - from: '{{ .SECRET }}'
+        to: X-Api-Key
+`},
+			variables:   map[string]string{"SECRET": longSecret},
+			wantErr:     "syntax validation failed",
+			want:        []string{"error destination/spec-syntax-valid"},
+			wantMessage: "from",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			out, err := renderLoadWith(t, renderer.NewJSONRenderer, tc.files, tc.variables)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err, "a warning alone must not fail validate")
+			}
+
+			var doc struct {
+				Diagnostics []struct {
+					RuleID   string `json:"ruleId"`
+					Severity string `json:"severity"`
+					Message  string `json:"message"`
+				} `json:"diagnostics"`
+				Summary struct {
+					Errors   int `json:"errors"`
+					Warnings int `json:"warnings"`
+				} `json:"summary"`
+			}
+			require.NoError(t, json.Unmarshal([]byte(out), &doc), out)
+
+			var got []string
+			var errorCount, warningCount int
+			for _, d := range doc.Diagnostics {
+				got = append(got, d.Severity+" "+d.RuleID)
+				switch d.Severity {
+				case "error":
+					errorCount++
+				case "warning":
+					warningCount++
+				}
+			}
+			require.Equal(t, tc.want, got, out)
+			assert.Contains(t, doc.Diagnostics[0].Message, tc.wantMessage)
+			assert.Equal(t, errorCount, doc.Summary.Errors)
+			assert.Equal(t, warningCount, doc.Summary.Warnings)
+
+			for _, secret := range []string{literalKey, varValue, longSecret} {
+				assert.NotContains(t, out, secret)
+			}
+		})
+	}
 }

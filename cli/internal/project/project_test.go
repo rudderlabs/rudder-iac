@@ -640,7 +640,8 @@ func (referenceWarningRule) ValidateSources(specs map[string]*rules.ValidationCo
 
 // TestProject_Load_RendersSourceDiagnostics covers the rules that read specs
 // before substitution: substitution stops the load when a variable is
-// undefined, and their diagnostics must be rendered then too.
+// undefined, and their diagnostics must be rendered then too. The JSON
+// renderer must list the same diagnostics, warnings with severity warning.
 func TestProject_Load_RendersSourceDiagnostics(t *testing.T) {
 	t.Parallel()
 
@@ -684,41 +685,76 @@ func TestProject_Load_RendersSourceDiagnostics(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+		for _, useJSON := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/json=%v", tc.name, useJSON), func(t *testing.T) {
+				t.Parallel()
 
-			mockProvider := &sourceRuleProvider{MockProvider: testutils.NewMockProvider(nil, nil)}
-			mockProvider.MatchPatterns = fixtureMatchPatterns
-			mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
-				raw := make(map[string]*specs.RawSpec, len(tc.rawSpecs))
-				for path, data := range tc.rawSpecs {
-					raw[path] = &specs.RawSpec{Data: []byte(data)}
+				mockProvider := &sourceRuleProvider{MockProvider: testutils.NewMockProvider(nil, nil)}
+				mockProvider.MatchPatterns = fixtureMatchPatterns
+				mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+					raw := make(map[string]*specs.RawSpec, len(tc.rawSpecs))
+					for path, data := range tc.rawSpecs {
+						raw[path] = &specs.RawSpec{Data: []byte(data)}
+					}
+					return raw, nil
+				}}
+
+				var buf bytes.Buffer
+				r := renderer.NewTextRenderer(&buf)
+				if useJSON {
+					r = renderer.NewJSONRenderer(&buf)
 				}
-				return raw, nil
-			}}
+				proj := project.New(mockProvider,
+					project.WithLoader(mockLoader),
+					project.WithSubstitutor(varsubst.NewSubstitutor(mapResolver{"NAME": "resolved_name"})),
+					project.WithRenderer(r),
+				)
 
-			var buf bytes.Buffer
-			proj := project.New(mockProvider,
-				project.WithLoader(mockLoader),
-				project.WithSubstitutor(varsubst.NewSubstitutor(mapResolver{"NAME": "resolved_name"})),
-				project.WithRenderer(renderer.NewTextRenderer(&buf)),
-			)
-
-			err := proj.Load("test_dir")
-			if tc.wantErr != "" {
-				require.EqualError(t, err, tc.wantErr)
-			} else {
-				require.NoError(t, err)
-			}
-
-			var rendered []string
-			for _, line := range strings.Split(buf.String(), "\n") {
-				if strings.HasPrefix(line, "warning[") || strings.HasPrefix(line, "error[") {
-					rendered = append(rendered, line)
+				err := proj.Load("test_dir")
+				if tc.wantErr != "" {
+					require.EqualError(t, err, tc.wantErr)
+				} else {
+					require.NoError(t, err)
 				}
-			}
-			assert.Equal(t, tc.wantLines, rendered)
-		})
+
+				var rendered []string
+				if useJSON {
+					var doc struct {
+						Diagnostics []struct {
+							RuleID   string `json:"ruleId"`
+							Severity string `json:"severity"`
+							Message  string `json:"message"`
+						} `json:"diagnostics"`
+						Summary struct {
+							Errors   int `json:"errors"`
+							Warnings int `json:"warnings"`
+						} `json:"summary"`
+					}
+					require.NoError(t, json.Unmarshal(buf.Bytes(), &doc))
+					var errorCount, warningCount int
+					for _, d := range doc.Diagnostics {
+						// The text renderer's first line, so both renderers
+						// share one list of expected diagnostics.
+						rendered = append(rendered, fmt.Sprintf("%s[%s]: %s", d.Severity, d.RuleID, d.Message))
+						switch d.Severity {
+						case "error":
+							errorCount++
+						case "warning":
+							warningCount++
+						}
+					}
+					assert.Equal(t, errorCount, doc.Summary.Errors)
+					assert.Equal(t, warningCount, doc.Summary.Warnings)
+				} else {
+					for _, line := range strings.Split(buf.String(), "\n") {
+						if strings.HasPrefix(line, "warning[") || strings.HasPrefix(line, "error[") {
+							rendered = append(rendered, line)
+						}
+					}
+				}
+				assert.Equal(t, tc.wantLines, rendered)
+			})
+		}
 	}
 }
 
