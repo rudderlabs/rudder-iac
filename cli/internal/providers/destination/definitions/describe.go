@@ -598,18 +598,26 @@ func isUnsigned(kind reflect.Kind) bool {
 	}
 }
 
-// parseLimit reads a min or max limit. go-playground reads it with base
-// prefixes and panics on a negative limit for an unsigned value, so the limit
-// must be plain base 10, and 0 or more on an unsigned value.
+// parseLimit reads a min or max limit.
 func parseLimit(valueType reflect.Type, raw string) (int, error) {
-	limit, err := strconv.Atoi(raw)
-	if err != nil || strconv.Itoa(limit) != raw {
+	return plainInteger(derefType(valueType).Kind(), raw)
+}
+
+// plainInteger reads an integer rule parameter that applies to a value of
+// kind: a min or max limit, an integer condition value or an integer oneof
+// value. go-playground reads limits and condition values with base prefixes,
+// compares a oneof value with the integer's base-10 text, and panics on a
+// negative value for an unsigned integer. So the parameter must be plain base
+// 10, and 0 or more when kind is unsigned.
+func plainInteger(kind reflect.Kind, raw string) (int, error) {
+	value, err := strconv.Atoi(raw)
+	if err != nil || strconv.Itoa(value) != raw {
 		return 0, fmt.Errorf("want a plain base-10 integer, got %q", raw)
 	}
-	if kind := derefType(valueType).Kind(); limit < 0 && isUnsigned(kind) {
+	if value < 0 && isUnsigned(kind) {
 		return 0, fmt.Errorf("want 0 or more for a %s, got %q", kind, raw)
 	}
-	return limit, nil
+	return value, nil
 }
 
 // conditions reads a required_if, required_unless or excluded_if parameter, a
@@ -682,11 +690,9 @@ func (s ruleScope) resolve(goName string) (string, reflect.Type, error) {
 // parseTypedValue converts a tag value to the type of the value it applies
 // to, so an integer enum stays integers in the output. It accepts only the
 // spellings go-playground reads the same way. It compares a bool condition
-// with the text "true", so a bool condition takes only true or false. It
-// parses an integer condition or limit with base prefixes and compares a
-// oneof value with the integer's base-10 text, so an integer must be plain
-// base 10, and it panics on a negative value for an unsigned integer. A value
-// of any other kind, such as a list compared by length, is refused.
+// with the text "true", so a bool condition takes only true or false, and
+// plainInteger says what an integer takes. A value of any other kind, such as
+// a list compared by length, is refused.
 func parseTypedValue(typ reflect.Type, raw string) (any, error) {
 	switch kind := derefType(typ).Kind(); {
 	case kind == reflect.String:
@@ -697,14 +703,11 @@ func parseTypedValue(typ reflect.Type, raw string) (any, error) {
 		}
 		return raw == "true", nil
 	case isInteger(kind):
-		value, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil || strconv.FormatInt(value, 10) != raw {
-			return nil, fmt.Errorf("want a plain base-10 integer, got %q", raw)
+		value, err := plainInteger(kind, raw)
+		if err != nil {
+			return nil, err
 		}
-		if value < 0 && isUnsigned(kind) {
-			return nil, fmt.Errorf("want 0 or more for a %s, got %q", kind, raw)
-		}
-		return value, nil
+		return int64(value), nil
 	case kind == reflect.Float32 || kind == reflect.Float64:
 		value, err := strconv.ParseFloat(raw, 64)
 		if err != nil {
