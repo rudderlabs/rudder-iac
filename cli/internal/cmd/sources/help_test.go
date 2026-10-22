@@ -186,7 +186,8 @@ func splitShell(line string) []string {
 				word.Reset()
 			}
 		case strings.ContainsRune(shellBreak, r):
-			if inWord {
+			// The 2 of 2> names a file descriptor, not an argument.
+			if inWord && (r != '>' || strings.Trim(word.String(), "0123456789") != "") {
 				words = append(words, word.String())
 			}
 			return words
