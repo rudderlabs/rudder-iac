@@ -29,7 +29,7 @@ func newDestinations(t *testing.T) (*specdocs.Destinations, *definitions.Registr
 
 	registry, err := builtin.NewRegistry(true)
 	require.NoError(t, err)
-	return specdocs.NewDestinations(registry, builtin.IsVerified), registry
+	return specdocs.NewDestinations(registry), registry
 }
 
 func describe(t *testing.T, docs *specdocs.Destinations, opts specdocs.DescribeOptions) specdocs.DestinationDoc {

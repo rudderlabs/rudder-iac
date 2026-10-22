@@ -74,7 +74,7 @@ func newCmdDestination() *cobra.Command {
 		var (
 			out        = cmd.OutOrStdout()
 			cliVersion = cmd.Root().Version
-			docs       = specdocs.NewDestinations(registry, builtin.IsVerified)
+			docs       = specdocs.NewDestinations(registry)
 		)
 
 		switch {

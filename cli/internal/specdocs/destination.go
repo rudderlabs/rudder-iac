@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/builtin"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
@@ -139,12 +140,12 @@ type DestinationSummary struct {
 // hold the unverified definitions too, so every compiled type can be read.
 type Destinations struct {
 	registry *definitions.Registry
-	verified func(destType string, version int64) bool
 }
 
-// NewDestinations documents registry, marking each definition with verified.
-func NewDestinations(registry *definitions.Registry, verified func(destType string, version int64) bool) *Destinations {
-	return &Destinations{registry: registry, verified: verified}
+// NewDestinations documents registry, marking each definition verified as
+// the builtin table does.
+func NewDestinations(registry *definitions.Registry) *Destinations {
+	return &Destinations{registry: registry}
 }
 
 // ListOptions narrow the listing.
@@ -191,7 +192,7 @@ func (d *Destinations) List(opts ListOptions) (DestinationList, error) {
 			DisplayName:        latest.DisplayName,
 			APIType:            latest.APIType,
 			DefinitionVersions: versions,
-			Verified:           d.verified(latest.Type, latest.Version),
+			Verified:           builtin.IsVerified(latest.Type, latest.Version),
 			SourceTypes:        sourceTypes,
 		}
 		if summary.SourceTypes == nil {
@@ -251,7 +252,7 @@ func (d *Destinations) Describe(opts DescribeOptions) (DestinationDoc, error) {
 		DisplayName:       desc.DisplayName,
 		APIType:           desc.APIType,
 		DefinitionVersion: desc.Version,
-		Verified:          d.verified(desc.Type, desc.Version),
+		Verified:          builtin.IsVerified(desc.Type, desc.Version),
 		Source:            source,
 		ConnectionModes:   connectionModes(desc, source),
 		SecretKeys:        desc.SecretKeys,
