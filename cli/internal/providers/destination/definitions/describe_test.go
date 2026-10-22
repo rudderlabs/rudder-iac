@@ -516,6 +516,24 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 			wantErr: `reading config key "event": validate rule "oneof='Page View' Track" uses |, a quote or an escaped character`,
 		},
 		{
+			name: "an escaped comma",
+			newConfig: func() any {
+				return &struct {
+					Mode string `mapstructure:"mode" validate:"omitempty,oneof=a0x2Cb c"`
+				}{}
+			},
+			wantErr: `reading config key "mode": validate rule "oneof=a0x2Cb c" uses |, a quote or an escaped character`,
+		},
+		{
+			name: "an escaped pipe",
+			newConfig: func() any {
+				return &struct {
+					Mode string `mapstructure:"mode" validate:"omitempty,oneof=a0x7Cb c"`
+				}{}
+			},
+			wantErr: `reading config key "mode": validate rule "oneof=a0x7Cb c" uses |, a quote or an escaped character`,
+		},
+		{
 			name: "item rules on a list of objects",
 			newConfig: func() any {
 				return &struct {
