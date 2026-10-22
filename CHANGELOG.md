@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.29.0](https://github.com/rudderlabs/rudder-iac/compare/v0.28.0...v0.29.0) (2026-10-22)
+
+
+### Features
+
+* **cli:** add docs destination and docs source commands ([#989](https://github.com/rudderlabs/rudder-iac/issues/989)) ([fc40d92](https://github.com/rudderlabs/rudder-iac/commit/fc40d92387f31a9127ed907e9fe581f4b7418c28))
+* **cli:** add rudder-cli dev listen, a local event capture server ([#936](https://github.com/rudderlabs/rudder-iac/issues/936)) ([1b927c2](https://github.com/rudderlabs/rudder-iac/commit/1b927c232d0a9aaace338a83aa560d22e254e7c1))
+* **devlisten:** rename to sources listen, print events on stdout, store behind --store ([#981](https://github.com/rudderlabs/rudder-iac/issues/981)) ([d8abd91](https://github.com/rudderlabs/rudder-iac/commit/d8abd910047a5cc82cd55c74fe91c43fe2394717))
+* **validate:** render diagnostics as JSON ([#877](https://github.com/rudderlabs/rudder-iac/issues/877)) ([b55d6f5](https://github.com/rudderlabs/rudder-iac/commit/b55d6f5573341c35a4e8758c8dbacd7db0da89e8))
+
+
+### Bug Fixes
+
+* **accounts:** refuse BigQuery credentials that are not a service account key ([#951](https://github.com/rudderlabs/rudder-iac/issues/951)) ([26a5cb5](https://github.com/rudderlabs/rudder-iac/commit/26a5cb590986c97c21539b64698ab32edf0a3e09))
+* **ci:** skip the test jobs, not the workflow, on docs-only pull requests ([#958](https://github.com/rudderlabs/rudder-iac/issues/958)) ([dc8a4f0](https://github.com/rudderlabs/rudder-iac/commit/dc8a4f030e95adcfc2ee874e68d51db38444cc7f))
+* **cli:** run validate offline without credentials ([#905](https://github.com/rudderlabs/rudder-iac/issues/905)) ([b8abcd8](https://github.com/rudderlabs/rudder-iac/commit/b8abcd8607f9ec737aa0cdbe942cbb0074c15ac3))
+* **import:** run import --merge matchers in a fixed provider dependency order ([#950](https://github.com/rudderlabs/rudder-iac/issues/950)) ([173ae9f](https://github.com/rudderlabs/rudder-iac/commit/173ae9fcf879f8a24c9f63fcdc4d885b429016fe))
+* **import:** single-quote generated secret template slots ([#955](https://github.com/rudderlabs/rudder-iac/issues/955)) ([7d274ce](https://github.com/rudderlabs/rudder-iac/commit/7d274cefff5c508892dc28ca322b56b6d56aec87))
+* **retl:** close validation gaps found in QA (DEX-960, 994, 995, 1020, 959) ([#937](https://github.com/rudderlabs/rudder-iac/issues/937)) ([dabdf75](https://github.com/rudderlabs/rudder-iac/commit/dabdf752ca73ca5a415d8e581277f35c11549472))
+* **telemetry:** report command failures accurately and track pre-run errors ([#858](https://github.com/rudderlabs/rudder-iac/issues/858)) ([fa072c9](https://github.com/rudderlabs/rudder-iac/commit/fa072c9689aceed4f58acbf980696ac1f7191ccc))
+
+
+### Miscellaneous
+
+* **devlisten:** e2e hardening tests, hostile-event page test and nightly job ([#941](https://github.com/rudderlabs/rudder-iac/issues/941)) ([ee407cd](https://github.com/rudderlabs/rudder-iac/commit/ee407cdf4fa542a3f0f197a5d5f62015c82c5684))
+
 ## [0.28.0](https://github.com/rudderlabs/rudder-iac/compare/v0.27.0...v0.28.0) (2026-10-08)
 
 
