@@ -143,10 +143,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "posthog",
-		APIType:    "POSTHOG",
-		Version:    1,
-		Properties: properties,
+		Type:        "posthog",
+		DisplayName: "PostHog",
+		APIType:     "POSTHOG",
+		Version:     1,
+		Properties:  properties,
 		// db-config secretKeys is empty; terraform marks api_key Sensitive.
 		SecretKeys: []string{"api_key"},
 		NewConfig: func() any {

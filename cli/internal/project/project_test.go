@@ -2,6 +2,7 @@ package project_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	provrules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
@@ -136,6 +138,8 @@ func TestNewProject_Load_Error(t *testing.T) {
 	err := p.Load("test_location")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "custom loader called")
+	// The text renderer printed nothing, so the caller still has to.
+	assert.NotErrorIs(t, err, project.ErrReported)
 }
 
 func TestProject_Load_Success(t *testing.T) {
@@ -383,6 +387,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 		substitutor varsubst.Substitutor
 		rawSpecs    map[string][]byte
 		wantErr     string // empty when Load should succeed
+		wantMatches bool   // the rendered output holds the failure, so ErrReported applies
 		wantSpecs   map[string]*specs.Spec
 	}{
 		{
@@ -432,8 +437,9 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			rawSpecs: map[string][]byte{
 				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: \"{{ .1A }}\"\nspec:\n  k: v"),
 			},
-			wantErr:   "variable substitution failed",
-			wantSpecs: map[string]*specs.Spec{},
+			wantErr:     "variable substitution failed",
+			wantMatches: true,
+			wantSpecs:   map[string]*specs.Spec{},
 		},
 		{
 			name:        "nil substitutor leaves spec untouched",
@@ -487,6 +493,7 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			err := proj.Load("test_dir")
 			if tc.wantErr != "" {
 				require.EqualError(t, err, tc.wantErr)
+				assert.Equal(t, tc.wantMatches, errors.Is(err, project.ErrReported))
 			} else {
 				require.NoError(t, err)
 			}
@@ -712,5 +719,292 @@ func TestProject_Load_RendersSourceDiagnostics(t *testing.T) {
 			}
 			assert.Equal(t, tc.wantLines, rendered)
 		})
+	}
+}
+
+// providerWithErrorRules adds a syntactic and a semantic rule that fail the
+// fixture spec named after them, so Load stops on real engine diagnostics.
+type providerWithErrorRules struct {
+	*testutils.MockProvider
+}
+
+func failOnSpecNamed(name string) func(string, string, map[string]any, map[string]any) []rules.ValidationResult {
+	return func(_ string, _ string, metadata map[string]any, _ map[string]any) []rules.ValidationResult {
+		if metadata["name"] != name {
+			return nil
+		}
+		return []rules.ValidationResult{{Message: "broken spec"}}
+	}
+}
+
+func (p *providerWithErrorRules) SyntacticRules() []rules.Rule {
+	return []rules.Rule{provrules.NewTypedRule(
+		"test/syntactic-error", rules.Error, "fails the syntactic fixture spec", rules.Examples{},
+		provrules.NewPatternValidator(fixtureMatchPatterns, failOnSpecNamed("syntactic_source")),
+	)}
+}
+
+func (p *providerWithErrorRules) SemanticRules() []rules.Rule {
+	return []rules.Rule{provrules.NewTypedRule(
+		"test/semantic-error", rules.Error, "fails the semantic fixture spec", rules.Examples{},
+		provrules.NewPatternValidator(fixtureMatchPatterns, failOnSpecNamed("semantic_source")),
+	)}
+}
+
+// Under the JSON renderer every failed load must leave one document on stdout,
+// and the returned error must match ErrReported so the caller does not
+// print the failure again. An empty diagnostics array has to mean "validated
+// clean", so a failure with no diagnostics of its own gets a load-failed one.
+func TestProject_Load_JSONRendererRecordsEveryFailure(t *testing.T) {
+	t.Parallel()
+
+	oneSource := map[string]*specs.RawSpec{"spec.yaml": fixtureSpec("abc")}
+
+	for _, tc := range []struct {
+		name      string
+		rawSpecs  map[string]*specs.RawSpec
+		loadErr   error
+		graphErr  error
+		wantErr   string
+		wantRules []string
+	}{
+		{
+			name:      "loader failure before validation",
+			loadErr:   errors.New("no such directory"),
+			wantErr:   "failed to load specs using specLoader: no such directory",
+			wantRules: []string{"project/load-failed"},
+		},
+		{
+			name:      "failure after the syntax gate carries no diagnostics",
+			rawSpecs:  oneSource,
+			graphErr:  errors.New("event not found"),
+			wantErr:   "building resource graph: event not found",
+			wantRules: []string{"project/load-failed"},
+		},
+		{
+			name:      "syntax rule error",
+			rawSpecs:  map[string]*specs.RawSpec{"spec.yaml": fixtureSpec("syntactic_source")},
+			wantErr:   "syntax validation failed",
+			wantRules: []string{"test/syntactic-error"},
+		},
+		{
+			name:      "semantic rule error",
+			rawSpecs:  map[string]*specs.RawSpec{"spec.yaml": fixtureSpec("semantic_source")},
+			wantErr:   "semantic validation failed",
+			wantRules: []string{"test/semantic-error"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockProvider := &providerWithErrorRules{MockProvider: testutils.NewMockProvider(nil, nil)}
+			mockProvider.MatchPatterns = fixtureMatchPatterns
+			mockProvider.GetResourceGraphErr = tc.graphErr
+			mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+				return tc.rawSpecs, tc.loadErr
+			}}
+
+			var out bytes.Buffer
+			proj := project.New(mockProvider,
+				project.WithLoader(mockLoader),
+				project.WithRenderer(renderer.NewJSONRenderer(&out)),
+			)
+
+			err := proj.Load("test_dir")
+
+			require.EqualError(t, err, tc.wantErr)
+			assert.ErrorIs(t, err, project.ErrReported)
+
+			var doc struct {
+				Diagnostics []struct {
+					RuleID string `json:"ruleId"`
+				} `json:"diagnostics"`
+			}
+			require.NoError(t, json.Unmarshal(out.Bytes(), &doc))
+			var got []string
+			for _, d := range doc.Diagnostics {
+				got = append(got, d.RuleID)
+			}
+			assert.Equal(t, tc.wantRules, got)
+		})
+	}
+}
+
+// providerWithUnregistrableRule adds a syntactic rule for a kind the provider
+// does not support, so building the rule registry fails before validation runs.
+type providerWithUnregistrableRule struct {
+	*testutils.MockProvider
+}
+
+func (p *providerWithUnregistrableRule) SyntacticRules() []rules.Rule {
+	return []rules.Rule{provrules.NewTypedRule(
+		"test/unregistrable", rules.Error, "applies to a kind the provider does not support", rules.Examples{},
+		provrules.NewPatternValidator(
+			[]rules.MatchPattern{rules.MatchKindVersion("Unsupported", "rudder/v1")},
+			failOnSpecNamed("unused"),
+		),
+	)}
+}
+
+// unknownFileRule is a project-wide rule that reports on a file the load does
+// not hold, so syntax validation fails to run after the specs are parsed.
+type unknownFileRule struct{}
+
+func (unknownFileRule) ID() string                      { return "test/unknown-file" }
+func (unknownFileRule) Severity() rules.Severity        { return rules.Error }
+func (unknownFileRule) Description() string             { return "reports on a file the load does not hold" }
+func (unknownFileRule) AppliesTo() []rules.MatchPattern { return fixtureMatchPatterns }
+func (unknownFileRule) Examples() rules.Examples        { return rules.Examples{} }
+func (unknownFileRule) Validate(*rules.ValidationContext) []rules.ValidationResult {
+	return nil
+}
+
+func (unknownFileRule) ValidateSpecs(map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+	return map[string][]rules.ValidationResult{"elsewhere.yaml": {{Message: "not in the load"}}}
+}
+
+// unknownSourceFileRule is a source rule that reports on a file the load does
+// not hold, so source validation fails to run before substitution.
+type unknownSourceFileRule struct{ referenceWarningRule }
+
+func (unknownSourceFileRule) ID() string { return "test/unknown-source-file" }
+func (unknownSourceFileRule) ValidateSources(map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+	return map[string][]rules.ValidationResult{"elsewhere.yaml": {{Message: "not in the load"}}}
+}
+
+// providerWithFailingSourceRun adds a source rule that makes source validation
+// fail to run.
+type providerWithFailingSourceRun struct {
+	*testutils.MockProvider
+}
+
+func (p *providerWithFailingSourceRun) SyntacticRules() []rules.Rule {
+	return []rules.Rule{unknownSourceFileRule{}}
+}
+
+// providerWithFailingSyntaxRun adds a source rule, whose warning is collected
+// before substitution, and a rule that makes syntax validation fail to run.
+type providerWithFailingSyntaxRun struct {
+	*testutils.MockProvider
+}
+
+func (p *providerWithFailingSyntaxRun) SyntacticRules() []rules.Rule {
+	return []rules.Rule{referenceWarningRule{}, unknownFileRule{}}
+}
+
+// Load sets up the registry and the engine and runs the source rules before it
+// parses any spec, so a failure there carries no diagnostics. Syntax validation runs after parsing,
+// so when it fails to run Load renders the source and parse diagnostics it
+// collected before the error. Under the JSON renderer the document also holds
+// the error, and under the text renderer the caller still prints it.
+func TestProject_Load_SetupFailureRendersCollectedDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	newMock := func() *testutils.MockProvider {
+		mock := testutils.NewMockProvider(nil, nil)
+		mock.MatchPatterns = fixtureMatchPatterns
+		return mock
+	}
+
+	for _, tc := range []struct {
+		name        string
+		newProvider func() provider.Provider
+		wantErr     string
+		wantRules   []string // ruleIds in the JSON document
+		wantMessage string   // part of the project/load-failed message
+		wantText    []string // starts of the diagnostic lines the text renderer prints
+		wantSummary string   // the text renderer's summary, empty when it prints nothing
+	}{
+		{
+			name:        "registry setup",
+			newProvider: func() provider.Provider { return &providerWithUnregistrableRule{MockProvider: newMock()} },
+			wantErr:     "setting up registry: registering syntactic rule test/unregistrable",
+			wantRules:   []string{"project/load-failed"},
+			wantMessage: "setting up registry",
+		},
+		{
+			name:        "source validation run",
+			newProvider: func() provider.Provider { return &providerWithFailingSourceRun{MockProvider: newMock()} },
+			wantErr:     "source validation: source rule test/unknown-source-file returned results for unknown file: elsewhere.yaml",
+			wantRules:   []string{"project/load-failed"},
+			wantMessage: "source validation",
+		},
+		{
+			name:        "syntax validation run",
+			newProvider: func() provider.Provider { return &providerWithFailingSyntaxRun{MockProvider: newMock()} },
+			wantErr:     "syntactic validation: project-wide validation: project rule test/unknown-file returned results for unknown file: elsewhere.yaml",
+			wantRules:   []string{"test/source-warning", "project/spec-syntax-parse-valid", "project/load-failed"},
+			wantMessage: "syntactic validation",
+			wantText: []string{
+				"warning[test/source-warning]: reference as written",
+				"error[project/spec-syntax-parse-valid]: failed to parse spec from path bad.yaml",
+			},
+			wantSummary: "Found 1 error(s), 1 warning(s)",
+		},
+	} {
+		for _, useJSON := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/json=%v", tc.name, useJSON), func(t *testing.T) {
+				t.Parallel()
+
+				mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+					return map[string]*specs.RawSpec{
+						"bad.yaml": {Data: []byte("kind: [")},
+						"a.yaml":   {Data: []byte("kind: Source\nversion: rudder/v1\nmetadata:\n  name: '{{ .NAME }}'\nspec:\n  k: v")},
+					}, nil
+				}}
+
+				var out bytes.Buffer
+				r := renderer.NewTextRenderer(&out)
+				if useJSON {
+					r = renderer.NewJSONRenderer(&out)
+				}
+				// Each run gets its own provider, since the mock records the
+				// specs it parses.
+				proj := project.New(tc.newProvider(),
+					project.WithLoader(mockLoader),
+					project.WithSubstitutor(varsubst.NewSubstitutor(mapResolver{"NAME": "resolved_name"})),
+					project.WithRenderer(r),
+				)
+
+				err := proj.Load("test_dir")
+
+				require.ErrorContains(t, err, tc.wantErr)
+				assert.Equal(t, useJSON, errors.Is(err, project.ErrReported))
+
+				if useJSON {
+					var doc struct {
+						Diagnostics []struct {
+							RuleID  string `json:"ruleId"`
+							Message string `json:"message"`
+						} `json:"diagnostics"`
+					}
+					require.NoError(t, json.Unmarshal(out.Bytes(), &doc))
+					var got []string
+					for _, d := range doc.Diagnostics {
+						got = append(got, d.RuleID)
+					}
+					assert.Equal(t, tc.wantRules, got)
+					assert.Contains(t, doc.Diagnostics[len(doc.Diagnostics)-1].Message, tc.wantMessage)
+					return
+				}
+
+				var lines []string
+				for _, line := range strings.Split(out.String(), "\n") {
+					if strings.HasPrefix(line, "warning[") || strings.HasPrefix(line, "error[") {
+						lines = append(lines, line)
+					}
+				}
+				require.Len(t, lines, len(tc.wantText))
+				for i, want := range tc.wantText {
+					assert.True(t, strings.HasPrefix(lines[i], want), "line %d: %q", i, lines[i])
+				}
+				if tc.wantSummary == "" {
+					assert.Empty(t, out.String())
+				} else {
+					assert.Contains(t, out.String(), tc.wantSummary)
+				}
+				assert.NotContains(t, out.String(), tc.wantMessage)
+			})
+		}
 	}
 }

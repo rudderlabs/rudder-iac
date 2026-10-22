@@ -356,3 +356,17 @@ func TestMapConfigMaskVariableNameGrammar(t *testing.T) {
 		assert.Contains(t, err.Error(), "does not satisfy the variable grammar")
 	})
 }
+
+// VariableName is the rule MaskSecrets applies, so a caller that names
+// variables up front gets the names import writes.
+func TestVariableName(t *testing.T) {
+	assert.Equal(t, "MY_DEST", VariableName("my-dest"))
+	assert.Equal(t, "MY_DEST_API_SECRET", VariableName("my-dest", "api_secret"))
+	assert.Equal(t, "MY_DEST_HEADERS_0_TO", VariableName("my-dest", "headers", "0", "to"))
+	// Only the ID folds "-" into "_", as the grammar test above requires.
+	assert.Equal(t, "MY_DEST_API-SECRET", VariableName("my-dest", "api-secret"))
+
+	config := map[string]any{"headers": []any{map[string]any{"to": "t"}}}
+	require.NoError(t, MaskSecrets(config, "my-dest", []string{"headers.to"}))
+	assert.Equal(t, Reference(VariableName("my-dest", "headers", "0", "to")), config["headers"].([]any)[0].(map[string]any)["to"])
+}

@@ -223,10 +223,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "customerio",
-		APIType:    "CUSTOMERIO",
-		Version:    1,
-		Properties: properties,
+		Type:        "customerio",
+		DisplayName: "Customer.io",
+		APIType:     "CUSTOMERIO",
+		Version:     1,
+		Properties:  properties,
 		// db-config lists no secretKeys for customerio, but terraform marks api_key
 		// Sensitive and it is a real credential, so it is wrapped write-only here.
 		// Note the API does still return apiKey, so the value is never absent from

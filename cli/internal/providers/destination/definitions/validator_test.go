@@ -22,8 +22,9 @@ func TestRegisterDefinitionMissingNewConfig(t *testing.T) {
 
 	registry := definitions.NewRegistry()
 	err := registry.Register(&definitions.DestinationDefinition{
-		Type:    "GA4",
-		Version: 1,
+		Type:        "GA4",
+		DisplayName: "Test",
+		Version:     1,
 	})
 	require.Error(t, err)
 }
@@ -104,6 +105,7 @@ func TestValidateConfigRejectsUnsupportedConsentSource(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -138,6 +140,7 @@ func TestValidateConfigAppliesCanonicalConsentValidation(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -174,6 +177,7 @@ func TestValidateConfigRejectsMissingConsentProvider(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -210,6 +214,7 @@ func TestValidateConfigReplacesCanonicalConsentValidationForSource(t *testing.T)
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"ios_swift"},
 		ConnectionModes: map[string][]string{
@@ -246,6 +251,7 @@ func TestValidateConfigKeepsCanonicalConsentValidationForSiblingSource(t *testin
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"ios_swift", "web"},
 		ConnectionModes: map[string][]string{
@@ -288,6 +294,7 @@ func TestValidateConfigReportsMalformedConsentValuePath(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -320,6 +327,7 @@ func TestValidateConfigRejectsNullConsentManagement(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -350,6 +358,7 @@ func TestValidateConfigRejectsNullConsentSourceEntries(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -382,6 +391,7 @@ func TestValidateConfigRejectsNullConsentProvider(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -418,6 +428,7 @@ func TestValidateConfigRejectsNullConsentEntry(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -452,6 +463,7 @@ func TestValidateConfigRejectsNullConsents(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -488,6 +500,7 @@ func TestValidateConfigRejectsNullConsentValue(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{

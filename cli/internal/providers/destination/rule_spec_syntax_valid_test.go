@@ -27,8 +27,9 @@ func ruleTestRegistry(t *testing.T) *definitions.Registry {
 
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
-		Type:    "WEBHOOK",
-		Version: 1,
+		Type:        "WEBHOOK",
+		DisplayName: "Test",
+		Version:     1,
 		NewConfig: func() any {
 			return &ruleTestConfig{}
 		},

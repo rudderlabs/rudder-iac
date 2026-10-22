@@ -33,8 +33,9 @@ type testWebhookConfig struct {
 // GA4TestDefinition returns a destination definition used by external tests.
 func GA4TestDefinition() *DestinationDefinition {
 	return &DestinationDefinition{
-		Type:    "GA4",
-		Version: 1,
+		Type:        "GA4",
+		DisplayName: "Test",
+		Version:     1,
 		Properties: []converter.ConfigProperty{
 			converter.Simple("apiSecret", "api_secret"),
 			converter.Simple("measurementId", "measurement_id"),
@@ -57,8 +58,9 @@ func GA4TestDefinition() *DestinationDefinition {
 // WebhookTestDefinition returns a webhook destination definition used by external tests.
 func WebhookTestDefinition(destType string, version int64) *DestinationDefinition {
 	return &DestinationDefinition{
-		Type:    destType,
-		Version: version,
+		Type:        destType,
+		DisplayName: "Test",
+		Version:     version,
 		Properties: []converter.ConfigProperty{
 			converter.Simple("webhookUrl", "webhook_url"),
 		},
@@ -86,8 +88,9 @@ func DynamicPatternTestDefinition() *DestinationDefinition {
 	funcs.NewPattern("test_digits", `^[0-9]+$`, "must contain only digits")
 
 	return &DestinationDefinition{
-		Type:    "DYNAMICPATTERN",
-		Version: 1,
+		Type:        "DYNAMICPATTERN",
+		DisplayName: "Test",
+		Version:     1,
 		NewConfig: func() any {
 			return &testDynamicPatternConfig{}
 		},
@@ -101,8 +104,9 @@ func DynamicPatternTestDefinition() *DestinationDefinition {
 // WebhookTestDefinitionWithoutConnectionMode returns a minimal webhook definition.
 func WebhookTestDefinitionWithoutConnectionMode() *DestinationDefinition {
 	return &DestinationDefinition{
-		Type:    "WEBHOOK",
-		Version: 1,
+		Type:        "WEBHOOK",
+		DisplayName: "Test",
+		Version:     1,
 		NewConfig: func() any {
 			return &struct {
 				WebhookURL string `mapstructure:"webhook_url" validate:"required"`

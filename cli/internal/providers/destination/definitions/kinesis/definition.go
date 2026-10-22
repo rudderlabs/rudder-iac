@@ -68,11 +68,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "kinesis",
-		APIType:    "KINESIS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"access_key_id", "access_key"},
+		Type:        "kinesis",
+		DisplayName: "Amazon Kinesis",
+		APIType:     "KINESIS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"access_key_id", "access_key"},
 		NewConfig: func() any {
 			return &kinesisConfig{}
 		},
