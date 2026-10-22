@@ -55,3 +55,12 @@ func TestAllowedCellReadsLimits(t *testing.T) {
 	assert.Equal(t, "`a`, `b`; no two items of the list may share a value",
 		allowedCell(Field{Enum: []any{"a", "b"}, Unique: true}))
 }
+
+func TestSecretCellNamesTheVariableAndSlot(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, "", secretCell(Field{}))
+	assert.Equal(t, "yes", secretCell(Field{Secret: true}))
+	assert.Equal(t, "yes, variable `SHOP_API_KEY`, slot `'{{ .SHOP_API_KEY }}'`",
+		secretCell(Field{Secret: true, Var: "SHOP_API_KEY", Slot: "'{{ .SHOP_API_KEY }}'"}))
+}

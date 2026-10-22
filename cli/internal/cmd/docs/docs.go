@@ -107,7 +107,10 @@ func plainMessage(e *specdocs.Error) string {
 	}
 	switch e.Code {
 	case specdocs.CodeUnknownType, specdocs.CodeMissingType:
-		message += " Run `rudder-cli docs destination` to list the types."
+		if len(e.ValidTypes) > 0 {
+			message += " Valid destination types: " + strings.Join(e.ValidTypes, ", ") + "."
+		}
+		message += " Run `rudder-cli docs destination` for their display names."
 	case specdocs.CodeUnknownSource, specdocs.CodeUnsupportedSource:
 		if len(e.ValidTypes) > 0 {
 			message += " Valid source types: " + strings.Join(e.ValidTypes, ", ") + "."

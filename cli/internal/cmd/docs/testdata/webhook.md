@@ -9,7 +9,7 @@ Each key goes under `spec.config`. `[]` marks the items of a list. A nested key 
 | `webhook_url` | `string` | yes |  | pattern `webhook_url`, or a template |  |
 | `webhook_method` | `string` |  | `POST` | `POST`, `PUT`, `PATCH`, `GET`, `DELETE` |  |
 | `headers[].from` | `string` |  |  | pattern `single_line_1000`, or a template |  |
-| `headers[].to` | `string` |  |  | pattern `single_line_1000`, or a template | yes, `STOREFRONT_WEBHOOK_HEADERS_<N>_TO` |
+| `headers[].to` | `string` |  |  | pattern `single_line_1000`, or a template | yes, variable `STOREFRONT_WEBHOOK_HEADERS_<N>_TO`, slot `'{{ .STOREFRONT_WEBHOOK_HEADERS_<N>_TO }}'` |
 | `connection_mode` | `map<sourceToken,string>` |  |  | see connection modes |  |
 | `consent_management` | `map<sourceToken,array<object>>` |  |  |  |  |
 | `consent_management.<sourceToken>[].provider` | `string` | yes, once its parent is written |  | `custom`, `iubenda`, `ketch`, `oneTrust`; no two items of the list may share a value |  |

@@ -235,7 +235,7 @@ func secretCell(f Field) string {
 	if f.Var == "" {
 		return "yes"
 	}
-	return "yes, " + code(f.Var)
+	return "yes, variable " + code(f.Var) + ", slot " + code(f.Slot)
 }
 
 func envAssignments(env map[string]string) string {

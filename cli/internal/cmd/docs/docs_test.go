@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -19,6 +20,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry/telemetrytest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/builtin"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/specdocs"
@@ -44,6 +46,16 @@ func run(t *testing.T, args ...string) (string, string, error) {
 	root.SetArgs(args)
 	err := root.Execute()
 	return stdout.String(), stderr.String(), err
+}
+
+// supportedTypes lists every compiled destination type, unverified ones
+// included, as the docs command registers them.
+func supportedTypes(t *testing.T) []string {
+	t.Helper()
+
+	registry, err := builtin.NewRegistry(true)
+	require.NoError(t, err)
+	return registry.SupportedTypes()
 }
 
 func assertGolden(t *testing.T, name, got string) {
@@ -152,7 +164,8 @@ func TestUnknownTypeWithMarkdownReturnsTheError(t *testing.T) {
 	stdout, _, err := run(t, "docs", "destination", "bigquery")
 
 	require.EqualError(t, err, `destination type "bigquery" is not supported; did you mean bq, bqstream? `+
-		"Run `rudder-cli docs destination` to list the types.")
+		"Valid destination types: "+strings.Join(supportedTypes(t), ", ")+". "+
+		"Run `rudder-cli docs destination` for their display names.")
 	var silent *cmderrors.SilentError
 	assert.False(t, errors.As(err, &silent), "the root prints the message")
 	assert.Empty(t, stdout)
@@ -202,7 +215,8 @@ func TestFlagErrors(t *testing.T) {
 
 	_, _, err = run(t, "docs", "destination", "--id", "shop")
 	require.EqualError(t, err, "--id and --definition-version need a destination type. "+
-		"Run `rudder-cli docs destination` to list the types.")
+		"Valid destination types: "+strings.Join(supportedTypes(t), ", ")+". "+
+		"Run `rudder-cli docs destination` for their display names.")
 
 	_, _, err = run(t, "docs", "destination", "webhook", "am")
 	require.EqualError(t, err, "docs destination takes at most one destination type, got 2 arguments.")
