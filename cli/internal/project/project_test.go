@@ -713,3 +713,84 @@ func TestProject_Load_JSONRendererRecordsEveryFailure(t *testing.T) {
 		})
 	}
 }
+
+// providerWithUnregistrableRule adds a syntactic rule for a kind the provider
+// does not support, so building the rule registry fails before validation runs.
+type providerWithUnregistrableRule struct {
+	*testutils.MockProvider
+}
+
+func (p *providerWithUnregistrableRule) SyntacticRules() []rules.Rule {
+	return []rules.Rule{provrules.NewTypedRule(
+		"test/unregistrable", rules.Error, "applies to a kind the provider does not support", rules.Examples{},
+		provrules.NewPatternValidator(
+			[]rules.MatchPattern{rules.MatchKindVersion("Unsupported", "rudder/v1")},
+			failOnSpecNamed("unused"),
+		),
+	)}
+}
+
+// When the registry, the engine or syntax validation fails to run, Load renders
+// the parse diagnostics it collected before the error. Under the JSON renderer
+// the document also holds the error, and under the text renderer the caller
+// still prints it.
+func TestProject_Load_SetupFailureRendersParseDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name         string
+		newRenderer  func(*bytes.Buffer) renderer.Renderer
+		wantReported bool
+		assertOutput func(t *testing.T, out string)
+	}{
+		{
+			name:         "json",
+			newRenderer:  func(b *bytes.Buffer) renderer.Renderer { return renderer.NewJSONRenderer(b) },
+			wantReported: true,
+			assertOutput: func(t *testing.T, out string) {
+				var doc struct {
+					Diagnostics []struct {
+						RuleID  string `json:"ruleId"`
+						Message string `json:"message"`
+					} `json:"diagnostics"`
+				}
+				require.NoError(t, json.Unmarshal([]byte(out), &doc))
+				require.Len(t, doc.Diagnostics, 2)
+				assert.Equal(t, "project/spec-syntax-parse-valid", doc.Diagnostics[0].RuleID)
+				assert.Equal(t, "project/load-failed", doc.Diagnostics[1].RuleID)
+				assert.Contains(t, doc.Diagnostics[1].Message, "setting up registry")
+			},
+		},
+		{
+			name:        "text",
+			newRenderer: func(b *bytes.Buffer) renderer.Renderer { return renderer.NewTextRenderer(b) },
+			assertOutput: func(t *testing.T, out string) {
+				assert.Contains(t, out, "error[project/spec-syntax-parse-valid]: failed to parse spec from path bad.yaml")
+				assert.Contains(t, out, "Found 1 error(s), 0 warning(s)")
+				assert.NotContains(t, out, "setting up registry")
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			mockProvider := &providerWithUnregistrableRule{MockProvider: testutils.NewMockProvider(nil, nil)}
+			mockProvider.MatchPatterns = fixtureMatchPatterns
+			mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+				return map[string]*specs.RawSpec{"bad.yaml": {Data: []byte("kind: [")}}, nil
+			}}
+
+			var out bytes.Buffer
+			proj := project.New(mockProvider,
+				project.WithLoader(mockLoader),
+				project.WithRenderer(tc.newRenderer(&out)),
+			)
+
+			err := proj.Load("test_dir")
+
+			require.ErrorContains(t, err, "setting up registry: registering syntactic rule test/unregistrable")
+			assert.Equal(t, tc.wantReported, errors.Is(err, project.ErrReported))
+			tc.assertOutput(t, out.String())
+		})
+	}
+}
