@@ -37,14 +37,19 @@ const (
 	CodeInvalidArguments = "invalid_arguments"
 )
 
-// Error is an input the documents cannot be built for. It carries what a
-// caller needs to correct the input without a second lookup.
+// Error is an input the documents cannot be built for, and the "error" object
+// of an ErrorDoc. It says what was wrong and how to fix it without a second
+// lookup. ValidTypes lists the values accepted for the input the code names:
+// destination types for unknown_type and missing_type, source spec types for
+// unknown_source, and the source spec types the destination accepts for
+// unsupported_source. ValidVersions lists the type's definition versions for
+// unknown_definition_version.
 type Error struct {
-	Code          string
-	Message       string
-	Suggestions   []string
-	ValidTypes    []string
-	ValidVersions []int64
+	Code          string   `json:"code"`
+	Message       string   `json:"message"`
+	Suggestions   []string `json:"suggestions"`
+	ValidTypes    []string `json:"validTypes,omitempty"`
+	ValidVersions []int64  `json:"validVersions,omitempty"`
 }
 
 func (e *Error) Error() string {
@@ -54,42 +59,19 @@ func (e *Error) Error() string {
 // ErrorDoc is the JSON document printed instead of the requested one when the
 // input is wrong.
 type ErrorDoc struct {
-	SchemaVersion int       `json:"schemaVersion"`
-	CLIVersion    string    `json:"cliVersion"`
-	Error         ErrorBody `json:"error"`
+	SchemaVersion int    `json:"schemaVersion"`
+	CLIVersion    string `json:"cliVersion"`
+	Error         Error  `json:"error"`
 }
 
-// ErrorBody says what was wrong and how to fix it. ValidTypes lists the
-// values accepted for the input the code names: destination types for
-// unknown_type and missing_type, source spec types for unknown_source, and
-// the source spec types the destination accepts for unsupported_source.
-// ValidVersions lists the type's definition versions for
-// unknown_definition_version.
-type ErrorBody struct {
-	Code          string   `json:"code"`
-	Message       string   `json:"message"`
-	Suggestions   []string `json:"suggestions"`
-	ValidTypes    []string `json:"validTypes,omitempty"`
-	ValidVersions []int64  `json:"validVersions,omitempty"`
-}
-
-// NewErrorDoc wraps e for JSON output.
+// NewErrorDoc wraps e for JSON output. It is the one place a nil Suggestions
+// becomes the empty array the contract prints.
 func NewErrorDoc(cliVersion string, e *Error) ErrorDoc {
-	suggestions := e.Suggestions
-	if suggestions == nil {
-		suggestions = []string{}
+	body := *e
+	if body.Suggestions == nil {
+		body.Suggestions = []string{}
 	}
-	return ErrorDoc{
-		SchemaVersion: SchemaVersion,
-		CLIVersion:    cliVersion,
-		Error: ErrorBody{
-			Code:          e.Code,
-			Message:       e.Message,
-			Suggestions:   suggestions,
-			ValidTypes:    e.ValidTypes,
-			ValidVersions: e.ValidVersions,
-		},
-	}
+	return ErrorDoc{SchemaVersion: SchemaVersion, CLIVersion: cliVersion, Error: body}
 }
 
 // WriteJSON writes v as indented JSON. HTML escaping is off because variable

@@ -85,20 +85,18 @@ func newCmdDestination() *cobra.Command {
 				invalidArguments(fmt.Sprintf("docs destination takes at most one destination type, got %d arguments", len(args))))
 		case len(args) == 1 && destType == "":
 			return fail(out, format, cliVersion, &specdocs.Error{
-				Code:        specdocs.CodeMissingType,
-				Message:     "the destination type argument is empty",
-				Suggestions: []string{},
-				ValidTypes:  registry.SupportedTypes(),
+				Code:       specdocs.CodeMissingType,
+				Message:    "the destination type argument is empty",
+				ValidTypes: registry.SupportedTypes(),
 			})
 		}
 
 		if destType == "" {
 			if id != "" || version != 0 {
 				return fail(out, format, cliVersion, &specdocs.Error{
-					Code:        specdocs.CodeMissingType,
-					Message:     "--id and --definition-version need a destination type",
-					Suggestions: []string{},
-					ValidTypes:  registry.SupportedTypes(),
+					Code:       specdocs.CodeMissingType,
+					Message:    "--id and --definition-version need a destination type",
+					ValidTypes: registry.SupportedTypes(),
 				})
 			}
 			list, err := docs.List(specdocs.ListOptions{CLIVersion: cliVersion, Source: source})

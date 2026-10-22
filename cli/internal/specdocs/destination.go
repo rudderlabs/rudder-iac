@@ -308,7 +308,6 @@ func (d *Destinations) lookup(destType string, version int64) (*definitions.Regi
 		return nil, &Error{
 			Code:          CodeUnknownDefinitionVersion,
 			Message:       fmt.Sprintf("destination type %q has no definition version %d", destType, version),
-			Suggestions:   []string{},
 			ValidVersions: versions,
 		}
 	}
@@ -433,7 +432,7 @@ func validateID(id string, fields []definitions.Field) error {
 }
 
 func invalidID(id, message string) error {
-	e := &Error{Code: CodeInvalidID, Message: message, Suggestions: []string{}}
+	e := &Error{Code: CodeInvalidID, Message: message}
 	if fixed := suggestID(id); fixed != "" {
 		e.Suggestions = []string{fixed}
 	}
@@ -470,7 +469,6 @@ func unsupportedSource(desc definitions.Description, ref SourceRef) error {
 		Code: CodeUnsupportedSource,
 		Message: fmt.Sprintf("destination type %q does not accept %s sources, which connect as %q",
 			desc.Type, ref.Type, ref.Token),
-		Suggestions: []string{},
-		ValidTypes:  accepted,
+		ValidTypes: accepted,
 	}
 }

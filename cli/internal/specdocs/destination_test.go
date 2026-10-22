@@ -736,7 +736,6 @@ func TestDescribeErrors(t *testing.T) {
 			want: &specdocs.Error{
 				Code:          specdocs.CodeUnknownDefinitionVersion,
 				Message:       `destination type "webhook" has no definition version 7`,
-				Suggestions:   []string{},
 				ValidVersions: []int64{1},
 			},
 		},
@@ -754,9 +753,8 @@ func TestDescribeErrors(t *testing.T) {
 			name: "a source the type does not accept",
 			opts: specdocs.DescribeOptions{Type: "adj", Source: "javascript"},
 			want: &specdocs.Error{
-				Code:        specdocs.CodeUnsupportedSource,
-				Message:     `destination type "adj" does not accept javascript sources, which connect as "web"`,
-				Suggestions: []string{},
+				Code:    specdocs.CodeUnsupportedSource,
+				Message: `destination type "adj" does not accept javascript sources, which connect as "web"`,
 				ValidTypes: []string{
 					"android", "android_kotlin", "cordova", "dotnet", "flutter", "go", "ios", "ios_swift",
 					"java", "node", "php", "python", "react_native", "ruby", "rust", "unity",

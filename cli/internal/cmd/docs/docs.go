@@ -73,7 +73,7 @@ func formatFlags(cmd *cobra.Command) func() (string, error) {
 }
 
 func invalidArguments(message string) *specdocs.Error {
-	return &specdocs.Error{Code: specdocs.CodeInvalidArguments, Message: message, Suggestions: []string{}}
+	return &specdocs.Error{Code: specdocs.CodeInvalidArguments, Message: message}
 }
 
 func reportedFormat(format string) string {
