@@ -34,7 +34,11 @@ func TestSuggest(t *testing.T) {
 		{input: "--", want: []string{}},
 	}
 	for _, tc := range cases {
-		assert.Equal(t, tc.want, suggest(tc.input, candidates), tc.input)
+		t.Run(tc.input, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tc.want, suggest(tc.input, candidates))
+		})
 	}
 }
 

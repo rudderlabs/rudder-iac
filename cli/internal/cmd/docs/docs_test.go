@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -103,11 +104,13 @@ func TestOutputIsByteIdenticalAcrossRuns(t *testing.T) {
 		{"docs", "destination"},
 		{"docs", "source", "--json"},
 	} {
-		first, _, err := run(t, args...)
-		require.NoError(t, err)
-		second, _, err := run(t, args...)
-		require.NoError(t, err)
-		assert.Equal(t, first, second, args)
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			first, _, err := run(t, args...)
+			require.NoError(t, err)
+			second, _, err := run(t, args...)
+			require.NoError(t, err)
+			assert.Equal(t, first, second)
+		})
 	}
 }
 
@@ -132,9 +135,11 @@ func TestDocsRunOffline(t *testing.T) {
 		{"docs", "destination", "webhook", "--source", "javascript", "--id", "storefront-webhook", "--json"},
 		{"docs", "source"},
 	} {
-		stdout, _, err := run(t, args...)
-		require.NoError(t, err, args)
-		assert.NotEmpty(t, stdout, args)
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			stdout, _, err := run(t, args...)
+			require.NoError(t, err)
+			assert.NotEmpty(t, stdout)
+		})
 	}
 }
 
@@ -149,12 +154,16 @@ func TestUnknownTypeWithJSONPrintsAnErrorDocument(t *testing.T) {
 
 	var doc specdocs.ErrorDoc
 	require.NoError(t, json.Unmarshal([]byte(stdout), &doc))
-	assert.Equal(t, 1, doc.SchemaVersion)
-	assert.Equal(t, testVersion, doc.CLIVersion)
-	assert.Equal(t, "unknown_type", doc.Error.Code)
-	assert.Equal(t, `destination type "bigquery" is not supported`, doc.Error.Message)
-	assert.Equal(t, []string{"bq", "bqstream"}, doc.Error.Suggestions)
-	assert.Contains(t, doc.Error.ValidTypes, "webhook")
+	assert.Equal(t, specdocs.ErrorDoc{
+		SchemaVersion: 1,
+		CLIVersion:    testVersion,
+		Error: specdocs.Error{
+			Code:        "unknown_type",
+			Message:     `destination type "bigquery" is not supported`,
+			Suggestions: []string{"bq", "bqstream"},
+			ValidTypes:  supportedTypes(t),
+		},
+	}, doc)
 	assert.Contains(t, doc.Error.ValidTypes, "adj", "unverified types are listed too")
 }
 
@@ -174,36 +183,158 @@ func TestUnknownTypeWithMarkdownReturnsTheError(t *testing.T) {
 func TestInputErrorsWithJSON(t *testing.T) {
 	telemetrytest.Record(t)
 
+	var (
+		destTypes   = supportedTypes(t)
+		sourceTypes = slices.Sorted(slices.Values(source.SourceTypes()))
+		idAdvice    = "use an ID of 2 to 100 letters, digits, underscores and hyphens that does not start with a digit"
+	)
 	cases := []struct {
-		args     []string
-		wantCode string
+		name string
+		args []string
+		want specdocs.Error
 	}{
-		{args: []string{"docs", "destination", "webhook", "--source", "web", "--json"}, wantCode: "unknown_source"},
-		{args: []string{"docs", "destination", "--source", "web", "--json"}, wantCode: "unknown_source"},
-		{args: []string{"docs", "destination", "adj", "--source", "javascript", "--json"}, wantCode: "unsupported_source"},
-		{args: []string{"docs", "destination", "webhook", "--id", "my.dest", "--json"}, wantCode: "invalid_id"},
-		{args: []string{"docs", "destination", "webhook", "--definition-version", "9", "--json"}, wantCode: "unknown_definition_version"},
-		{args: []string{"docs", "destination", "--id", "shop", "--json"}, wantCode: "missing_type"},
-		{args: []string{"docs", "destination", "--definition-version", "1", "--json"}, wantCode: "missing_type"},
-		{args: []string{"docs", "destination", "", "--json"}, wantCode: "missing_type"},
-		{args: []string{"docs", "destination", "webhook", "extra", "--json"}, wantCode: "invalid_arguments"},
-		{args: []string{"docs", "destination", "webhook", "--format", "md", "--json"}, wantCode: "invalid_arguments"},
-		{args: []string{"docs", "destination", "webhook", "--format", "yaml", "-j"}, wantCode: "invalid_arguments"},
-		{args: []string{"docs", "source", "extra", "--json"}, wantCode: "invalid_arguments"},
-		{args: []string{"docs", "source", "--format", "md", "--json"}, wantCode: "invalid_arguments"},
+		{
+			name: "a source token in place of a source type",
+			args: []string{"docs", "destination", "webhook", "--source", "web", "--json"},
+			want: specdocs.Error{
+				Code:        "unknown_source",
+				Message:     `source type "web" is not an event stream source spec type`,
+				Suggestions: []string{"javascript"},
+				ValidTypes:  sourceTypes,
+			},
+		},
+		{
+			name: "a listing narrowed to a source token",
+			args: []string{"docs", "destination", "--source", "web", "--json"},
+			want: specdocs.Error{
+				Code:        "unknown_source",
+				Message:     `source type "web" is not an event stream source spec type`,
+				Suggestions: []string{"javascript"},
+				ValidTypes:  sourceTypes,
+			},
+		},
+		{
+			name: "a source the type does not accept",
+			args: []string{"docs", "destination", "adj", "--source", "javascript", "--json"},
+			want: specdocs.Error{
+				Code:        "unsupported_source",
+				Message:     `destination type "adj" does not accept javascript sources, which connect as "web"`,
+				Suggestions: []string{},
+				ValidTypes: []string{
+					"android", "android_kotlin", "cordova", "dotnet", "flutter", "go", "ios", "ios_swift",
+					"java", "node", "php", "python", "react_native", "ruby", "rust", "unity",
+				},
+			},
+		},
+		{
+			name: "an ID that makes an invalid variable name",
+			args: []string{"docs", "destination", "webhook", "--id", "my.dest", "--json"},
+			want: specdocs.Error{
+				Code: "invalid_id",
+				Message: `--id "my.dest" gives the secret variable name "MY.DEST", which does not match ` +
+					"^[A-Za-z_][A-Za-z0-9_]*$; " + idAdvice,
+				Suggestions: []string{},
+			},
+		},
+		{
+			name: "an unknown definition version",
+			args: []string{"docs", "destination", "webhook", "--definition-version", "9", "--json"},
+			want: specdocs.Error{
+				Code:          "unknown_definition_version",
+				Message:       `destination type "webhook" has no definition version 9`,
+				Suggestions:   []string{},
+				ValidVersions: []int64{1},
+			},
+		},
+		{
+			name: "an ID without a type",
+			args: []string{"docs", "destination", "--id", "shop", "--json"},
+			want: specdocs.Error{
+				Code:        "missing_type",
+				Message:     "--id and --definition-version need a destination type",
+				Suggestions: []string{},
+				ValidTypes:  destTypes,
+			},
+		},
+		{
+			name: "a definition version without a type",
+			args: []string{"docs", "destination", "--definition-version", "1", "--json"},
+			want: specdocs.Error{
+				Code:        "missing_type",
+				Message:     "--id and --definition-version need a destination type",
+				Suggestions: []string{},
+				ValidTypes:  destTypes,
+			},
+		},
+		{
+			name: "an empty type",
+			args: []string{"docs", "destination", "", "--json"},
+			want: specdocs.Error{
+				Code:        "missing_type",
+				Message:     "the destination type argument is empty",
+				Suggestions: []string{},
+				ValidTypes:  destTypes,
+			},
+		},
+		{
+			name: "an extra argument",
+			args: []string{"docs", "destination", "webhook", "extra", "--json"},
+			want: specdocs.Error{
+				Code:        "invalid_arguments",
+				Message:     "docs destination takes at most one destination type, got 2 arguments",
+				Suggestions: []string{},
+			},
+		},
+		{
+			name: "--json with --format md",
+			args: []string{"docs", "destination", "webhook", "--format", "md", "--json"},
+			want: specdocs.Error{
+				Code:        "invalid_arguments",
+				Message:     `--json and --format "md" ask for different formats; pass one of them`,
+				Suggestions: []string{},
+			},
+		},
+		{
+			name: "-j with an unknown --format",
+			args: []string{"docs", "destination", "webhook", "--format", "yaml", "-j"},
+			want: specdocs.Error{
+				Code:        "invalid_arguments",
+				Message:     `--json and --format "yaml" ask for different formats; pass one of them`,
+				Suggestions: []string{},
+			},
+		},
+		{
+			name: "an argument to docs source",
+			args: []string{"docs", "source", "extra", "--json"},
+			want: specdocs.Error{
+				Code:        "invalid_arguments",
+				Message:     "docs source takes no arguments, got 1",
+				Suggestions: []string{},
+			},
+		},
+		{
+			name: "docs source with --json and --format md",
+			args: []string{"docs", "source", "--format", "md", "--json"},
+			want: specdocs.Error{
+				Code:        "invalid_arguments",
+				Message:     `--json and --format "md" ask for different formats; pass one of them`,
+				Suggestions: []string{},
+			},
+		},
 	}
 
 	for _, tc := range cases {
-		stdout, stderr, err := run(t, tc.args...)
+		t.Run(tc.name, func(t *testing.T) {
+			stdout, stderr, err := run(t, tc.args...)
 
-		var silent *cmderrors.SilentError
-		require.ErrorAs(t, err, &silent, tc.args)
-		assert.Empty(t, stderr, tc.args)
+			var silent *cmderrors.SilentError
+			require.ErrorAs(t, err, &silent)
+			assert.Empty(t, stderr)
 
-		var doc specdocs.ErrorDoc
-		require.NoError(t, json.Unmarshal([]byte(stdout), &doc), tc.args)
-		assert.Equal(t, tc.wantCode, doc.Error.Code, tc.args)
-		assert.NotNil(t, doc.Error.Suggestions, tc.args)
+			var doc specdocs.ErrorDoc
+			require.NoError(t, json.Unmarshal([]byte(stdout), &doc))
+			assert.Equal(t, specdocs.ErrorDoc{SchemaVersion: 1, CLIVersion: testVersion, Error: tc.want}, doc)
+		})
 	}
 }
 
