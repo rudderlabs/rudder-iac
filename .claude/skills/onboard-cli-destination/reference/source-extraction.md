@@ -180,7 +180,10 @@ Everything else in this section is for branches conditioned on ordinary
 config keys.
 
 `schema.json` states conditional requiredness as `allOf` branches, and
-go-playground's built-in tags cover every shape upstream uses. **Never write a
+go-playground's built-in tags cover every shape upstream uses. Use only the
+built-ins registration accepts, listed in definition-anatomy.md "Rules the
+registry enforces at Register()"; it rejects any other, because
+`rudder-cli docs destination` could not describe it. **Never write a
 custom validator or a `CustomValidateConfig`-style hook for this** — see the
 worked example in `definitions/postgres/definition.go`, which enforces all eight
 of its branches with built-ins alone.

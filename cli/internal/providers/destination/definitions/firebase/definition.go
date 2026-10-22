@@ -59,10 +59,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "firebase",
-		APIType:    "FIREBASE",
-		Version:    1,
-		Properties: properties,
+		Type:        "firebase",
+		DisplayName: "Firebase",
+		APIType:     "FIREBASE",
+		Version:     1,
+		Properties:  properties,
 		NewConfig: func() any {
 			return &firebaseConfig{}
 		},

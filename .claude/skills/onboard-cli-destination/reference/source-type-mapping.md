@@ -109,11 +109,10 @@ raw "$TYPE/schema.json" | jq -c '.configSchema.allOf[]?
   | select((.if | tostring | test("connectionMode")) and .then.required != null)
   | {if, required: .then.required}'
 
-# Verified vs unverified, from the repo root: the types listed before the
-# UnverifiedDestinations marker are verified, the rest unverified.
-sed -n '/^func newDestinationRegistry/,/^}/p' cli/internal/app/dependencies.go |
-  grep -oE 'UnverifiedDestinations|registering [a-z0-9_]+ destination' |
-  sed -E 's/^registering ([a-z0-9_]+) destination$/\1/'
+# Verified vs unverified, from the repo root, as the docs command reads the
+# builtin table.
+go run ./cli/cmd/rudder-cli docs destination --json |
+  jq -r '.destinations[] | "\(.type) \(if .verified then "verified" else "unverified" end)"'
 ```
 
 ## Per-source-type connect-time required keys

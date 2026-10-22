@@ -86,11 +86,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "tiktok_ads",
-		APIType:    "TIKTOK_ADS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"access_token", "pixel_code"},
+		Type:        "tiktok_ads",
+		DisplayName: "TikTok Ads",
+		APIType:     "TIKTOK_ADS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"access_token", "pixel_code"},
 		NewConfig: func() any {
 			return &tiktokAdsConfig{}
 		},
