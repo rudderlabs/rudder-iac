@@ -549,6 +549,15 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 			wantErr: `reading config key "size": validate rule "pattern" on a int does not check the value`,
 		},
 		{
+			name: "dynamic_or_pattern on an integer",
+			newConfig: func() any {
+				return &struct {
+					Size *int `mapstructure:"size" validate:"omitempty,dynamic_or_pattern=describe_short"`
+				}{}
+			},
+			wantErr: `reading config key "size": validate rule "dynamic_or_pattern" on a int does not check the value`,
+		},
+		{
 			name: "min on a bool",
 			newConfig: func() any {
 				return &struct {
@@ -617,6 +626,17 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 				}{}
 			},
 			wantErr: `reading config key "name": validate rule "required_unless" appears twice on one key`,
+		},
+		{
+			name: "two excluded_if rules",
+			newConfig: func() any {
+				return &struct {
+					A    *string `mapstructure:"a"`
+					B    *string `mapstructure:"b"`
+					Name *string `mapstructure:"name" validate:"excluded_if=A x,excluded_if=B y"`
+				}{}
+			},
+			wantErr: `reading config key "name": validate rule "excluded_if" appears twice on one key`,
 		},
 	}
 
