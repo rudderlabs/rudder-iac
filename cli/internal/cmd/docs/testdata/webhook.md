@@ -33,8 +33,8 @@ Each key goes under `spec.config`. `[]` marks the items of a list. A nested key 
 ## Spec template
 
 ```yaml
-# Replace each null with a value. A value you fill in can meet another key's
-# requiredIf or requiredUnless condition, which makes that key required too.
+# Replace each null with a value. A value you fill in can trigger another key's
+# requiredIf, requiredUnless or requiredWith rule, which then requires that key.
 version: rudder/v1
 kind: destination
 metadata:

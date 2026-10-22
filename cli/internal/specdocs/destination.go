@@ -47,10 +47,10 @@ type DestinationDoc struct {
 	// the required keys, the keys the connection mode needs, and the keys a
 	// requiredIf or requiredUnless rule requires once the defaults apply. It
 	// validates once its nulls are filled, with two exceptions its first lines
-	// state as a YAML comment: a value the caller fills in can meet another
-	// key's requiredIf or requiredUnless condition, and a custom validator can
-	// require a key under conditions only its Go code states. postgres and
-	// snowflake do the latter when use_rudder_storage is false.
+	// state as a YAML comment: a value the caller fills in can trigger another
+	// key's requiredIf, requiredUnless or requiredWith rule, and a custom
+	// validator can require a key under conditions only its Go code states.
+	// postgres and snowflake do the latter when use_rudder_storage is false.
 	SpecTemplate string `json:"specTemplate,omitempty"`
 }
 

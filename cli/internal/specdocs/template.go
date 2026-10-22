@@ -19,11 +19,11 @@ import (
 const connectionModeKey = "connection_mode"
 
 const (
-	// templateNote heads every spec template. Validate checks the conditions
-	// of requiredIf and requiredUnless against the values the caller fills
-	// in, which the template cannot know.
-	templateNote = "Replace each null with a value. A value you fill in can meet another key's\n" +
-		"requiredIf or requiredUnless condition, which makes that key required too."
+	// templateNote heads every spec template. Validate checks requiredIf,
+	// requiredUnless and requiredWith against the values the caller fills in,
+	// which the template cannot know.
+	templateNote = "Replace each null with a value. A value you fill in can trigger another key's\n" +
+		"requiredIf, requiredUnless or requiredWith rule, which then requires that key."
 	// customValidatorNote follows templateNote when the type has custom
 	// validators, whose conditions only their Go code states.
 	customValidatorNote = "A custom validator (checkedBy) can require more keys under conditions the\n" +
