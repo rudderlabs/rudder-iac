@@ -56,7 +56,7 @@ func newCmdDestination() *cobra.Command {
 				}
 			}
 			reportedSource := source
-			if source != "" && !specdocs.IsSourceType(source) {
+			if given("source") && !specdocs.IsSourceType(source) {
 				reportedSource = unknownValue
 			}
 			telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
@@ -64,7 +64,7 @@ func newCmdDestination() *cobra.Command {
 				{K: "format", V: reportedFormat(format)},
 				{K: "source", V: reportedSource},
 				{K: "listing", V: len(args) == 0},
-				{K: "has_id", V: id != ""},
+				{K: "has_id", V: given("id")},
 			}...)
 		}()
 

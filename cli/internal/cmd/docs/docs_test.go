@@ -506,6 +506,28 @@ func TestSourceListsTheSpecTypes(t *testing.T) {
 	assert.ElementsMatch(t, source.SourceTypes(), types)
 }
 
+// A flag given with an empty value counts as given: the source reports as
+// unknown, as a wrong value does, and has_id is true.
+func TestTelemetryCountsAnEmptyFlagAsGiven(t *testing.T) {
+	calls := telemetrytest.Record(t)
+
+	_, _, _ = run(t, "docs", "destination", "webhook", "--source", "", "--id", "", "--json")
+
+	assert.Equal(t, []telemetrytest.Call{
+		{
+			Command: "docs destination",
+			Errored: true,
+			Extras: []telemetry.KV{
+				{K: "type", V: "webhook"},
+				{K: "format", V: "json"},
+				{K: "source", V: "unknown"},
+				{K: "listing", V: false},
+				{K: "has_id", V: true},
+			},
+		},
+	}, *calls)
+}
+
 func TestTelemetryNeverCarriesFreeText(t *testing.T) {
 	calls := telemetrytest.Record(t)
 
