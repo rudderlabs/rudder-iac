@@ -245,6 +245,33 @@ func TestDescribeReturnsACopy(t *testing.T) {
 	assert.Equal(t, []string{"cloud", "device"}, second.ConnectionModes["web"])
 }
 
+// An integer oneof or condition value is read as 64 bits on every platform,
+// so a value above 2147483647 also registers on the 32-bit release builds.
+// Run it there with GOARCH=386.
+func TestDescribeReadsInt64RuleValues(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "TEST",
+		DisplayName: "Test",
+		Version:     1,
+		NewConfig: func() any {
+			return &struct {
+				Size *int64  `mapstructure:"size" validate:"omitempty,oneof=3000000000 9223372036854775807"`
+				Name *string `mapstructure:"name" validate:"required_if=Size 3000000000"`
+			}{}
+		},
+	}))
+	registered, err := registry.Get("TEST", 1)
+	require.NoError(t, err)
+
+	assert.Equal(t, []definitions.Field{
+		{Key: "size", Type: "integer", Enum: []any{int64(3000000000), int64(9223372036854775807)}},
+		{Key: "name", Type: "string", RequiredIf: []definitions.Condition{{Key: "size", Value: int64(3000000000)}}},
+	}, registered.Describe().Fields)
+}
+
 func TestRegisterRequiresDisplayName(t *testing.T) {
 	t.Parallel()
 

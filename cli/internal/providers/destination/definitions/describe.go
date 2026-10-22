@@ -598,9 +598,18 @@ func isUnsigned(kind reflect.Kind) bool {
 	}
 }
 
-// parseLimit reads a min or max limit.
+// parseLimit reads a min or max limit. Field holds a limit as an int, so
+// once plainInteger accepts the text, Atoi reads it again as an int rather
+// than narrow the int64.
 func parseLimit(valueType reflect.Type, raw string) (int, error) {
-	return plainInteger(derefType(valueType).Kind(), raw)
+	if _, err := plainInteger(derefType(valueType).Kind(), raw); err != nil {
+		return 0, err
+	}
+	limit, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("want a limit that fits an int, got %q", raw)
+	}
+	return limit, nil
 }
 
 // plainInteger reads an integer rule parameter that applies to a value of
@@ -608,10 +617,12 @@ func parseLimit(valueType reflect.Type, raw string) (int, error) {
 // value. go-playground reads limits and condition values with base prefixes,
 // compares a oneof value with the integer's base-10 text, and panics on a
 // negative value for an unsigned integer. So the parameter must be plain base
-// 10, and 0 or more when kind is unsigned.
-func plainInteger(kind reflect.Kind, raw string) (int, error) {
-	value, err := strconv.Atoi(raw)
-	if err != nil || strconv.Itoa(value) != raw {
+// 10, and 0 or more when kind is unsigned. It reads 64 bits on every
+// platform, so an int64 value above 2147483647 also registers on the 32-bit
+// builds.
+func plainInteger(kind reflect.Kind, raw string) (int64, error) {
+	value, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || strconv.FormatInt(value, 10) != raw {
 		return 0, fmt.Errorf("want a plain base-10 integer, got %q", raw)
 	}
 	if value < 0 && isUnsigned(kind) {
@@ -707,7 +718,7 @@ func parseTypedValue(typ reflect.Type, raw string) (any, error) {
 		if err != nil {
 			return nil, err
 		}
-		return int64(value), nil
+		return value, nil
 	case kind == reflect.Float32 || kind == reflect.Float64:
 		value, err := strconv.ParseFloat(raw, 64)
 		if err != nil {
