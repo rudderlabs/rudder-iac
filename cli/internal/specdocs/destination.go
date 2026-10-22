@@ -240,7 +240,7 @@ func (d *Destinations) Describe(opts DescribeOptions) (DestinationDoc, error) {
 	}
 
 	if opts.ID != "" {
-		if err := validateID(opts.ID, desc.Fields); err != nil {
+		if err := validateID(opts.ID); err != nil {
 			return DestinationDoc{}, err
 		}
 	}
@@ -408,55 +408,22 @@ func slot(varName string) string {
 const idAdvice = "use an ID of 2 to 100 letters, digits, underscores and hyphens that does not start with a digit"
 
 // validateID checks what id becomes: the template's display_name, and the
-// secret variable names. A list index is a number, so "0" stands in for it
-// here.
-func validateID(id string, fields []definitions.Field) error {
+// secret variable names. Registration requires snake_case secret keys, which
+// only add valid characters to a name, so the ID's own part decides.
+func validateID(id string) error {
 	if !funcs.MatchPattern(destination.DisplayNamePattern, id) {
 		pattern, _ := funcs.LookupPattern(destination.DisplayNamePattern)
-		return invalidID(id, fmt.Sprintf("--id %q is also the spec's display_name, which %s; %s", id, pattern.Message, idAdvice))
+		return invalidID(fmt.Sprintf("--id %q is also the spec's display_name, which %s; %s", id, pattern.Message, idAdvice))
 	}
-
-	names := []string{secret.VariableName(id)}
-	for _, f := range fields {
-		if f.Secret {
-			names = append(names, secret.VariableName(id, varSegments(f.Key, "0")...))
-		}
-	}
-	for _, name := range names {
-		if varsubst.IsValidVariableName(name) {
-			continue
-		}
-		return invalidID(id, fmt.Sprintf("--id %q gives the secret variable name %q, which does not match ^[A-Za-z_][A-Za-z0-9_]*$; %s",
+	if name := secret.VariableName(id); !varsubst.IsValidVariableName(name) {
+		return invalidID(fmt.Sprintf("--id %q gives the secret variable name %q, which does not match ^[A-Za-z_][A-Za-z0-9_]*$; %s",
 			id, name, idAdvice))
 	}
 	return nil
 }
 
-func invalidID(id, message string) error {
-	e := &Error{Code: CodeInvalidID, Message: message}
-	if fixed := suggestID(id); fixed != "" {
-		e.Suggestions = []string{fixed}
-	}
-	return e
-}
-
-// suggestID lower-cases id, turns every other character into a hyphen and
-// drops a leading run that cannot start a name.
-func suggestID(id string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(id) {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '_', r == '-':
-			b.WriteRune(r)
-		default:
-			b.WriteRune('-')
-		}
-	}
-	fixed := strings.TrimLeft(b.String(), "-0123456789")
-	if !funcs.MatchPattern(destination.DisplayNamePattern, fixed) || !varsubst.IsValidVariableName(secret.VariableName(fixed)) {
-		return ""
-	}
-	return fixed
+func invalidID(message string) error {
+	return &Error{Code: CodeInvalidID, Message: message}
 }
 
 func unsupportedSource(desc definitions.Description, ref SourceRef) error {

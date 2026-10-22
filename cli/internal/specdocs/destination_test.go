@@ -768,7 +768,6 @@ func TestDescribeErrors(t *testing.T) {
 				Code: specdocs.CodeInvalidID,
 				Message: `--id "9.Shop" gives the secret variable name "9.SHOP", which does not match ^[A-Za-z_][A-Za-z0-9_]*$; ` +
 					"use an ID of 2 to 100 letters, digits, underscores and hyphens that does not start with a digit",
-				Suggestions: []string{"shop"},
 			},
 		},
 		{
@@ -779,7 +778,6 @@ func TestDescribeErrors(t *testing.T) {
 				Message: `--id "ıdshop" is also the spec's display_name, which must be 2-100 characters and contain only ` +
 					"letters, digits, underscores, spaces, periods, and hyphens; " +
 					"use an ID of 2 to 100 letters, digits, underscores and hyphens that does not start with a digit",
-				Suggestions: []string{"dshop"},
 			},
 		},
 	}

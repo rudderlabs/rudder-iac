@@ -270,6 +270,26 @@ func TestRegisterRequiresSecretKeysToResolveToStrings(t *testing.T) {
 	}
 }
 
+// The docs check only the spec ID when they name a secret's variable, which
+// holds because every key segment is snake_case.
+func TestRegisterRequiresSnakeCaseSecretKeys(t *testing.T) {
+	t.Parallel()
+
+	err := definitions.NewRegistry().Register(&definitions.DestinationDefinition{
+		Type:        "TEST",
+		DisplayName: "Test",
+		Version:     1,
+		SecretKeys:  []string{"client-secret"},
+		NewConfig: func() any {
+			return &struct {
+				ClientSecret string `mapstructure:"client-secret"`
+			}{}
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `secret key "client-secret" is not snake_case`)
+}
+
 func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 	t.Parallel()
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -285,6 +286,11 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 	}, nil
 }
 
+// snakeCaseKey is a dotted path of snake_case segments. secret.VariableName
+// upper-cases each segment into the secret's variable name, so such a key
+// always adds valid characters and only the spec ID can make the name invalid.
+var snakeCaseKey = regexp.MustCompile(`^[a-z0-9_]+(\.[a-z0-9_]+)*$`)
+
 // validateSecretKeys requires every secret key to name a string field of the
 // described config, through nested objects and lists of objects. Apply, import
 // and the docs command all act on these paths, and a path the config model
@@ -301,6 +307,9 @@ func validateSecretKeys(secretKeys []string, fields []Field) error {
 		}
 		if fieldType != "string" {
 			return fmt.Errorf("secret key %q names a field of type %s, not string", key, fieldType)
+		}
+		if !snakeCaseKey.MatchString(key) {
+			return fmt.Errorf("secret key %q is not snake_case, so its secret's variable name could be invalid", key)
 		}
 	}
 	return nil

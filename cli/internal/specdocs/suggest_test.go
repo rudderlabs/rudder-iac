@@ -46,11 +46,3 @@ func TestSuggestSourcesMapsTokens(t *testing.T) {
 	assert.Equal(t, []string{"javascript", "java"}, suggestSources("JavaScript"))
 	assert.Equal(t, []string{"dotnet", "go", "java", "node", "php", "python", "ruby", "rust"}, suggestSources("cloud"))
 }
-
-func TestSuggestID(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, "shop-web", suggestID("Shop.Web"))
-	assert.Equal(t, "shop", suggestID("9-shop"))
-	assert.Equal(t, "", suggestID("123"))
-}

@@ -142,7 +142,8 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
   config struct, no duplicates, and the property must carry a local key
   (`Gated(Discriminator(...))` is rejected).
 - Every `SecretKeys` path must resolve to a string field, through nested
-  objects and lists of objects.
+  objects and lists of objects, and be snake_case, since each segment goes
+  upper-cased into the secret's variable name.
 - Every `validate` rule on the config struct must be one that
   `(*RegisteredDefinition).Describe` reads (`required`, `required_if`,
   `required_unless`, `required_with`, `excluded_with`, `excluded_if`, `oneof`,
