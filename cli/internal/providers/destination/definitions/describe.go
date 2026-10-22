@@ -170,13 +170,8 @@ var (
 	consentManagementType = reflect.TypeOf(common.ConsentManagement{})
 )
 
-const (
-	// sourceTokenKey stands for a key of a map keyed by source token.
-	sourceTokenKey = "<sourceToken>"
-	// consentValuePatternName names common.ConsentValueRegex in
-	// Description.Patterns.
-	consentValuePatternName = "consent_value"
-)
+// sourceTokenKey stands for a key of a map keyed by source token.
+const sourceTokenKey = "<sourceToken>"
 
 // configWalker reads a config model's fields. It fails on any validate rule
 // it cannot describe, so a rule added to a definition without teaching the
@@ -294,8 +289,7 @@ func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructF
 	switch {
 	case fieldType == consentManagementType:
 		w.fields = append(w.fields, field)
-		w.describeConsentEntries(key, gate)
-		return nil
+		return w.describeConsentEntries(key, gate)
 	case fieldType.Kind() == reflect.Struct:
 		if field.constrained() {
 			w.fields = append(w.fields, field)
@@ -316,20 +310,22 @@ func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructF
 // common.ValidateConsentEntries checks in Go code rather than through
 // validate tags. A source token whose definition overrides that check is
 // left out, since only the override's code says what it accepts.
-func (w *configWalker) describeConsentEntries(key string, gate []string) {
+func (w *configWalker) describeConsentEntries(key string, gate []string) error {
 	gate, described := w.consentGate(gate)
 	if !described {
-		return
+		return nil
 	}
+
+	pattern, ok := funcs.LookupPattern(common.ConsentValuePattern)
+	if !ok {
+		return fmt.Errorf("pattern %q is not registered", common.ConsentValuePattern)
+	}
+	w.patterns[common.ConsentValuePattern] = pattern
 
 	var (
 		item     = key + "." + sourceTokenKey + "[]"
 		provider = item + ".provider"
 	)
-	w.patterns[consentValuePatternName] = funcs.PatternInfo{
-		Regex:   common.ConsentValueRegex,
-		Message: common.ConsentValueMessage,
-	}
 	w.fields = append(w.fields,
 		Field{
 			Key:                provider,
@@ -349,11 +345,12 @@ func (w *configWalker) describeConsentEntries(key string, gate []string) {
 		Field{
 			Key:                item + ".consents",
 			Type:               "array<string>",
-			Pattern:            consentValuePatternName,
+			Pattern:            common.ConsentValuePattern,
 			AcceptsTemplate:    true,
 			OnlyForSourceTypes: slices.Clone(gate),
 		},
 	)
+	return nil
 }
 
 // consentGate narrows gate to the source tokens the canonical consent check

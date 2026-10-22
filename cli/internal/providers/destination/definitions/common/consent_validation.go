@@ -2,28 +2,30 @@ package common
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 )
 
 const (
 	// ConsentProviderCustom is the provider whose entries need a
 	// resolution_strategy.
 	ConsentProviderCustom = "custom"
-	// ConsentValueRegex is what each value in an entry's consents must match:
-	// a `{{ path || fallback }}` template, an `env.` value, or at most 100
-	// characters.
-	ConsentValueRegex = `^(\{\{.*\|\|.*\}\}|env\..+|.{0,100})$`
-	// ConsentValueMessage is the validation message for a consent value that
-	// does not match ConsentValueRegex.
-	ConsentValueMessage = "must be at most 100 characters"
+	// ConsentValuePattern names the registered pattern each value in an
+	// entry's consents must match: a `{{ path || fallback }}` template, an
+	// `env.` value, or at most 100 characters.
+	ConsentValuePattern = "consent_value"
+	consentValueMessage = "must be at most 100 characters"
 )
 
 var (
 	consentProviders            = []string{ConsentProviderCustom, "iubenda", "ketch", "oneTrust"}
 	consentResolutionStrategies = []string{"and", "or"}
-	consentValuePattern         = regexp.MustCompile(ConsentValueRegex)
 )
+
+func init() {
+	funcs.NewPattern(ConsentValuePattern, `^(\{\{.*\|\|.*\}\}|env\..+|.{0,100})$`, consentValueMessage)
+}
 
 // ConsentProviders returns a copy of the provider values ValidateConsentEntries
 // accepts, for Describe to document.
@@ -108,12 +110,12 @@ func validateConsentEntry(index int, entry ConsentEntry) []ConsentValidationErro
 func validateConsentValues(entryIndex int, consents []string) []ConsentValidationError {
 	var errors []ConsentValidationError
 	for consentIndex, consent := range consents {
-		if consentValuePattern.MatchString(consent) {
+		if funcs.MatchPattern(ConsentValuePattern, consent) {
 			continue
 		}
 		errors = append(errors, ConsentValidationError{
 			Path:    fmt.Sprintf("/%d/consents/%d", entryIndex, consentIndex),
-			Message: "'consent' " + ConsentValueMessage,
+			Message: "'consent' " + consentValueMessage,
 		})
 	}
 	return errors

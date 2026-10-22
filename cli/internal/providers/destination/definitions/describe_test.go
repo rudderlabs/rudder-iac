@@ -166,7 +166,7 @@ func TestDescribeReadsTheConfigModel(t *testing.T) {
 		},
 		Patterns: map[string]funcs.PatternInfo{
 			"describe_short": {Regex: `^.{0,10}$`, Reject: `^bad`, Message: "must be short"},
-			"consent_value":  {Regex: common.ConsentValueRegex, Message: "must be at most 100 characters"},
+			"consent_value":  {Regex: `^(\{\{.*\|\|.*\}\}|env\..+|.{0,100})$`, Message: "must be at most 100 characters"},
 		},
 		CustomValidators: []string{"describe_token_check"},
 	}, registered.Describe())
