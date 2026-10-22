@@ -172,6 +172,12 @@ func TestInputErrorsWithJSON(t *testing.T) {
 		{args: []string{"docs", "destination", "webhook", "--definition-version", "9", "--json"}, wantCode: "unknown_definition_version"},
 		{args: []string{"docs", "destination", "--id", "shop", "--json"}, wantCode: "missing_type"},
 		{args: []string{"docs", "destination", "--definition-version", "1", "--json"}, wantCode: "missing_type"},
+		{args: []string{"docs", "destination", "", "--json"}, wantCode: "missing_type"},
+		{args: []string{"docs", "destination", "webhook", "extra", "--json"}, wantCode: "invalid_arguments"},
+		{args: []string{"docs", "destination", "webhook", "--format", "md", "--json"}, wantCode: "invalid_arguments"},
+		{args: []string{"docs", "destination", "webhook", "--format", "yaml", "-j"}, wantCode: "invalid_arguments"},
+		{args: []string{"docs", "source", "extra", "--json"}, wantCode: "invalid_arguments"},
+		{args: []string{"docs", "source", "--format", "md", "--json"}, wantCode: "invalid_arguments"},
 	}
 
 	for _, tc := range cases {
@@ -192,20 +198,33 @@ func TestFlagErrors(t *testing.T) {
 	telemetrytest.Record(t)
 
 	_, _, err := run(t, "docs", "destination", "webhook", "--format", "yaml")
-	require.EqualError(t, err, `--format must be md or json, got "yaml"`)
-
-	_, _, err = run(t, "docs", "destination", "webhook", "--format", "md", "--json")
-	require.Error(t, err)
+	require.EqualError(t, err, `--format must be md or json, got "yaml".`)
 
 	_, _, err = run(t, "docs", "destination", "--id", "shop")
 	require.EqualError(t, err, "--id and --definition-version need a destination type. "+
 		"Run `rudder-cli docs destination` to list the types.")
 
 	_, _, err = run(t, "docs", "destination", "webhook", "am")
-	require.Error(t, err)
+	require.EqualError(t, err, "docs destination takes at most one destination type, got 2 arguments.")
+
+	_, _, err = run(t, "docs", "source", "extra")
+	require.EqualError(t, err, "docs source takes no arguments, got 1.")
 
 	_, _, err = run(t, "docs", "nothing")
 	require.Error(t, err)
+}
+
+// --format json and --json agree, so together they print JSON.
+func TestFormatAndJSONFlagsThatAgree(t *testing.T) {
+	telemetrytest.Record(t)
+
+	stdout, stderr, err := run(t, "docs", "destination", "webhook", "--format", "json", "--json")
+	require.NoError(t, err)
+	assert.Empty(t, stderr)
+
+	var doc specdocs.DestinationDoc
+	require.NoError(t, json.Unmarshal([]byte(stdout), &doc))
+	assert.Equal(t, "webhook", doc.Type)
 }
 
 func TestSourceListsTheSpecTypes(t *testing.T) {
@@ -235,6 +254,7 @@ func TestTelemetryNeverCarriesFreeText(t *testing.T) {
 	_, _, _ = run(t, "docs", "destination", "--json")
 	_, _, _ = run(t, "docs", "source")
 	_, _, _ = run(t, "docs", "source", "--format", "private-text")
+	_, _, _ = run(t, "docs", "destination", "", "--json")
 
 	assert.Equal(t, []telemetrytest.Call{
 		{
@@ -276,6 +296,17 @@ func TestTelemetryNeverCarriesFreeText(t *testing.T) {
 			Command: "docs source",
 			Errored: true,
 			Extras:  []telemetry.KV{{K: "format", V: "unknown"}},
+		},
+		{
+			Command: "docs destination",
+			Errored: true,
+			Extras: []telemetry.KV{
+				{K: "type", V: ""},
+				{K: "format", V: "json"},
+				{K: "source", V: ""},
+				{K: "listing", V: false},
+				{K: "has_id", V: false},
+			},
 		},
 	}, *calls)
 }

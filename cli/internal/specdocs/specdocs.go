@@ -29,8 +29,12 @@ const (
 	CodeInvalidID = "invalid_id"
 	// CodeUnknownDefinitionVersion: the type has no such definition version.
 	CodeUnknownDefinitionVersion = "unknown_definition_version"
-	// CodeMissingType: --id or --definition-version was given without a type.
+	// CodeMissingType: --id or --definition-version was given without a type,
+	// or the type argument is empty.
 	CodeMissingType = "missing_type"
+	// CodeInvalidArguments: the command got more arguments than it takes, a
+	// --format other than md or json, or --format and --json that disagree.
+	CodeInvalidArguments = "invalid_arguments"
 )
 
 // Error is an input the documents cannot be built for. It carries what a

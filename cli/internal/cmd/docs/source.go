@@ -1,6 +1,8 @@
 package docs
 
 import (
+	"fmt"
+
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/spf13/cobra"
 
@@ -20,24 +22,35 @@ func newCmdSource() *cobra.Command {
 		Example: heredoc.Doc(`
 			$ rudder-cli docs source --json
 		`),
-		Args: cobra.NoArgs,
+		// RunE checks the arguments, so that an extra one fails with the JSON
+		// document --json asks for, not with cobra's text.
+		Args: cobra.ArbitraryArgs,
 	}
 	resolveFormat := formatFlags(cmd)
 
-	cmd.RunE = func(cmd *cobra.Command, _ []string) (err error) {
-		format, err := resolveFormat()
+	cmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
+		format, formatErr := resolveFormat()
 		defer func() {
 			telemetry.TrackCommand(telemetry.CommandName(cmd), err, telemetry.KV{K: "format", V: reportedFormat(format)})
 		}()
-		if err != nil {
-			return err
+
+		var (
+			out        = cmd.OutOrStdout()
+			cliVersion = cmd.Root().Version
+		)
+		switch {
+		case formatErr != nil:
+			return fail(out, format, cliVersion, formatErr)
+		case len(args) > 0:
+			return fail(out, format, cliVersion,
+				invalidArguments(fmt.Sprintf("docs source takes no arguments, got %d", len(args))))
 		}
 
-		list := specdocs.ListSources(cmd.Root().Version)
+		list := specdocs.ListSources(cliVersion)
 		if format == formatJSON {
-			return specdocs.WriteJSON(cmd.OutOrStdout(), list)
+			return specdocs.WriteJSON(out, list)
 		}
-		return specdocs.RenderSourceListMarkdown(cmd.OutOrStdout(), list)
+		return specdocs.RenderSourceListMarkdown(out, list)
 	}
 	return cmd
 }

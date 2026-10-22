@@ -30,13 +30,15 @@ func newCmdDestination() *cobra.Command {
 		Example: heredoc.Doc(`
 			$ rudder-cli docs destination webhook --source javascript --id storefront-webhook --json
 		`),
-		Args: cobra.MaximumNArgs(1),
+		// RunE checks the arguments, so that a wrong count fails with the
+		// JSON document --json asks for, not with cobra's text.
+		Args: cobra.ArbitraryArgs,
 	}
 	resolveFormat := formatFlags(cmd)
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) (err error) {
 		var destType string
-		if len(args) == 1 {
+		if len(args) > 0 {
 			destType = args[0]
 		}
 		format, formatErr := resolveFormat()
@@ -60,7 +62,7 @@ func newCmdDestination() *cobra.Command {
 				{K: "type", V: reportedType},
 				{K: "format", V: reportedFormat(format)},
 				{K: "source", V: reportedSource},
-				{K: "listing", V: destType == ""},
+				{K: "listing", V: len(args) == 0},
 				{K: "has_id", V: id != ""},
 			}...)
 		}()
@@ -68,15 +70,27 @@ func newCmdDestination() *cobra.Command {
 		if registryErr != nil {
 			return fmt.Errorf("building destination registry: %w", registryErr)
 		}
-		if formatErr != nil {
-			return formatErr
-		}
 
 		var (
 			out        = cmd.OutOrStdout()
 			cliVersion = cmd.Root().Version
 			docs       = specdocs.NewDestinations(registry, builtin.IsVerified)
 		)
+
+		switch {
+		case formatErr != nil:
+			return fail(out, format, cliVersion, formatErr)
+		case len(args) > 1:
+			return fail(out, format, cliVersion,
+				invalidArguments(fmt.Sprintf("docs destination takes at most one destination type, got %d arguments", len(args))))
+		case len(args) == 1 && destType == "":
+			return fail(out, format, cliVersion, &specdocs.Error{
+				Code:        specdocs.CodeMissingType,
+				Message:     "the destination type argument is empty",
+				Suggestions: []string{},
+				ValidTypes:  registry.SupportedTypes(),
+			})
+		}
 
 		if destType == "" {
 			if id != "" || version != 0 {

@@ -47,7 +47,9 @@ func NewCmdDocs() *cobra.Command {
 }
 
 // formatFlags registers --format and its -j/--json shorthand, which validate
-// also offers, and returns a func that resolves the chosen format.
+// also offers, and returns a func that resolves the chosen format. The func,
+// not cobra, rejects --json with a --format other than json, so that error
+// comes as the JSON document --json asks for.
 func formatFlags(cmd *cobra.Command) func() (string, error) {
 	var (
 		format string
@@ -55,17 +57,23 @@ func formatFlags(cmd *cobra.Command) func() (string, error) {
 	)
 	cmd.Flags().StringVar(&format, "format", formatMarkdown, "Output format: md or json")
 	cmd.Flags().BoolVarP(&asJSON, "json", "j", false, "Output JSON, the same as --format json")
-	cmd.MarkFlagsMutuallyExclusive("format", "json")
 
 	return func() (string, error) {
-		if asJSON {
+		switch {
+		case asJSON && cmd.Flags().Changed("format") && format != formatJSON:
+			return formatJSON, invalidArguments(fmt.Sprintf("--json and --format %q ask for different formats; pass one of them", format))
+		case asJSON:
 			return formatJSON, nil
+		case format != formatMarkdown && format != formatJSON:
+			return format, invalidArguments(fmt.Sprintf("--format must be md or json, got %q", format))
+		default:
+			return format, nil
 		}
-		if format != formatMarkdown && format != formatJSON {
-			return format, fmt.Errorf("--format must be md or json, got %q", format)
-		}
-		return format, nil
 	}
+}
+
+func invalidArguments(message string) *specdocs.Error {
+	return &specdocs.Error{Code: specdocs.CodeInvalidArguments, Message: message, Suggestions: []string{}}
 }
 
 func reportedFormat(format string) string {
