@@ -174,6 +174,42 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 	}
 }
 
+// ErrReported marks a load error that the renderer's output already holds. A
+// caller uses it to avoid printing the failure a second time. It does not say
+// why the load failed: under the JSON renderer a missing --location matches it,
+// while under the text renderer the same error does not, because the caller
+// still has to print it. Do not use it to classify a failure, for example to
+// pick an exit code.
+var ErrReported = errors.New("already reported")
+
+// reported is a load error the renderer already wrote out. It matches
+// ErrReported and still unwraps to the cause.
+type reported struct{ cause error }
+
+func (e reported) Error() string   { return e.cause.Error() }
+func (e reported) Unwrap() []error { return []error{ErrReported, e.cause} }
+
+// recordFailure renders the diagnostics carried so far and returns cause. A
+// renderer that implements FailureRenderer also records the cause in its
+// document, and the returned error then matches ErrReported. The text renderer
+// does not, because the caller prints the error.
+func (p *project) recordFailure(carried validation.Diagnostics, cause error) error {
+	failureRenderer, ok := p.renderer.(renderer.FailureRenderer)
+	if !ok {
+		if err := p.render(carried); err != nil {
+			return err
+		}
+		return cause
+	}
+
+	ui.StopSpinner()
+	carried.Sort()
+	if err := failureRenderer.RenderFailure(carried, cause); err != nil {
+		return fmt.Errorf("rendering diagnostics: %w", err)
+	}
+	return reported{cause: cause}
+}
+
 // Load loads the project specifications from the given location using the
 // configured SpecLoader, runs variable substitution if a substitutor is
 // configured, then runs the specs through the validation engine (syntax,
@@ -186,7 +222,7 @@ func (p *project) Load(location string) error {
 
 	rawSpecs, err := p.loader.Load(p.location)
 	if err != nil {
-		return fmt.Errorf("failed to load specs using specLoader: %w", err)
+		return p.recordFailure(nil, fmt.Errorf("failed to load specs using specLoader: %w", err))
 	}
 
 	if p.substitutor != nil {
@@ -200,7 +236,7 @@ func (p *project) Load(location string) error {
 			if hasUndefined {
 				return fmt.Errorf("variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file")
 			}
-			return fmt.Errorf("variable substitution failed")
+			return reported{cause: errors.New("variable substitution failed")}
 		}
 		rawSpecs = substituted
 	}
@@ -220,19 +256,19 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 
 	registry, err := p.registry()
 	if err != nil {
-		return fmt.Errorf("setting up registry: %w", err)
+		return p.recordFailure(specDiags, fmt.Errorf("setting up registry: %w", err))
 	}
 
 	engine, err := validation.NewValidationEngine(registry, log)
 	if err != nil {
-		return fmt.Errorf("initialising validation engine: %w", err)
+		return p.recordFailure(specDiags, fmt.Errorf("initialising validation engine: %w", err))
 	}
 
 	// At this point, rawspecs are successfully parsed as well and information
 	// parsed gets augmented to the base struct
 	syntaxDiags, err := engine.ValidateSyntax(ctx, parsedRawSpecs)
 	if err != nil {
-		return fmt.Errorf("syntactic validation: %w", err)
+		return p.recordFailure(specDiags, fmt.Errorf("syntactic validation: %w", err))
 	}
 
 	// If any spec or syntax diagnostic errors exist, render the diagnostics and return
@@ -241,7 +277,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 		if err := p.render(slices.Concat(specDiags, syntaxDiags)); err != nil {
 			return err
 		}
-		return fmt.Errorf("syntax validation failed")
+		return reported{cause: errors.New("syntax validation failed")}
 	}
 
 	// The syntax phase only stops the load on errors, so its warnings are carried
@@ -250,10 +286,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	// render exists to fix. The success path folds them into the single render at
 	// the end instead.
 	fail := func(err error) error {
-		if renderErr := p.render(slices.Concat(specDiags, syntaxDiags)); renderErr != nil {
-			return renderErr
-		}
-		return err
+		return p.recordFailure(slices.Concat(specDiags, syntaxDiags), err)
 	}
 
 	for path, rawSpec := range parsedRawSpecs {
@@ -308,7 +341,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	}
 
 	if semanticDiags.HasErrors() {
-		return fmt.Errorf("semantic validation failed")
+		return reported{cause: errors.New("semantic validation failed")}
 	}
 
 	return nil
