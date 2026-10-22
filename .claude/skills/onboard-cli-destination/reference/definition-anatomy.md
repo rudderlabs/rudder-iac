@@ -157,6 +157,15 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
     go-playground checks it even when the spec leaves the block out;
   - a `required*` rule on a `bool` or number that is not a pointer, since it
     rejects `false` or `0`;
+  - a `required*` rule on a nested block that is not a pointer, since
+    go-playground skips a bare `required` there and reads the other rules as
+    "not empty";
+  - a `required*` rule after `omitempty`, since go-playground skips every rule
+    after `omitempty` on an empty value;
+  - in a condition or a `oneof`, a bool value other than `true` or `false`
+    (go-playground compares it with the text `true`) or an integer not written
+    in plain base 10 (it reads `010` as octal);
+  - a condition on a key that is not a string, bool or number;
   - `|`, a quoted value, or a `0x2C` or `0x7C` escape in a tag.
 
 ## Validation semantics to remember

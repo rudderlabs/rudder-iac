@@ -239,6 +239,9 @@ func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructF
 	}
 
 	ownRules, itemRules := splitDive(structField.Tag.Get("validate"))
+	if err := requiredBeforeOmitempty(ownRules); err != nil {
+		return err
+	}
 	scope := ruleScope{owner: owner, prefix: parentKey(key), valueType: fieldType}
 	for _, rule := range ownRules {
 		if err := w.applyRule(&field, rule, scope); err != nil {
@@ -289,22 +292,56 @@ func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructF
 	}
 }
 
+// requiredBeforeOmitempty fails a required rule placed after omitempty. On an
+// empty value go-playground stops at omitempty and skips every rule after it,
+// so such a rule never rejects a missing key the docs would call required.
+func requiredBeforeOmitempty(rules []string) error {
+	omitted := false
+	for _, rule := range rules {
+		name, _, _ := strings.Cut(rule, "=")
+		switch {
+		case name == "omitempty":
+			omitted = true
+		case omitted && isRequiredRule(name):
+			return fmt.Errorf("validate rule %q comes after omitempty, which skips it on an empty value; put it before omitempty", name)
+		}
+	}
+	return nil
+}
+
+func isRequiredRule(name string) bool {
+	switch name {
+	case "required", "required_if", "required_unless", "required_with":
+		return true
+	default:
+		return false
+	}
+}
+
 // requiredMeansWritten fails a required rule the docs would misstate. The docs
 // say a required key must be written, and a nested one once its parent is.
 // go-playground instead checks a key inside a block that is not a pointer even
 // when the block is left out, and rejects the zero value of a bool or number
 // that is not a pointer, so `false` or `0` would fail a key the docs call
-// written.
+// written. On a block that is not a pointer it skips a bare required, because
+// validate does not enable WithRequiredStructEnabled, and reads the other
+// required rules as "not empty".
 func requiredMeansWritten(goType reflect.Type, field Field, alwaysChecked bool) error {
 	if field.Required && alwaysChecked {
 		return fmt.Errorf("required inside a block that is not a pointer applies even when the spec leaves the block out; make the block a pointer")
 	}
 	requires := field.Required || len(field.RequiredIf) > 0 || len(field.RequiredUnless) > 0 || len(field.RequiredWith) > 0
-	if requires && zeroIsAValue(goType) {
+	switch {
+	case !requires:
+		return nil
+	case goType.Kind() == reflect.Struct:
+		return fmt.Errorf("a required rule on a block that is not a pointer is skipped or rejects an empty block, so it does not mean written; make the block a pointer")
+	case zeroIsAValue(goType):
 		return fmt.Errorf("a required rule on a %s that is not a pointer rejects %v, so it means non-zero, not written; make the field a pointer",
 			goType.Kind(), reflect.Zero(goType).Interface())
+	default:
+		return nil
 	}
-	return nil
 }
 
 func zeroIsAValue(typ reflect.Type) bool {
@@ -492,20 +529,26 @@ func (s ruleScope) resolve(goName string) (string, reflect.Type, error) {
 }
 
 // parseTypedValue converts a tag value to the type of the value it applies
-// to, so an integer enum stays integers in the output.
+// to, so an integer enum stays integers in the output. It accepts only the
+// spellings go-playground reads the same way: it compares a bool condition
+// with the text "true", parses an integer condition with base prefixes, and
+// compares a oneof value with the integer's base-10 text. So a bool takes
+// only true or false and an integer only plain base 10, and a value of any
+// other kind, such as a list compared by length, is refused.
 func parseTypedValue(typ reflect.Type, raw string) (any, error) {
-	switch derefType(typ).Kind() {
+	switch kind := derefType(typ).Kind(); kind {
+	case reflect.String:
+		return raw, nil
 	case reflect.Bool:
-		value, err := strconv.ParseBool(raw)
-		if err != nil {
-			return nil, fmt.Errorf("invalid bool %q", raw)
+		if raw != "true" && raw != "false" {
+			return nil, fmt.Errorf("want true or false, got %q", raw)
 		}
-		return value, nil
+		return raw == "true", nil
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		value, err := strconv.ParseInt(raw, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid integer %q", raw)
+		if err != nil || strconv.FormatInt(value, 10) != raw {
+			return nil, fmt.Errorf("want a plain base-10 integer, got %q", raw)
 		}
 		return value, nil
 	case reflect.Float32, reflect.Float64:
@@ -515,7 +558,7 @@ func parseTypedValue(typ reflect.Type, raw string) (any, error) {
 		}
 		return value, nil
 	default:
-		return raw, nil
+		return nil, fmt.Errorf("cannot compare a %s with %q", kind, raw)
 	}
 }
 

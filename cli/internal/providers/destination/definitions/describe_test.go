@@ -265,7 +265,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					Name string `mapstructure:"name" validate:"required_if=Flag yes"`
 				}{}
 			},
-			wantErr: `reading config key "name": reading required_if rule: parsing the value for flag: invalid bool "yes"`,
+			wantErr: `reading config key "name": reading required_if rule: parsing the value for flag: want true or false, got "yes"`,
 		},
 		{
 			name: "an enum value the field cannot hold",
@@ -274,7 +274,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					Size *int `mapstructure:"size" validate:"omitempty,oneof=1 big"`
 				}{}
 			},
-			wantErr: `reading config key "size": reading oneof rule: invalid integer "big"`,
+			wantErr: `reading config key "size": reading oneof rule: want a plain base-10 integer, got "big"`,
 		},
 		{
 			name: "required on each item of a list",
@@ -323,6 +323,88 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 				}{}
 			},
 			wantErr: `reading config key "size": a required rule on a int that is not a pointer rejects 0`,
+		},
+		{
+			name: "required_with after omitempty",
+			newConfig: func() any {
+				return &struct {
+					Other string `mapstructure:"other"`
+					Name  string `mapstructure:"name" validate:"omitempty,required_with=Other"`
+				}{}
+			},
+			wantErr: `reading config key "name": validate rule "required_with" comes after omitempty, which skips it on an empty value`,
+		},
+		{
+			name: "required_if after omitempty",
+			newConfig: func() any {
+				return &struct {
+					Flag *bool  `mapstructure:"flag"`
+					Name string `mapstructure:"name" validate:"omitempty,max=5,required_if=Flag true"`
+				}{}
+			},
+			wantErr: `reading config key "name": validate rule "required_if" comes after omitempty, which skips it on an empty value`,
+		},
+		{
+			name: "a bool condition value go-playground reads as false",
+			newConfig: func() any {
+				return &struct {
+					Flag *bool  `mapstructure:"flag"`
+					Name string `mapstructure:"name" validate:"required_if=Flag True"`
+				}{}
+			},
+			wantErr: `reading config key "name": reading required_if rule: parsing the value for flag: want true or false, got "True"`,
+		},
+		{
+			name: "an integer condition value go-playground reads as octal",
+			newConfig: func() any {
+				return &struct {
+					Level *int   `mapstructure:"level"`
+					Name  string `mapstructure:"name" validate:"required_unless=Level 010"`
+				}{}
+			},
+			wantErr: `reading config key "name": reading required_unless rule: parsing the value for level: want a plain base-10 integer, got "010"`,
+		},
+		{
+			name: "an integer enum value oneof never matches",
+			newConfig: func() any {
+				return &struct {
+					Size *int `mapstructure:"size" validate:"omitempty,oneof=+1 2"`
+				}{}
+			},
+			wantErr: `reading config key "size": reading oneof rule: want a plain base-10 integer, got "+1"`,
+		},
+		{
+			name: "a condition on a list",
+			newConfig: func() any {
+				return &struct {
+					Tags []string `mapstructure:"tags"`
+					Name string   `mapstructure:"name" validate:"required_if=Tags 2"`
+				}{}
+			},
+			wantErr: `reading config key "name": reading required_if rule: parsing the value for tags: cannot compare a slice with "2"`,
+		},
+		{
+			name: "required on a block that is not a pointer",
+			newConfig: func() any {
+				return &struct {
+					Inner struct {
+						Name string `mapstructure:"name"`
+					} `mapstructure:"inner" validate:"required"`
+				}{}
+			},
+			wantErr: `reading config key "inner": a required rule on a block that is not a pointer is skipped or rejects an empty block`,
+		},
+		{
+			name: "required_if on a block that is not a pointer",
+			newConfig: func() any {
+				return &struct {
+					Flag  *bool `mapstructure:"flag"`
+					Inner struct {
+						Name string `mapstructure:"name"`
+					} `mapstructure:"inner" validate:"required_if=Flag true"`
+				}{}
+			},
+			wantErr: `reading config key "inner": a required rule on a block that is not a pointer is skipped or rejects an empty block`,
 		},
 		{
 			name: "an or rule",
