@@ -237,7 +237,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					Name string `mapstructure:"name" validate:"omitempty,len=3"`
 				}{}
 			},
-			wantErr: `config key "name": validate rule "len" is neither described nor one of the definition's ConfigValidateFuncs`,
+			wantErr: `reading config key "name": validate rule "len" is neither described nor one of the definition's ConfigValidateFuncs`,
 		},
 		{
 			name: "an unregistered pattern",
@@ -246,7 +246,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					Name string `mapstructure:"name" validate:"omitempty,dynamic_or_pattern=describe_missing"`
 				}{}
 			},
-			wantErr: `config key "name": dynamic_or_pattern: pattern "describe_missing" is not registered`,
+			wantErr: `reading config key "name": reading dynamic_or_pattern rule: pattern "describe_missing" is not registered`,
 		},
 		{
 			name: "a condition on an unknown field",
@@ -255,7 +255,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					Name string `mapstructure:"name" validate:"required_if=Missing true"`
 				}{}
 			},
-			wantErr: `config key "name": required_if: field "Missing" does not resolve to a config model field`,
+			wantErr: `reading config key "name": reading required_if rule: field "Missing" does not resolve to a config model field`,
 		},
 		{
 			name: "a condition value the field cannot hold",
@@ -265,7 +265,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					Name string `mapstructure:"name" validate:"required_if=Flag yes"`
 				}{}
 			},
-			wantErr: `config key "name": required_if: value for flag: invalid bool "yes"`,
+			wantErr: `reading config key "name": reading required_if rule: parsing the value for flag: invalid bool "yes"`,
 		},
 		{
 			name: "an enum value the field cannot hold",
@@ -274,7 +274,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					Size *int `mapstructure:"size" validate:"omitempty,oneof=1 big"`
 				}{}
 			},
-			wantErr: `config key "size": oneof: invalid integer "big"`,
+			wantErr: `reading config key "size": reading oneof rule: invalid integer "big"`,
 		},
 		{
 			name: "required on each item of a list",
@@ -283,7 +283,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					Tags []string `mapstructure:"tags" validate:"omitempty,dive,required"`
 				}{}
 			},
-			wantErr: `config key "tags": validate rule "required" after dive would be described as a rule on the list`,
+			wantErr: `reading config key "tags": validate rule "required" after dive would be described as a rule on the list`,
 		},
 		{
 			name: "max on each item of a list",
@@ -292,7 +292,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					Tags []string `mapstructure:"tags" validate:"omitempty,dive,max=5"`
 				}{}
 			},
-			wantErr: `config key "tags": validate rule "max" after dive would be described as a rule on the list`,
+			wantErr: `reading config key "tags": validate rule "max" after dive would be described as a rule on the list`,
 		},
 		{
 			name: "required inside a block that is not a pointer",
@@ -303,7 +303,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					} `mapstructure:"inner"`
 				}{}
 			},
-			wantErr: `config key "inner.must": required inside a block that is not a pointer applies even when the spec leaves the block out`,
+			wantErr: `reading config key "inner.must": required inside a block that is not a pointer applies even when the spec leaves the block out`,
 		},
 		{
 			name: "required on a bool that is not a pointer",
@@ -312,7 +312,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					Flag bool `mapstructure:"flag" validate:"required"`
 				}{}
 			},
-			wantErr: `config key "flag": a required rule on a bool that is not a pointer rejects false`,
+			wantErr: `reading config key "flag": a required rule on a bool that is not a pointer rejects false`,
 		},
 		{
 			name: "required_if on a number that is not a pointer",
@@ -322,7 +322,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					Size int   `mapstructure:"size" validate:"required_if=Flag true"`
 				}{}
 			},
-			wantErr: `config key "size": a required rule on a int that is not a pointer rejects 0`,
+			wantErr: `reading config key "size": a required rule on a int that is not a pointer rejects 0`,
 		},
 		{
 			name: "an or rule",
@@ -331,7 +331,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					Mode string `mapstructure:"mode" validate:"omitempty,oneof=a b|eq=c"`
 				}{}
 			},
-			wantErr: `config key "mode": validate rule "oneof=a b|eq=c" uses |, a quote or an escaped character`,
+			wantErr: `reading config key "mode": validate rule "oneof=a b|eq=c" uses |, a quote or an escaped character`,
 		},
 		{
 			name: "a quoted parameter",
@@ -340,7 +340,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					Event string `mapstructure:"event" validate:"omitempty,oneof='Page View' Track"`
 				}{}
 			},
-			wantErr: `config key "event": validate rule "oneof='Page View' Track" uses |, a quote or an escaped character`,
+			wantErr: `reading config key "event": validate rule "oneof='Page View' Track" uses |, a quote or an escaped character`,
 		},
 		{
 			name: "item rules on a list of objects",
@@ -351,7 +351,7 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 					} `mapstructure:"items" validate:"dive,required"`
 				}{}
 			},
-			wantErr: `config key "items": rules after dive apply only to a list of scalars`,
+			wantErr: `reading config key "items": rules after dive apply only to a list of scalars`,
 		},
 	}
 

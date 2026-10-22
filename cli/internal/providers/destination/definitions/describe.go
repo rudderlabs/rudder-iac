@@ -216,7 +216,7 @@ func (w *configWalker) walkStruct(typ reflect.Type, prefix string, gate []string
 			key = prefix + "." + name
 		}
 		if err := w.walkField(typ, structField, key, gate, alwaysChecked); err != nil {
-			return fmt.Errorf("config key %q: %w", key, err)
+			return fmt.Errorf("reading config key %q: %w", key, err)
 		}
 	}
 	return nil
@@ -364,7 +364,7 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 	case "required_if", "required_unless", "excluded_if":
 		conditions, err := scope.conditions(param)
 		if err != nil {
-			return fmt.Errorf("%s: %w", name, err)
+			return fmt.Errorf("reading %s rule: %w", name, err)
 		}
 		switch name {
 		case "required_if":
@@ -377,7 +377,7 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 	case "required_with", "excluded_with":
 		keys, err := scope.keys(strings.Fields(param))
 		if err != nil {
-			return fmt.Errorf("%s: %w", name, err)
+			return fmt.Errorf("reading %s rule: %w", name, err)
 		}
 		if name == "required_with" {
 			field.RequiredWith = append(field.RequiredWith, keys...)
@@ -388,7 +388,7 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 		for _, raw := range strings.Fields(param) {
 			value, err := parseTypedValue(scope.valueType, raw)
 			if err != nil {
-				return fmt.Errorf("%s: %w", name, err)
+				return fmt.Errorf("reading %s rule: %w", name, err)
 			}
 			field.Enum = append(field.Enum, value)
 		}
@@ -398,7 +398,7 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 	case "pattern", "dynamic_or_pattern":
 		pattern, ok := funcs.LookupPattern(param)
 		if !ok {
-			return fmt.Errorf("%s: pattern %q is not registered", name, param)
+			return fmt.Errorf("reading %s rule: pattern %q is not registered", name, param)
 		}
 		w.patterns[param] = pattern
 		field.Pattern = param
@@ -408,7 +408,7 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 	case "min", "max":
 		limit, err := strconv.Atoi(param)
 		if err != nil {
-			return fmt.Errorf("%s: invalid limit %q", name, param)
+			return fmt.Errorf("reading %s rule: invalid limit %q", name, param)
 		}
 		if name == "min" {
 			field.Min = &limit
@@ -440,7 +440,7 @@ func (s ruleScope) conditions(param string) ([]Condition, error) {
 		}
 		value, err := parseTypedValue(fieldType, parts[i+1])
 		if err != nil {
-			return nil, fmt.Errorf("value for %s: %w", key, err)
+			return nil, fmt.Errorf("parsing the value for %s: %w", key, err)
 		}
 		conditions = append(conditions, Condition{Key: key, Value: value})
 	}
