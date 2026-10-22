@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -227,6 +228,72 @@ func TestSpecTemplateWritesNothingInvalid(t *testing.T) {
 			}
 		}
 	}
+}
+
+// An agent writes consent_management from the JSON document alone: an entry
+// for each provider, a resolution_strategy where requiredIf asks for one, and
+// a consent value the pattern accepts. Validate accepts that block for every
+// type and source token, and rejects a second entry for a provider, as unique
+// says.
+func TestConsentBlockWrittenFromTheDocumentValidates(t *testing.T) {
+	t.Parallel()
+
+	const item = "consent_management.<sourceToken>[]"
+	docs, registry := newDestinations(t)
+
+	for _, registered := range registry.Definitions() {
+		t.Run(fmt.Sprintf("%s v%d", registered.Type, registered.Version), func(t *testing.T) {
+			t.Parallel()
+
+			doc := describeJSON(t, docs, specdocs.DescribeOptions{Type: registered.Type, Version: registered.Version})
+			fields := map[string]map[string]any{}
+			for _, f := range doc["fields"].([]any) {
+				field := f.(map[string]any)
+				fields[field["key"].(string)] = field
+			}
+			var (
+				provider = fields[item+".provider"]
+				strategy = fields[item+".resolution_strategy"]
+				consents = fields[item+".consents"]
+				pattern  = doc["patterns"].(map[string]any)[consents["pattern"].(string)].(map[string]any)
+				value    = "analytics"
+			)
+			require.Regexp(t, pattern["regex"], value)
+			assert.Equal(t, true, provider["unique"])
+
+			var entries []any
+			for _, name := range provider["enum"].([]any) {
+				entry := map[string]any{"provider": name, "consents": []any{value}}
+				for _, c := range strategy["requiredIf"].([]any) {
+					condition := c.(map[string]any)
+					if condition["key"] == item+".provider" && condition["value"] == name {
+						entry["resolution_strategy"] = strategy["enum"].([]any)[0]
+					}
+				}
+				entries = append(entries, entry)
+			}
+			block := map[string]any{}
+			for token := range doc["connectionModes"].(map[string]any) {
+				block[token] = entries
+			}
+			assert.Empty(t, consentErrors(registered, block))
+
+			for token := range block {
+				block[token] = append(entries, entries[0])
+			}
+			assert.NotEmpty(t, consentErrors(registered, block), "a second entry for a provider")
+		})
+	}
+}
+
+func consentErrors(registered *definitions.RegisteredDefinition, block map[string]any) []definitions.ConfigError {
+	var errors []definitions.ConfigError
+	for _, configErr := range registered.ValidateConfig(map[string]any{"consent_management": block}) {
+		if strings.HasPrefix(configErr.Path, "/consent_management") {
+			errors = append(errors, configErr)
+		}
+	}
+	return errors
 }
 
 // Every ID docs accepts writes a template the spec rule accepts, and every ID

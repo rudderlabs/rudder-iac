@@ -367,6 +367,38 @@
       "type": "map<sourceToken,array<object>>"
     },
     {
+      "key": "consent_management.<sourceToken>[].provider",
+      "type": "string",
+      "requiredWhenParentPresent": true,
+      "enum": [
+        "custom",
+        "iubenda",
+        "ketch",
+        "oneTrust"
+      ],
+      "unique": true
+    },
+    {
+      "key": "consent_management.<sourceToken>[].resolution_strategy",
+      "type": "string",
+      "requiredIf": [
+        {
+          "key": "consent_management.<sourceToken>[].provider",
+          "value": "custom"
+        }
+      ],
+      "enum": [
+        "and",
+        "or"
+      ]
+    },
+    {
+      "key": "consent_management.<sourceToken>[].consents",
+      "type": "array<string>",
+      "pattern": "consent_value",
+      "acceptsTemplate": true
+    },
+    {
       "key": "residency_server",
       "type": "string",
       "required": true,
@@ -385,6 +417,10 @@
       "regex": "^.*$",
       "reject": "^http://|^.*\\.ngrok\\.io.*$",
       "message": "must not start with http:// and must not contain .ngrok.io"
+    },
+    "consent_value": {
+      "regex": "^(\\{\\{.*\\|\\|.*\\}\\}|env\\..+|.{0,100})$",
+      "message": "must be at most 100 characters"
     },
     "single_line_100": {
       "regex": "^(.{0,100})$",

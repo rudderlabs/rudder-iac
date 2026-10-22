@@ -13,9 +13,14 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
 
-// listIndex stands in for a list item's index in a secret's variable name,
-// which is only known once the spec writes the list.
-const listIndex = "<N>"
+const (
+	// listIndex stands in for a list item's index in a secret's variable
+	// name, which is only known once the spec writes the list.
+	listIndex = "<N>"
+	// sourceTokenKey stands in for a source token in a key under a map keyed
+	// by source token.
+	sourceTokenKey = "<sourceToken>"
+)
 
 // DestinationDoc documents one destination type for one definition version.
 type DestinationDoc struct {
@@ -58,12 +63,15 @@ type ConnectionModes struct {
 	RequiredKeys map[string][]string `json:"requiredKeys"`
 }
 
-// Field is one config key. Required holds only for top-level keys; a nested
-// key's own required rule applies once its parent block or list item is
-// written, which RequiredWhenParentPresent says. Var is a secret's variable
-// name and Slot the text a spec writes for it; in both, "<N>" stands for the
-// item's zero-based index in a list on the key's path, so item 0 of
-// headers[].to is SHOP_HEADERS_0_TO.
+// Field is one config key. In Key, "[]" marks the items of a list and
+// "<sourceToken>" a key of a map keyed by source token, such as
+// consent_management.<sourceToken>[].provider. Required holds only for
+// top-level keys; a nested key's own required rule applies once its parent
+// block or list item is written, which RequiredWhenParentPresent says. Unique
+// says no two items of the enclosing list may hold the same value. Var is a
+// secret's variable name and Slot the text a spec writes for it; in both,
+// "<N>" stands for the item's zero-based index in a list on the key's path,
+// so item 0 of headers[].to is SHOP_HEADERS_0_TO.
 type Field struct {
 	Key                       string      `json:"key"`
 	Type                      string      `json:"type"`
@@ -85,6 +93,7 @@ type Field struct {
 	Max                       *int        `json:"max,omitempty"`
 	OnlyForSourceTypes        []string    `json:"onlyForSourceTypes,omitempty"`
 	Secret                    bool        `json:"secret,omitempty"`
+	Unique                    bool        `json:"unique,omitempty"`
 	Var                       string      `json:"var,omitempty"`
 	Slot                      string      `json:"slot,omitempty"`
 }
@@ -344,6 +353,7 @@ func docField(f definitions.Field, id string) Field {
 		Max:                f.Max,
 		OnlyForSourceTypes: f.OnlyForSourceTypes,
 		Secret:             f.Secret,
+		Unique:             f.Unique,
 	}
 	if f.Required {
 		field.Required = !f.Nested()

@@ -27,6 +27,9 @@ func RenderDestinationMarkdown(w io.Writer, doc DestinationDoc) error {
 		"is required once its parent block or list item is written, and a nested default applies only once " +
 		"its parent block is written. A pattern applies to literal values; a key that takes a template " +
 		"also accepts a `{{ path || fallback }}` template in its place."
+	if slices.ContainsFunc(doc.Fields, func(f Field) bool { return strings.Contains(f.Key, sourceTokenKey) }) {
+		intro += " " + code(sourceTokenKey) + " stands for a source token the type accepts, as in `connection_mode`."
+	}
 	if slices.ContainsFunc(doc.Fields, func(f Field) bool { return strings.Contains(f.Var, listIndex) }) {
 		intro += " In a secret's variable name, " + code(listIndex) + " stands for the item's position in its list, counting from 0."
 	}
@@ -216,6 +219,9 @@ func allowedCell(f Field) string {
 	}
 	if f.Max != nil {
 		parts = append(parts, fmt.Sprintf("at most %d", *f.Max))
+	}
+	if f.Unique {
+		parts = append(parts, "no two items of the list may share a value")
 	}
 	if len(f.OnlyForSourceTypes) > 0 {
 		parts = append(parts, "only for "+codeList(f.OnlyForSourceTypes, ", "))

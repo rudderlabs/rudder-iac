@@ -40,7 +40,8 @@ type Description struct {
 // Field describes one config key.
 type Field struct {
 	// Key is the dotted local key; "[]" marks the items of a list, as in
-	// "headers[].to".
+	// "headers[].to", and "<sourceToken>" a key of a map keyed by source
+	// token, as in "consent_management.<sourceToken>[].provider".
 	Key string
 	// Type is string, boolean, integer, number, object, array<T> or map<K,T>.
 	// connection_mode and consent_management are maps keyed by source token.
@@ -85,6 +86,9 @@ type Field struct {
 	OnlyForSourceTypes []string
 	// Secret marks a SecretKeys path.
 	Secret bool
+	// Unique is set when no two items of the enclosing list may hold the same
+	// value.
+	Unique bool
 }
 
 // Nested reports whether the key sits inside a block or a list item.
@@ -166,24 +170,36 @@ var (
 	consentManagementType = reflect.TypeOf(common.ConsentManagement{})
 )
 
+const (
+	// sourceTokenKey stands for a key of a map keyed by source token.
+	sourceTokenKey = "<sourceToken>"
+	// consentValuePatternName names common.ConsentValueRegex in
+	// Description.Patterns.
+	consentValuePatternName = "consent_value"
+)
+
 // configWalker reads a config model's fields. It fails on any validate rule
 // it cannot describe, so a rule added to a definition without teaching the
 // walker about it fails registration instead of going undocumented.
 type configWalker struct {
-	customTags []string
-	gated      map[string][]string
-	defaults   map[string]any
-	secretKeys []string
-	fields     []Field
-	patterns   map[string]funcs.PatternInfo
+	customTags       []string
+	gated            map[string][]string
+	defaults         map[string]any
+	secretKeys       []string
+	sourceTypes      []string
+	consentOverrides map[string]common.ConsentValidator
+	fields           []Field
+	patterns         map[string]funcs.PatternInfo
 }
 
 func describeConfig(def *DestinationDefinition, configType reflect.Type, gated map[string][]string, defaults map[string]any) ([]Field, map[string]funcs.PatternInfo, error) {
 	w := &configWalker{
-		gated:      gated,
-		defaults:   defaults,
-		secretKeys: def.SecretKeys,
-		patterns:   map[string]funcs.PatternInfo{},
+		gated:            gated,
+		defaults:         defaults,
+		secretKeys:       def.SecretKeys,
+		sourceTypes:      def.SourceTypes,
+		consentOverrides: def.ConsentValidationOverrides,
+		patterns:         map[string]funcs.PatternInfo{},
 	}
 	for _, fn := range def.ConfigValidateFuncs {
 		w.customTags = append(w.customTags, fn.Tag)
@@ -276,6 +292,10 @@ func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructF
 	}
 
 	switch {
+	case fieldType == consentManagementType:
+		w.fields = append(w.fields, field)
+		w.describeConsentEntries(key, gate)
+		return nil
 	case fieldType.Kind() == reflect.Struct:
 		if field.constrained() {
 			w.fields = append(w.fields, field)
@@ -290,6 +310,77 @@ func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructF
 		w.fields = append(w.fields, field)
 		return nil
 	}
+}
+
+// describeConsentEntries describes the items of consent_management, which
+// common.ValidateConsentEntries checks in Go code rather than through
+// validate tags. A source token whose definition overrides that check is
+// left out, since only the override's code says what it accepts.
+func (w *configWalker) describeConsentEntries(key string, gate []string) {
+	gate, described := w.consentGate(gate)
+	if !described {
+		return
+	}
+
+	var (
+		item     = key + "." + sourceTokenKey + "[]"
+		provider = item + ".provider"
+	)
+	w.patterns[consentValuePatternName] = funcs.PatternInfo{
+		Regex:   common.ConsentValueRegex,
+		Message: common.ConsentValueMessage,
+	}
+	w.fields = append(w.fields,
+		Field{
+			Key:                provider,
+			Type:               "string",
+			Required:           true,
+			Enum:               anyValues(common.ConsentProviders()),
+			Unique:             true,
+			OnlyForSourceTypes: slices.Clone(gate),
+		},
+		Field{
+			Key:                item + ".resolution_strategy",
+			Type:               "string",
+			RequiredIf:         []Condition{{Key: provider, Value: common.ConsentProviderCustom}},
+			Enum:               anyValues(common.ConsentResolutionStrategies()),
+			OnlyForSourceTypes: slices.Clone(gate),
+		},
+		Field{
+			Key:                item + ".consents",
+			Type:               "array<string>",
+			Pattern:            consentValuePatternName,
+			AcceptsTemplate:    true,
+			OnlyForSourceTypes: slices.Clone(gate),
+		},
+	)
+}
+
+// consentGate narrows gate to the source tokens the canonical consent check
+// applies to. It reports false when every token has an override.
+func (w *configWalker) consentGate(gate []string) ([]string, bool) {
+	if len(w.consentOverrides) == 0 {
+		return gate, true
+	}
+	tokens := gate
+	if len(tokens) == 0 {
+		tokens = w.sourceTypes
+	}
+	var canonical []string
+	for _, token := range tokens {
+		if _, overridden := w.consentOverrides[token]; !overridden {
+			canonical = append(canonical, token)
+		}
+	}
+	return canonical, len(canonical) > 0
+}
+
+func anyValues(values []string) []any {
+	out := make([]any, len(values))
+	for i, v := range values {
+		out[i] = v
+	}
+	return out
 }
 
 // requiredBeforeOmitempty fails a required rule placed after omitempty. On an

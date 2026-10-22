@@ -2,6 +2,7 @@ package definitions_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/go-playground/validator/v10"
@@ -151,12 +152,57 @@ func TestDescribeReadsTheConfigModel(t *testing.T) {
 			{Key: "auth.token", Type: "string", Required: true, CheckedBy: []string{"describe_token_check"}},
 			{Key: "connection_mode", Type: "map<sourceToken,string>"},
 			{Key: "consent_management", Type: "map<sourceToken,array<object>>"},
+			{
+				Key: "consent_management.<sourceToken>[].provider", Type: "string", Required: true,
+				Enum: []any{"custom", "iubenda", "ketch", "oneTrust"}, Unique: true,
+			},
+			{
+				Key:        "consent_management.<sourceToken>[].resolution_strategy",
+				Type:       "string",
+				RequiredIf: []definitions.Condition{{Key: "consent_management.<sourceToken>[].provider", Value: "custom"}},
+				Enum:       []any{"and", "or"},
+			},
+			{Key: "consent_management.<sourceToken>[].consents", Type: "array<string>", Pattern: "consent_value", AcceptsTemplate: true},
 		},
 		Patterns: map[string]funcs.PatternInfo{
 			"describe_short": {Regex: `^.{0,10}$`, Reject: `^bad`, Message: "must be short"},
+			"consent_value":  {Regex: common.ConsentValueRegex, Message: "must be at most 100 characters"},
 		},
 		CustomValidators: []string{"describe_token_check"},
 	}, registered.Describe())
+}
+
+// A source token whose definition replaces the canonical consent check keeps
+// no consent entry rules, since only the override's code says what it accepts.
+func TestDescribeLeavesOutOverriddenConsentTokens(t *testing.T) {
+	t.Parallel()
+
+	override := func([]common.ConsentEntry) []common.ConsentValidationError { return nil }
+	consentKeys := func(t *testing.T, overrides map[string]common.ConsentValidator) map[string][]string {
+		t.Helper()
+
+		def := describeDefinition()
+		def.ConsentValidationOverrides = overrides
+		registry := definitions.NewRegistry()
+		require.NoError(t, registry.Register(def))
+		registered, err := registry.Get("describe", 1)
+		require.NoError(t, err)
+
+		keys := map[string][]string{}
+		for _, f := range registered.Describe().Fields {
+			if strings.HasPrefix(f.Key, "consent_management.") {
+				keys[f.Key] = f.OnlyForSourceTypes
+			}
+		}
+		return keys
+	}
+
+	assert.Equal(t, map[string][]string{
+		"consent_management.<sourceToken>[].provider":            {"cloud"},
+		"consent_management.<sourceToken>[].resolution_strategy": {"cloud"},
+		"consent_management.<sourceToken>[].consents":            {"cloud"},
+	}, consentKeys(t, map[string]common.ConsentValidator{"web": override}))
+	assert.Empty(t, consentKeys(t, map[string]common.ConsentValidator{"web": override, "cloud": override}))
 }
 
 func TestDescribeReturnsACopy(t *testing.T) {

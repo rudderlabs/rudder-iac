@@ -63,9 +63,45 @@
     {
       "key": "consent_management",
       "type": "map<sourceToken,array<object>>"
+    },
+    {
+      "key": "consent_management.<sourceToken>[].provider",
+      "type": "string",
+      "requiredWhenParentPresent": true,
+      "enum": [
+        "custom",
+        "iubenda",
+        "ketch",
+        "oneTrust"
+      ],
+      "unique": true
+    },
+    {
+      "key": "consent_management.<sourceToken>[].resolution_strategy",
+      "type": "string",
+      "requiredIf": [
+        {
+          "key": "consent_management.<sourceToken>[].provider",
+          "value": "custom"
+        }
+      ],
+      "enum": [
+        "and",
+        "or"
+      ]
+    },
+    {
+      "key": "consent_management.<sourceToken>[].consents",
+      "type": "array<string>",
+      "pattern": "consent_value",
+      "acceptsTemplate": true
     }
   ],
   "patterns": {
+    "consent_value": {
+      "regex": "^(\\{\\{.*\\|\\|.*\\}\\}|env\\..+|.{0,100})$",
+      "message": "must be at most 100 characters"
+    },
     "single_line_1000": {
       "regex": "^(.{0,1000})$",
       "message": "must be at most 1000 characters and must not contain line breaks"

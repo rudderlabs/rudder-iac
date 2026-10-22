@@ -52,4 +52,6 @@ func TestAllowedCellReadsLimits(t *testing.T) {
 	two, eight := 2, 8
 	assert.Equal(t, "pattern `short`, or a template; at least 2; at most 8",
 		allowedCell(Field{Pattern: "short", AcceptsTemplate: true, Min: &two, Max: &eight}))
+	assert.Equal(t, "`a`, `b`; no two items of the list may share a value",
+		allowedCell(Field{Enum: []any{"a", "b"}, Unique: true}))
 }
