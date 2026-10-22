@@ -378,25 +378,59 @@ func TestInputErrorsWithJSON(t *testing.T) {
 	}
 }
 
+// Without --json, an input error is the command's error, which the root prints.
 func TestFlagErrors(t *testing.T) {
 	telemetrytest.Record(t)
 
-	_, _, err := run(t, "docs", "destination", "webhook", "--format", "yaml")
-	require.EqualError(t, err, `--format must be md or json, got "yaml".`)
+	var (
+		destTypes   = strings.Join(supportedTypes(t), ", ")
+		sourceTypes = strings.Join(slices.Sorted(slices.Values(source.SourceTypes())), ", ")
+	)
+	cases := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{
+			name:    "an unknown --format",
+			args:    []string{"docs", "destination", "webhook", "--format", "yaml"},
+			wantErr: `--format must be md or json, got "yaml".`,
+		},
+		{
+			name: "an ID without a type",
+			args: []string{"docs", "destination", "--id", "shop"},
+			wantErr: "--id and --definition-version need a destination type. " +
+				"Valid destination types: " + destTypes + ". " +
+				"Run `rudder-cli docs destination` for their display names.",
+		},
+		{
+			name:    "an empty --source",
+			args:    []string{"docs", "destination", "webhook", "--source", ""},
+			wantErr: `source type "" is not an event stream source spec type. Valid source types: ` + sourceTypes + ".",
+		},
+		{
+			name:    "an extra argument",
+			args:    []string{"docs", "destination", "webhook", "am"},
+			wantErr: "docs destination takes at most one destination type, got 2 arguments.",
+		},
+		{
+			name:    "an argument to docs source",
+			args:    []string{"docs", "source", "extra"},
+			wantErr: "docs source takes no arguments, got 1.",
+		},
+		{
+			name:    "an unknown subcommand",
+			args:    []string{"docs", "nothing"},
+			wantErr: `unknown command "nothing" for "rudder-cli docs"`,
+		},
+	}
 
-	_, _, err = run(t, "docs", "destination", "--id", "shop")
-	require.EqualError(t, err, "--id and --definition-version need a destination type. "+
-		"Valid destination types: "+strings.Join(supportedTypes(t), ", ")+". "+
-		"Run `rudder-cli docs destination` for their display names.")
-
-	_, _, err = run(t, "docs", "destination", "webhook", "am")
-	require.EqualError(t, err, "docs destination takes at most one destination type, got 2 arguments.")
-
-	_, _, err = run(t, "docs", "source", "extra")
-	require.EqualError(t, err, "docs source takes no arguments, got 1.")
-
-	_, _, err = run(t, "docs", "nothing")
-	require.Error(t, err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := run(t, tc.args...)
+			require.EqualError(t, err, tc.wantErr)
+		})
+	}
 }
 
 // --format json and --json agree, so together they print JSON.
