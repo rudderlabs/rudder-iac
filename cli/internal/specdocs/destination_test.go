@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -151,6 +152,13 @@ func TestSpecTemplateFailsOnlyOnItsNullKeys(t *testing.T) {
 			// The slot stays in place: validate substitutes it before checking.
 			fill: map[string]any{"residency_server": "standard"},
 		},
+		{
+			// api_version defaults to v2, which requires user_id_identifier_type.
+			destType: "customerio",
+			id:       "storefront-customerio",
+			wantNull: []string{"datacenter", "user_id_identifier_type"},
+			fill:     map[string]any{"datacenter": "US", "user_id_identifier_type": "id"},
+		},
 	}
 
 	for _, tc := range cases {
@@ -194,40 +202,203 @@ func TestSpecTemplateFailsOnlyOnItsNullKeys(t *testing.T) {
 	}
 }
 
-// Across every type and source, a template only ever leaves keys for the
-// caller to fill: whatever it writes itself must already pass the same rule
-// validate runs, envelope included. Keys it leaves out may still be required
-// by a condition, which the caller resolves from the fields' requiredIf rules.
-func TestSpecTemplateWritesNothingInvalid(t *testing.T) {
+// Across every type and every source it accepts, a caller fills each null and
+// secret slot of the template from the document alone, then adds each key a
+// requiredIf, requiredUnless or requiredWith rule asks for given those values,
+// as the template's first lines say. Booleans are filled with false and then
+// with true, to open both branches they decide. Validate accepts the result
+// with no error, envelope included, except in customValidatorBranches.
+func TestFilledSpecTemplatesValidate(t *testing.T) {
 	t.Parallel()
 
 	docs, registry := newDestinations(t)
 	rule := destination.NewSpecSyntaxValidRule(registry)
 
 	for _, registered := range registry.Definitions() {
-		for _, sourceType := range source.SourceTypes() {
-			doc, err := docs.Describe(specdocs.DescribeOptions{Type: registered.Type, Source: sourceType, ID: "dest-id"})
+		for _, sourceType := range sortedSourceTypes() {
+			doc, err := docs.Describe(specdocs.DescribeOptions{
+				Type: registered.Type, Version: registered.Version, Source: sourceType, ID: "dest-id",
+			})
 			var docErr *specdocs.Error
 			if errors.As(err, &docErr) && docErr.Code == specdocs.CodeUnsupportedSource {
 				continue
 			}
 			require.NoError(t, err)
 
-			spec := templateSpec(t, doc.SpecTemplate)
-			toFill := append(spec.nullKeys(), spec.slotKeys()...)
-			for _, result := range validateSpec(rule, spec) {
-				configKey, inConfig := strings.CutPrefix(result.Reference, "/spec/config/")
-				if !assert.True(t, inConfig, "%s from %s: %s %s", registered.Type, sourceType, result.Reference, result.Message) {
-					continue
-				}
-				key, _, _ := strings.Cut(configKey, "/")
-				if slices.Contains(toFill, key) {
-					continue
-				}
-				assert.NotContains(t, spec.config, key, "%s from %s: %s", registered.Type, sourceType, result.Message)
+			for _, boolean := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s from %s with %t", registered.Type, sourceType, boolean), func(t *testing.T) {
+					t.Parallel()
+
+					fill := filler{doc: doc, boolean: boolean}
+					spec := templateSpec(t, doc.SpecTemplate)
+					for key, value := range spec.config {
+						if value == nil || isSlot(value) {
+							spec.config[key] = fill.value(t, fill.fields()[key])
+						}
+					}
+					if added := fill.followConditions(t, spec.config); len(added) > 0 {
+						t.Logf("the filled values require %v", added)
+					}
+
+					results := validateSpec(rule, spec)
+					if boolean || !slices.Contains(customValidatorBranches, registered.Type) {
+						assert.Empty(t, results)
+						return
+					}
+					assert.NotEmpty(t, results, "remove %s from customValidatorBranches", registered.Type)
+					for _, result := range results {
+						key := strings.TrimPrefix(result.Reference, "/spec/config/")
+						checkedBy := checkedByAt(doc, strings.ReplaceAll(key, "/", "."))
+						assert.NotEmpty(t, checkedBy, "%s: %s", result.Reference, result.Message)
+					}
+				})
 			}
 		}
 	}
+}
+
+// customValidatorBranches are the types whose custom validators require keys
+// under conditions the document cannot state, once use_rudder_storage is
+// false: postgres needs the bucket provider's credentials, and snowflake
+// s3.role_based_auth for AWS. Validate names those keys; the template's note
+// says it will.
+var customValidatorBranches = []string{"postgres", "snowflake"}
+
+// checkedByAt returns the custom validators on the field at a dotted config
+// path, matching list items by "[]".
+func checkedByAt(doc specdocs.DestinationDoc, path string) []string {
+	for _, f := range doc.Fields {
+		if strings.ReplaceAll(f.Key, "[]", "") == path {
+			return f.CheckedBy
+		}
+	}
+	return nil
+}
+
+// filler writes the values a caller would from the document alone.
+type filler struct {
+	doc specdocs.DestinationDoc
+	// boolean fills every boolean key.
+	boolean bool
+}
+
+func (f filler) fields() map[string]specdocs.Field {
+	return fieldsByKey(f.doc)
+}
+
+// followConditions adds, until none is left, each top-level key whose
+// requiredIf, requiredUnless or requiredWith rule holds on the config's values,
+// or on the defaults where the config leaves a key out.
+func (f filler) followConditions(t *testing.T, config map[string]any) []string {
+	t.Helper()
+
+	var (
+		fields = f.fields()
+		added  []string
+	)
+	holds := func(c specdocs.Condition) bool {
+		value, written := config[c.Key]
+		if key := fields[c.Key]; !written && key.Default != nil && !key.DefaultRequiresParent {
+			value, written = key.Default, true
+		}
+		return written && fmt.Sprint(value) == fmt.Sprint(c.Value)
+	}
+	isWritten := func(key string) bool {
+		_, written := config[key]
+		return written
+	}
+
+	for changed := true; changed; {
+		changed = false
+		for _, field := range f.doc.Fields {
+			if strings.Contains(field.Key, ".") || isWritten(field.Key) {
+				continue
+			}
+			requiredIf := len(field.RequiredIf) > 0 && !slices.ContainsFunc(field.RequiredIf, func(c specdocs.Condition) bool { return !holds(c) })
+			requiredUnless := len(field.RequiredUnless) > 0 && !slices.ContainsFunc(field.RequiredUnless, holds)
+			if !requiredIf && !requiredUnless && !slices.ContainsFunc(field.RequiredWith, isWritten) {
+				continue
+			}
+			config[field.Key] = f.value(t, field)
+			added = append(added, field.Key)
+			changed = true
+		}
+	}
+	return added
+}
+
+// fakeStrings are tried in order for a string key; the first its pattern and
+// limits accept is used.
+var fakeStrings = []string{
+	"fake-value",
+	"https://hooks.example.com/rudder",
+	"arn:aws:iam::123456789012:role/fake",
+	"G-ABCDEF1234",
+	"1:123456789012:web:abcdef1234567890",
+	"123456789012",
+	"fake@example.com",
+	"us-east-1",
+	"FakeValue1",
+	"9092",
+	"UA-123456-1",
+	"AW-123456789",
+	"-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----",
+}
+
+// value is a value the field's own rules accept: the first enum value,
+// f.boolean, the lower limit of a number, the first of fakeStrings the
+// pattern and length limits accept, or a list of one such item, whose keys
+// are filled when it is an object.
+func (f filler) value(t *testing.T, field specdocs.Field) any {
+	t.Helper()
+
+	if itemType, isList := strings.CutPrefix(field.Type, "array<"); isList {
+		item := field
+		item.Key, item.Type, item.Min, item.Max = field.Key+"[]", strings.TrimSuffix(itemType, ">"), nil, nil
+		return []any{f.value(t, item)}
+	}
+	switch {
+	case field.Type == "object":
+		object := map[string]any{}
+		for _, child := range f.doc.Fields {
+			name, isChild := strings.CutPrefix(child.Key, field.Key+".")
+			if isChild && !strings.ContainsAny(name, ".[") {
+				object[name] = f.value(t, child)
+			}
+		}
+		return object
+	case len(field.Enum) > 0:
+		return field.Enum[0]
+	case field.Type == "boolean":
+		return f.boolean
+	case field.Type == "integer" || field.Type == "number":
+		if field.Min != nil {
+			return *field.Min
+		}
+		return 1
+	case field.Type == "string":
+		for _, candidate := range fakeStrings {
+			if acceptsString(f.doc, field, candidate) {
+				return candidate
+			}
+		}
+	}
+	require.Failf(t, "no fake value", "%s: type %s, pattern %v", field.Key, field.Type, f.doc.Patterns[field.Pattern])
+	return nil
+}
+
+func acceptsString(doc specdocs.DestinationDoc, f specdocs.Field, value string) bool {
+	if f.Min != nil && len(value) < *f.Min || f.Max != nil && len(value) > *f.Max {
+		return false
+	}
+	if f.Pattern == "" {
+		return true
+	}
+	pattern := doc.Patterns[f.Pattern]
+	if pattern.Reject != "" && regexp.MustCompile(pattern.Reject).MatchString(value) {
+		return false
+	}
+	return regexp.MustCompile(pattern.Regex).MatchString(value)
 }
 
 // An agent writes consent_management from the JSON document alone: an entry
@@ -354,20 +525,17 @@ func (p parsedTemplate) nullKeys() []string {
 	return keys
 }
 
-func (p parsedTemplate) slotKeys() []string {
-	var keys []string
-	for key, value := range p.config {
-		if s, ok := value.(string); ok && strings.HasPrefix(s, "{{ .") {
-			keys = append(keys, key)
-		}
-	}
-	return keys
+// isSlot reports whether a template value is a secret's slot, which validate
+// substitutes before it checks.
+func isSlot(value any) bool {
+	s, ok := value.(string)
+	return ok && strings.HasPrefix(s, "{{ .")
 }
 
 func substituteSlots(config map[string]any, value string) map[string]any {
 	out := make(map[string]any, len(config))
 	for key, v := range config {
-		if s, ok := v.(string); ok && strings.HasPrefix(s, "{{ .") {
+		if isSlot(v) {
 			out[key] = value
 			continue
 		}

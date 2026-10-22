@@ -432,5 +432,5 @@
     }
   },
   "customValidators": [],
-  "specTemplate": "version: rudder/v1\nkind: destination\nmetadata:\n  name: storefront-amplitude\nspec:\n  id: storefront-amplitude\n  display_name: storefront-amplitude\n  type: am\n  definition_version: 1\n  enabled: true\n  config:\n    api_key: '{{ .STOREFRONT_AMPLITUDE_API_KEY }}'\n    residency_server: null\n    connection_mode:\n      web: cloud\n"
+  "specTemplate": "# Replace each null with a value. A value you fill in can meet another key's\n# requiredIf or requiredUnless condition, which makes that key required too.\nversion: rudder/v1\nkind: destination\nmetadata:\n  name: storefront-amplitude\nspec:\n  id: storefront-amplitude\n  display_name: storefront-amplitude\n  type: am\n  definition_version: 1\n  enabled: true\n  config:\n    api_key: '{{ .STOREFRONT_AMPLITUDE_API_KEY }}'\n    residency_server: null\n    connection_mode:\n      web: cloud\n"
 }

@@ -42,11 +42,14 @@ type DestinationDoc struct {
 	Patterns         map[string]Pattern         `json:"patterns"`
 	CustomValidators []string                   `json:"customValidators"`
 	// SpecTemplate is a destination spec holding the keys every spec of this
-	// type needs, present when the document names both a source and an ID. It
-	// leaves out keys required only by a requiredIf or requiredUnless rule;
-	// such a rule on a key the spec omits is checked against that key's
-	// default, so a caller also adds the keys whose conditions the defaults
-	// meet.
+	// type needs, present when the document names both a source and an ID:
+	// the required keys, the keys the connection mode needs, and the keys a
+	// requiredIf or requiredUnless rule requires once the defaults apply. It
+	// validates once its nulls are filled, with two exceptions its first lines
+	// state as a YAML comment: a value the caller fills in can meet another
+	// key's requiredIf or requiredUnless condition, and a custom validator can
+	// require a key under conditions only its Go code states. postgres and
+	// snowflake do the latter when use_rudder_storage is false.
 	SpecTemplate string `json:"specTemplate,omitempty"`
 }
 

@@ -85,10 +85,6 @@ func RenderDestinationMarkdown(w io.Writer, doc DestinationDoc) error {
 		p.line("")
 		p.line("## Spec template")
 		p.line("")
-		p.line("Replace each `null` with a value. The template leaves out keys required only by a condition. " +
-			"A condition on a key the spec leaves out is checked against that key's default, so also add any " +
-			"key whose `if` condition the defaults meet.")
-		p.line("")
 		p.line("```yaml")
 		p.write(doc.SpecTemplate)
 		p.line("```")
