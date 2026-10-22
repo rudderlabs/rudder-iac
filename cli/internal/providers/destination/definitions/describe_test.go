@@ -503,6 +503,121 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 			},
 			wantErr: `reading config key "items": rules after dive apply only to a list of scalars`,
 		},
+		{
+			name: "oneof on a bool",
+			newConfig: func() any {
+				return &struct {
+					Flag *bool `mapstructure:"flag" validate:"omitempty,oneof=true false"`
+				}{}
+			},
+			wantErr: `reading config key "flag": validate rule "oneof" on a bool makes go-playground panic`,
+		},
+		{
+			name: "oneof on a number",
+			newConfig: func() any {
+				return &struct {
+					Rate *float64 `mapstructure:"rate" validate:"omitempty,oneof=1.5 2.5"`
+				}{}
+			},
+			wantErr: `reading config key "rate": validate rule "oneof" on a float64 makes go-playground panic`,
+		},
+		{
+			name: "oneof on a list without dive",
+			newConfig: func() any {
+				return &struct {
+					Tags []string `mapstructure:"tags" validate:"omitempty,oneof=a b"`
+				}{}
+			},
+			wantErr: `reading config key "tags": validate rule "oneof" on a slice makes go-playground panic`,
+		},
+		{
+			name: "dynamic_or_oneof on an integer",
+			newConfig: func() any {
+				return &struct {
+					Size *int `mapstructure:"size" validate:"omitempty,dynamic_or_oneof=1 2"`
+				}{}
+			},
+			wantErr: `reading config key "size": validate rule "dynamic_or_oneof" on a int does not check the value`,
+		},
+		{
+			name: "pattern on an integer",
+			newConfig: func() any {
+				return &struct {
+					Size *int `mapstructure:"size" validate:"omitempty,pattern=describe_missing"`
+				}{}
+			},
+			wantErr: `reading config key "size": validate rule "pattern" on a int does not check the value`,
+		},
+		{
+			name: "min on a bool",
+			newConfig: func() any {
+				return &struct {
+					Flag *bool `mapstructure:"flag" validate:"omitempty,min=1"`
+				}{}
+			},
+			wantErr: `reading config key "flag": validate rule "min" on a bool makes go-playground panic`,
+		},
+		{
+			name: "max on a block",
+			newConfig: func() any {
+				return &struct {
+					Inner *struct {
+						Name string `mapstructure:"name"`
+					} `mapstructure:"inner" validate:"omitempty,max=1"`
+				}{}
+			},
+			wantErr: `reading config key "inner": validate rule "max" on a struct makes go-playground panic`,
+		},
+		{
+			name: "a limit go-playground reads as octal",
+			newConfig: func() any {
+				return &struct {
+					Name string `mapstructure:"name" validate:"omitempty,min=010"`
+				}{}
+			},
+			wantErr: `reading config key "name": reading min rule: want a plain base-10 integer, got "010"`,
+		},
+		{
+			name: "a negative limit on an unsigned integer",
+			newConfig: func() any {
+				return &struct {
+					Count *uint `mapstructure:"count" validate:"omitempty,min=-1"`
+				}{}
+			},
+			wantErr: `reading config key "count": reading min rule: want 0 or more for a uint, got "-1"`,
+		},
+		{
+			name: "a negative condition value on an unsigned integer",
+			newConfig: func() any {
+				return &struct {
+					Count *uint   `mapstructure:"count"`
+					Name  *string `mapstructure:"name" validate:"required_if=Count -1"`
+				}{}
+			},
+			wantErr: `reading config key "name": reading required_if rule: parsing the value for count: want 0 or more for a uint, got "-1"`,
+		},
+		{
+			name: "two required_if rules",
+			newConfig: func() any {
+				return &struct {
+					A    *string `mapstructure:"a"`
+					B    *string `mapstructure:"b"`
+					Name *string `mapstructure:"name" validate:"required_if=A x,required_if=B y"`
+				}{}
+			},
+			wantErr: `reading config key "name": validate rule "required_if" appears twice on one key`,
+		},
+		{
+			name: "two required_unless rules",
+			newConfig: func() any {
+				return &struct {
+					A    *string `mapstructure:"a"`
+					B    *string `mapstructure:"b"`
+					Name *string `mapstructure:"name" validate:"required_unless=A x,required_unless=B y"`
+				}{}
+			},
+			wantErr: `reading config key "name": validate rule "required_unless" appears twice on one key`,
+		},
 	}
 
 	for _, tc := range cases {

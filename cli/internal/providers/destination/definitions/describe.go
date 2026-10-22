@@ -484,24 +484,27 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 		return fmt.Errorf("validate rule %q uses |, a quote or an escaped character, which Describe cannot read", rule)
 	}
 	name, param, _ := strings.Cut(rule, "=")
+	if err := ruleFitsValue(name, scope.valueType); err != nil {
+		return err
+	}
 	switch name {
 	case "", "omitempty":
 		return nil
 	case "required":
 		field.Required = true
 	case "required_if", "required_unless", "excluded_if":
+		// go-playground checks each such rule on its own, so two of them combine
+		// differently from the conditions of one, and Field has room for one.
+		target := field.conditionsOf(name)
+		if len(*target) > 0 {
+			return fmt.Errorf("validate rule %q appears twice on one key; go-playground checks each on its own, "+
+				"which the docs would read as one rule, so keep one", name)
+		}
 		conditions, err := scope.conditions(param)
 		if err != nil {
 			return fmt.Errorf("reading %s rule: %w", name, err)
 		}
-		switch name {
-		case "required_if":
-			field.RequiredIf = append(field.RequiredIf, conditions...)
-		case "required_unless":
-			field.RequiredUnless = append(field.RequiredUnless, conditions...)
-		default:
-			field.ExcludedIf = append(field.ExcludedIf, conditions...)
-		}
+		*target = conditions
 	case "required_with", "excluded_with":
 		keys, err := scope.keys(strings.Fields(param))
 		if err != nil {
@@ -534,10 +537,11 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 			field.AcceptsTemplate = true
 		}
 	case "min", "max":
-		limit, err := strconv.Atoi(param)
+		value, err := parseTypedValue(limitType(scope.valueType), param)
 		if err != nil {
-			return fmt.Errorf("reading %s rule: invalid limit %q", name, param)
+			return fmt.Errorf("reading %s rule: %w", name, err)
 		}
+		limit := int(value.(int64))
 		if name == "min" {
 			field.Min = &limit
 		} else {
@@ -550,6 +554,80 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 		field.CheckedBy = append(field.CheckedBy, name)
 	}
 	return nil
+}
+
+func (f *Field) conditionsOf(rule string) *[]Condition {
+	switch rule {
+	case "required_if":
+		return &f.RequiredIf
+	case "required_unless":
+		return &f.RequiredUnless
+	default:
+		return &f.ExcludedIf
+	}
+}
+
+// ruleFitsValue fails a rule on a kind of value it does not check the way the
+// docs state it. go-playground's oneof panics on anything but a string or an
+// integer, and its min and max on a bool or a block. pattern and the
+// dynamic_or_ rules read only strings: on other values pattern and
+// dynamic_or_pattern always fail and dynamic_or_oneof always passes.
+func ruleFitsValue(name string, valueType reflect.Type) error {
+	kind := derefType(valueType).Kind()
+	switch name {
+	case "oneof":
+		if kind == reflect.String || isInteger(kind) {
+			return nil
+		}
+		return fmt.Errorf("validate rule %q on a %s makes go-playground panic; it takes only strings and integers", name, kind)
+	case "pattern", "dynamic_or_pattern", "dynamic_or_oneof":
+		if kind == reflect.String {
+			return nil
+		}
+		return fmt.Errorf("validate rule %q on a %s does not check the value, since it reads only strings", name, kind)
+	case "min", "max":
+		switch {
+		case kind == reflect.String, isInteger(kind), kind == reflect.Float32, kind == reflect.Float64,
+			kind == reflect.Slice, kind == reflect.Array, kind == reflect.Map:
+			return nil
+		default:
+			return fmt.Errorf("validate rule %q on a %s makes go-playground panic", name, kind)
+		}
+	default:
+		return nil
+	}
+}
+
+func isInteger(kind reflect.Kind) bool {
+	return isSigned(kind) || isUnsigned(kind)
+}
+
+func isSigned(kind reflect.Kind) bool {
+	switch kind {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return true
+	default:
+		return false
+	}
+}
+
+func isUnsigned(kind reflect.Kind) bool {
+	switch kind {
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return true
+	default:
+		return false
+	}
+}
+
+// limitType is the type a min or max limit is read as. go-playground reads it
+// as a signed integer, except on an unsigned value, where a negative limit
+// makes it panic.
+func limitType(valueType reflect.Type) reflect.Type {
+	if typ := derefType(valueType); isUnsigned(typ.Kind()) {
+		return typ
+	}
+	return reflect.TypeOf(int64(0))
 }
 
 // conditions reads a required_if, required_unless or excluded_if parameter, a
@@ -621,28 +699,31 @@ func (s ruleScope) resolve(goName string) (string, reflect.Type, error) {
 
 // parseTypedValue converts a tag value to the type of the value it applies
 // to, so an integer enum stays integers in the output. It accepts only the
-// spellings go-playground reads the same way: it compares a bool condition
-// with the text "true", parses an integer condition with base prefixes, and
-// compares a oneof value with the integer's base-10 text. So a bool takes
-// only true or false and an integer only plain base 10, and a value of any
-// other kind, such as a list compared by length, is refused.
+// spellings go-playground reads the same way. It compares a bool condition
+// with the text "true", so a bool condition takes only true or false. It
+// parses an integer condition or limit with base prefixes and compares a
+// oneof value with the integer's base-10 text, so an integer must be plain
+// base 10, and it panics on a negative value for an unsigned integer. A value
+// of any other kind, such as a list compared by length, is refused.
 func parseTypedValue(typ reflect.Type, raw string) (any, error) {
-	switch kind := derefType(typ).Kind(); kind {
-	case reflect.String:
+	switch kind := derefType(typ).Kind(); {
+	case kind == reflect.String:
 		return raw, nil
-	case reflect.Bool:
+	case kind == reflect.Bool:
 		if raw != "true" && raw != "false" {
 			return nil, fmt.Errorf("want true or false, got %q", raw)
 		}
 		return raw == "true", nil
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+	case isInteger(kind):
 		value, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || strconv.FormatInt(value, 10) != raw {
 			return nil, fmt.Errorf("want a plain base-10 integer, got %q", raw)
 		}
+		if value < 0 && isUnsigned(kind) {
+			return nil, fmt.Errorf("want 0 or more for a %s, got %q", kind, raw)
+		}
 		return value, nil
-	case reflect.Float32, reflect.Float64:
+	case kind == reflect.Float32 || kind == reflect.Float64:
 		value, err := strconv.ParseFloat(raw, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid number %q", raw)

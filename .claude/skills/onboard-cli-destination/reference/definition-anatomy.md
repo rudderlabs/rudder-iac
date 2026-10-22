@@ -163,10 +163,18 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
     "not empty";
   - a `required*` rule after `omitempty`, since go-playground skips every rule
     after `omitempty` on an empty value;
-  - in a condition or a `oneof`, a bool value other than `true` or `false`
-    (go-playground compares it with the text `true`) or an integer not written
-    in plain base 10 (it reads `010` as octal);
+  - a second `required_if`, `required_unless` or `excluded_if` on one key,
+    since go-playground checks each on its own;
+  - in a condition, a bool value other than `true` or `false` (go-playground
+    compares it with the text `true`);
+  - in a condition, a `oneof` or a `min`/`max` limit, an integer not written in
+    plain base 10 (go-playground reads `010` as octal), or a negative value for
+    an unsigned integer;
   - a condition on a key that is not a string, bool or number;
+  - `oneof` on anything but a string or an integer, and `min` or `max` on a
+    bool or a block, since go-playground panics on them;
+  - `pattern`, `dynamic_or_pattern` or `dynamic_or_oneof` on anything but a
+    string, since they read only strings;
   - `|`, a quoted value, or a `0x2C` or `0x7C` escape in a tag.
 
 ## Validation semantics to remember
