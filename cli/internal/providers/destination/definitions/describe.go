@@ -537,11 +537,10 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 			field.AcceptsTemplate = true
 		}
 	case "min", "max":
-		value, err := parseTypedValue(limitType(scope.valueType), param)
+		limit, err := parseLimit(scope.valueType, param)
 		if err != nil {
 			return fmt.Errorf("reading %s rule: %w", name, err)
 		}
-		limit := int(value.(int64))
 		if name == "min" {
 			field.Min = &limit
 		} else {
@@ -620,14 +619,18 @@ func isUnsigned(kind reflect.Kind) bool {
 	}
 }
 
-// limitType is the type a min or max limit is read as. go-playground reads it
-// as a signed integer, except on an unsigned value, where a negative limit
-// makes it panic.
-func limitType(valueType reflect.Type) reflect.Type {
-	if typ := derefType(valueType); isUnsigned(typ.Kind()) {
-		return typ
+// parseLimit reads a min or max limit. go-playground reads it with base
+// prefixes and panics on a negative limit for an unsigned value, so the limit
+// must be plain base 10, and 0 or more on an unsigned value.
+func parseLimit(valueType reflect.Type, raw string) (int, error) {
+	limit, err := strconv.Atoi(raw)
+	if err != nil || strconv.Itoa(limit) != raw {
+		return 0, fmt.Errorf("want a plain base-10 integer, got %q", raw)
 	}
-	return reflect.TypeOf(int64(0))
+	if kind := derefType(valueType).Kind(); limit < 0 && isUnsigned(kind) {
+		return 0, fmt.Errorf("want 0 or more for a %s, got %q", kind, raw)
+	}
+	return limit, nil
 }
 
 // conditions reads a required_if, required_unless or excluded_if parameter, a
