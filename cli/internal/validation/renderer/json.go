@@ -11,8 +11,8 @@ import (
 )
 
 // JSONRenderer emits diagnostics as a single JSON document for machine
-// consumers — CI gates, editors, and coding agents that run validate, read the
-// failures, and correct the specs themselves.
+// consumers, such as CI gates, editors and coding agents that run validate,
+// read the failures and correct the specs themselves.
 //
 // One load renders one document. A run that validated clean emits an empty
 // diagnostics array. A run that stopped on an error with no diagnostics of its
