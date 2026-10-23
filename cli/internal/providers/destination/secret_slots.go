@@ -167,12 +167,11 @@ func readsEvent(value any) bool {
 	if strings.HasPrefix(s, "$.") || strings.HasPrefix(s, "$[") {
 		return true
 	}
-	if !definitions.IsTemplateConfigValue(s) {
+	fallback, ok := definitions.TemplateFallback(s)
+	if !ok {
 		return false
 	}
-
-	// The template pattern takes the fallback after the last "||".
-	fallback := strings.TrimSpace(strings.TrimSuffix(s[strings.LastIndex(s, "||")+len("||"):], "}}"))
+	fallback = strings.TrimSpace(fallback)
 	return fallback == "" || fallback == `""` || fallback == "''"
 }
 
