@@ -177,7 +177,7 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes without applying them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
-	cmd.Flags().BoolVar(&noDelete, "no-delete", false, "Skip deletion of resources (only create and update)")
+	cmd.Flags().BoolVar(&noDelete, "no-delete", false, "Skip deletion of resources")
 	cmd.Flags().StringArrayVar(&providers, "provider", nil, "Only apply changes for specified providers (can be repeated)")
 
 	return cmd
