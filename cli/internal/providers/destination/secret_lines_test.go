@@ -147,11 +147,11 @@ spec:
 func TestMaskSecretLinesKeepsRuleInterfaces(t *testing.T) {
 	t.Parallel()
 
-	const apiKey = "/spec/config/api_key"
+	const pointer = "/spec/config/api_key"
 	rules := maskSecretLines(secretRuleRegistry(t),
-		referencesRule{apiKey},
-		referencesSourceRule{referencesRule{apiKey}},
-		referencesMultiSpecRule{referencesRule{apiKey}},
+		referencesRule{pointer},
+		referencesSourceRule{referencesRule{pointer}},
+		referencesMultiSpecRule{referencesRule{pointer}},
 	)
 	var (
 		ctx = &vrules.ValidationContext{Spec: map[string]any{
@@ -160,7 +160,7 @@ func TestMaskSecretLinesKeepsRuleInterfaces(t *testing.T) {
 			"config":             map[string]any{"api_key": "fake-amplitude-key"},
 		}}
 		contexts = map[string]*vrules.ValidationContext{"dest.yaml": ctx}
-		want     = []vrules.ValidationResult{{Reference: apiKey, Message: apiKey, Sensitive: true}}
+		want     = []vrules.ValidationResult{{Reference: pointer, Message: pointer, Sensitive: true}}
 	)
 
 	_, isSource := rules[0].(vrules.SourceRule)
