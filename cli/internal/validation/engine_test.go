@@ -848,12 +848,18 @@ func TestValidationEngine_ValidateSources(t *testing.T) {
 		t.Parallel()
 
 		// "/hook" after the unquoted reference is not YAML until substitution.
+		// A masked line shows no value, and an unmasked one shows each
+		// reference as written, never its placeholder.
 		source := sourceWithReferences + "  url: {{ .HOST }}/hook\n"
 		sr := &mockSourceRule{
 			mockRule: mockRule{id: "source-rule", severity: rules.Warning, appliesTo: []rules.MatchPattern{rules.MatchKind("properties")}},
 			validateSourcesFn: func(map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
 				return map[string][]rules.ValidationResult{
-					"/path/to/props.yaml": {{Reference: "/spec/token", Message: "token as written", Sensitive: true}},
+					"/path/to/props.yaml": {
+						{Reference: "/spec/group", Message: "group as written"},
+						{Reference: "/spec/token", Message: "token as written", Sensitive: true},
+						{Reference: "/spec/url", Message: "url as written"},
+					},
 				}
 			},
 		}
@@ -866,8 +872,23 @@ func TestValidationEngine_ValidateSources(t *testing.T) {
 			"/path/to/props.yaml": {Data: []byte(source)},
 		})
 		require.NoError(t, err)
-		require.Len(t, diagnostics, 1)
-		assert.Equal(t, pathindex.Position{Line: 7, Column: 3, LineText: "token: ***"}, diagnostics[0].Position)
+
+		diagnostic := func(message string, position pathindex.Position, sensitive bool) Diagnostic {
+			return Diagnostic{
+				RuleID:    "source-rule",
+				Severity:  rules.Warning,
+				Message:   message,
+				File:      "/path/to/props.yaml",
+				Position:  position,
+				Sensitive: sensitive,
+				Examples:  rules.Examples{},
+			}
+		}
+		assert.Equal(t, Diagnostics{
+			diagnostic("group as written", pathindex.Position{Line: 6, Column: 3, LineText: "group: {{ .GROUP }}"}, false),
+			diagnostic("token as written", pathindex.Position{Line: 7, Column: 3, LineText: "token: ***"}, true),
+			diagnostic("url as written", pathindex.Position{Line: 8, Column: 3, LineText: "url: {{ .HOST }}/hook"}, false),
+		}, diagnostics)
 	})
 
 	t.Run("source that does not parse at all reports at its start", func(t *testing.T) {

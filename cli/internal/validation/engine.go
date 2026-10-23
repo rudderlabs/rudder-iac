@@ -270,12 +270,7 @@ func (e *validationEngine) ValidateSources(ctx context.Context, sources map[stri
 				return nil, fmt.Errorf("source rule %s returned results for unknown file: %s", rule.ID(), filePath)
 			}
 
-			pi, err := source.PathIndexer()
-			if err != nil {
-				pi = placeholderIndexer(source.Data)
-			}
-
-			fileDiagnostics, err := ruleDiagnostics(rule, filePath, pi, results)
+			fileDiagnostics, err := sourceDiagnostics(rule, filePath, source, results)
 			if err != nil {
 				return nil, err
 			}
@@ -302,16 +297,31 @@ func sourceKindVersion(data []byte) (kind, version string) {
 	return header.Kind, header.Version
 }
 
-// placeholderIndexer indexes a source that is not YAML as written, such as one
-// with an unquoted reference followed by more text. With the references swapped
-// for placeholders it parses, and the keys stay on their lines. It returns nil
-// when even that fails, which places results at the start of the file.
-func placeholderIndexer(data []byte) pathindex.PathIndexer {
-	pi, err := pathindex.NewPathIndexer(varsubst.ReplaceReferences(data).Data)
-	if err != nil {
-		return nil
+// sourceDiagnostics places a source rule's results in the source as written.
+// A source that is not YAML as written, such as one with an unquoted reference
+// followed by more text, is indexed with its references swapped for
+// placeholders: that copy parses, and the keys stay on their lines. Each line
+// a diagnostic shows is then given its references back, so no placeholder is
+// printed. When even that copy does not parse, results are placed at the start
+// of the file.
+func sourceDiagnostics(rule rules.Rule, file string, source *specs.RawSpec, results []rules.ValidationResult) (Diagnostics, error) {
+	if pi, err := source.PathIndexer(); err == nil {
+		return ruleDiagnostics(rule, file, pi, results)
 	}
-	return pi
+
+	replaced := varsubst.ReplaceReferences(source.Data)
+	pi, err := pathindex.NewPathIndexer(replaced.Data)
+	if err != nil {
+		pi = nil
+	}
+	diagnostics, err := ruleDiagnostics(rule, file, pi, results)
+	if err != nil {
+		return nil, err
+	}
+	for i := range diagnostics {
+		diagnostics[i].Position.LineText = replaced.Restore(diagnostics[i].Position.LineText)
+	}
+	return diagnostics, nil
 }
 
 // ruleDiagnostics turns rule's results for file into diagnostics, each placed

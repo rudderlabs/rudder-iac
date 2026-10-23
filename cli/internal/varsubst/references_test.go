@@ -24,25 +24,25 @@ func TestReplaceReferences(t *testing.T) {
 			name:     "quoted and unquoted tokens",
 			input:    "a: '{{ .A }}'\nb: \"{{.B}}\"\nc: {{ .C }}",
 			wantData: "a: '__rudder_variable_reference_0__'\nb: \"__rudder_variable_reference_1__\"\nc: __rudder_variable_reference_2__",
-			wantRefs: []Reference{{Name: "A"}, {Name: "B"}, {Name: "C"}},
+			wantRefs: []Reference{{Name: "A", Text: "{{ .A }}"}, {Name: "B", Text: "{{.B}}"}, {Name: "C", Text: "{{ .C }}"}},
 		},
 		{
 			name:     "default is recorded and dropped",
 			input:    "port: {{ .PORT | 5432 }}",
 			wantData: "port: __rudder_variable_reference_0__",
-			wantRefs: []Reference{{Name: "PORT", HasDefault: true}},
+			wantRefs: []Reference{{Name: "PORT", HasDefault: true, Text: "{{ .PORT | 5432 }}"}},
 		},
 		{
 			name:     "tokens inside a longer value",
 			input:    "url: https://{{ .HOST }}/{{ .PATH }}",
 			wantData: "url: https://__rudder_variable_reference_0__/__rudder_variable_reference_1__",
-			wantRefs: []Reference{{Name: "HOST"}, {Name: "PATH"}},
+			wantRefs: []Reference{{Name: "HOST", Text: "{{ .HOST }}"}, {Name: "PATH", Text: "{{ .PATH }}"}},
 		},
 		{
 			name:     "comment and malformed tokens are left as written",
 			input:    "# {{ .IN_COMMENT }}\nbad: '{{ .9BAD }}'\nok: '{{ .OK }}'",
 			wantData: "# {{ .IN_COMMENT }}\nbad: '{{ .9BAD }}'\nok: '__rudder_variable_reference_0__'",
-			wantRefs: []Reference{{Name: "OK"}},
+			wantRefs: []Reference{{Name: "OK", Text: "{{ .OK }}"}},
 		},
 		{
 			name:     "UI templates without a dot are not references",
@@ -78,11 +78,11 @@ func TestReplaceReferences_ParsesAsWritten(t *testing.T) {
 
 	ref, ok := replaced.Reference(parsed["key"])
 	assert.True(t, ok)
-	assert.Equal(t, Reference{Name: "KEY"}, ref)
+	assert.Equal(t, Reference{Name: "KEY", Text: "{{ .KEY }}"}, ref)
 
 	ref, ok = replaced.Reference(parsed["quoted"])
 	assert.True(t, ok)
-	assert.Equal(t, Reference{Name: "QUOTED", HasDefault: true}, ref)
+	assert.Equal(t, Reference{Name: "QUOTED", HasDefault: true, Text: "{{ .QUOTED | fallback }}"}, ref)
 }
 
 func TestReplaced_Reference(t *testing.T) {
@@ -95,7 +95,7 @@ func TestReplaced_Reference(t *testing.T) {
 		wantOK       bool
 		wantHoldsRef bool
 	}{
-		{name: "placeholder", value: "__rudder_variable_reference_0__", want: Reference{Name: "A"}, wantOK: true, wantHoldsRef: true},
+		{name: "placeholder", value: "__rudder_variable_reference_0__", want: Reference{Name: "A", Text: "{{ .A }}"}, wantOK: true, wantHoldsRef: true},
 		{name: "index out of range", value: "__rudder_variable_reference_1__", wantHoldsRef: true},
 		{name: "signed index", value: "__rudder_variable_reference_+0__", wantHoldsRef: true},
 		{name: "surrounding text", value: " __rudder_variable_reference_0__", wantHoldsRef: true},
@@ -129,10 +129,33 @@ func TestReplaceReferences_LiteralPlaceholder(t *testing.T) {
 
 	ref, ok := replaced.Reference(parsed["ref"])
 	assert.True(t, ok)
-	assert.Equal(t, Reference{Name: "A"}, ref)
+	assert.Equal(t, Reference{Name: "A", Text: "{{ .A }}"}, ref)
 }
 
 func TestReplaced_HoldsReference_NoReferences(t *testing.T) {
 	replaced := ReplaceReferences([]byte("key: value"))
 	assert.False(t, replaced.HoldsReference("__rudder_variable_reference_0__"))
+}
+
+// Restore turns text read from the placeholder copy back into the spec as
+// written, whatever form each token took.
+func TestReplaced_Restore(t *testing.T) {
+	input := []byte("url: {{ .HOST }}/hook\nkey: '{{.KEY | fallback}}'\nplain: value\n")
+
+	replaced := ReplaceReferences(input)
+	var parsed map[string]string
+	require.NoError(t, yaml.Unmarshal(replaced.Data, &parsed))
+
+	assert.Equal(t, "{{ .HOST }}/hook", replaced.Restore(parsed["url"]))
+	assert.Equal(t, "key: {{.KEY | fallback}}", replaced.Restore("key: "+parsed["key"]))
+	assert.Equal(t, "plain: value", replaced.Restore("plain: "+parsed["plain"]))
+	assert.Equal(t, string(input), replaced.Restore(string(replaced.Data)))
+}
+
+// A literal that looks like a placeholder is left alone, since the spec's
+// placeholders got a longer prefix.
+func TestReplaced_Restore_LiteralPlaceholder(t *testing.T) {
+	replaced := ReplaceReferences([]byte("literal: __rudder_variable_reference_0__\nref: '{{ .A }}'\n"))
+
+	assert.Equal(t, "literal: __rudder_variable_reference_0__", replaced.Restore("literal: __rudder_variable_reference_0__"))
 }

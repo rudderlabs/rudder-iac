@@ -13,6 +13,8 @@ type Reference struct {
 	// HasDefault reports a `| default` part, which substitution uses when the
 	// variable is undefined.
 	HasDefault bool
+	// Text is the token as written, such as "{{ .NAME | fallback }}".
+	Text string
 }
 
 // Replaced is spec bytes with every {{ .NAME }} reference swapped for a
@@ -66,7 +68,7 @@ func ReplaceReferences(data []byte) Replaced {
 			continue
 		}
 
-		ref := Reference{Name: name, HasDefault: match[4] != -1}
+		ref := Reference{Name: name, HasDefault: match[4] != -1, Text: string(data[start:end])}
 		placeholder := replaced.prefix + strconv.Itoa(len(replaced.References)) + placeholderSuffix
 		replaced.byPlaceholder[placeholder] = ref
 		replaced.References = append(replaced.References, ref)
@@ -90,4 +92,18 @@ func (r Replaced) Reference(value string) (Reference, bool) {
 // text around it. value comes from parsing Data.
 func (r Replaced) HoldsReference(value string) bool {
 	return len(r.References) > 0 && strings.Contains(value, r.prefix)
+}
+
+// Restore swaps each placeholder in text for its reference as written. text
+// comes from Data, such as a value parsed from it or a line of it, and a
+// caller restores it before showing it, since a placeholder means nothing to
+// the person who wrote the spec.
+func (r Replaced) Restore(text string) string {
+	if len(r.byPlaceholder) == 0 || !strings.Contains(text, r.prefix) {
+		return text
+	}
+	for placeholder, ref := range r.byPlaceholder {
+		text = strings.ReplaceAll(text, placeholder, ref.Text)
+	}
+	return text
 }

@@ -160,6 +160,55 @@ spec:
 	assert.NotContains(t, out, "***")
 }
 
+// An unquoted reference followed by more text is not YAML until substitution,
+// so the shared variable's line is read from the copy with placeholders. It
+// still shows the reference as written.
+func TestSharedVariableLineShowsReferenceInFileThatNeedsSubstitution(t *testing.T) {
+	t.Parallel()
+
+	out, err := renderLoad(t, map[string]string{
+		"amplitude.yaml": `version: rudder/v1
+kind: destination
+metadata:
+  name: shop-amplitude
+spec:
+  id: shop-amplitude
+  display_name: Shop Amplitude
+  type: am
+  definition_version: 1
+  enabled: true
+  config:
+    api_key: '{{ .SHARED }}'
+    residency_server: standard
+`,
+		"webhook.yaml": `version: rudder/v1
+kind: destination
+metadata:
+  name: shop-webhook
+spec:
+  id: shop-webhook
+  display_name: Shop Webhook
+  type: webhook
+  definition_version: 1
+  enabled: true
+  config:
+    webhook_url: {{ .HOOK_BASE }}/hook
+    headers:
+      - to: '{{ .SHARED }}'
+        from: X-Api-Key
+`,
+	}, map[string]string{
+		"SHARED":    "fake-shared-secret-value",
+		"HOOK_BASE": "https://example.com",
+	})
+	require.NoError(t, err)
+
+	assert.Contains(t, out, `warning[destination/secret-reference-unique]: secret key "headers[0].to" of destination "shop-webhook" shares variable SHARED`)
+	assert.Contains(t, out, "   14 | to: {{ .SHARED }}\n")
+	assert.NotContains(t, out, "__rudder_variable_reference_")
+	assert.NotContains(t, out, "fake-shared-secret-value")
+}
+
 func TestSecretReferenceReportedWhenSubstitutionSucceeds(t *testing.T) {
 	t.Parallel()
 
