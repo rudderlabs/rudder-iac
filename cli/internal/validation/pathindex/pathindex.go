@@ -23,7 +23,7 @@ type PathIndexer interface {
 	NearestPosition(path string) *Position
 
 	// MaskedPosition is NearestPosition with the value the line text shows
-	// replaced by MaskedValue. The key stays, and a line that shows a
+	// replaced by "***". The key stays, and a line that shows a
 	// container ("key: {...}", "[...]") is unchanged, since it holds no value.
 	MaskedPosition(path string) *Position
 }
@@ -50,8 +50,8 @@ type Position struct {
 	LineText string // Full text representation for error display
 }
 
-// MaskedValue stands in for a value that must not be printed.
-const MaskedValue = "***"
+// maskedValue stands in for a value that must not be printed.
+const maskedValue = "***"
 
 // NewPathIndex creates a new PathIndex by parsing YAML content and building the position map
 func NewPathIndexer(content []byte) (PathIndexer, error) {
@@ -95,7 +95,7 @@ func (idx *PathIndex) NearestPosition(path string) *Position {
 }
 
 // MaskedPosition is NearestPosition with the value the line text shows
-// replaced by MaskedValue.
+// replaced by maskedValue ("***").
 func (idx *PathIndex) MaskedPosition(path string) *Position {
 	nearest := idx.nearestPath(path)
 	pos := idx.positions[nearest]
@@ -227,7 +227,7 @@ func (pi *PathIndex) recordPosition(
 }
 
 // maskedLineText returns lineText, built by extractLineText, with the value it
-// shows replaced by MaskedValue. A scalar shows its value after its key, or
+// shows replaced by maskedValue. A scalar shows its value after its key, or
 // alone as a list item. A list item that is a mapping shows its first
 // property's value. Other lines show no value, and an empty value is left as
 // it is.
@@ -235,13 +235,13 @@ func maskedLineText(node *yaml.Node, key *yaml.Node, lineText string) string {
 	switch {
 	case node.Kind == yaml.ScalarNode && node.Value != "":
 		if key != nil {
-			return fmt.Sprintf("%s: %s", key.Value, MaskedValue)
+			return fmt.Sprintf("%s: %s", key.Value, maskedValue)
 		}
-		return MaskedValue
+		return maskedValue
 
 	case node.Kind == yaml.MappingNode && key == nil && len(node.Content) >= 2 &&
 		node.Content[1].Kind == yaml.ScalarNode && node.Content[1].Value != "":
-		return fmt.Sprintf("- %s: %s", node.Content[0].Value, MaskedValue)
+		return fmt.Sprintf("- %s: %s", node.Content[0].Value, maskedValue)
 	}
 	return lineText
 }

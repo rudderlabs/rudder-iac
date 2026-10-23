@@ -166,10 +166,12 @@ func readSourceSpec(data []byte) (sourceSpec, bool) {
 		return sourceSpec{}, false
 	}
 
-	id, _ := parsed.Spec["id"].(string)
-	destinationType, _ := parsed.Spec["type"].(string)
-	definitionVersion, _ := parsed.Spec["definition_version"].(int)
-	config, _ := parsed.Spec["config"].(map[string]any)
+	var (
+		id, _                = parsed.Spec["id"].(string)
+		destinationType, _   = parsed.Spec["type"].(string)
+		definitionVersion, _ = parsed.Spec["definition_version"].(int)
+		config, _            = parsed.Spec["config"].(map[string]any)
+	)
 	return sourceSpec{
 		id:                id,
 		destinationType:   destinationType,
