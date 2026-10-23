@@ -113,10 +113,9 @@ func TestMaskSensitiveLines(t *testing.T) {
 
 	assert.Equal(t, validation.Diagnostics{
 		{
-			RuleID:    "project/var-substitution",
-			File:      "dest.yaml",
-			Position:  pathindex.Position{Line: 12, Column: 36, LineText: "api_key: ***"},
-			Sensitive: true,
+			RuleID:   "project/var-substitution",
+			File:     "dest.yaml",
+			Position: pathindex.Position{Line: 12, Column: 36, LineText: "api_key: ***"},
 		},
 		substitution[1],
 		substitution[2],

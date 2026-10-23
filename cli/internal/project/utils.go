@@ -50,9 +50,8 @@ func maskSensitiveLines(diagnostics, sensitive validation.Diagnostics) validatio
 
 	out := slices.Clone(diagnostics)
 	for i, d := range out {
-		if text, ok := masked[fileLine{d.File, d.Position.Line}]; ok && !d.Sensitive {
+		if text, ok := masked[fileLine{d.File, d.Position.Line}]; ok {
 			out[i].Position.LineText = text
-			out[i].Sensitive = true
 		}
 	}
 	return out
