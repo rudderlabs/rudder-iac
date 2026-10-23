@@ -26,6 +26,8 @@ func TestApplyTracksRunFailureAsErrored(t *testing.T) {
 			{K: "location", V: location},
 			{K: "dryRun", V: false},
 			{K: "confirm", V: false},
+			{K: "noDelete", V: false},
+			{K: "providers", V: ""},
 		},
 	}}, *calls)
 }
