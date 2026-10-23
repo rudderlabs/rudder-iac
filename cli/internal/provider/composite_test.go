@@ -362,7 +362,7 @@ func TestCompositeProvider_ProviderNames(t *testing.T) {
 				"eventstream": testutils.NewMockProvider([]string{"kindB"}, []string{"typeB"}),
 				"datacatalog": testutils.NewMockProvider([]string{"kindC"}, []string{"typeC"}),
 			},
-			expected: []string{"retl", "eventstream", "datacatalog"},
+			expected: []string{"datacatalog", "eventstream", "retl"},
 		},
 	}
 
@@ -373,10 +373,11 @@ func TestCompositeProvider_ProviderNames(t *testing.T) {
 			assert.NotNil(t, cp)
 
 			composite := cp.(*provider.CompositeProvider)
-			actual := composite.ProviderNames()
-			sort.Strings(actual)
-			sort.Strings(tt.expected)
-			assert.Equal(t, tt.expected, actual)
+			// The names reach user-facing errors, so the order must not
+			// depend on map iteration. Repeat to catch a random order.
+			for range 20 {
+				assert.Equal(t, tt.expected, composite.ProviderNames())
+			}
 		})
 	}
 }
@@ -421,7 +422,7 @@ func TestCompositeProvider_ResourceTypesForProviders(t *testing.T) {
 			expectedErr: "unknown provider: unknownProvider",
 		},
 		{
-			name:     "empty provider list returns empty types",
+			name:      "empty provider list returns empty types",
 			providers: []string{},
 			expected:  nil,
 		},

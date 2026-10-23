@@ -463,9 +463,11 @@ func (p *CompositeProvider) SemanticRules() []rules.Rule {
 	return allRules
 }
 
-// ProviderNames returns the names of all registered providers
+// ProviderNames returns the names of all registered providers, sorted.
 func (p *CompositeProvider) ProviderNames() []string {
-	return maps.Keys(p.Providers)
+	names := maps.Keys(p.Providers)
+	slices.Sort(names)
+	return names
 }
 
 // ResourceTypesForProviders returns all resource types supported by the specified
