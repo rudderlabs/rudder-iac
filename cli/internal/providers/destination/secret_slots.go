@@ -23,16 +23,19 @@ type secretSlot struct {
 	key string
 	// reference is the JSON pointer to the value in the spec file.
 	reference string
-	// variable is the variable the value references when the value is exactly
-	// one reference with no default, and empty otherwise.
-	variable string
-	// defaulted is the variable the value references when the value is
-	// exactly one reference with a default, and empty otherwise.
-	defaulted string
+	// ref is the reference the value is, when the value is exactly one
+	// reference with nothing around it, and nil otherwise.
+	ref *varsubst.Reference
 	// suggested is the variable import would write for the key. It is empty
 	// when the spec id is empty, holds a reference, or makes no valid variable
 	// name.
 	suggested string
+}
+
+// referencesVariable reports whether the value is exactly one reference with
+// no default, the only value a secret key may hold.
+func (s secretSlot) referencesVariable() bool {
+	return s.ref != nil && !s.ref.HasDefault
 }
 
 // readSecretSlots returns the secret key values of the destination spec ctx
@@ -79,14 +82,10 @@ func readSecretSlots(registry *definitions.Registry, ctx *vrules.ValidationConte
 			reference:   "/spec/config/" + strings.Join(segments, "/"),
 			suggested:   suggestedVariable(id, segments),
 		}
-		if s, ok := value.(string); ok {
-			if ref, ok := replaced.Reference(s); ok {
-				if ref.HasDefault {
-					slot.defaulted = ref.Name
-				} else {
-					slot.variable = ref.Name
-				}
-			}
+		// A value that is not a string is no placeholder.
+		s, _ := value.(string)
+		if ref, ok := replaced.Reference(s); ok {
+			slot.ref = &ref
 		}
 		slots = append(slots, slot)
 	})

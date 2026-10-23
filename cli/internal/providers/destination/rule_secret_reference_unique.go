@@ -58,10 +58,10 @@ func (r *secretReferenceUniqueRule) ValidateSources(specs map[string]*vrules.Val
 	byVariable := make(map[string][]secretSlot)
 	for _, ctx := range specs {
 		for _, slot := range readSecretSlots(r.registry, ctx) {
-			if slot.variable == "" {
+			if !slot.referencesVariable() {
 				continue
 			}
-			byVariable[slot.variable] = append(byVariable[slot.variable], slot)
+			byVariable[slot.ref.Name] = append(byVariable[slot.ref.Name], slot)
 		}
 	}
 
@@ -109,7 +109,7 @@ func sharedVariableMessage(slot secretSlot, others []secretSlot) string {
 
 	return fmt.Sprintf(
 		"secret key %q of %s shares variable %s with %s; give each secret key its own variable",
-		slot.key, slot.destination, slot.variable, joinAnd(locations),
+		slot.key, slot.destination, slot.ref.Name, joinAnd(locations),
 	)
 }
 

@@ -51,7 +51,7 @@ func (r *secretReferenceRule) ValidateSources(specs map[string]*vrules.Validatio
 	results := make(map[string][]vrules.ValidationResult)
 	for path, ctx := range specs {
 		for _, slot := range readSecretSlots(r.registry, ctx) {
-			if slot.variable != "" {
+			if slot.referencesVariable() {
 				continue
 			}
 			results[path] = append(results[path], vrules.ValidationResult{
@@ -67,9 +67,10 @@ func (r *secretReferenceRule) ValidateSources(specs map[string]*vrules.Validatio
 // secretReferenceMessage names the key and the variable to use, never the value.
 func secretReferenceMessage(slot secretSlot) string {
 	const fix = "set the value in a var file or a RUDDER_ environment variable"
-	if slot.defaulted != "" {
-		// The variable is already named, so only the default has to go.
-		return fmt.Sprintf("secret key %q must hold only a variable reference with no default; remove the default from the reference to %s and %s", slot.key, slot.defaulted, fix)
+	if slot.ref != nil {
+		// The value is a reference with a default. The variable is already
+		// named, so only the default has to go.
+		return fmt.Sprintf("secret key %q must hold only a variable reference with no default; remove the default from the reference to %s and %s", slot.key, slot.ref.Name, fix)
 	}
 	if slot.suggested == "" {
 		return fmt.Sprintf("secret key %q must hold only a variable reference with no default; %s", slot.key, fix)
