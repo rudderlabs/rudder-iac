@@ -98,23 +98,21 @@ func WithAskConfirmation(askConfirmation bool) Option {
 	}
 }
 
-// WithSkipDeletes configures the syncer to skip delete operations
+// WithSkipDeletes configures the syncer to skip delete operations.
+// A later call replaces an earlier one.
 func WithSkipDeletes(skip bool) Option {
 	return func(s *ProjectSyncer) error {
-		if skip {
-			s.plannerOptions = append(s.plannerOptions, planner.WithSkipDeletes(true))
-		}
+		s.plannerOptions = append(s.plannerOptions, planner.WithSkipDeletes(skip))
 		return nil
 	}
 }
 
 // WithResourceTypes configures the syncer to only apply operations for
-// the specified resource types
+// the specified resource types. Empty types means all types. A later call
+// replaces an earlier one.
 func WithResourceTypes(types []string) Option {
 	return func(s *ProjectSyncer) error {
-		if len(types) > 0 {
-			s.plannerOptions = append(s.plannerOptions, planner.WithResourceTypes(types))
-		}
+		s.plannerOptions = append(s.plannerOptions, planner.WithResourceTypes(types))
 		return nil
 	}
 }

@@ -237,8 +237,8 @@ func TestPlanner_ResourceTypeFilter(t *testing.T) {
 	// Use resources with identical names in source and target to avoid update operations
 	sourceTypeA := newResourceWithType("res0", "resource 0", "type-a")
 	sourceTypeB := newResourceWithType("res1", "resource 1", "type-b")
-	targetTypeA := newResourceWithType("res0", "resource 0", "type-a")   // Same as source - no update
-	targetTypeB := newResourceWithType("res1", "resource 1", "type-b")   // Same as source - no update
+	targetTypeA := newResourceWithType("res0", "resource 0", "type-a") // Same as source - no update
+	targetTypeB := newResourceWithType("res1", "resource 1", "type-b") // Same as source - no update
 	targetTypeANew := newResourceWithType("res2", "resource 2", "type-a")
 	targetTypeBNew := newResourceWithType("res3", "resource 3", "type-b")
 
