@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/validator"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
 )
 
 var validateLog = logger.New("datagraph", logger.Attr{
@@ -75,6 +76,12 @@ func NewCmdValidate() *cobra.Command {
 			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
 				return err
+			}
+
+			// Under --json stdout holds only the report, so the diagnostics
+			// the load renders, warnings included, go to stderr.
+			if jsonOutput {
+				projectOpts = append(projectOpts, project.WithRenderer(renderer.NewTextRenderer(cmd.ErrOrStderr())))
 			}
 
 			p = deps.NewProject(projectOpts...)
