@@ -140,22 +140,11 @@ func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.
 				return nil, fmt.Errorf("building path indexer for %s: %w", filePath, err)
 			}
 
-			for _, result := range results {
-				position, err := resultPosition(pi, result)
-				if err != nil {
-					return nil, err
-				}
-
-				diagnostics = append(diagnostics, Diagnostic{
-					RuleID:    rule.ID(),
-					Severity:  rule.Severity(),
-					Message:   result.Message,
-					File:      filePath,
-					Position:  position,
-					Sensitive: result.Sensitive,
-					Examples:  rule.Examples(),
-				})
+			fileDiagnostics, err := ruleDiagnostics(rule, filePath, pi, results)
+			if err != nil {
+				return nil, err
 			}
+			diagnostics = append(diagnostics, fileDiagnostics...)
 		}
 	}
 
@@ -233,21 +222,11 @@ func (e *validationEngine) runValidationRules(
 			WorkspaceID: workspaceID,
 		})
 
-		for _, result := range results {
-			position, err := resultPosition(pi, result)
-			if err != nil {
-				return nil, err
-			}
-			diagnostics = append(diagnostics, Diagnostic{
-				RuleID:    rule.ID(),
-				Severity:  rule.Severity(),
-				Message:   result.Message,
-				File:      path,
-				Position:  position,
-				Sensitive: result.Sensitive,
-				Examples:  rule.Examples(),
-			})
+		ruleDiags, err := ruleDiagnostics(rule, path, pi, results)
+		if err != nil {
+			return nil, err
 		}
+		diagnostics = append(diagnostics, ruleDiags...)
 	}
 
 	return diagnostics, nil
@@ -296,21 +275,11 @@ func (e *validationEngine) ValidateSources(ctx context.Context, sources map[stri
 				pi = placeholderIndexer(source.Data)
 			}
 
-			for _, result := range results {
-				position, err := resultPosition(pi, result)
-				if err != nil {
-					return nil, err
-				}
-				diagnostics = append(diagnostics, Diagnostic{
-					RuleID:    rule.ID(),
-					Severity:  rule.Severity(),
-					Message:   result.Message,
-					File:      filePath,
-					Position:  position,
-					Sensitive: result.Sensitive,
-					Examples:  rule.Examples(),
-				})
+			fileDiagnostics, err := ruleDiagnostics(rule, filePath, pi, results)
+			if err != nil {
+				return nil, err
 			}
+			diagnostics = append(diagnostics, fileDiagnostics...)
 		}
 	}
 
@@ -343,6 +312,28 @@ func placeholderIndexer(data []byte) pathindex.PathIndexer {
 		return nil
 	}
 	return pi
+}
+
+// ruleDiagnostics turns rule's results for file into diagnostics, each placed
+// where its reference points in pi.
+func ruleDiagnostics(rule rules.Rule, file string, pi pathindex.PathIndexer, results []rules.ValidationResult) (Diagnostics, error) {
+	diagnostics := make(Diagnostics, 0, len(results))
+	for _, result := range results {
+		position, err := resultPosition(pi, result)
+		if err != nil {
+			return nil, err
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			RuleID:    rule.ID(),
+			Severity:  rule.Severity(),
+			Message:   result.Message,
+			File:      file,
+			Position:  position,
+			Sensitive: result.Sensitive,
+			Examples:  rule.Examples(),
+		})
+	}
+	return diagnostics, nil
 }
 
 // resultPosition resolves a result's reference to its position in the file,
