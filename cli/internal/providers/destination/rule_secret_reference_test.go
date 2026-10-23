@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -31,12 +32,7 @@ spec:
 func sourceContexts(sources map[string][]byte) map[string]*vrules.ValidationContext {
 	contexts := make(map[string]*vrules.ValidationContext, len(sources))
 	for path, source := range sources {
-		contexts[path] = &vrules.ValidationContext{
-			FilePath: path,
-			Kind:     DestinationSpecKind,
-			Version:  "rudder/v1",
-			Source:   source,
-		}
+		contexts[path] = vrules.NewSourceContext(path, &specs.RawSpec{Data: source})
 	}
 	return contexts
 }

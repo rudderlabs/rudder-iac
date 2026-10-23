@@ -50,7 +50,7 @@ func (r *secretReferenceRule) Validate(*vrules.ValidationContext) []vrules.Valid
 func (r *secretReferenceRule) ValidateSources(specs map[string]*vrules.ValidationContext) map[string][]vrules.ValidationResult {
 	results := make(map[string][]vrules.ValidationResult)
 	for path, ctx := range specs {
-		for _, slot := range readSecretSlots(r.registry, path, ctx.Source) {
+		for _, slot := range readSecretSlots(r.registry, ctx) {
 			if slot.variable != "" {
 				continue
 			}

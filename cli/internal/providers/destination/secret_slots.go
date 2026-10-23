@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
+	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
 
@@ -35,18 +35,21 @@ type secretSlot struct {
 	suggested string
 }
 
-// readSecretSlots returns the secret key values of the destination spec in
-// source. A spec it cannot read has none, and the syntax rule reports it. That
-// includes a spec whose type is unregistered or a reference, since the type
-// decides which keys are secret. A key holding null, an empty string or a
-// value read from each event is left out, since it holds no secret.
-func readSecretSlots(registry *definitions.Registry, file string, source []byte) []secretSlot {
-	replaced := varsubst.ReplaceReferences(source)
-
-	spec, ok := readSourceSpec(replaced.Data)
-	if !ok {
+// readSecretSlots returns the secret key values of the destination spec ctx
+// holds as written, read from ctx.Spec, the copy NewSourceContext parsed with
+// placeholders. A spec it cannot read has none, and the syntax rule reports
+// it. That includes a spec whose type is unregistered or a reference, since
+// the type decides which keys are secret. A key holding null, an empty string
+// or a value read from each event is left out, since it holds no secret.
+func readSecretSlots(registry *definitions.Registry, ctx *vrules.ValidationContext) []secretSlot {
+	if ctx.Spec == nil {
 		return nil
 	}
+	var (
+		file     = ctx.FilePath
+		replaced = ctx.References
+		spec     = readSourceSpec(ctx.Spec)
+	)
 	secretKeys := specSecretKeys(registry, spec)
 	if len(secretKeys) == 0 {
 		return nil
@@ -182,27 +185,22 @@ type sourceSpec struct {
 	config            map[string]any
 }
 
-// readSourceSpec reads a spec whose references were replaced by placeholders.
-// Any field may hold a placeholder where the spec expects another type, so each
-// is read on its own instead of decoding the whole spec.
-func readSourceSpec(data []byte) (sourceSpec, bool) {
-	parsed, err := specs.New(data)
-	if err != nil {
-		return sourceSpec{}, false
-	}
-
+// readSourceSpec reads the fields of a spec whose references were replaced by
+// placeholders. Any field may hold a placeholder where the spec expects
+// another type, so each is read on its own instead of decoding the whole spec.
+func readSourceSpec(spec map[string]any) sourceSpec {
 	var (
-		id, _                = parsed.Spec["id"].(string)
-		destinationType, _   = parsed.Spec["type"].(string)
-		definitionVersion, _ = parsed.Spec["definition_version"].(int)
-		config, _            = parsed.Spec["config"].(map[string]any)
+		id, _                = spec["id"].(string)
+		destinationType, _   = spec["type"].(string)
+		definitionVersion, _ = spec["definition_version"].(int)
+		config, _            = spec["config"].(map[string]any)
 	)
 	return sourceSpec{
 		id:                id,
 		destinationType:   destinationType,
 		definitionVersion: int64(definitionVersion),
 		config:            config,
-	}, true
+	}
 }
 
 // showsSecret reports whether the line validate prints for a result at

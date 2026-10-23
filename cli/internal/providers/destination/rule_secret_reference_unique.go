@@ -56,8 +56,8 @@ func (r *secretReferenceUniqueRule) Validate(*vrules.ValidationContext) []vrules
 // default. Anything else already gets a secret-reference warning.
 func (r *secretReferenceUniqueRule) ValidateSources(specs map[string]*vrules.ValidationContext) map[string][]vrules.ValidationResult {
 	byVariable := make(map[string][]secretSlot)
-	for path, ctx := range specs {
-		for _, slot := range readSecretSlots(r.registry, path, ctx.Source) {
+	for _, ctx := range specs {
+		for _, slot := range readSecretSlots(r.registry, ctx) {
 			if slot.variable == "" {
 				continue
 			}

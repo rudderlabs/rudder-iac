@@ -803,13 +803,7 @@ func TestValidationEngine_ValidateSources(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, map[string]*rules.ValidationContext{
-			"/path/to/props.yaml": {
-				FilePath: "/path/to/props.yaml",
-				FileName: "props.yaml",
-				Kind:     "properties",
-				Version:  "rudder/v0.1",
-				Source:   []byte(sourceWithReferences),
-			},
+			"/path/to/props.yaml": rules.NewSourceContext("/path/to/props.yaml", &specs.RawSpec{Data: []byte(sourceWithReferences)}),
 		}, got)
 		assert.Equal(t, Diagnostics{{
 			RuleID:   "source-rule",

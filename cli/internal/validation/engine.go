@@ -12,7 +12,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
-	"gopkg.in/yaml.v3"
 )
 
 // ValidationEngine is the main orchestrator for the two-phase validation framework.
@@ -250,14 +249,7 @@ func (e *validationEngine) ValidateSources(ctx context.Context, sources map[stri
 
 	contexts := make(map[string]*rules.ValidationContext, len(sources))
 	for path, source := range sources {
-		kind, version := sourceKindVersion(source.Data)
-		contexts[path] = &rules.ValidationContext{
-			FilePath: path,
-			FileName: filepath.Base(path),
-			Kind:     kind,
-			Version:  version,
-			Source:   source.Data,
-		}
+		contexts[path] = rules.NewSourceContext(path, source)
 	}
 
 	diagnostics := make(Diagnostics, 0)
@@ -270,7 +262,7 @@ func (e *validationEngine) ValidateSources(ctx context.Context, sources map[stri
 				return nil, fmt.Errorf("source rule %s returned results for unknown file: %s", rule.ID(), filePath)
 			}
 
-			fileDiagnostics, err := sourceDiagnostics(rule, filePath, source, results)
+			fileDiagnostics, err := sourceDiagnostics(rule, filePath, source, contexts[filePath].References, results)
 			if err != nil {
 				return nil, err
 			}
@@ -282,21 +274,6 @@ func (e *validationEngine) ValidateSources(ctx context.Context, sources map[stri
 	return diagnostics, nil
 }
 
-// sourceKindVersion reads kind and version from a spec as written. References
-// are swapped for placeholders first, because an unquoted one does not parse as
-// YAML until substitution runs. Unknown fields are skipped, so the rest of the
-// spec does not have to decode.
-func sourceKindVersion(data []byte) (kind, version string) {
-	var header struct {
-		Kind    string `yaml:"kind"`
-		Version string `yaml:"version"`
-	}
-	if err := yaml.Unmarshal(varsubst.ReplaceReferences(data).Data, &header); err != nil {
-		return "", ""
-	}
-	return header.Kind, header.Version
-}
-
 // sourceDiagnostics places a source rule's results in the source as written.
 // A source that is not YAML as written, such as one with an unquoted reference
 // followed by more text, is indexed with its references swapped for
@@ -304,12 +281,11 @@ func sourceKindVersion(data []byte) (kind, version string) {
 // a diagnostic shows is then given its references back, so no placeholder is
 // printed. When even that copy does not parse, results are placed at the start
 // of the file.
-func sourceDiagnostics(rule rules.Rule, file string, source *specs.RawSpec, results []rules.ValidationResult) (Diagnostics, error) {
+func sourceDiagnostics(rule rules.Rule, file string, source *specs.RawSpec, replaced varsubst.Replaced, results []rules.ValidationResult) (Diagnostics, error) {
 	if pi, err := source.PathIndexer(); err == nil {
 		return ruleDiagnostics(rule, file, pi, results)
 	}
 
-	replaced := varsubst.ReplaceReferences(source.Data)
 	pi, err := pathindex.NewPathIndexer(replaced.Data)
 	if err != nil {
 		pi = nil

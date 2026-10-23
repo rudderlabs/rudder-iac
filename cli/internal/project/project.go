@@ -1,6 +1,7 @@
 package project
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -392,6 +393,12 @@ func (p *project) substituteSpecs(raw map[string]*specs.RawSpec) (substituted ma
 				hasUndefined = hasUndefined || errors.Is(e.Err, varsubst.ErrUndefinedVariable)
 			}
 			diags = append(diags, substitutionDiagnostics(path, subErrs)...)
+			continue
+		}
+		// A spec substitution leaves unchanged keeps its RawSpec, and with it
+		// the parse the source rules already made of it.
+		if bytes.Equal(data, rawSpec.Data) {
+			substituted[path] = rawSpec
 			continue
 		}
 		substituted[path] = &specs.RawSpec{Data: data}
