@@ -57,7 +57,6 @@ func (r *secretReferenceRule) ValidateSources(specs map[string]*vrules.Validatio
 			results[path] = append(results[path], vrules.ValidationResult{
 				Reference: slot.reference,
 				Message:   secretReferenceMessage(slot),
-				Sensitive: true,
 			})
 		}
 	}

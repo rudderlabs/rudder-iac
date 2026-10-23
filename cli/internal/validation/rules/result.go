@@ -26,6 +26,11 @@ type ValidationResult struct {
 	// Sensitive marks a result whose line in the spec can show a secret value,
 	// such as a destination secret key or a list item holding one. The engine
 	// masks the value part of that line, so no renderer prints it.
+	//
+	// The destination provider sets it on the results of every rule it
+	// registers, so a destination rule does not have to. A rule registered by
+	// another provider that reports on a line of a destination spec's config
+	// must set it itself.
 	Sensitive bool
 
 	// Examples provides valid and invalid usage examples for this validation result.

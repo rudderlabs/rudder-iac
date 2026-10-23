@@ -76,7 +76,7 @@ func (r *secretReferenceUniqueRule) ValidateSources(specs map[string]*vrules.Val
 		})
 
 		// Each slot holds exactly one reference, and the line is read before
-		// substitution, so it shows no secret and is not masked.
+		// substitution, so it shows no secret, and maskSecretLines leaves it.
 		for i, slot := range slots {
 			others := slices.Concat(slots[:i], slots[i+1:])
 			results[slot.file] = append(results[slot.file], vrules.ValidationResult{

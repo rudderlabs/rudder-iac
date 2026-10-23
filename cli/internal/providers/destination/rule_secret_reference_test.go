@@ -88,7 +88,6 @@ func TestSecretReferenceRule(t *testing.T) {
 			want: []vrules.ValidationResult{{
 				Reference: "/spec/config/api_key",
 				Message:   `secret key "api_key" must hold only a variable reference with no default, such as '{{ .SHOP_AMPLITUDE_API_KEY }}'` + fix,
-				Sensitive: true,
 			}},
 		},
 		{
@@ -101,7 +100,6 @@ func TestSecretReferenceRule(t *testing.T) {
 			want: []vrules.ValidationResult{{
 				Reference: "/spec/config/api_key",
 				Message:   `secret key "api_key" must hold only a variable reference with no default, such as '{{ .SHOP_AMPLITUDE_API_KEY }}'` + fix,
-				Sensitive: true,
 			}},
 		},
 		{
@@ -114,7 +112,6 @@ func TestSecretReferenceRule(t *testing.T) {
 			want: []vrules.ValidationResult{{
 				Reference: "/spec/config/api_key",
 				Message:   `secret key "api_key" must hold only a variable reference with no default; remove the default from the reference to MY_AMPLITUDE_KEY and` + strings.TrimPrefix(fix, ";"),
-				Sensitive: true,
 			}},
 		},
 		{
@@ -129,12 +126,10 @@ func TestSecretReferenceRule(t *testing.T) {
 				{
 					Reference: "/spec/config/api_secret",
 					Message:   `secret key "api_secret" must hold only a variable reference with no default, such as '{{ .SHOP_AMPLITUDE_API_SECRET }}'` + fix,
-					Sensitive: true,
 				},
 				{
 					Reference: "/spec/config/api_key",
 					Message:   `secret key "api_key" must hold only a variable reference with no default, such as '{{ .SHOP_AMPLITUDE_API_KEY }}'` + fix,
-					Sensitive: true,
 				},
 			},
 		},
@@ -152,7 +147,6 @@ func TestSecretReferenceRule(t *testing.T) {
 			want: []vrules.ValidationResult{{
 				Reference: "/spec/config/headers/1/to",
 				Message:   `secret key "headers[1].to" must hold only a variable reference with no default, such as '{{ .SHOP_WEBHOOK_HEADERS_1_TO }}'` + fix,
-				Sensitive: true,
 			}},
 		},
 		{
@@ -169,7 +163,6 @@ func TestSecretReferenceRule(t *testing.T) {
 			want: []vrules.ValidationResult{{
 				Reference: "/spec/config/headers/0/to",
 				Message:   `secret key "headers[0].to" must hold only a variable reference with no default, such as '{{ .SHOP_WEBHOOK_HEADERS_0_TO }}'` + fix,
-				Sensitive: true,
 			}},
 		},
 		{
@@ -210,7 +203,6 @@ func TestSecretReferenceRule(t *testing.T) {
 			want: []vrules.ValidationResult{{
 				Reference: "/spec/config/headers/1/to",
 				Message:   `secret key "headers[1].to" must hold only a variable reference with no default, such as '{{ .SHOP_WEBHOOK_HEADERS_1_TO }}'` + fix,
-				Sensitive: true,
 			}},
 		},
 		{
@@ -223,7 +215,6 @@ func TestSecretReferenceRule(t *testing.T) {
 			want: []vrules.ValidationResult{{
 				Reference: "/spec/config/api_key",
 				Message:   `secret key "api_key" must hold only a variable reference with no default` + fix,
-				Sensitive: true,
 			}},
 		},
 		{
@@ -238,7 +229,6 @@ func TestSecretReferenceRule(t *testing.T) {
 			want: []vrules.ValidationResult{{
 				Reference: "/spec/config/api_key",
 				Message:   `secret key "api_key" must hold only a variable reference with no default` + fix,
-				Sensitive: true,
 			}},
 		},
 		{
@@ -251,7 +241,6 @@ func TestSecretReferenceRule(t *testing.T) {
 			want: []vrules.ValidationResult{{
 				Reference: "/spec/config/api_key",
 				Message:   `secret key "api_key" must hold only a variable reference with no default` + fix,
-				Sensitive: true,
 			}},
 		},
 		{
@@ -267,7 +256,6 @@ func TestSecretReferenceRule(t *testing.T) {
 			want: []vrules.ValidationResult{{
 				Reference: "/spec/config/api_key",
 				Message:   `secret key "api_key" must hold only a variable reference with no default, such as '{{ .SHOP_AMPLITUDE_API_KEY }}'` + fix,
-				Sensitive: true,
 			}},
 		},
 		{
@@ -319,7 +307,6 @@ spec:
 	want := []vrules.ValidationResult{{
 		Reference: "/spec/config/api_key",
 		Message:   `secret key "api_key" must hold only a variable reference with no default, such as '{{ .SHOP_AMPLITUDE_API_KEY }}'; set the value in a var file or a RUDDER_ environment variable`,
-		Sensitive: true,
 	}}
 
 	cases := []struct {
@@ -375,6 +362,5 @@ spec:
 	assert.Equal(t, map[string][]vrules.ValidationResult{"dest.yaml": {{
 		Reference: "/spec/config/api_key",
 		Message:   `secret key "api_key" must hold only a variable reference with no default, such as '{{ .SHOP_AMPLITUDE_API_KEY }}'; set the value in a var file or a RUDDER_ environment variable`,
-		Sensitive: true,
 	}}}, results)
 }

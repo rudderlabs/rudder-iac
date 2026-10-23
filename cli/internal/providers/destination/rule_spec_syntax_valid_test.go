@@ -396,31 +396,3 @@ func TestSpecSyntaxValidRuleValidSpec(t *testing.T) {
 	results := runSyntaxRule(t, ruleTestRegistry(t), validSpecMap())
 	assert.Empty(t, results)
 }
-
-// Config errors are reported after substitution, so a line at a secret key
-// would print the real secret. Those results are marked for masking.
-func TestSpecSyntaxValidRuleMarksSecretConfigErrorsSensitive(t *testing.T) {
-	t.Parallel()
-
-	spec := map[string]any{
-		"id":                 "shop-amplitude",
-		"display_name":       "Shop Amplitude",
-		"type":               "am",
-		"enabled":            true,
-		"definition_version": 1,
-		"config": map[string]any{
-			"api_key":          strings.Repeat("x", 101),
-			"residency_server": "moon",
-		},
-	}
-
-	results := runSyntaxRule(t, secretRuleRegistry(t), spec)
-	sensitive := make(map[string]bool, len(results))
-	for _, result := range results {
-		sensitive[result.Reference] = result.Sensitive
-	}
-	assert.Equal(t, map[string]bool{
-		"/spec/config/api_key":          true,
-		"/spec/config/residency_server": false,
-	}, sensitive)
-}
