@@ -165,7 +165,7 @@ type TrackingPlanStore interface {
 	GetTrackingPlans(ctx context.Context, options ListOptions) ([]*TrackingPlan, error)
 	GetTrackingPlanWithIdentifiers(ctx context.Context, id string, rebuildSchemas bool) (*TrackingPlanWithIdentifiers, error)
 	GetTrackingPlansWithIdentifiers(ctx context.Context, options ListOptions) ([]*TrackingPlanWithIdentifiers, error)
-	GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error)
+	GetTrackingPlanEventSchema(ctx context.Context, id string, eventID string) (*TrackingPlanEventSchema, error)
 	UpdateTrackingPlanEvents(ctx context.Context, id string, input []EventIdentifierDetail, rebuildSchemas bool) error
 	SetTrackingPlanExternalId(ctx context.Context, id string, externalId string) error
 }
@@ -361,16 +361,63 @@ func (c *RudderDataCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id s
 		return nil, fmt.Errorf("fetching all events on tracking plan: %s: %w", id, err)
 	}
 
-	trackingPlan.Events = make([]TrackingPlanEventSchema, len(events))
-	for i, event := range events {
-		schema, err := c.GetTrackingPlanEventSchema(ctx, id, event.ID)
-		if err != nil {
-			return nil, fmt.Errorf("fetching event schema: %s on tracking plan: %s: %w", event.ID, id, err)
-		}
-		trackingPlan.Events[i] = *schema
+	trackingPlan.Events, err = c.getTrackingPlanEventSchemas(ctx, id, events)
+	if err != nil {
+		return nil, err
 	}
 
 	return &trackingPlan, nil
+}
+
+func trackingPlanEventSchemaPath(trackingPlanID, eventID string) string {
+	return fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=schema", trackingPlanID, eventID)
+}
+
+func (c *RudderDataCatalog) getTrackingPlanEventSchemas(
+	ctx context.Context,
+	trackingPlanID string,
+	events []*TrackingPlanEventResponse,
+) ([]TrackingPlanEventSchema, error) {
+	if len(events) == 0 {
+		return []TrackingPlanEventSchema{}, nil
+	}
+
+	paths := make([]string, len(events))
+	eventTasks := make([]tasker.Task, 0, len(events))
+	seen := make(map[string]struct{}, len(events))
+	for i, event := range events {
+		path := trackingPlanEventSchemaPath(trackingPlanID, event.ID)
+		paths[i] = path
+		if _, ok := seen[path]; ok {
+			continue
+		}
+
+		seen[path] = struct{}{}
+		eventTasks = append(eventTasks, apitask.NewAPIFetchTask[*TrackingPlanEventSchema](c.client, path))
+	}
+
+	results := tasker.NewResults[*TrackingPlanEventSchema]()
+	errs := tasker.RunTasks(
+		ctx,
+		eventTasks,
+		c.concurrency,
+		false,
+		apitask.RunAPIFetchTask(ctx, results),
+	)
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("fetching event schemas on tracking plan: %s: %w", trackingPlanID, errors.Join(errs...))
+	}
+
+	eventSchemas := make([]TrackingPlanEventSchema, len(events))
+	for i, path := range paths {
+		schema, ok := results.Get(path)
+		if !ok {
+			return nil, fmt.Errorf("event schema not found in results for path: %s", path)
+		}
+		eventSchemas[i] = *schema
+	}
+
+	return eventSchemas, nil
 }
 
 func (c *RudderDataCatalog) GetTrackingPlansWithIdentifiers(ctx context.Context, options ListOptions) ([]*TrackingPlanWithIdentifiers, error) {
@@ -417,8 +464,8 @@ func (c *RudderDataCatalog) GetTrackingPlansWithIdentifiers(ctx context.Context,
 	return result, nil
 }
 
-func (c *RudderDataCatalog) GetTrackingPlanEventSchema(ctx context.Context, id string, eventId string) (*TrackingPlanEventSchema, error) {
-	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=schema", id, eventId), nil)
+func (c *RudderDataCatalog) GetTrackingPlanEventSchema(ctx context.Context, id string, eventID string) (*TrackingPlanEventSchema, error) {
+	resp, err := c.client.Do(ctx, "GET", trackingPlanEventSchemaPath(id, eventID), nil)
 	if err != nil {
 		return nil, fmt.Errorf("executing http request: %w", err)
 	}

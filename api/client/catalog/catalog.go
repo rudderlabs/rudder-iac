@@ -129,19 +129,20 @@ func getAllResourcesPaginated[T any](ctx context.Context, apiClient *client.Clie
 		return firstPage.Data, nil
 	}
 
-	tasks := make([]tasker.Task, totalPages)
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("parsing URL: %w", err)
+	}
+	q := u.Query()
+	tasks := make([]tasker.Task, 0, totalPages-1)
 
 	results := tasker.NewResults[PaginatedResponse[T]]()
-	for i := 1; i <= totalPages; i++ {
-		u, err := url.Parse(endpoint)
-		if err != nil {
-			return nil, fmt.Errorf("parsing URL: %w", err)
-		}
-		q := u.Query()
+	for i := 2; i <= totalPages; i++ {
+		pageURL := *u
 		q.Set("page", strconv.Itoa(i))
-		u.RawQuery = q.Encode()
+		pageURL.RawQuery = q.Encode()
 
-		tasks[i-1] = apitask.NewAPIFetchTask[PaginatedResponse[T]](apiClient, u.String())
+		tasks = append(tasks, apitask.NewAPIFetchTask[PaginatedResponse[T]](apiClient, pageURL.String()))
 	}
 
 	errs := tasker.RunTasks(
@@ -157,10 +158,11 @@ func getAllResourcesPaginated[T any](ctx context.Context, apiClient *client.Clie
 	}
 
 	allItems := make([]T, 0, firstPage.Total)
-	for _, key := range results.GetKeys() {
-		item, ok := results.Get(key)
+	allItems = append(allItems, firstPage.Data...)
+	for _, task := range tasks {
+		item, ok := results.Get(task.Id())
 		if !ok {
-			return nil, fmt.Errorf("item %s not found in results", key)
+			return nil, fmt.Errorf("item %s not found in results", task.Id())
 		}
 
 		allItems = append(allItems, item.Data...)
