@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
@@ -373,6 +372,9 @@ spec:
 	rule := NewSecretReferenceRule(secretRuleRegistry(t)).(vrules.SourceRule)
 
 	results := rule.ValidateSources(sourceContexts(map[string][]byte{"dest.yaml": source}))
-	require.Len(t, results["dest.yaml"], 1)
-	assert.Equal(t, "/spec/config/api_key", results["dest.yaml"][0].Reference)
+	assert.Equal(t, map[string][]vrules.ValidationResult{"dest.yaml": {{
+		Reference: "/spec/config/api_key",
+		Message:   `secret key "api_key" must hold only a variable reference with no default, such as '{{ .SHOP_AMPLITUDE_API_KEY }}'; set the value in a var file or a RUDDER_ environment variable`,
+		Sensitive: true,
+	}}}, results)
 }

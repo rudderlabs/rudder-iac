@@ -905,8 +905,14 @@ func TestValidationEngine_ValidateSources(t *testing.T) {
 			"/path/to/broken.yaml": {Data: []byte("spec: [unclosed\n")},
 		})
 		require.NoError(t, err)
-		require.Len(t, diagnostics, 1)
-		assert.Equal(t, pathindex.StartingPosition, diagnostics[0].Position)
+		assert.Equal(t, Diagnostics{{
+			RuleID:   "source-rule",
+			Severity: rules.Warning,
+			Message:  "token as written",
+			File:     "/path/to/broken.yaml",
+			Position: pathindex.StartingPosition,
+			Examples: rules.Examples{},
+		}}, diagnostics)
 	})
 
 	t.Run("results for an unknown file fail", func(t *testing.T) {
