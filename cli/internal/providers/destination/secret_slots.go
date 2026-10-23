@@ -63,29 +63,20 @@ func readSecretSlots(registry *definitions.Registry, file string, source []byte)
 		destination = fmt.Sprintf("the destination in %q", file)
 	}
 
-	// MaskSecrets rewrites each secret value as the reference import writes for
-	// it, so masking a second copy of the config yields the suggested names
-	// without restating the naming rule here. A missing id, which the syntax
-	// rule reports, would give names with no prefix, so it gets none.
-	masked, _ := readSourceSpec(replaced.Data)
-	if id == "" || secret.MaskSecrets(masked.config, id, secretKeys) != nil {
-		masked.config = nil
-	}
-
 	var slots []secretSlot
-	for _, value := range secretValues(spec.config, masked.config, secretKeys) {
-		if value.value == nil || value.value == "" || readsEvent(value.value) {
-			continue
+	secret.WalkSecrets(spec.config, secretKeys, func(segments []string, value any) {
+		if value == nil || value == "" || readsEvent(value) {
+			return
 		}
 
 		slot := secretSlot{
 			file:        file,
 			destination: destination,
-			key:         value.key,
-			reference:   "/spec/config" + value.reference,
-			suggested:   referencedVariable(value.masked),
+			key:         secretKeyName(segments),
+			reference:   "/spec/config/" + strings.Join(segments, "/"),
+			suggested:   suggestedVariable(id, segments),
 		}
-		if s, ok := value.value.(string); ok {
+		if s, ok := value.(string); ok {
 			if ref, ok := replaced.Reference(s); ok {
 				if ref.HasDefault {
 					slot.defaulted = ref.Name
@@ -95,8 +86,42 @@ func readSecretSlots(registry *definitions.Registry, file string, source []byte)
 			}
 		}
 		slots = append(slots, slot)
-	}
+	})
 	return slots
+}
+
+// secretKeyName writes the segments that lead to a secret value as messages
+// name the key, with list indexes in brackets, such as "headers[0].to".
+// Registration requires secret keys in snake_case, so a segment that is a
+// number is a list index.
+func secretKeyName(segments []string) string {
+	var b strings.Builder
+	for _, segment := range segments {
+		if _, err := strconv.Atoi(segment); err == nil {
+			fmt.Fprintf(&b, "[%s]", segment)
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteString(".")
+		}
+		b.WriteString(segment)
+	}
+	return b.String()
+}
+
+// suggestedVariable is the variable import writes for the secret value
+// segments lead to in the spec with id. A missing id, which the syntax rule
+// reports, would give a name with no prefix, and an id that makes no valid
+// variable name would make import fail, so neither gets a suggestion.
+func suggestedVariable(id string, segments []string) string {
+	if id == "" {
+		return ""
+	}
+	name := secret.VariableName(id, segments...)
+	if !varsubst.IsValidVariableName(name) {
+		return ""
+	}
+	return name
 }
 
 // specSecretKeys returns the secret keys of the definition the spec names.
@@ -178,76 +203,6 @@ func readSourceSpec(data []byte) (sourceSpec, bool) {
 		definitionVersion: int64(definitionVersion),
 		config:            config,
 	}, true
-}
-
-// secretValue is one value a secret key resolves to.
-type secretValue struct {
-	reference string // JSON pointer relative to config
-	key       string
-	value     any
-	masked    any // the same value in the config MaskSecrets rewrote
-}
-
-// secretValues resolves each secret key against config the way the secret
-// package does: a map descends into the named key and a list fans out to every
-// member. masked is walked in step with config.
-func secretValues(config, masked map[string]any, secretKeys []string) []secretValue {
-	var values []secretValue
-	for _, secretKey := range secretKeys {
-		values = appendSecretValues(values, config, masked, strings.Split(secretKey, "."), "", "")
-	}
-	return values
-}
-
-func appendSecretValues(values []secretValue, config, masked map[string]any, path []string, reference, key string) []secretValue {
-	if len(path) == 0 || path[0] == "" {
-		return values
-	}
-
-	name := path[0]
-	value, ok := config[name]
-	if !ok {
-		return values
-	}
-
-	reference += "/" + name
-	if key != "" {
-		key += "."
-	}
-	key += name
-
-	if len(path) == 1 {
-		return append(values, secretValue{reference: reference, key: key, value: value, masked: masked[name]})
-	}
-	return appendNestedSecretValues(values, value, masked[name], path[1:], reference, key)
-}
-
-func appendNestedSecretValues(values []secretValue, value, masked any, path []string, reference, key string) []secretValue {
-	switch v := value.(type) {
-	case []any:
-		maskedItems, _ := masked.([]any)
-		for i, item := range v {
-			var maskedItem any
-			if i < len(maskedItems) {
-				maskedItem = maskedItems[i]
-			}
-			values = appendNestedSecretValues(values, item, maskedItem, path, fmt.Sprintf("%s/%d", reference, i), fmt.Sprintf("%s[%d]", key, i))
-		}
-	case map[string]any:
-		maskedMap, _ := masked.(map[string]any)
-		values = appendSecretValues(values, v, maskedMap, path, reference, key)
-	}
-	return values
-}
-
-// referencedVariable returns the variable a "{{ .NAME }}" reference names.
-func referencedVariable(value any) string {
-	token, _ := value.(string)
-	refs := varsubst.ReplaceReferences([]byte(token)).References
-	if len(refs) != 1 {
-		return ""
-	}
-	return refs[0].Name
 }
 
 // showsSecret reports whether the line validate prints for a result at
