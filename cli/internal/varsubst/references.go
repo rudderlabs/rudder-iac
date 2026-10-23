@@ -2,7 +2,6 @@ package varsubst
 
 import (
 	"bytes"
-	"fmt"
 	"strconv"
 	"strings"
 )
@@ -26,16 +25,18 @@ type Replaced struct {
 	// prefix starts every placeholder. It does not occur in the spec as
 	// written, so a literal is never read as a placeholder.
 	prefix string
+	// byPlaceholder maps each placeholder in Data to its reference.
+	byPlaceholder map[string]Reference
 }
 
-// placeholderPrefix starts a placeholder. The form is a plain YAML string that
-// a spec is unlikely to hold, and ReplaceReferences lengthens it when the spec
-// holds it anyway.
-const placeholderPrefix = "__rudder_variable_reference_"
-
-func (r Replaced) placeholder(index int) string {
-	return fmt.Sprintf("%s%d__", r.prefix, index)
-}
+// A placeholder is placeholderPrefix, the reference's index and
+// placeholderSuffix. The form is a plain YAML string that a spec is unlikely
+// to hold, and ReplaceReferences lengthens the prefix when the spec holds it
+// anyway.
+const (
+	placeholderPrefix = "__rudder_variable_reference_"
+	placeholderSuffix = "__"
+)
 
 // ReplaceReferences returns a copy of data with every {{ .NAME }} token that
 // substitution would resolve swapped for a numbered placeholder. Tokens in YAML
@@ -46,7 +47,7 @@ func (r Replaced) placeholder(index int) string {
 // flow mapping, so a spec holding one may not parse until substitution runs,
 // while a placeholder parses as a plain string wherever the token stood.
 func ReplaceReferences(data []byte) Replaced {
-	replaced := Replaced{prefix: placeholderPrefix}
+	replaced := Replaced{prefix: placeholderPrefix, byPlaceholder: make(map[string]Reference)}
 	for bytes.Contains(data, []byte(replaced.prefix)) {
 		replaced.prefix = "_" + replaced.prefix
 	}
@@ -65,9 +66,13 @@ func ReplaceReferences(data []byte) Replaced {
 			continue
 		}
 
+		ref := Reference{Name: name, HasDefault: match[4] != -1}
+		placeholder := replaced.prefix + strconv.Itoa(len(replaced.References)) + placeholderSuffix
+		replaced.byPlaceholder[placeholder] = ref
+		replaced.References = append(replaced.References, ref)
+
 		out = append(out, data[last:start]...)
-		out = append(out, replaced.placeholder(len(replaced.References))...)
-		replaced.References = append(replaced.References, Reference{Name: name, HasDefault: match[4] != -1})
+		out = append(out, placeholder...)
 		last = end
 	}
 	replaced.Data = append(out, data[last:]...)
@@ -77,19 +82,8 @@ func ReplaceReferences(data []byte) Replaced {
 // Reference returns the reference that value stands for when value is exactly
 // one placeholder, with nothing around it. value comes from parsing Data.
 func (r Replaced) Reference(value string) (Reference, bool) {
-	digits, ok := strings.CutPrefix(value, r.prefix)
-	if !ok {
-		return Reference{}, false
-	}
-	digits, ok = strings.CutSuffix(digits, "__")
-	if !ok {
-		return Reference{}, false
-	}
-	index, err := strconv.Atoi(digits)
-	if err != nil || index < 0 || index >= len(r.References) || r.placeholder(index) != value {
-		return Reference{}, false
-	}
-	return r.References[index], true
+	ref, ok := r.byPlaceholder[value]
+	return ref, ok
 }
 
 // HoldsReference reports whether value holds a placeholder, alone or with
