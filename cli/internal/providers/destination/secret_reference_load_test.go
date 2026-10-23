@@ -11,9 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs/docstest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
@@ -37,18 +38,26 @@ func renderLoad(t *testing.T, files map[string]string, variables map[string]stri
 func renderLoadWith(t *testing.T, newRenderer func(io.Writer) renderer.Renderer, files map[string]string, variables map[string]string) (string, error) {
 	t.Helper()
 
+	var out bytes.Buffer
+	err := docstest.Load(
+		destinationProvider(t, destination.SecretRuleRegistry(t)),
+		files,
+		varsubst.NewSubstitutor(mapResolver(variables)),
+		newRenderer(&out),
+	)
+	return out.String(), err
+}
+
+// destinationProvider is the provider validate builds, with the destination
+// provider alone.
+func destinationProvider(t *testing.T, registry *definitions.Registry) provider.Provider {
+	t.Helper()
+
 	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
-		"destination": destination.NewProvider(nil, destination.SecretRuleRegistry(t)),
+		"destination": destination.NewProvider(nil, registry),
 	})
 	require.NoError(t, err)
-
-	var out bytes.Buffer
-	err = project.New(cp,
-		project.WithLoader(memoryFiles(files)),
-		project.WithRenderer(newRenderer(&out)),
-		project.WithSubstitutor(varsubst.NewSubstitutor(mapResolver(variables))),
-	).Load("example")
-	return out.String(), err
+	return cp
 }
 
 const amplitudeWithLiteral = `version: rudder/v1
