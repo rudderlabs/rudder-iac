@@ -50,6 +50,13 @@ func TestSecretReferenceRuleDocs(t *testing.T) {
 
 					diagnostics, err := docstest.LoadDiagnostics(destinationProvider(t, registry), example.Files, filledVarFile)
 					docstest.AssertExpectedDiagnostics(t, entry.RuleID, example, diagnostics, err)
+					// The shared check lets an expected diagnostic come from
+					// another rule, which some rETL examples need. These
+					// examples document one rule each, so every diagnostic
+					// must come from it.
+					for _, d := range diagnostics {
+						assert.Equal(t, entry.RuleID, d.RuleID, "diagnostics:\n%s", docstest.Describe(diagnostics))
+					}
 				})
 			}
 		}
