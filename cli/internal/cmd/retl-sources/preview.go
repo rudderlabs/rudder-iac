@@ -7,6 +7,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/previewer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
 	"github.com/spf13/cobra"
 )
 
@@ -58,6 +60,12 @@ func newCmdPreview() *cobra.Command {
 			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
 				return err
+			}
+
+			// Under --json stdout holds only the rows, so the diagnostics the
+			// load renders, warnings included, go to stderr.
+			if jsonOutput {
+				projectOpts = append(projectOpts, project.WithRenderer(renderer.NewTextRenderer(cmd.ErrOrStderr())))
 			}
 
 			p := d.NewProject(projectOpts...)

@@ -441,3 +441,50 @@ spec:
 		}
 	})
 }
+
+// TestPathIndex_MaskedPosition masks the line text the indexer builds for each
+// node kind, so the cases cannot drift from extractLineText.
+func TestPathIndex_MaskedPosition(t *testing.T) {
+	t.Parallel()
+
+	pi, err := NewPathIndexer([]byte(`config:
+  api_key: sk-fake-value
+  empty:
+  headers:
+    - from: X-Fake-Header
+      to: fake-header-value
+  tokens:
+    - fake-token
+    - 'sk_fake_PART1: PART2'
+  nested: {}
+`))
+	require.NoError(t, err)
+
+	cases := []struct {
+		path string
+		want string
+	}{
+		{path: "/config/api_key", want: "api_key: ***"},
+		{path: "/config/headers/0", want: "- from: ***"},
+		{path: "/config/headers/0/to", want: "to: ***"},
+		{path: "/config/tokens/0", want: "***"},
+		// A scalar list item has no key, so ": " inside its value is not one.
+		{path: "/config/tokens/1", want: "***"},
+		{path: "/config/empty", want: "empty: "},
+		{path: "/config/headers", want: "headers: [...]"},
+		{path: "/config", want: "config: {...}"},
+		{path: "/config/nested", want: "nested: {}"},
+		// A missing path prints its nearest ancestor's line, masked.
+		{path: "/config/headers/0/missing", want: "- from: ***"},
+		{path: "/missing", want: ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.path, func(t *testing.T) {
+			t.Parallel()
+
+			pos := pi.NearestPosition(tc.path)
+			assert.Equal(t, &Position{Line: pos.Line, Column: pos.Column, LineText: tc.want}, pi.MaskedPosition(tc.path))
+		})
+	}
+}

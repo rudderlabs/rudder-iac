@@ -74,3 +74,51 @@ func TestSubstitutionDiagnostics(t *testing.T) {
 		},
 	}, got)
 }
+
+func TestMaskSensitiveLines(t *testing.T) {
+	t.Parallel()
+
+	substitution := validation.Diagnostics{
+		{
+			RuleID:   "project/var-substitution",
+			File:     "dest.yaml",
+			Position: pathindex.Position{Line: 12, Column: 36, LineText: "    api_key: 'fake-literal-{{ .UNDEF }}'"},
+		},
+		{
+			RuleID:   "project/var-substitution",
+			File:     "dest.yaml",
+			Position: pathindex.Position{Line: 13, Column: 18, LineText: "    api_secret: '{{ .PW }}'"},
+		},
+		{
+			RuleID:   "project/var-substitution",
+			File:     "other.yaml",
+			Position: pathindex.Position{Line: 12, Column: 18, LineText: "    api_key: '{{ .OTHER }}'"},
+		},
+	}
+	sensitive := validation.Diagnostics{
+		{
+			RuleID:    "destination/secret-reference",
+			File:      "dest.yaml",
+			Position:  pathindex.Position{Line: 12, Column: 5, LineText: "api_key: ***"},
+			Sensitive: true,
+		},
+		{
+			RuleID:   "test/plain",
+			File:     "dest.yaml",
+			Position: pathindex.Position{Line: 13, Column: 5, LineText: "api_secret: '{{ .PW }}'"},
+		},
+	}
+
+	got := maskSensitiveLines(substitution, sensitive)
+
+	assert.Equal(t, validation.Diagnostics{
+		{
+			RuleID:   "project/var-substitution",
+			File:     "dest.yaml",
+			Position: pathindex.Position{Line: 12, Column: 36, LineText: "api_key: ***"},
+		},
+		substitution[1],
+		substitution[2],
+	}, got)
+	assert.Equal(t, "    api_key: 'fake-literal-{{ .UNDEF }}'", substitution[0].Position.LineText, "the input is left as it was")
+}

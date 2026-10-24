@@ -32,6 +32,33 @@ func TestIsDynamicConfigValue(t *testing.T) {
 	}
 }
 
+func TestTemplateFallback(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name         string
+		value        string
+		wantFallback string
+		wantOK       bool
+	}{
+		{name: "quoted fallback", value: `{{ message.userId || "anonymous" }}`, wantFallback: ` "anonymous" `, wantOK: true},
+		{name: "empty fallback", value: "{{ message.userId ||}}", wantFallback: "", wantOK: true},
+		{name: "last of several", value: "{{ message.a || message.b || fallback }}", wantFallback: " fallback ", wantOK: true},
+		{name: "iac variable", value: "{{ .API_SECRET }}", wantOK: false},
+		{name: "plain literal", value: "secret-value", wantOK: false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			fallback, ok := definitions.TemplateFallback(c.value)
+			assert.Equal(t, c.wantOK, ok)
+			assert.Equal(t, c.wantFallback, fallback)
+		})
+	}
+}
+
 func TestValidateConfigAllowsDynamicValues(t *testing.T) {
 	t.Parallel()
 
