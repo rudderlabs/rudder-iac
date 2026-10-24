@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // Reference is a {{ .NAME }} token as written in spec bytes.
@@ -106,4 +107,37 @@ func (r Replaced) Restore(text string) string {
 		text = strings.ReplaceAll(text, placeholder, ref.Text)
 	}
 	return text
+}
+
+// SourcePosition returns where a position in Data sits in the spec as
+// written. line and column are 1-indexed, with columns counted in characters,
+// as the YAML parser reports them. A placeholder and its reference differ in
+// length, and a reference may span lines, so a key that follows a reference
+// moves when the reference goes back.
+func (r Replaced) SourcePosition(line, column int) (int, int) {
+	before := string(r.Data[:offsetOf(r.Data, line, column)])
+	written := r.Restore(before)
+	if written == before {
+		return line, column
+	}
+	lineStart := strings.LastIndexByte(written, '\n') + 1
+	return strings.Count(written, "\n") + 1, utf8.RuneCountInString(written[lineStart:]) + 1
+}
+
+// offsetOf returns the byte offset in data of a 1-indexed line and column,
+// with columns counted in characters.
+func offsetOf(data []byte, line, column int) int {
+	offset := 0
+	for ; line > 1; line-- {
+		next := bytes.IndexByte(data[offset:], '\n')
+		if next < 0 {
+			return len(data)
+		}
+		offset += next + 1
+	}
+	for ; column > 1 && offset < len(data) && data[offset] != '\n'; column-- {
+		_, size := utf8.DecodeRune(data[offset:])
+		offset += size
+	}
+	return offset
 }

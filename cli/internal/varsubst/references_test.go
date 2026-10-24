@@ -159,3 +159,59 @@ func TestReplaced_Restore_LiteralPlaceholder(t *testing.T) {
 
 	assert.Equal(t, "literal: __rudder_variable_reference_0__", replaced.Restore("literal: __rudder_variable_reference_0__"))
 }
+
+// Every key the parser finds in the placeholder copy maps back to where the
+// parser places it in the spec as written: after references longer or shorter
+// than their placeholders, after a default holding a character wider than a
+// byte, and below a reference that spans two lines.
+func TestReplaced_SourcePosition(t *testing.T) {
+	input := []byte("a: '{{ .A }}'\n" +
+		"b: {from: '{{ .HDR_NAME }}', to: '{{ .SHARED }}', at: 1}\n" +
+		"c: {x: '{{ .X | \"é\" }}', y: 2}\n" +
+		"d: '{{ .D |\n  \"multi\" }}'\n" +
+		"e: {z: 3}\n")
+	replaced := ReplaceReferences(input)
+	require.Len(t, replaced.References, 5)
+
+	written, placeholders := keyPositions(t, input), keyPositions(t, replaced.Data)
+	require.Len(t, placeholders, len(written))
+	for key, position := range placeholders {
+		line, column := replaced.SourcePosition(position[0], position[1])
+		assert.Equal(t, written[key], [2]int{line, column}, key)
+	}
+
+	// These keys sit elsewhere in the placeholder copy, so the loop checks
+	// more than positions that stay put.
+	var moved []string
+	for key, position := range placeholders {
+		if position != written[key] {
+			moved = append(moved, key)
+		}
+	}
+	assert.ElementsMatch(t, []string{"b/to", "b/at", "c/y", "e", "e/z"}, moved)
+}
+
+// keyPositions returns the line and column of every mapping key in data, keyed
+// by its path.
+func keyPositions(t *testing.T, data []byte) map[string][2]int {
+	t.Helper()
+
+	var document yaml.Node
+	require.NoError(t, yaml.Unmarshal(data, &document))
+
+	positions := make(map[string][2]int)
+	var walk func(node *yaml.Node, path string)
+	walk = func(node *yaml.Node, path string) {
+		if node.Kind != yaml.MappingNode {
+			return
+		}
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			key := node.Content[i]
+			keyPath := path + key.Value
+			positions[keyPath] = [2]int{key.Line, key.Column}
+			walk(node.Content[i+1], keyPath+"/")
+		}
+	}
+	walk(document.Content[0], "")
+	return positions
+}

@@ -277,10 +277,10 @@ func (e *validationEngine) ValidateSources(ctx context.Context, sources map[stri
 // sourceDiagnostics places a source rule's results in the source as written.
 // A source that is not YAML as written, such as one with an unquoted reference
 // followed by more text, is indexed with its references swapped for
-// placeholders: that copy parses, and the keys stay on their lines. Each line
-// a diagnostic shows is then given its references back, so no placeholder is
-// printed. When even that copy does not parse, results are placed at the start
-// of the file.
+// placeholders, since that copy parses. Each position found in that copy is
+// then mapped back to the source, and each line a diagnostic shows is given
+// its references back, so no placeholder is printed. When even that copy does
+// not parse, results are placed at the start of the file.
 func sourceDiagnostics(rule rules.Rule, file string, source *specs.RawSpec, replaced varsubst.Replaced, results []rules.ValidationResult) (Diagnostics, error) {
 	if pi, err := source.PathIndexer(); err == nil {
 		return ruleDiagnostics(rule, file, pi, results)
@@ -295,7 +295,9 @@ func sourceDiagnostics(rule rules.Rule, file string, source *specs.RawSpec, repl
 		return nil, err
 	}
 	for i := range diagnostics {
-		diagnostics[i].Position.LineText = replaced.Restore(diagnostics[i].Position.LineText)
+		position := &diagnostics[i].Position
+		position.Line, position.Column = replaced.SourcePosition(position.Line, position.Column)
+		position.LineText = replaced.Restore(position.LineText)
 	}
 	return diagnostics, nil
 }

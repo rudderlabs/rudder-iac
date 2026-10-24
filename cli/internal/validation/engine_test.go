@@ -843,8 +843,10 @@ func TestValidationEngine_ValidateSources(t *testing.T) {
 
 		// "/hook" after the unquoted reference is not YAML until substitution.
 		// A masked line shows no value, and an unmasked one shows each
-		// reference as written, never its placeholder.
-		source := sourceWithReferences + "  url: {{ .HOST }}/hook\n"
+		// reference as written, never its placeholder. A key after a reference
+		// on its line keeps its column as written, though the placeholder
+		// before it is longer than the reference.
+		source := sourceWithReferences + "  url: {{ .HOST }}/hook\n  pair: {from: '{{ .FROM }}', to: x}\n"
 		sr := &mockSourceRule{
 			mockRule: mockRule{id: "source-rule", severity: rules.Warning, appliesTo: []rules.MatchPattern{rules.MatchKind("properties")}},
 			validateSourcesFn: func(map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
@@ -853,6 +855,7 @@ func TestValidationEngine_ValidateSources(t *testing.T) {
 						{Reference: "/spec/group", Message: "group as written"},
 						{Reference: "/spec/token", Message: "token as written", Sensitive: true},
 						{Reference: "/spec/url", Message: "url as written"},
+						{Reference: "/spec/pair/to", Message: "to as written"},
 					},
 				}
 			},
@@ -882,6 +885,7 @@ func TestValidationEngine_ValidateSources(t *testing.T) {
 			diagnostic("group as written", pathindex.Position{Line: 6, Column: 3, LineText: "group: {{ .GROUP }}"}, false),
 			diagnostic("token as written", pathindex.Position{Line: 7, Column: 3, LineText: "token: ***"}, true),
 			diagnostic("url as written", pathindex.Position{Line: 8, Column: 3, LineText: "url: {{ .HOST }}/hook"}, false),
+			diagnostic("to as written", pathindex.Position{Line: 9, Column: 31, LineText: "to: x"}, false),
 		}, diagnostics)
 	})
 
