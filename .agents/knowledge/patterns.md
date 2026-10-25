@@ -262,3 +262,9 @@
 - Every CLI command under `cli/internal/cmd` that constructs a project with `Deps.NewProject` and then calls `Project.Load` should expose the shared repeatable `--var-file` flag, build options with `app.NewProjectOptions(varFiles)`, and pass those options to `NewProject` before loading. This keeps substitution behavior aligned across apply, validate, transformations test, data-graphs validate, and RETL source validate/preview; bare `NewProject()` calls in project-loading commands are a regression signal.
 - When one command prints a pasteable invocation of another command, preserve project-load context in the hint. In particular, `retl-sources validate` forwards each `--var-file` to its suggested `retl-sources preview` command in original precedence order and shell-quotes each path.
 - Var-file paths may contain environment or secret context and must not be sent to telemetry or logs. If telemetry is needed, record only the number of files rather than their paths.
+
+## DEX-1082 — Destination Config Rejects Nulls At Validate
+<!-- ticket:DEX-1082 -->
+- `RegisteredDefinition.ValidateConfig` rejects a null anywhere in destination `config` (a top-level key, a key inside a list item, or a list item) with `'<key>' must not be null; set a value or remove the key`. `consent_management` is skipped because its own shape checks already reject nulls with type-specific messages.
+- This mirrors schema.json: no registered destination's schema admits null (all 50 types scanned on 2026-10-25). A property that does would need an opt-out in `findNullValues` plus a converter that sends the null rather than dropping it.
+- Do not drop nulls in the converter instead. The plan compares the raw spec config against the remote, so a null the CLI drops before sending still diffs against a remote that never stores the key, and a null on a defaulted key also blocks `ApplyDefaults`, which only fills absent keys. Either way the destination re-applies on every plan.

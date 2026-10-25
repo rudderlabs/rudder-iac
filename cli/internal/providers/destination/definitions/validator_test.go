@@ -542,6 +542,78 @@ func registerTestDefinition(t *testing.T) *definitions.RegisteredDefinition {
 	return registered
 }
 
+func TestValidateConfigRejectsNullValues(t *testing.T) {
+	t.Parallel()
+
+	type mapping struct {
+		From string `mapstructure:"from"`
+		To   string `mapstructure:"to"`
+	}
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "TEST",
+		DisplayName: "Test",
+		Version:     1,
+		SourceTypes: []string{"web"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+		},
+		NewConfig: func() any {
+			return &struct {
+				Name              string                   `mapstructure:"name"`
+				Enabled           *bool                    `mapstructure:"enabled"`
+				Mappings          []mapping                `mapstructure:"mappings"`
+				Tags              []string                 `mapstructure:"tags"`
+				ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
+			}{}
+		},
+	}))
+	registered, err := registry.Get("TEST", 1)
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name   string
+		config map[string]any
+		want   []definitions.ConfigError
+	}{
+		{
+			name:   "top-level null",
+			config: map[string]any{"name": nil},
+			want:   []definitions.ConfigError{{Path: "/name", Message: "'name' must not be null; set a value or remove the key"}},
+		},
+		{
+			name:   "null inside a list item",
+			config: map[string]any{"mappings": []any{map[string]any{"from": nil, "to": "some_event"}}},
+			want:   []definitions.ConfigError{{Path: "/mappings/0/from", Message: "'from' must not be null; set a value or remove the key"}},
+		},
+		{
+			name:   "null list item",
+			config: map[string]any{"tags": []any{"a", nil}},
+			want:   []definitions.ConfigError{{Path: "/tags/1", Message: "list item must not be null; remove it"}},
+		},
+		{
+			name: "zero values pass",
+			config: map[string]any{
+				"name":     "",
+				"enabled":  false,
+				"mappings": []any{map[string]any{"from": "", "to": ""}},
+				"tags":     []any{},
+			},
+		},
+		{
+			name:   "null consent_management reported once",
+			config: map[string]any{"consent_management": nil},
+			want:   []definitions.ConfigError{{Path: "/consent_management", Message: "'consent_management' must be an object"}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.ElementsMatch(t, tc.want, registered.ValidateConfig(tc.config))
+		})
+	}
+}
+
 func assertConfigError(t *testing.T, errors []definitions.ConfigError, path, message string) {
 	t.Helper()
 
