@@ -91,11 +91,13 @@ func validateConsentEntryShape(basePath string, raw any) []ConfigError {
 	}
 
 	var errors []ConfigError
-	if provider, exists := entry["provider"]; exists && provider == nil {
-		errors = append(errors, ConfigError{
-			Path:    joinConfigPath(basePath, "provider"),
-			Message: "'provider' must be a string",
-		})
+	for _, key := range []string{"provider", "resolution_strategy"} {
+		if value, exists := entry[key]; exists && value == nil {
+			errors = append(errors, ConfigError{
+				Path:    joinConfigPath(basePath, key),
+				Message: fmt.Sprintf("'%s' must be a string", key),
+			})
+		}
 	}
 	errors = append(errors, validateConsentValuesShape(basePath, entry)...)
 	return errors

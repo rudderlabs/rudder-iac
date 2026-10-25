@@ -565,6 +565,7 @@ func TestValidateConfigRejectsNullValues(t *testing.T) {
 				Enabled           *bool                    `mapstructure:"enabled"`
 				Mappings          []mapping                `mapstructure:"mappings"`
 				Tags              []string                 `mapstructure:"tags"`
+				ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
 				ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
 			}{}
 		},
@@ -606,6 +607,23 @@ func TestValidateConfigRejectsNullValues(t *testing.T) {
 			name:   "null consent_management reported once",
 			config: map[string]any{"required_name": "valid", "consent_management": nil},
 			want:   []definitions.ConfigError{{Path: "/consent_management", Message: "'consent_management' must be an object"}},
+		},
+		{
+			name: "null resolution_strategy on a non-custom provider",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{
+				"web": []any{map[string]any{"provider": "ketch", "resolution_strategy": nil, "consents": []any{"analytics"}}},
+			}},
+			want: []definitions.ConfigError{{Path: "/consent_management/web/0/resolution_strategy", Message: "'resolution_strategy' must be a string"}},
+		},
+		{
+			name:   "null connection_mode reported once",
+			config: map[string]any{"required_name": "valid", "connection_mode": nil},
+			want:   []definitions.ConfigError{{Path: "/connection_mode", Message: "'connection_mode' must not be null; set a value or remove the key"}},
+		},
+		{
+			name:   "null connection_mode value reported once",
+			config: map[string]any{"required_name": "valid", "connection_mode": map[string]any{"web": nil}},
+			want:   []definitions.ConfigError{{Path: "/connection_mode/web", Message: "'web' must not be null; set a value or remove the key"}},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

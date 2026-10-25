@@ -265,6 +265,5 @@
 
 ## DEX-1082 — Destination Config Rejects Nulls At Validate
 <!-- ticket:DEX-1082 -->
-- `RegisteredDefinition.ValidateConfig` rejects a null anywhere in destination `config` (a top-level key, a key inside a list item, or a list item) with `'<key>' must not be null; set a value or remove the key`. `consent_management` is skipped because its own shape checks already reject nulls with type-specific messages.
-- This mirrors schema.json: no registered destination's schema admits null (all 50 types scanned on 2026-10-25). A property that does would need an opt-out in `findNullValues` plus a converter that sends the null rather than dropping it.
+- `RegisteredDefinition.ValidateConfig` rejects a null anywhere in destination `config` (a top-level key, a key inside a list item, or a list item) with `'<key>' must not be null; set a value or remove the key`. `consent_management` is skipped because its own shape checks already reject nulls with type-specific messages. Later errors at a null's path or below it are dropped, so a null on a required key reports once.
 - Do not drop nulls in the converter instead. The plan compares the raw spec config against the remote, so a null the CLI drops before sending still diffs against a remote that never stores the key, and a null on a defaulted key also blocks `ApplyDefaults`, which only fills absent keys. Either way the destination re-applies on every plan.
