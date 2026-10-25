@@ -5,6 +5,7 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+	"strings"
 )
 
 // findNullValues reports every null in a spec's config. No destination
@@ -45,4 +46,19 @@ func findNullValues(value any, basePath string) []ConfigError {
 	default:
 		return nil
 	}
+}
+
+// errorsOutsideNullPaths keeps the explicit null error authoritative for that
+// value. Decoding null into a Go zero value can otherwise make model validation
+// report a second, misleading error for the same path or one of its children.
+func errorsOutsideNullPaths(errors, nullErrors []ConfigError) []ConfigError {
+	if len(nullErrors) == 0 {
+		return errors
+	}
+
+	return slices.DeleteFunc(errors, func(configError ConfigError) bool {
+		return slices.ContainsFunc(nullErrors, func(nullError ConfigError) bool {
+			return configError.Path == nullError.Path || strings.HasPrefix(configError.Path, nullError.Path+"/")
+		})
+	})
 }

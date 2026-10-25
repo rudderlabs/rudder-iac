@@ -561,6 +561,7 @@ func TestValidateConfigRejectsNullValues(t *testing.T) {
 		NewConfig: func() any {
 			return &struct {
 				Name              string                   `mapstructure:"name"`
+				RequiredName      string                   `mapstructure:"required_name" validate:"required"`
 				Enabled           *bool                    `mapstructure:"enabled"`
 				Mappings          []mapping                `mapstructure:"mappings"`
 				Tags              []string                 `mapstructure:"tags"`
@@ -578,31 +579,32 @@ func TestValidateConfigRejectsNullValues(t *testing.T) {
 	}{
 		{
 			name:   "top-level null",
-			config: map[string]any{"name": nil},
-			want:   []definitions.ConfigError{{Path: "/name", Message: "'name' must not be null; set a value or remove the key"}},
+			config: map[string]any{"required_name": nil},
+			want:   []definitions.ConfigError{{Path: "/required_name", Message: "'required_name' must not be null; set a value or remove the key"}},
 		},
 		{
 			name:   "null inside a list item",
-			config: map[string]any{"mappings": []any{map[string]any{"from": nil, "to": "some_event"}}},
+			config: map[string]any{"required_name": "valid", "mappings": []any{map[string]any{"from": nil, "to": "some_event"}}},
 			want:   []definitions.ConfigError{{Path: "/mappings/0/from", Message: "'from' must not be null; set a value or remove the key"}},
 		},
 		{
 			name:   "null list item",
-			config: map[string]any{"tags": []any{"a", nil}},
+			config: map[string]any{"required_name": "valid", "tags": []any{"a", nil}},
 			want:   []definitions.ConfigError{{Path: "/tags/1", Message: "list item must not be null; remove it"}},
 		},
 		{
 			name: "zero values pass",
 			config: map[string]any{
-				"name":     "",
-				"enabled":  false,
-				"mappings": []any{map[string]any{"from": "", "to": ""}},
-				"tags":     []any{},
+				"name":          "",
+				"required_name": "valid",
+				"enabled":       false,
+				"mappings":      []any{map[string]any{"from": "", "to": ""}},
+				"tags":          []any{},
 			},
 		},
 		{
 			name:   "null consent_management reported once",
-			config: map[string]any{"consent_management": nil},
+			config: map[string]any{"required_name": "valid", "consent_management": nil},
 			want:   []definitions.ConfigError{{Path: "/consent_management", Message: "'consent_management' must be an object"}},
 		},
 	} {

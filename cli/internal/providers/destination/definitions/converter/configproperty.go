@@ -298,17 +298,25 @@ func GetAPIValue(localValue []any, fields map[string]any) []any {
 	for _, i := range localValue {
 		av := map[string]any{}
 
-		tv, ok := i.(map[string]any)
-		if !ok {
-			continue
-		}
+		if tv, ok := i.(map[string]any); ok {
+			for localField, localFieldValue := range tv {
+				switch fieldVal := fields[localField].(type) {
+				case string:
+					av[fieldVal] = localFieldValue
+				case localNestedObject:
+					tfValues := []any{}
+					apiKey := fieldVal.APIKey
+					nestedKey := fieldVal.NestedKey
 
-		for localField, localFieldValue := range tv {
-			if localFieldValue == nil {
-				continue
+					for _, nestedVal := range localFieldValue.([]any) {
+						nestedObj := map[string]any{
+							nestedKey: nestedVal,
+						}
+						tfValues = append(tfValues, nestedObj)
+					}
+					av[apiKey] = tfValues
+				}
 			}
-
-			setAPIValue(av, fields[localField], localFieldValue)
 		}
 
 		if len(av) > 0 {
@@ -316,19 +324,6 @@ func GetAPIValue(localValue []any, fields map[string]any) []any {
 		}
 	}
 	return contents
-}
-
-func setAPIValue(apiRow map[string]any, field, localValue any) {
-	switch fieldVal := field.(type) {
-	case string:
-		apiRow[fieldVal] = localValue
-	case localNestedObject:
-		nestedValues := []any{}
-		for _, nestedValue := range localValue.([]any) {
-			nestedValues = append(nestedValues, map[string]any{fieldVal.NestedKey: nestedValue})
-		}
-		apiRow[fieldVal.APIKey] = nestedValues
-	}
 }
 
 func applyFilters(a any, filters []ValueFilter) bool {

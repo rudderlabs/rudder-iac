@@ -86,11 +86,12 @@ type RegisteredDefinition struct {
 // ValidateConfig validates config with its defaults applied, since that is what
 // apply sends: a default can satisfy a conditional requirement or trigger one.
 func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigError {
-	errors := findNullValues(config, "")
+	nullErrors := findNullValues(config, "")
 	config = d.ApplyDefaults(config)
-	errors = append(errors, validateConfigModel(config, d.configType, "", d.ConfigValidateFuncs...)...)
+	errors := validateConfigModel(config, d.configType, "", d.ConfigValidateFuncs...)
 	errors = append(errors, d.validateConsentManagement(config)...)
-	return append(errors, d.validateConnectionMode(config)...)
+	errors = append(errors, d.validateConnectionMode(config)...)
+	return append(nullErrors, errorsOutsideNullPaths(errors, nullErrors)...)
 }
 
 func (d *RegisteredDefinition) LocalToAPI(local map[string]any) (map[string]any, error) {
