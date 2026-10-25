@@ -263,7 +263,8 @@
 - When one command prints a pasteable invocation of another command, preserve project-load context in the hint. In particular, `retl-sources validate` forwards each `--var-file` to its suggested `retl-sources preview` command in original precedence order and shell-quotes each path.
 - Var-file paths may contain environment or secret context and must not be sent to telemetry or logs. If telemetry is needed, record only the number of files rather than their paths.
 
-## DEX-1082 — Array-With-Objects Null Leaf Omission
-
-- `converter.GetAPIValue` treats explicit nil leaves inside `ArrayWithObjects` rows as missing and omits only those leaves before destination create/update payloads are sent; this shared conversion boundary prevents backend string-type errors without adding destination-specific nested-required validation.
-- Preserve non-nil empty strings, false, zero, and empty collections because they can be meaningful destination values. Existing sparse-row behavior remains authoritative: if omitting nil leaves leaves a row with no mapped fields, omit that row.
+## DEX-1082 — Destination Config Rejects Nulls At Validate
+<!-- ticket:DEX-1082 -->
+- `RegisteredDefinition.ValidateConfig` rejects a null anywhere in destination `config` (a top-level key, a key inside a list item, or a list item) with `'<key>' must not be null; set a value or remove the key`. `consent_management` is skipped because its own shape checks already reject nulls with type-specific messages.
+- This mirrors schema.json: no registered destination's schema admits null (all 50 types scanned on 2026-10-25). A property that does would need an opt-out in `findNullValues` plus a converter that sends the null rather than dropping it.
+- Do not drop nulls in the converter instead. The plan compares the raw spec config against the remote, so a null the CLI drops before sending still diffs against a remote that never stores the key, and a null on a defaulted key also blocks `ApplyDefaults`, which only fills absent keys. Either way the destination re-applies on every plan.
