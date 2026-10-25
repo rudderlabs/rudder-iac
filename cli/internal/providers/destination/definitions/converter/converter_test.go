@@ -317,6 +317,112 @@ func TestArrayWithObjects(t *testing.T) {
 	}`, s)
 }
 
+func TestArrayWithObjectsOmitsNullLeaf(t *testing.T) {
+	t.Parallel()
+
+	p := converter.ArrayWithObjects("customMappings", "custom_mappings", map[string]any{
+		"from": "from",
+		"to":   "to",
+	})
+
+	api, err := p.FromLocalFunc(`{}`, `{
+		"custom_mappings": [
+			{ "from": null, "to": "some_event_token" }
+		]
+	}`)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{
+		"customMappings": [
+			{ "to": "some_event_token" }
+		]
+	}`, api)
+}
+
+func TestArrayWithObjectsOmitsAllNullRow(t *testing.T) {
+	t.Parallel()
+
+	p := converter.ArrayWithObjects("customMappings", "custom_mappings", map[string]any{
+		"from": "from",
+		"to":   "to",
+	})
+
+	api, err := p.FromLocalFunc(`{}`, `{
+		"custom_mappings": [
+			{ "from": null, "to": null },
+			{ "from": "some_event", "to": "some_event_token" }
+		]
+	}`)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{
+		"customMappings": [
+			{ "from": "some_event", "to": "some_event_token" }
+		]
+	}`, api)
+}
+
+func TestArrayWithObjectsOmitsNullNestedObject(t *testing.T) {
+	t.Parallel()
+
+	p := converter.ArrayWithObjects("eventMappings", "event_mappings", map[string]any{
+		"event": "event",
+		"properties": converter.APINestedObject{
+			LocalKey:  "properties",
+			NestedKey: "name",
+		},
+	})
+
+	api, err := p.FromLocalFunc(`{}`, `{
+		"event_mappings": [
+			{ "event": "some_event", "properties": null }
+		]
+	}`)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{
+		"eventMappings": [
+			{ "event": "some_event" }
+		]
+	}`, api)
+}
+
+func TestArrayWithObjectsPreservesNonNullZeroValues(t *testing.T) {
+	t.Parallel()
+
+	p := converter.ArrayWithObjects("mappings", "mappings", map[string]any{
+		"emptyString": "empty_string",
+		"falseValue":  "false_value",
+		"zeroValue":   "zero_value",
+		"emptyArray":  "empty_array",
+		"nestedArray": converter.APINestedObject{
+			LocalKey:  "nested_array",
+			NestedKey: "value",
+		},
+	})
+
+	api, err := p.FromLocalFunc(`{}`, `{
+		"mappings": [
+			{
+				"empty_string": "",
+				"false_value": false,
+				"zero_value": 0,
+				"empty_array": [],
+				"nested_array": []
+			}
+		]
+	}`)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{
+		"mappings": [
+			{
+				"emptyString": "",
+				"falseValue": false,
+				"zeroValue": 0,
+				"emptyArray": [],
+				"nestedArray": []
+			}
+		]
+	}`, api)
+}
+
 func TestNestedSimplePath(t *testing.T) {
 	t.Parallel()
 

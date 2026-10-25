@@ -262,3 +262,8 @@
 - Every CLI command under `cli/internal/cmd` that constructs a project with `Deps.NewProject` and then calls `Project.Load` should expose the shared repeatable `--var-file` flag, build options with `app.NewProjectOptions(varFiles)`, and pass those options to `NewProject` before loading. This keeps substitution behavior aligned across apply, validate, transformations test, data-graphs validate, and RETL source validate/preview; bare `NewProject()` calls in project-loading commands are a regression signal.
 - When one command prints a pasteable invocation of another command, preserve project-load context in the hint. In particular, `retl-sources validate` forwards each `--var-file` to its suggested `retl-sources preview` command in original precedence order and shell-quotes each path.
 - Var-file paths may contain environment or secret context and must not be sent to telemetry or logs. If telemetry is needed, record only the number of files rather than their paths.
+
+## DEX-1082 — Array-With-Objects Null Leaf Omission
+
+- `converter.GetAPIValue` treats explicit nil leaves inside `ArrayWithObjects` rows as missing and omits only those leaves before destination create/update payloads are sent; this shared conversion boundary prevents backend string-type errors without adding destination-specific nested-required validation.
+- Preserve non-nil empty strings, false, zero, and empty collections because they can be meaningful destination values. Existing sparse-row behavior remains authoritative: if omitting nil leaves leaves a row with no mapped fields, omit that row.
