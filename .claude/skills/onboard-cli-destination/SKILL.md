@@ -124,14 +124,17 @@ Mechanical rules:
   converter-mapping.md "Do not skip zero values").
 - `Version` = terraform's registered `Version` (currently 1 everywhere).
 - `schema.json` constraints → `validate` struct tags (see source-extraction.md
-  for the constraint translation table). Real regex patterns →
-  `dynamic_or_pattern=<name>`: reuse an existing `NewPattern` registration, or
-  register a minimal new one. Strip upstream `env.` / `{{ … }}` alternations;
-  never bake those into the CLI regex — the tag accepts `{{ path || fallback }}`
-  templates, the pattern holds only the real constraint. Note `^(.{0,100})$` is
-  a pattern, not a length limit (it forbids newlines) — reuse the shared
-  `single_line_100` rather than `max=100`. Use plain `pattern=<name>` only to
-  reject templates too (see source-extraction.md "Enforcing regex patterns").
+  for the constraint translation table). Real regex patterns → a named
+  pattern: reuse an existing `NewPattern` registration, or register a minimal
+  new one. Tag it `dynamic_or_pattern=<name>` when schema.json wraps the regex
+  in a `{{ … || … }}` alternative (the usual shape), and plain `pattern=<name>`
+  when it declares the bare regex, since the backend rejects a template there
+  (see source-extraction.md "Let schema.json decide whether a value may be
+  dynamic"). Strip upstream `env.` / `{{ … }}` alternations; never bake those
+  into the CLI regex — the tag accepts `{{ path || fallback }}` templates, the
+  pattern holds only the real constraint. Note `^(.{0,100})$` is a pattern, not
+  a length limit (it forbids newlines) — reuse the shared `single_line_100`
+  rather than `max=100`.
 - `schema.json` `default` keywords → `default:"…"` struct tags (see
   source-extraction.md "Declaring defaults"). The backend applies these when it
   persists a destination, so a spec that omits the key must still carry it or
@@ -236,7 +239,8 @@ Mirror `definitions/s3/definition_test.go` exactly in structure:
 2. `Test<Type>ConfigValidation` — subtests via `registered.ValidateConfig`:
    each required field missing, each conditional/exclusion rule, each
    pattern-validated field with an invalid literal rejected and a
-   `{{ path || fallback }}` template accepted, valid minimal config,
+   `{{ path || fallback }}` template accepted (`dynamic_or_pattern`) or
+   rejected (`pattern`), valid minimal config,
    valid full config, unknown key rejected, and (when consent is supported)
    unsupported consent source + invalid provider.
 3. `Test<Type>ConversionRoundTrip` — `testutil.AssertConversion` with paired
