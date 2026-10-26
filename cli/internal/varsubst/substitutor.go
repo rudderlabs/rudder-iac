@@ -47,7 +47,7 @@ func IsValidVariableName(name string) bool {
 //     description text), so any `{{ .X }}`-shaped substring in a quoted value
 //     is treated as a variable reference.
 //   - Resolved values are injected verbatim, except that a multi-line value
-//     filling a quoted scalar keeps its line breaks (see
+//     filling a quoted scalar keeps its line breaks and backslashes (see
 //     restoreMultilineValues). Values containing YAML special characters, or
 //     content that parses as a different YAML type (`true`, `123`, `null`,
 //     sequences) can change the document's semantics. Callers that need to
@@ -247,6 +247,8 @@ func quotePlaceholders(data []byte, multiline map[string]string, quotes map[stri
 			// one-line value.
 			value = strings.ReplaceAll(value, "''", "'")
 		}
+		// A double-quoted slot gets the value as written: unlike a one-line
+		// value, its backslashes are not read as YAML escapes.
 		data = bytes.Replace(data, []byte(string(quote)+placeholder+string(quote)), []byte(strconv.Quote(value)), 1)
 	}
 	return data
