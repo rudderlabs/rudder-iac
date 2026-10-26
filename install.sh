@@ -150,8 +150,11 @@ main() {
   tar -xzf "$tmp/$archive" -C "$tmp" "$BIN" 2>/dev/null || fail "could not extract $BIN from $archive"
 
   # Copy next to the target first so the final rename never leaves a partial binary.
-  # The EXIT trap removes the copy if a step fails or the script is interrupted.
-  partial="$dir/.$BIN.tmp"
+  # mktemp gives each run its own copy, so two installs into one directory do not
+  # write the same file. The EXIT trap removes the copy if a step fails or the
+  # script is interrupted.
+  partial=$(mktemp "$dir/.$BIN.XXXXXX" 2>/dev/null) ||
+    fail "could not write to $dir; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
   { cp "$tmp/$BIN" "$partial" && chmod 755 "$partial" && mv -f "$partial" "$dir/$BIN"; } 2>/dev/null ||
     fail "could not write $dir/$BIN; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
   partial=""
@@ -160,24 +163,41 @@ main() {
   installed=$("$dir/$BIN" --version) || fail "installed $dir/$BIN but it failed to run${installed:+: $installed}"
   echo "Installed $installed at $dir/$BIN"
 
-  # Which binary a plain 'rudder-cli' starts in this shell. A PATH entry may end
-  # in a slash, and then some shells print the binary as dir//rudder-cli.
+  # Which binary a plain 'rudder-cli' starts in this shell. Shells print it as
+  # dir//rudder-cli for a PATH entry with a trailing slash, and as a relative or
+  # dir/./ path for a relative entry such as ./bin, so resolve its directory the
+  # same way as $dir above before comparing.
   found=$(command -v "$BIN" || true)
+  other_dir=""
+  if [ -n "$found" ]; then
+    other_dir=$(CDPATH='' cd -- "$(dirname -- "$found")" 2>/dev/null && pwd) || other_dir=""
+  fi
   other=""
-  case "$found" in
-    "$dir/$BIN" | "$dir//$BIN") ;;
-    /*)
-      other_dir=${found%/*}
-      other_dir=${other_dir%/}
+  case "$other_dir" in
+    "" | "$dir") ;;
+    *)
       # </dev/null keeps the other copy from reading the rest of a piped script.
-      other_version=$("$found" --version </dev/null 2>/dev/null) || other_version=""
+      other_version=$("$other_dir/$BIN" --version </dev/null 2>/dev/null) || other_version=""
       other="$other_dir/$BIN${other_version:+ ($other_version)}"
       ;;
   esac
 
   case "${SHELL:-}" in
     */zsh) profile=".zshrc" ;;
-    */bash) profile=".bashrc" ;;
+    */bash)
+      profile=".bashrc"
+      # Terminal on macOS starts bash as a login shell, which reads the first of
+      # these files that exists and never reads .bashrc on its own.
+      if [ "$os" = "Darwin" ]; then
+        profile=".bash_profile"
+        for f in .bash_profile .bash_login .profile; do
+          if [ -f "${HOME:-}/$f" ]; then
+            profile=$f
+            break
+          fi
+        done
+      fi
+      ;;
     *) profile=".profile" ;;
   esac
   path_line="export PATH=\"$dir:\$PATH\""
