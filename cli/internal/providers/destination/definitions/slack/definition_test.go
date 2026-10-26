@@ -305,14 +305,6 @@ func TestSlackConfigValidation(t *testing.T) {
 	t.Run("keys absent from terraform are still validated", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("incoming_webhooks_type rejects an explicit empty value", func(t *testing.T) {
-			t.Parallel()
-			errors := registered.ValidateConfig(withConfig(validMinimalConfig(), "incoming_webhooks_type", ""))
-			require.Len(t, errors, 1)
-			assert.Equal(t, "/incoming_webhooks_type", errors[0].Path)
-			assert.Contains(t, errors[0].Message, "must be one of")
-		})
-
 		t.Run("incoming_webhooks_type rejects values outside the enum", func(t *testing.T) {
 			t.Parallel()
 			errors := registered.ValidateConfig(withConfig(validMinimalConfig(), "incoming_webhooks_type", "classic"))

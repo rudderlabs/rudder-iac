@@ -113,13 +113,13 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 		return fmt.Sprintf("'%s' does not match the required pattern", fieldName)
 
 	case "oneof":
-		return fmt.Sprintf("'%s' must be one of [%s]", fieldName, err.Param())
+		return fmt.Sprintf("'%s' must be one of [%s]", fieldName, oneOfText(err.Param()))
 
 	case "dynamic_or_oneof":
 		return fmt.Sprintf(
 			"'%s' must be one of [%s] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})",
 			fieldName,
-			err.Param(),
+			oneOfText(err.Param()),
 		)
 
 	case "dynamic_or_pattern":
@@ -223,6 +223,12 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 	default:
 		return fmt.Sprintf("'%s' is not valid: %s", fieldName, err.Error())
 	}
+}
+
+// oneOfText renders a oneof parameter for a message, showing the empty member,
+// which a tag writes as a pair of single quotes, as "" the way the docs do.
+func oneOfText(param string) string {
+	return strings.ReplaceAll(param, "''", `""`)
 }
 
 // resolveFieldDisplayName is a helper function to help resolve the field display name

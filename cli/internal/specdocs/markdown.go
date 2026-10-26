@@ -1,6 +1,7 @@
 package specdocs
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"maps"
@@ -198,11 +199,7 @@ func allowedCell(f Field) string {
 		values := make([]string, 0, len(f.Enum))
 		for _, v := range f.Enum {
 			// An empty member would otherwise render as an empty code span.
-			if v == "" {
-				values = append(values, `""`)
-				continue
-			}
-			values = append(values, fmt.Sprint(v))
+			values = append(values, cmp.Or(fmt.Sprint(v), `""`))
 		}
 		text := codeList(values, ", ")
 		if f.OpenEnum {

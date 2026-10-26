@@ -79,9 +79,8 @@ type RegisteredDefinition struct {
 	configDefaults map[string]any
 	// fields and patterns are the described config model, built once at
 	// registration so a definition Describe cannot read fails to register.
-	fields     []Field
-	enumFields []Field
-	patterns   map[string]funcs.PatternInfo
+	fields   []Field
+	patterns map[string]funcs.PatternInfo
 }
 
 // ValidateConfig validates config with its defaults applied, since that is what
@@ -89,7 +88,7 @@ type RegisteredDefinition struct {
 func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigError {
 	// A null under an unknown key isn't reported: removing the key fixes both.
 	nullErrors := errorsOutside(findNullValues(config, ""), findUnknownKeys(config, d.configType, ""))
-	rawErrors := slices.Concat(nullErrors, findEmptyEnumValues(config, d.enumFields))
+	rawErrors := slices.Concat(nullErrors, findEmptyEnumValues(config, d.fields))
 	config = d.ApplyDefaults(config)
 	errors := validateConfigModel(config, d.configType, "", d.ConfigValidateFuncs...)
 	errors = append(errors, d.validateConsentManagement(config)...)
@@ -281,20 +280,12 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 		return nil, fmt.Errorf("validating secret keys: %w", err)
 	}
 
-	enumFields := make([]Field, 0, len(fields))
-	for _, field := range fields {
-		if field.Type == "string" && len(field.Enum) > 0 {
-			enumFields = append(enumFields, field)
-		}
-	}
-
 	return &RegisteredDefinition{
 		DestinationDefinition: def,
 		configType:            configType,
 		keyPathSourceTypes:    keyPathSourceTypes,
 		configDefaults:        configDefaults,
 		fields:                fields,
-		enumFields:            enumFields,
 		patterns:              patterns,
 	}, nil
 }

@@ -83,6 +83,46 @@ func describeDefinition() *definitions.DestinationDefinition {
 
 func intPtr(v int) *int { return &v }
 
+// oneof and dynamic_or_oneof read members the way go-playground does: quotes
+// group a member that holds spaces, and a pair with nothing between them is "".
+func TestDescribeReadsQuotedOneOfMembers(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "quoted",
+		DisplayName: "Quoted",
+		Version:     1,
+		NewConfig: func() any {
+			return &struct {
+				Middle string `mapstructure:"middle" validate:"omitempty,oneof=a '' b"`
+				End    string `mapstructure:"end" validate:"omitempty,dynamic_or_oneof=a b ''"`
+				Alone  string `mapstructure:"alone" validate:"omitempty,oneof=''"`
+				Spaced string `mapstructure:"spaced" validate:"omitempty,dynamic_or_oneof='Page View' Track"`
+			}{}
+		},
+	}))
+	registered, err := registry.Get("quoted", 1)
+	require.NoError(t, err)
+
+	enums := map[string][]any{}
+	for _, field := range registered.Describe().Fields {
+		enums[field.Key] = field.Enum
+	}
+	assert.Equal(t, map[string][]any{
+		"middle": {"a", "", "b"},
+		"end":    {"a", "b", ""},
+		"alone":  {""},
+		"spaced": {"Page View", "Track"},
+	}, enums)
+
+	assert.Empty(t, registered.ValidateConfig(map[string]any{"middle": "", "end": "", "alone": "", "spaced": "Page View"}))
+	assert.Equal(t, []definitions.ConfigError{{
+		Path:    "/spaced",
+		Message: "'spaced' must be one of ['Page View' Track] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})",
+	}}, registered.ValidateConfig(map[string]any{"spaced": "Page"}))
+}
+
 func TestDescribeReadsTheConfigModel(t *testing.T) {
 	t.Parallel()
 

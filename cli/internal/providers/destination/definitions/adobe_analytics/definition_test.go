@@ -220,15 +220,15 @@ func TestAdobeAnalyticsConfigValidation(t *testing.T) {
 
 	t.Run("empty strict enums rejected", func(t *testing.T) {
 		t.Parallel()
-		for _, field := range []string{"timestamp_option", "product_identifier"} {
-			errors := registered.ValidateConfig(map[string]any{
-				"report_suite_ids": "rsid1",
-				field:              "",
-			})
-			require.Len(t, errors, 1, field)
-			assert.Equal(t, "/"+field, errors[0].Path)
-			assert.Contains(t, errors[0].Message, "must be one of")
-		}
+		errors := registered.ValidateConfig(map[string]any{
+			"report_suite_ids":   "rsid1",
+			"timestamp_option":   "",
+			"product_identifier": "",
+		})
+		assert.Equal(t, []definitions.ConfigError{
+			{Path: "/timestamp_option", Message: "'timestamp_option' must be one of [disabled hybrid optional enabled]"},
+			{Path: "/product_identifier", Message: "'product_identifier' must be one of [name id sku]"},
+		}, errors)
 	})
 
 	t.Run("empty schema-authorized mapping target accepted", func(t *testing.T) {

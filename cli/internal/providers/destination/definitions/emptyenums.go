@@ -13,7 +13,7 @@ import (
 func findEmptyEnumValues(config map[string]any, fields []Field) []ConfigError {
 	var errors []ConfigError
 	for _, field := range fields {
-		if slices.Contains(field.Enum, any("")) {
+		if field.Type != "string" || len(field.Enum) == 0 || slices.Contains(field.Enum, any("")) {
 			continue
 		}
 		walkConfigPath(config, strings.Split(field.Key, "."), "", func(value any, path string) {

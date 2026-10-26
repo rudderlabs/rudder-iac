@@ -552,8 +552,7 @@ func (f *Field) conditionsOf(rule string) *[]Condition {
 // ruleFitsValue fails a rule on a kind of value it does not check the way the
 // docs state it. go-playground's oneof panics on anything but a string or an
 // integer, and its min and max on a bool or a block. pattern and the
-// dynamic_or_ rules read only strings: on other values pattern and
-// dynamic_or_pattern always fail and dynamic_or_oneof always passes.
+// dynamic_or_ rules read only strings and always fail on other values.
 func ruleFitsValue(name string, valueType reflect.Type) error {
 	kind := derefType(valueType).Kind()
 	switch name {
