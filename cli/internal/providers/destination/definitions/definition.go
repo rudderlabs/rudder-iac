@@ -86,10 +86,13 @@ type RegisteredDefinition struct {
 // ValidateConfig validates config with its defaults applied, since that is what
 // apply sends: a default can satisfy a conditional requirement or trigger one.
 func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigError {
+	// A null under an unknown key isn't reported: removing the key fixes both.
+	nullErrors := errorsOutside(findNullValues(config, ""), findUnknownKeys(config, d.configType, ""))
 	config = d.ApplyDefaults(config)
 	errors := validateConfigModel(config, d.configType, "", d.ConfigValidateFuncs...)
 	errors = append(errors, d.validateConsentManagement(config)...)
-	return append(errors, d.validateConnectionMode(config)...)
+	errors = append(errors, d.validateConnectionMode(config)...)
+	return append(nullErrors, errorsOutside(errors, nullErrors)...)
 }
 
 func (d *RegisteredDefinition) LocalToAPI(local map[string]any) (map[string]any, error) {

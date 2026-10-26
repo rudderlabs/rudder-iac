@@ -77,6 +77,12 @@ Notes:
 - Booleans that gate conditionals (like S3 `role_based_auth`) should be
   `*bool` with `validate:"required"` so "absent" and "false" are distinct.
 - Optional booleans → `*bool` without `required`.
+- **Let schema.json decide whether a key may be null.** No onboarded schema.json
+  lists `null` in a property's `type`, so `ValidateConfig` rejects every null in
+  config and there is nothing to add per field. If a property does admit null,
+  flag it in the report rather than modelling it: accepting it needs an opt-out
+  in `findNullValues` and a converter that sends the null instead of dropping
+  it, or the spec diffs on every plan.
 - `consentManagement` and `connectionMode` subtrees in schema.json are handled
   by `common` — do not model either as an ad-hoc field. Append
   `common.Properties(sourceTypes)` and add a `ConsentManagement` field when the
