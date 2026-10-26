@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -456,13 +457,16 @@ type ruleScope struct {
 }
 
 func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) error {
+	name, param, _ := strings.Cut(rule, "=")
 	// go-playground reads | as "or", quoted values as one parameter, and 0x2C
 	// and 0x7C as escaped commas and pipes. Describe splits parameters on
-	// spaces only, so it refuses these rather than misread them.
-	if strings.ContainsAny(rule, "|'") || strings.Contains(rule, "0x2C") || strings.Contains(rule, "0x7C") {
+	// spaces only, so it refuses these rather than misread them. A quoted
+	// oneof member is the exception: oneOfMembers reads it as go-playground
+	// does.
+	quoted := strings.Contains(rule, "'") && name != "oneof" && name != "dynamic_or_oneof"
+	if strings.Contains(rule, "|") || quoted || strings.Contains(rule, "0x2C") || strings.Contains(rule, "0x7C") {
 		return fmt.Errorf("validate rule %q uses |, a quote or an escaped character, which Describe cannot read", rule)
 	}
-	name, param, _ := strings.Cut(rule, "=")
 	if err := ruleFitsValue(name, scope.valueType); err != nil {
 		return err
 	}
@@ -495,7 +499,7 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 			field.ExcludedWith = append(field.ExcludedWith, keys...)
 		}
 	case "oneof", "dynamic_or_oneof":
-		for _, raw := range strings.Fields(param) {
+		for _, raw := range oneOfMembers(param) {
 			value, err := parseTypedValue(scope.valueType, raw)
 			if err != nil {
 				return fmt.Errorf("reading %s rule: %w", name, err)
@@ -811,3 +815,16 @@ func lookupDefault(defaults map[string]any, dotted string) (any, bool) {
 	}
 	return current, true
 }
+
+// oneOfMembers splits a oneof or dynamic_or_oneof parameter the way
+// go-playground's oneof does: a member in single quotes may hold spaces, and
+// a pair of quotes with nothing between them is the empty string.
+func oneOfMembers(param string) []string {
+	members := oneOfMemberPattern.FindAllString(param, -1)
+	for i, member := range members {
+		members[i] = strings.ReplaceAll(member, "'", "")
+	}
+	return members
+}
+
+var oneOfMemberPattern = regexp.MustCompile(`'[^']*'|\S+`)

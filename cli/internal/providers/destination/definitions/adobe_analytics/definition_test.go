@@ -218,6 +218,29 @@ func TestAdobeAnalyticsConfigValidation(t *testing.T) {
 		assert.Equal(t, "/timestamp_option", errors[0].Path)
 	})
 
+	t.Run("empty strict enums rejected", func(t *testing.T) {
+		t.Parallel()
+		for _, field := range []string{"timestamp_option", "product_identifier"} {
+			errors := registered.ValidateConfig(map[string]any{
+				"report_suite_ids": "rsid1",
+				field:              "",
+			})
+			require.Len(t, errors, 1, field)
+			assert.Equal(t, "/"+field, errors[0].Path)
+			assert.Contains(t, errors[0].Message, "must be one of")
+		}
+	})
+
+	t.Run("empty schema-authorized mapping target accepted", func(t *testing.T) {
+		t.Parallel()
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"report_suite_ids": "rsid1",
+			"events_to_types": []any{
+				map[string]any{"from": "Video Start", "to": ""},
+			},
+		}))
+	})
+
 	t.Run("invalid product_identifier rejected", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{

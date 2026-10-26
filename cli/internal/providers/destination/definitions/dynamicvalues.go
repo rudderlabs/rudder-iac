@@ -3,7 +3,6 @@ package definitions
 import (
 	"reflect"
 	"regexp"
-	"strings"
 
 	"github.com/go-playground/validator/v10"
 
@@ -81,15 +80,15 @@ func dynamicOrPattern(fl validator.FieldLevel) bool {
 
 func dynamicOrOneOf(fl validator.FieldLevel) bool {
 	value, ok := stringFieldValue(fl)
-	if !ok || value == "" {
-		return true
+	if !ok {
+		return false
 	}
 
 	if IsDynamicConfigValue(value) {
 		return true
 	}
 
-	for _, option := range strings.Fields(fl.Param()) {
+	for _, option := range oneOfMembers(fl.Param()) {
 		if value == option {
 			return true
 		}

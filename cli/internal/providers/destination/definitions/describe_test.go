@@ -37,7 +37,7 @@ type describeAuth struct {
 type describeConfig struct {
 	APIKey            string                   `mapstructure:"api_key" validate:"required,dynamic_or_pattern=describe_short"`
 	Region            string                   `mapstructure:"region" validate:"required,oneof=us eu"`
-	Mode              *string                  `mapstructure:"mode" validate:"omitempty,dynamic_or_oneof=fast safe"`
+	Mode              *string                  `mapstructure:"mode" validate:"omitempty,dynamic_or_oneof='' fast safe"`
 	UseAuth           *bool                    `mapstructure:"use_auth" default:"false"`
 	AuthKey           string                   `mapstructure:"auth_key" validate:"required_if=UseAuth true Region eu,max=20"`
 	Fallback          string                   `mapstructure:"fallback" validate:"required_unless=Region us,required_with=AuthKey"`
@@ -108,7 +108,7 @@ func TestDescribeReadsTheConfigModel(t *testing.T) {
 		Fields: []definitions.Field{
 			{Key: "api_key", Type: "string", Required: true, Pattern: "describe_short", AcceptsTemplate: true, Secret: true},
 			{Key: "region", Type: "string", Required: true, Enum: []any{"us", "eu"}},
-			{Key: "mode", Type: "string", Enum: []any{"fast", "safe"}, OpenEnum: true, AcceptsTemplate: true},
+			{Key: "mode", Type: "string", Enum: []any{"", "fast", "safe"}, OpenEnum: true, AcceptsTemplate: true},
 			{Key: "use_auth", Type: "boolean", Default: false, HasDefault: true},
 			{
 				Key:  "auth_key",
@@ -537,10 +537,11 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 			name: "a quoted parameter",
 			newConfig: func() any {
 				return &struct {
-					Event string `mapstructure:"event" validate:"omitempty,oneof='Page View' Track"`
+					Event string `mapstructure:"event" validate:"omitempty,excluded_if=Mode 'fast mode'"`
+					Mode  string `mapstructure:"mode"`
 				}{}
 			},
-			wantErr: `reading config key "event": validate rule "oneof='Page View' Track" uses |, a quote or an escaped character`,
+			wantErr: `reading config key "event": validate rule "excluded_if=Mode 'fast mode'" uses |, a quote or an escaped character`,
 		},
 		{
 			name: "an escaped comma",

@@ -223,7 +223,20 @@ func TestKafkaConfigValidation(t *testing.T) {
 		assertError(t, errors, "/username", "required")
 
 		config["sasl_type"] = ""
-		assertError(t, registered.ValidateConfig(config), "/sasl_type", "required")
+		errors = registered.ValidateConfig(config)
+		require.Len(t, errors, 2)
+		assertError(t, errors, "/sasl_type", "must be one of")
+	})
+
+	t.Run("sasl type rejects explicit empty when conditional is inactive", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["sasl_type"] = ""
+
+		errors := registered.ValidateConfig(config)
+
+		require.Len(t, errors, 1)
+		assertError(t, errors, "/sasl_type", "must be one of")
 	})
 
 	t.Run("sasl fields not required when ssl is disabled", func(t *testing.T) {
@@ -322,6 +335,25 @@ func TestKafkaConfigValidation(t *testing.T) {
 
 			assertError(t, registered.ValidateConfig(config), tc.path, "")
 		}
+	})
+
+	t.Run("event type mapping rejects explicit empty type", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["event_type_to_topic_map"] = []any{map[string]any{"from": "", "to": "tracks"}}
+
+		errors := registered.ValidateConfig(config)
+
+		require.Len(t, errors, 1)
+		assertError(t, errors, "/event_type_to_topic_map/0/from", "must be one of")
+	})
+
+	t.Run("event type mapping permits omitted type", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["event_type_to_topic_map"] = []any{map[string]any{"to": "tracks"}}
+
+		assert.Empty(t, registered.ValidateConfig(config))
 	})
 
 	t.Run("event type mapping rejects unsupported type", func(t *testing.T) {

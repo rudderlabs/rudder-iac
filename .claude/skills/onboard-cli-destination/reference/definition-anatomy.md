@@ -175,7 +175,8 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
     bool or a block, since go-playground panics on them;
   - `pattern`, `dynamic_or_pattern` or `dynamic_or_oneof` on anything but a
     string, since they read only strings;
-  - `|`, a quoted value, or a `0x2C` or `0x7C` escape in a tag.
+  - `|`, a quoted value outside a `oneof` or `dynamic_or_oneof` list, or a
+    `0x2C` or `0x7C` escape in a tag.
 
 ## Validation semantics to remember
 
@@ -191,6 +192,10 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
   source-extraction.md "Enforcing regex patterns".
 - Error paths are JSON pointers over local keys (`/bucket_name`,
   `/consent_management/web/0/provider`) — assert them in tests.
+- An explicitly configured empty string is rejected for enum fields before
+  defaults are applied. Omitted enum keys may still receive defaults; only a
+  schema enum that contains `""` should list it, as the quoted member `''`
+  (`oneof='' a b`).
 
 ## Test template
 

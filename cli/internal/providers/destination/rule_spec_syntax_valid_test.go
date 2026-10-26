@@ -302,6 +302,32 @@ func TestSpecSyntaxValidRuleTransformationRefFormat(t *testing.T) {
 	}
 }
 
+func TestSpecSyntaxValidRuleRejectsExplicitEmptyEnum(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "ENUM",
+		DisplayName: "Enum Test",
+		Version:     1,
+		NewConfig: func() any {
+			return &struct {
+				Mode string `mapstructure:"mode" validate:"omitempty,oneof=fast safe"`
+			}{}
+		},
+	}))
+	spec := validSpecMap()
+	spec["type"] = "ENUM"
+	spec["config"] = map[string]any{"mode": ""}
+
+	results := runSyntaxRule(t, registry, spec)
+
+	assert.Equal(t, []vrules.ValidationResult{{
+		Reference: "/spec/config/mode",
+		Message:   "'mode' must be one of [fast safe]",
+	}}, results)
+}
+
 func TestSpecSyntaxValidRuleConfigErrors(t *testing.T) {
 	t.Parallel()
 

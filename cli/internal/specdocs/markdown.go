@@ -197,6 +197,11 @@ func allowedCell(f Field) string {
 	if len(f.Enum) > 0 {
 		values := make([]string, 0, len(f.Enum))
 		for _, v := range f.Enum {
+			// An empty member would otherwise render as an empty code span.
+			if v == "" {
+				values = append(values, `""`)
+				continue
+			}
 			values = append(values, fmt.Sprint(v))
 		}
 		text := codeList(values, ", ")

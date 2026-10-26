@@ -1,6 +1,7 @@
 package definitions_test
 
 import (
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -82,6 +83,65 @@ func TestValidateConfigNestedEnumField(t *testing.T) {
 		"/nested_block/web",
 		"'web' must be one of [cloud device hybrid] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})",
 	)
+}
+
+func TestValidateConfigRejectsExplicitEmptyEnum(t *testing.T) {
+	t.Parallel()
+
+	registered := registerTestDefinition(t)
+	valid := map[string]any{
+		"api_secret":      "secret",
+		"types_of_client": "gtag",
+		"measurement_id":  "G-123",
+	}
+
+	t.Run("nested enum", func(t *testing.T) {
+		config := maps.Clone(valid)
+		config["nested_block"] = map[string]any{"web": ""}
+
+		errors := registered.ValidateConfig(config)
+
+		require.Len(t, errors, 1)
+		assertConfigError(
+			t,
+			errors,
+			"/nested_block/web",
+			"'web' must be one of [cloud device hybrid] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})",
+		)
+	})
+
+	t.Run("omitted nested enum", func(t *testing.T) {
+		config := maps.Clone(valid)
+		config["nested_block"] = map[string]any{}
+
+		assert.Empty(t, registered.ValidateConfig(config))
+	})
+
+	t.Run("dynamic enum reference", func(t *testing.T) {
+		config := maps.Clone(valid)
+		config["nested_block"] = map[string]any{"web": "{{ .MODE }}"}
+
+		assert.Empty(t, registered.ValidateConfig(config))
+	})
+
+	t.Run("unrelated zero values", func(t *testing.T) {
+		config := maps.Clone(valid)
+		config["debug_mode"] = false
+		config["types_of_client"] = "firebase"
+		config["measurement_id"] = ""
+
+		assert.Empty(t, registered.ValidateConfig(config))
+	})
+
+	t.Run("malformed parent remains a decode error", func(t *testing.T) {
+		config := maps.Clone(valid)
+		config["nested_block"] = "invalid"
+
+		errors := registered.ValidateConfig(config)
+
+		require.Len(t, errors, 1)
+		assert.Contains(t, errors[0].Message, "nested_block")
+	})
 }
 
 func TestValidateConfigDecodeTypeError(t *testing.T) {

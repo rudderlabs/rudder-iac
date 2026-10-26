@@ -109,6 +109,20 @@ func TestIntercomConfigValidation(t *testing.T) {
 		assert.Empty(t, registered.ValidateConfig(map[string]any{}))
 	})
 
+	t.Run("empty api enums rejected", func(t *testing.T) {
+		t.Parallel()
+
+		for _, key := range []string{"api_server", "api_version"} {
+			config := validFullConfig()
+			config[key] = ""
+
+			errors := registered.ValidateConfig(config)
+			require.Len(t, errors, 1, key)
+			assert.Equal(t, "/"+key, errors[0].Path)
+			assert.Contains(t, errors[0].Message, "must be one of")
+		}
+	})
+
 	t.Run("api enums rejected", func(t *testing.T) {
 		t.Parallel()
 
