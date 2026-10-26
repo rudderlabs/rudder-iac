@@ -7,8 +7,8 @@ on:
       - "install.sh"
       - ".github/workflows/install-script.yml"
   workflow_dispatch:
-  # Installs each new release once goreleaser has uploaded its assets, so a
-  # renamed archive or checksums file fails here on the day it ships.
+  # Runs after every goreleaser run, whatever its conclusion, so a release with
+  # a renamed or missing archive or checksums file fails here on the day it ships.
   workflow_run:
     workflows: [goreleaser]
     types: [completed]
