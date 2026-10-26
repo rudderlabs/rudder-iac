@@ -16,8 +16,10 @@ REPO="rudderlabs/rudder-iac"
 BIN="rudder-cli"
 RELEASES="https://github.com/$REPO/releases"
 
+# Messages go through printf, not echo: the echo of dash and of macOS sh rewrites
+# backslash sequences such as \c, which a folder name can contain.
 fail() {
-  echo "rudder-cli install: $*" >&2
+  printf 'rudder-cli install: %s\n' "$*" >&2
   exit 1
 }
 
@@ -56,7 +58,18 @@ latest_tag() {
   else
     url=$(wget -S --spider "$RELEASES/latest" 2>&1 | tr -d '\r' | sed -n 's/^ *[Ll]ocation: *\([^ ]*\).*/\1/p' | tail -n 1)
   fi
-  echo "${url##*/}"
+  printf '%s\n' "${url##*/}"
+}
+
+# Prints $1 as one shell word that sh, bash and zsh read back as the same text:
+# as is when it holds only characters no shell treats specially, otherwise in
+# single quotes, with each ' written as '\''. Inside single quotes $, backticks,
+# \ and ! are plain characters, so a folder name cannot run as code.
+shell_word() {
+  case "$1" in
+    *[!A-Za-z0-9_./:@%+=,-]*) printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")" ;;
+    *) printf '%s' "$1" ;;
+  esac
 }
 
 # Removes the temp directory and, if set, the partial copy in the install directory.
@@ -132,7 +145,7 @@ main() {
   dir=$(CDPATH='' cd -- "$dir" && pwd) ||
     fail "cannot write to $dir; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
 
-  echo "Installing $BIN $tag ($os $arch) into $dir"
+  printf '%s\n' "Installing $BIN $tag ($os $arch) into $dir"
   download "$RELEASES/download/$tag/$archive" "$tmp/$archive" || {
     exists "$RELEASES/download/$tag/$archive" || not_uploaded "$archive"
     fail "could not download $RELEASES/download/$tag/$archive"
@@ -161,7 +174,7 @@ main() {
 
   # rudder-cli prints startup errors, such as a missing HOME, on stdout.
   installed=$("$dir/$BIN" --version) || fail "installed $dir/$BIN but it failed to run${installed:+: $installed}"
-  echo "Installed $installed at $dir/$BIN"
+  printf '%s\n' "Installed $installed at $dir/$BIN"
 
   # Which binary a plain 'rudder-cli' starts in this shell. Shells print it as
   # dir//rudder-cli for a PATH entry with a trailing slash, and as a relative or
@@ -200,24 +213,31 @@ main() {
       ;;
     *) profile=".profile" ;;
   esac
-  path_line="export PATH=\"$dir:\$PATH\""
+  # The user pastes these lines into a shell, so the folder goes in as a shell word.
+  qdir=$(shell_word "$dir")
+  if [ "$qdir" = "$dir" ]; then
+    path_line="export PATH=\"$dir:\$PATH\""
+  else
+    path_line="export PATH=$qdir:\"\$PATH\""
+  fi
+  run_line=$(shell_word "$dir/$BIN")
 
   case ":$PATH:" in
     *":$dir:"* | *":$dir/:"*)
       if [ -n "$other" ]; then
         echo
-        echo "Warning: '$BIN' runs $other, not $dir/$BIN, because $other_dir comes before $dir on your PATH."
-        echo "To put the new one first, add this line to the end of ~/$profile, then open a new terminal:"
-        echo "  $path_line"
-        echo "To use it in this terminal, run the same line, or run $dir/$BIN directly."
+        printf '%s\n' "Warning: '$BIN' runs $other, not $dir/$BIN, because $other_dir comes before $dir on your PATH."
+        printf '%s\n' "To put the new one first, add this line to the end of ~/$profile, then open a new terminal:"
+        printf '  %s\n' "$path_line"
+        printf 'To use it in this terminal, run the same line, or run %s directly.\n' "$run_line"
       fi
       ;;
     *)
       echo
-      echo "$dir is not on your PATH. Add this line to the end of ~/$profile, then open a new terminal:"
-      echo "  $path_line"
+      printf '%s\n' "$dir is not on your PATH. Add this line to the end of ~/$profile, then open a new terminal:"
+      printf '  %s\n' "$path_line"
       if [ -n "$other" ]; then
-        echo "Until then, '$BIN' runs $other. To use the new one in this terminal, run the same line, or run $dir/$BIN directly."
+        printf "Until then, '%s' runs %s. To use the new one in this terminal, run the same line, or run %s directly.\n" "$BIN" "$other" "$run_line"
       fi
       ;;
   esac

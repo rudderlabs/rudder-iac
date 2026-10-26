@@ -84,6 +84,20 @@ jobs:
           PATH="$OLDER_DIR:$PATH" RUDDER_CLI_INSTALL_DIR="$RUNNER_TEMP/off-path" sh install.sh | tee "$RUNNER_TEMP/off-path.txt"
           grep -F "Until then, 'rudder-cli' runs $OLDER_DIR/rudder-cli (rudder-cli version 0.27.0)." "$RUNNER_TEMP/off-path.txt"
 
+      - name: print a PATH line that keeps shell syntax in the folder name as text
+        env:
+          RUDDER_CLI_INSTALL_DIR: '${{ runner.temp }}/odd $HOME `touch ran` $(touch ran2) it''s "q" back\c !x'
+        run: |
+          sh install.sh | tee "$RUNNER_TEMP/odd.txt"
+          # Run the printed line in a shell, as a user who pastes it would, and read PATH back.
+          sed -n 's/^  \(export PATH=.*\)$/\1/p' "$RUNNER_TEMP/odd.txt" > "$RUNNER_TEMP/path-line.sh"
+          cd "$RUNNER_TEMP" || exit 1
+          for shell in sh bash; do
+            test "$("$shell" -c ". ./path-line.sh && printf '%s\n' \"\${PATH%%:*}\"")" = "$RUDDER_CLI_INSTALL_DIR"
+          done
+          test ! -e ran
+          test ! -e ran2
+
       - name: fail on a release that does not exist
         env:
           RUDDER_CLI_VERSION: "9.9.9"
