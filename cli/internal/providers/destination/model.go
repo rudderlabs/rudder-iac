@@ -12,7 +12,7 @@ type DestinationSpec struct {
 	DisplayName       string         `mapstructure:"display_name" validate:"required,pattern=destination_display_name"`
 	Type              string         `mapstructure:"type" validate:"required"`
 	Enabled           bool           `mapstructure:"enabled"`
-	DefinitionVersion int64          `mapstructure:"definition_version" validate:"required"`
+	DefinitionVersion *int64         `mapstructure:"definition_version" validate:"required"`
 	Transformation    string         `mapstructure:"transformation"` // scalar "#transformation:<id>" — object form deferred
 	Config            map[string]any `mapstructure:"config"`
 }

@@ -98,7 +98,7 @@ func (r *specSyntaxValidRule) Validate(ctx *vrules.ValidationContext) []vrules.V
 		results = append(results, vrules.ValidationResult{Reference: "/type", Message: err.Error()})
 		return prefixSpecReferences(results)
 	}
-	if !slices.Contains(versions, spec.DefinitionVersion) {
+	if !slices.Contains(versions, *spec.DefinitionVersion) {
 		results = append(results, vrules.ValidationResult{
 			Reference: "/definition_version",
 			Message: fmt.Sprintf(
@@ -117,7 +117,7 @@ func (r *specSyntaxValidRule) Validate(ctx *vrules.ValidationContext) []vrules.V
 		})
 	}
 
-	def, err := r.registry.Get(spec.Type, spec.DefinitionVersion)
+	def, err := r.registry.Get(spec.Type, *spec.DefinitionVersion)
 	if err != nil {
 		results = append(results, vrules.ValidationResult{Reference: "/definition_version", Message: err.Error()})
 		return prefixSpecReferences(results)
