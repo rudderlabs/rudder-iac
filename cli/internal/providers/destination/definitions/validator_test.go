@@ -95,8 +95,7 @@ func TestValidateConfigDecodeTypeError(t *testing.T) {
 		"measurement_id":  "G-123",
 		"debug_mode":      "not-a-boolean",
 	})
-	require.Len(t, errors, 1)
-	assert.Contains(t, errors[0].Message, "debug_mode")
+	assert.Equal(t, []definitions.ConfigError{{Path: "/debug_mode", Message: "'debug_mode' must be a boolean"}}, errors)
 }
 
 func TestValidateConfigRejectsUnsupportedConsentSource(t *testing.T) {
@@ -542,8 +541,10 @@ func registerTestDefinition(t *testing.T) *definitions.RegisteredDefinition {
 	return registered
 }
 
-func TestValidateConfigRejectsNullValues(t *testing.T) {
-	t.Parallel()
+// registerShapeTestDefinition registers a config with one field of each value
+// shape: scalar, pointer, object list, string list and the source-type blocks.
+func registerShapeTestDefinition(t *testing.T) *definitions.RegisteredDefinition {
+	t.Helper()
 
 	type mapping struct {
 		From string `mapstructure:"from"`
@@ -572,6 +573,111 @@ func TestValidateConfigRejectsNullValues(t *testing.T) {
 	}))
 	registered, err := registry.Get("TEST", 1)
 	require.NoError(t, err)
+	return registered
+}
+
+func TestValidateConfigRejectsWrongTypes(t *testing.T) {
+	t.Parallel()
+
+	registered := registerShapeTestDefinition(t)
+
+	for _, tc := range []struct {
+		name   string
+		config map[string]any
+		want   []definitions.ConfigError
+	}{
+		{
+			name:   "string given an integer",
+			config: map[string]any{"required_name": 9092},
+			want:   []definitions.ConfigError{{Path: "/required_name", Message: "'required_name' must be a string"}},
+		},
+		{
+			name:   "boolean given a string",
+			config: map[string]any{"required_name": "valid", "enabled": "false"},
+			want:   []definitions.ConfigError{{Path: "/enabled", Message: "'enabled' must be a boolean"}},
+		},
+		{
+			name:   "list given a string",
+			config: map[string]any{"required_name": "valid", "tags": "a"},
+			want:   []definitions.ConfigError{{Path: "/tags", Message: "'tags' must be an array"}},
+		},
+		{
+			name:   "string list item given an integer",
+			config: map[string]any{"required_name": "valid", "tags": []any{"a", 1}},
+			want:   []definitions.ConfigError{{Path: "/tags/1", Message: "list item must be a string"}},
+		},
+		{
+			name:   "object list item given a string",
+			config: map[string]any{"required_name": "valid", "mappings": []any{"a"}},
+			want:   []definitions.ConfigError{{Path: "/mappings/0", Message: "list item must be an object"}},
+		},
+		{
+			name:   "field inside a list item",
+			config: map[string]any{"required_name": "valid", "mappings": []any{map[string]any{"from": 1, "to": "b"}}},
+			want:   []definitions.ConfigError{{Path: "/mappings/0/from", Message: "'from' must be a string"}},
+		},
+		{
+			name:   "every wrong type reported",
+			config: map[string]any{"required_name": 1, "enabled": "yes", "tags": "a"},
+			want: []definitions.ConfigError{
+				{Path: "/required_name", Message: "'required_name' must be a string"},
+				{Path: "/enabled", Message: "'enabled' must be a boolean"},
+				{Path: "/tags", Message: "'tags' must be an array"},
+			},
+		},
+		{
+			name:   "connection_mode given a string",
+			config: map[string]any{"required_name": "valid", "connection_mode": "cloud"},
+			want:   []definitions.ConfigError{{Path: "/connection_mode", Message: "'connection_mode' must be an object"}},
+		},
+		{
+			name:   "non-string connection mode reported once",
+			config: map[string]any{"required_name": "valid", "connection_mode": map[string]any{"web": true}},
+			want:   []definitions.ConfigError{{Path: "/connection_mode/web", Message: "'web' connection mode must be a string"}},
+		},
+		{
+			name:   "consent_management given a list",
+			config: map[string]any{"required_name": "valid", "consent_management": []any{}},
+			want:   []definitions.ConfigError{{Path: "/consent_management", Message: "'consent_management' must be an object"}},
+		},
+		{
+			name:   "non-list consent entries reported once",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{"web": "a"}},
+			want:   []definitions.ConfigError{{Path: "/consent_management/web", Message: "consent entries must be an array"}},
+		},
+		{
+			name:   "non-object consent entry reported once",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{"web": []any{"a"}}},
+			want:   []definitions.ConfigError{{Path: "/consent_management/web/0", Message: "consent entry must be an object"}},
+		},
+		{
+			name: "non-list consents",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{
+				"web": []any{map[string]any{"provider": "ketch", "consents": "a"}},
+			}},
+			want: []definitions.ConfigError{{Path: "/consent_management/web/0/consents", Message: "'consents' must be an array"}},
+		},
+		{
+			name:   "unsupported consent source type reported over its shape",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{"ios": "a"}},
+			want: []definitions.ConfigError{{
+				Path:    "/consent_management/ios",
+				Message: "source type 'ios' is not supported by destination type 'TEST'; supported source types: web",
+			}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.ElementsMatch(t, tc.want, registered.ValidateConfig(tc.config))
+		})
+	}
+}
+
+func TestValidateConfigRejectsNullValues(t *testing.T) {
+	t.Parallel()
+
+	registered := registerShapeTestDefinition(t)
 
 	for _, tc := range []struct {
 		name   string

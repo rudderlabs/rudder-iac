@@ -62,9 +62,11 @@ func (r *specSyntaxValidRule) Examples() vrules.Examples {
 func (r *specSyntaxValidRule) Validate(ctx *vrules.ValidationContext) []vrules.ValidationResult {
 	spec, unknownKeys, err := decodeDestinationSpec(ctx.Spec)
 	if err != nil {
-		return prefixSpecReferences([]vrules.ValidationResult{{
-			Message: err.Error(),
-		}})
+		var results []vrules.ValidationResult
+		for _, decodeErr := range definitions.DecodeErrors(err, reflect.TypeFor[DestinationSpec](), "") {
+			results = append(results, vrules.ValidationResult{Reference: decodeErr.Path, Message: decodeErr.Message})
+		}
+		return prefixSpecReferences(results)
 	}
 
 	results := make([]vrules.ValidationResult, 0, len(unknownKeys))

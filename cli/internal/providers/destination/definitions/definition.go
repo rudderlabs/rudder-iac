@@ -89,9 +89,12 @@ func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigErr
 	// A null under an unknown key isn't reported: removing the key fixes both.
 	nullErrors := errorsOutside(findNullValues(config, ""), findUnknownKeys(config, d.configType, ""))
 	config = d.ApplyDefaults(config)
-	errors := validateConfigModel(config, d.configType, "", d.ConfigValidateFuncs...)
-	errors = append(errors, d.validateConsentManagement(config)...)
-	errors = append(errors, d.validateConnectionMode(config)...)
+	// The source-type checks own the paths they report: they word a wrong shape
+	// more specifically than model decoding does.
+	sourceTypeErrors := d.validateConsentManagement(config)
+	sourceTypeErrors = append(sourceTypeErrors, d.validateConnectionMode(config)...)
+	errors := errorsOutside(validateConfigModel(config, d.configType, "", d.ConfigValidateFuncs...), sourceTypeErrors)
+	errors = append(errors, sourceTypeErrors...)
 	return append(nullErrors, errorsOutside(errors, nullErrors)...)
 }
 
