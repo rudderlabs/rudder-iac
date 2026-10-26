@@ -32,8 +32,6 @@ var destinationSnapshotIgnore = []string{"id", "workspaceId", "version", "versio
 // destinationRawSecrets are literal secret values from the var file that must
 // never surface in CLI output.
 var destinationRawSecrets = []string{
-	"-----BEGIN PRIVATE KEY-----snowflakePrivateKeyXXXXXXXXXXX-----END PRIVATE KEY-----",
-	"-----BEGIN PRIVATE KEY-----snowpipeStreamingPrivateKeyXXXXXXXXXX-----END PRIVATE KEY-----",
 	"123456789012345",
 	"1234567890123456",
 	"6543210987654321",

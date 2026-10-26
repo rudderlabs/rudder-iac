@@ -14,6 +14,6 @@ spec:
     prefix: rudder-cli-e2e-tls
     cluster_mode: true
     secure: true
-    ca_certificate: "{{ .REDIS_CA_CERTIFICATE }}"
+    ca_certificate: '{{ .REDIS_CA_CERTIFICATE }}'
     skip_verify: true
     use_json_module: true

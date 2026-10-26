@@ -28,7 +28,7 @@ const varFileHeader = `# Variables referenced by the imported specs. Fill in eve
 # empty secret; to deliberately send an empty value, use KEY: "".
 #
 # Generated specs write each reference as '{{ .VAR }}', in single quotes, and
-# the value is inserted as is.
+# a one-line value is inserted as is.
 #
 # For a JSON value (such as a service account key), wrap it in single quotes
 # here:
@@ -40,9 +40,13 @@ const varFileHeader = `# Variables referenced by the imported specs. Fill in eve
 # without quotes in this file. For the password it's-a-secret, write:
 #   KEY: it''s-a-secret
 #
-# A multi-line PEM value written as a | block reaches the spec with its line
-# breaks folded into spaces. Some consumers rebuild the key from that and
-# others may not, so check the field with a dry run before relying on it.
+# For a multi-line value such as a PEM certificate or key, use a YAML literal
+# block so its line breaks stay intact:
+#   KEY: |
+#     -----BEGIN CERTIFICATE-----
+#     ...
+#     -----END CERTIFICATE-----
+# The generated '{{ .VAR }}' references keep those line breaks.
 `
 
 // scaffoldSecretsVarFile writes a fill-in-the-blanks var file for every
