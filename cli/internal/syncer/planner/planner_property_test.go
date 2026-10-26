@@ -36,15 +36,9 @@ func TestPlanner_Convergence(t *testing.T) {
 	})
 }
 
-// TestPlanner_DependencyOrder checks that, within each operation type, a
-// resource is created, imported or updated only after the resources it
-// references, and deleted only after the resources that reference it.
-//
-// The check stops at type boundaries because the planner groups operations as
-// imports, creates, updates, deletes. A create can therefore precede an update
-// of the resource it references. The concurrent executor schedules by the
-// dependency graph and is unaffected; the sequential one (concurrency.syncer: 1)
-// runs in plan order.
+// TestPlanner_DependencyOrder checks that a resource is created, imported or
+// updated only after the resources it references, and deleted only after the
+// resources that reference it.
 func TestPlanner_DependencyOrder(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		var (
@@ -63,7 +57,7 @@ func TestPlanner_DependencyOrder(t *testing.T) {
 			urn := op.Resource.URN()
 			if op.Type == planner.Delete {
 				for _, dependent := range source.GetDependents(urn) {
-					if j, ok := position[dependent]; ok && plan.Operations[j].Type == planner.Delete {
+					if j, ok := position[dependent]; ok {
 						require.Less(t, j, i, "%s deleted before its dependent %s: %v", urn, dependent, ops)
 					}
 				}
@@ -71,7 +65,7 @@ func TestPlanner_DependencyOrder(t *testing.T) {
 			}
 			for _, dep := range target.GetDependencies(urn) {
 				j, ok := position[dep]
-				if !ok || plan.Operations[j].Type != op.Type {
+				if !ok {
 					continue
 				}
 				require.Less(t, j, i, "%s planned before its dependency %s: %v", urn, dep, ops)
