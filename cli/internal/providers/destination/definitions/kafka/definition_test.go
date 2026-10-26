@@ -200,6 +200,32 @@ func TestKafkaConfigValidation(t *testing.T) {
 		assert.Empty(t, errors)
 	})
 
+	for _, value := range []string{"env.REGION", `{{ message.x || "plain" }}`} {
+		t.Run("sasl_type rejects dynamic value "+value, func(t *testing.T) {
+			t.Parallel()
+			config := minimalConfig()
+			config["sasl_type"] = value
+
+			errors := registered.ValidateConfig(config)
+
+			assert.Equal(t, []definitions.ConfigError{
+				{Path: "/sasl_type", Message: "'sasl_type' must be one of [plain sha256 sha512]"},
+			}, errors)
+		})
+
+		t.Run("event type mapping rejects dynamic type "+value, func(t *testing.T) {
+			t.Parallel()
+			config := minimalConfig()
+			config["event_type_to_topic_map"] = []any{map[string]any{"from": value, "to": "tracks"}}
+
+			errors := registered.ValidateConfig(config)
+
+			assert.Equal(t, []definitions.ConfigError{
+				{Path: "/event_type_to_topic_map/0/from", Message: "'from' must be one of [identify page screen group alias]"},
+			}, errors)
+		})
+	}
+
 	t.Run("sasl_type rejects unsupported value", func(t *testing.T) {
 		t.Parallel()
 		config := minimalConfig()
