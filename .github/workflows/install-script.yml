@@ -98,6 +98,17 @@ jobs:
           test ! -e ran
           test ! -e ran2
 
+      - name: install from a temporary folder whose path holds a backslash
+        env:
+          RUDDER_CLI_INSTALL_DIR: ${{ runner.temp }}/backslash
+        run: |
+          # GNU sha256sum and shasum put a backslash before the hash of such a
+          # path. GNU mktemp, on ubuntu, makes the folder under TMPDIR.
+          export TMPDIR="$RUNNER_TEMP"'/back\slash'
+          mkdir -p "$TMPDIR"
+          sh install.sh
+          "$RUDDER_CLI_INSTALL_DIR/rudder-cli" --version
+
       - name: fail on a release that does not exist
         env:
           RUDDER_CLI_VERSION: "9.9.9"

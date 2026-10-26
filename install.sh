@@ -151,10 +151,12 @@ main() {
     fail "could not download $RELEASES/download/$tag/$archive"
   }
 
+  # Hash from stdin, because GNU sha256sum and shasum put a backslash before
+  # the hash when the file's path holds one.
   if has sha256sum; then
-    got=$(sha256sum "$tmp/$archive" | cut -d ' ' -f 1)
+    got=$(sha256sum <"$tmp/$archive" | cut -d ' ' -f 1)
   elif has shasum; then
-    got=$(shasum -a 256 "$tmp/$archive" | cut -d ' ' -f 1)
+    got=$(shasum -a 256 <"$tmp/$archive" | cut -d ' ' -f 1)
   else
     fail "sha256sum or shasum is required to verify the download"
   fi
