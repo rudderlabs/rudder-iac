@@ -66,6 +66,10 @@ nfpms:
     formats:
       - deb
       - rpm
+    # rudder-cli verifies HTTPS against the system's CA certificates, which slim
+    # Debian and Ubuntu images do not install.
+    dependencies:
+      - ca-certificates
     bindir: /usr/bin
     contents:
       - src: LICENSE
@@ -89,12 +93,14 @@ homebrew_casks:
       # The tap's main branch requires a pull request with one approval.
       pull_request:
         enabled: true
-    # Nothing is pushed to the tap until the release job sets HOMEBREW_TAP_TOKEN.
+    # Nothing is pushed to the tap unless the release job sets both a non-empty
+    # HOMEBREW_TAP_TOKEN and HOMEBREW_TAP_PUBLISH=true. release.yml sets neither.
     # The cask is still written to dist/homebrew/Casks/rudder-cli.rb.
-    skip_upload: '{{ if isEnvSet "HOMEBREW_TAP_TOKEN" }}auto{{ else }}true{{ end }}'
+    skip_upload: '{{ if and (isEnvSet "HOMEBREW_TAP_TOKEN") (eq (envOrDefault "HOMEBREW_TAP_PUBLISH" "") "true") }}auto{{ else }}true{{ end }}'
     # The binary is not notarized, so remove the quarantine attribute that
     # Homebrew sets on cask downloads. Drop this once the binary is notarized.
-    # install_steps needs GoReleaser v2.19 or later.
+    # install_steps needs GoReleaser v2.19 or later, and the cask's run step needs
+    # Homebrew 6.0.13 or later on the user's Mac.
     hooks:
       post:
         install_steps: |

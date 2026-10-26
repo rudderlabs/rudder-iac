@@ -1,17 +1,23 @@
 # .github/workflows/goreleaser-check.yml
-# Runs the release config in snapshot mode on pull requests that change it, so a broken
-# config fails here instead of in the release job. Nothing is published.
+# Runs the release config in snapshot mode on pull requests that change it, and weekly on
+# main because the release job downloads the newest GoReleaser v2 each time. A broken
+# config, or a GoReleaser release that breaks it, should fail here before it fails in the
+# release job. Nothing is published.
 name: goreleaser-check
 
 on:
   pull_request:
     paths:
       - cli/.goreleaser.yaml
+      - LICENSE
       - .github/workflows/release.yml
       - .github/workflows/goreleaser-check.yml
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions: {}
@@ -72,6 +78,8 @@ jobs:
         env:
           RUDDERSTACK_CLI_TELEMETRY_DISABLED: "true"
         run: |
+          # Slim images have no CA certificates, and rudder-cli needs them for HTTPS.
+          dpkg-deb --field dist/rudder-cli_Linux_x86_64.deb Depends | grep -qw ca-certificates
           sudo apt-get install -y ./dist/rudder-cli_Linux_x86_64.deb
           test "$(command -v rudder-cli)" = /usr/bin/rudder-cli
           rudder-cli --version
