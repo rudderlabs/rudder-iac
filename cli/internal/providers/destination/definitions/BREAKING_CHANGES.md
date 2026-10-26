@@ -6,6 +6,26 @@ A destination type's history starts at the first release that made it available 
 
 ---
 
+## Upcoming (unreleased)
+
+### Null config values rejected
+
+**Scope:** spec
+
+**Types:** `active_campaign`, `am`, `attentive_tag`, `bq`, `bqstream`, `braze`, `customerio`, `facebook_conversions`, `facebook_pixel`, `ga4`, `gcs`, `googleads`, `hs`, `http`, `iterable`, `mp`, `postgres`, `posthog`, `rs`, `s3`, `s3_datalake`, `snowflake`, `tiktok_ads`, `webhook`
+
+**Why:** A null in a destination's `config`, written as `key: null`, `key: ~` or `key:` with no value, now fails validation:
+
+```text
+'delay' must not be null; set a value or remove the key
+```
+
+Earlier releases accepted it. A null inside a list item reached the API and failed the apply, and a top-level null was dropped before sending but planned an update on every apply.
+
+**Migration:** Remove the key to leave it unset, or give it a value.
+
+---
+
 ## v0.28.0 — 2026-10-08
 
 ### Source type added: `warehouse`
