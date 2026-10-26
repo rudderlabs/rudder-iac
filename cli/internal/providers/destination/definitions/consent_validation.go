@@ -31,18 +31,17 @@ func (d *RegisteredDefinition) validateConsentManagement(config map[string]any) 
 			})
 			continue
 		}
-		errors = append(
-			errors,
-			validateConsentEntriesShape(
-				joinConfigPath("/consent_management", sourceType),
-				consentManagement[sourceType],
-			)...,
+		shapeErrors := validateConsentEntriesShape(
+			joinConfigPath("/consent_management", sourceType),
+			consentManagement[sourceType],
 		)
 		validator := common.ConsentValidator(common.ValidateConsentEntries)
 		if override, ok := d.ConsentValidationOverrides[sourceType]; ok {
 			validator = override
 		}
-		errors = append(errors, validateConsentEntries(sourceType, consentManagement[sourceType], validator)...)
+		// A null decodes to a zero value the semantic check would report again.
+		errors = append(errors, shapeErrors...)
+		errors = append(errors, errorsOutside(validateConsentEntries(sourceType, consentManagement[sourceType], validator), shapeErrors)...)
 	}
 	return errors
 }

@@ -2,6 +2,7 @@ package definitions
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -10,16 +11,18 @@ import (
 // findNullValues reports every null in a spec's config. No destination
 // schema.json admits null, so the backend rejects one, and dropping it instead
 // leaves the spec diffing forever against a remote that never stores the key.
-// consent_management is skipped because validateConsentManagement has its own
-// null checks.
+// consent_management and connection_mode are skipped because their validators
+// have their own null checks, which also leave a null under an unsupported
+// source type to be reported as unsupported.
 func findNullValues(value any, basePath string) []ConfigError {
 	var errors []ConfigError
 	switch v := value.(type) {
 	case map[string]any:
-		for key, item := range v {
-			if basePath == "" && key == "consent_management" {
+		for _, key := range slices.Sorted(maps.Keys(v)) {
+			if basePath == "" && (key == "consent_management" || key == "connection_mode") {
 				continue
 			}
+			item := v[key]
 			path := joinConfigPath(basePath, key)
 			if item == nil {
 				errors = append(errors, ConfigError{
@@ -43,13 +46,14 @@ func findNullValues(value any, basePath string) []ConfigError {
 	return errors
 }
 
-// errorsOutsideNullPaths keeps the explicit null error authoritative for that
-// value. Decoding null into a Go zero value can otherwise make model validation
-// report a second, misleading error for the same path or one of its children.
-func errorsOutsideNullPaths(errors, nullErrors []ConfigError) []ConfigError {
+// errorsOutside drops the errors at or under an owner error's path, so the
+// owner is the one error reported there. Decoding null into a Go zero value can
+// otherwise make model validation report a second, misleading error for the
+// same path or one of its children.
+func errorsOutside(errors, owners []ConfigError) []ConfigError {
 	return slices.DeleteFunc(errors, func(configError ConfigError) bool {
-		return slices.ContainsFunc(nullErrors, func(nullError ConfigError) bool {
-			return configError.Path == nullError.Path || strings.HasPrefix(configError.Path, nullError.Path+"/")
+		return slices.ContainsFunc(owners, func(owner ConfigError) bool {
+			return configError.Path == owner.Path || strings.HasPrefix(configError.Path, owner.Path+"/")
 		})
 	})
 }

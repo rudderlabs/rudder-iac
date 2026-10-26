@@ -349,6 +349,19 @@ func TestSpecSyntaxValidRuleSourceTypeKeys(t *testing.T) {
 			},
 		},
 		{
+			name: "null under an unsupported source type",
+			config: map[string]any{
+				"webhook_url":     "https://example.com/hook",
+				"connection_mode": map[string]any{"ios": nil},
+			},
+			expected: []vrules.ValidationResult{
+				{
+					Reference: "/spec/config/connection_mode/ios",
+					Message:   "source type 'ios' is not supported by destination type 'WEBHOOK'; supported source types: web, react_native",
+				},
+			},
+		},
+		{
 			name: "unsupported source type under consent_management",
 			config: map[string]any{
 				"webhook_url": "https://example.com/hook",

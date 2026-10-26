@@ -618,12 +618,31 @@ func TestValidateConfigRejectsNullValues(t *testing.T) {
 		{
 			name:   "null connection_mode reported once",
 			config: map[string]any{"required_name": "valid", "connection_mode": nil},
-			want:   []definitions.ConfigError{{Path: "/connection_mode", Message: "'connection_mode' must not be null; set a value or remove the key"}},
+			want:   []definitions.ConfigError{{Path: "/connection_mode", Message: "'connection_mode' must be an object"}},
 		},
 		{
 			name:   "null connection_mode value reported once",
 			config: map[string]any{"required_name": "valid", "connection_mode": map[string]any{"web": nil}},
-			want:   []definitions.ConfigError{{Path: "/connection_mode/web", Message: "'web' must not be null; set a value or remove the key"}},
+			want:   []definitions.ConfigError{{Path: "/connection_mode/web", Message: "'web' connection mode must be a string"}},
+		},
+		{
+			name: "null resolution_strategy on a custom provider reported once",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{
+				"web": []any{map[string]any{"provider": "custom", "resolution_strategy": nil, "consents": []any{"analytics"}}},
+			}},
+			want: []definitions.ConfigError{{Path: "/consent_management/web/0/resolution_strategy", Message: "'resolution_strategy' must be a string"}},
+		},
+		{
+			name: "null provider reported once",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{
+				"web": []any{map[string]any{"provider": nil, "consents": []any{"analytics"}}},
+			}},
+			want: []definitions.ConfigError{{Path: "/consent_management/web/0/provider", Message: "'provider' must be a string"}},
+		},
+		{
+			name:   "null unknown key reported as unknown",
+			config: map[string]any{"required_name": "valid", "nmae": nil},
+			want:   []definitions.ConfigError{{Path: "/nmae", Message: `unknown config field "nmae"`}},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
