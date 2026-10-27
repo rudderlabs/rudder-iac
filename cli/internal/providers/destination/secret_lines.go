@@ -41,12 +41,18 @@ func (r *secretLinesRule) Validate(ctx *vrules.ValidationContext) []vrules.Valid
 	return r.mark(ctx, r.Rule.Validate(ctx))
 }
 
-// mark sets Sensitive on each result whose line can show a secret value.
+// mark sets Sensitive on each result whose line can show a secret value. It
+// reads the spec's secret keys and slots once for all of its results.
 func (r *secretLinesRule) mark(ctx *vrules.ValidationContext, results []vrules.ValidationResult) []vrules.ValidationResult {
+	var lines *secretLines
 	for i := range results {
-		if !results[i].Sensitive {
-			results[i].Sensitive = r.lineShowsSecret(ctx, results[i].Reference)
+		if results[i].Sensitive {
+			continue
 		}
+		if lines == nil {
+			lines = readSecretLines(r.registry, ctx)
+		}
+		results[i].Sensitive = lines.showSecret(results[i].Reference)
 	}
 	return results
 }
@@ -59,29 +65,44 @@ func (r *secretLinesRule) markFiles(contexts map[string]*vrules.ValidationContex
 	return results
 }
 
-// lineShowsSecret reports whether the line validate prints for a result at
-// reference in the destination spec ctx holds can show a secret value. Only a
-// line in config can, and it does when showsSecret says so. Read as written,
-// before substitution, a secret key holding exactly one reference with no
-// default shows that reference and nothing else, so its line is left as it
-// is.
-func (r *secretLinesRule) lineShowsSecret(ctx *vrules.ValidationContext, reference string) bool {
-	configPath, ok := strings.CutPrefix(reference, "/spec/config/")
-	if !ok || ctx == nil {
-		return false
-	}
+// secretLines is what deciding whether a line of one destination spec can show
+// a secret needs, read once per spec.
+type secretLines struct {
+	config     map[string]any
+	secretKeys []string
+	// asWritten holds the secret keys, by reference, that hold exactly one
+	// variable reference with no default.
+	asWritten map[string]bool
+}
 
-	spec := readSourceSpec(ctx.Spec)
-	secretKeys, _ := specSecretKeys(r.registry, spec)
-	if !showsSecret(secretKeys, spec.config, configPath) {
-		return false
+// readSecretLines reads the secret keys and slots of the destination spec ctx
+// holds. A nil ctx gives lines that show no secret.
+func readSecretLines(registry *definitions.Registry, ctx *vrules.ValidationContext) *secretLines {
+	if ctx == nil {
+		return &secretLines{}
 	}
-	for _, slot := range readSecretSlots(r.registry, ctx) {
-		if slot.reference == reference && slot.referencesVariable() {
-			return false
+	spec := readSourceSpec(ctx.Spec)
+	secretKeys, _ := specSecretKeys(registry, spec)
+	lines := &secretLines{config: spec.config, secretKeys: secretKeys, asWritten: map[string]bool{}}
+	for _, slot := range readSecretSlots(registry, ctx) {
+		if slot.referencesVariable() {
+			lines.asWritten[slot.reference] = true
 		}
 	}
-	return true
+	return lines
+}
+
+// showSecret reports whether the line validate prints for a result at
+// reference can show a secret value. Only a line in config can, and it does
+// when showsSecret says so. Read as written, before substitution, a secret key
+// holding exactly one reference with no default shows that reference and
+// nothing else, so its line is left as it is.
+func (l *secretLines) showSecret(reference string) bool {
+	configPath, ok := strings.CutPrefix(reference, "/spec/config/")
+	if !ok || !showsSecret(l.secretKeys, l.config, configPath) {
+		return false
+	}
+	return !l.asWritten[reference]
 }
 
 type secretLinesSourceRule struct {
