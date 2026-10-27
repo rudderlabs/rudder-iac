@@ -283,6 +283,10 @@ func (w *configWalker) walkField(owner reflect.Type, structField reflect.StructF
 				return err
 			}
 		}
+		if slices.Contains(itemRules, "omitempty") && len(field.Enum) > 0 {
+			return fmt.Errorf("omitempty after dive skips the enum on an empty item, which the docs would not show; " +
+				"list '' as a member to allow one")
+		}
 	}
 
 	switch {
@@ -456,13 +460,16 @@ type ruleScope struct {
 }
 
 func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) error {
+	name, param, _ := strings.Cut(rule, "=")
 	// go-playground reads | as "or", quoted values as one parameter, and 0x2C
 	// and 0x7C as escaped commas and pipes. Describe splits parameters on
-	// spaces only, so it refuses these rather than misread them.
-	if strings.ContainsAny(rule, "|'") || strings.Contains(rule, "0x2C") || strings.Contains(rule, "0x7C") {
+	// spaces only, so it refuses these rather than misread them. A quoted
+	// oneof member is the exception: funcs.OneOfMembers reads it as
+	// go-playground does.
+	quoted := strings.Contains(rule, "'") && name != "oneof" && name != "dynamic_or_oneof"
+	if strings.Contains(rule, "|") || quoted || strings.Contains(rule, "0x2C") || strings.Contains(rule, "0x7C") {
 		return fmt.Errorf("validate rule %q uses |, a quote or an escaped character, which Describe cannot read", rule)
 	}
-	name, param, _ := strings.Cut(rule, "=")
 	if err := ruleFitsValue(name, scope.valueType); err != nil {
 		return err
 	}
@@ -495,7 +502,7 @@ func (w *configWalker) applyRule(field *Field, rule string, scope ruleScope) err
 			field.ExcludedWith = append(field.ExcludedWith, keys...)
 		}
 	case "oneof", "dynamic_or_oneof":
-		for _, raw := range strings.Fields(param) {
+		for _, raw := range funcs.OneOfMembers(param) {
 			value, err := parseTypedValue(scope.valueType, raw)
 			if err != nil {
 				return fmt.Errorf("reading %s rule: %w", name, err)
@@ -548,8 +555,7 @@ func (f *Field) conditionsOf(rule string) *[]Condition {
 // ruleFitsValue fails a rule on a kind of value it does not check the way the
 // docs state it. go-playground's oneof panics on anything but a string or an
 // integer, and its min and max on a bool or a block. pattern and the
-// dynamic_or_ rules read only strings: on other values pattern and
-// dynamic_or_pattern always fail and dynamic_or_oneof always passes.
+// dynamic_or_ rules read only strings and always fail on other values.
 func ruleFitsValue(name string, valueType reflect.Type) error {
 	kind := derefType(valueType).Kind()
 	switch name {
