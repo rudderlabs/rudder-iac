@@ -188,6 +188,13 @@ func readsEvent(value any, readsJSONPath bool) bool {
 	if readsJSONPath && (strings.HasPrefix(s, "$.") || strings.HasPrefix(s, "$[")) {
 		return true
 	}
+	// Only a value that is one template reads from the event. The template
+	// pattern spans from the first {{ to the last }}, so with two templates
+	// it would read the fallback of the last one alone and pass over a
+	// literal fallback in an earlier one.
+	if strings.Count(s, "{{") != 1 || strings.Count(s, "}}") != 1 {
+		return false
+	}
 	fallback, ok := definitions.TemplateFallback(s)
 	if !ok {
 		return false

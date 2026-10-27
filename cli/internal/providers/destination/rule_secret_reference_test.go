@@ -236,6 +236,22 @@ func TestSecretReferenceRule(t *testing.T) {
 			}},
 		},
 		{
+			// Each template has its own fallback, so a value of two holds the
+			// first one's literal even when the last one's is empty.
+			name:            "two templates, the first with a literal fallback",
+			id:              "shop-webhook",
+			destinationType: "webhook",
+			config: `    webhook_url: https://example.com/hook
+    headers:
+      - from: Authorization
+        to: '{{ message.token || "fake-literal-token" }}{{ message.other || "" }}'
+`,
+			want: []vrules.ValidationResult{{
+				Reference: "/spec/config/headers/0/to",
+				Message:   `secret key "headers[0].to" must hold only a variable reference with no default, such as '{{ .SHOP_WEBHOOK_HEADERS_0_TO }}'` + fix,
+			}},
+		},
+		{
 			name:            "id that makes no variable name",
 			id:              "shop.amplitude",
 			destinationType: "am",
