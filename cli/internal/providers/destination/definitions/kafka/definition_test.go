@@ -149,26 +149,56 @@ func TestKafkaConfigValidation(t *testing.T) {
 		})
 	}
 
-	for _, field := range []string{"host_name", "port", "topic", "username", "ssh.host", "ssh.port", "ssh.user", "ssh.public_key"} {
-		field := field
-		t.Run("template accepted for "+field, func(t *testing.T) {
+	for _, tc := range []struct {
+		field   string
+		message string
+	}{
+		{field: "host_name", message: "must be one or more comma-separated host names"},
+		{field: "port", message: "must be a string integer from 1 to 65535"},
+		{field: "topic", message: "must be 1-249 characters and contain only letters, digits, underscores, periods, and hyphens"},
+		{field: "username", message: "must be 1-32 characters and contain only letters, digits, underscores, and hyphens"},
+		{field: "ssh.host", message: "must be a host name with an optional port"},
+		{field: "ssh.port", message: "must be a string integer from 1 to 65535"},
+		{field: "ssh.user", message: "must be 1-32 characters and contain only letters, digits, underscores, and hyphens"},
+		{field: "ssh.public_key", message: "must be an ssh-rsa, ssh-ed25519, or ssh-dss public key"},
+	} {
+		t.Run("template rejected for "+tc.field, func(t *testing.T) {
 			t.Parallel()
 			config := minimalConfig()
-			if strings.HasPrefix(field, "ssh.") {
+			if strings.HasPrefix(tc.field, "ssh.") {
 				withSSH(config)
 			}
-			setNestedConfigValue(config, field, "{{ config."+field+" || fallback }}")
-			if field == "username" {
+			if tc.field == "username" {
 				config["ssl_enabled"] = true
 				config["use_sasl"] = true
 				config["sasl_type"] = "plain"
 			}
+			setNestedConfigValue(config, tc.field, `{{ message.traits.x || "fallback" }}`)
 
 			errors := registered.ValidateConfig(config)
 
-			assert.Empty(t, errors)
+			require.Len(t, errors, 1)
+			assertError(t, errors, "/"+strings.ReplaceAll(tc.field, ".", "/"), tc.message)
 		})
 	}
+
+	t.Run("templates accepted for topic mapping values", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["event_type_to_topic_map"] = []any{
+			map[string]any{"from": "identify", "to": `{{ message.type || "identifies" }}`},
+		}
+		config["event_to_topic_map"] = []any{
+			map[string]any{
+				"from": `{{ message.event || "Signed Up" }}`,
+				"to":   `{{ message.properties.topic || "signups" }}`,
+			},
+		}
+
+		errors := registered.ValidateConfig(config)
+
+		assert.Empty(t, errors)
+	})
 
 	t.Run("sasl_type rejects unsupported value", func(t *testing.T) {
 		t.Parallel()

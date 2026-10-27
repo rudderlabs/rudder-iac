@@ -406,6 +406,23 @@ func TestProject_Load_WithSubstitutor(t *testing.T) {
 			},
 		},
 		{
+			name:        "preserves multiline string in imported single-quoted slot",
+			substitutor: varsubst.NewSubstitutor(mapResolver{"CERT": "-----BEGIN CERTIFICATE-----\nline one\nline two\n-----END CERTIFICATE-----\n"}),
+			rawSpecs: map[string][]byte{
+				"path/to/spec.yaml": []byte("kind: Source\nversion: rudder/0.1\nmetadata:\n  name: redis\nspec:\n  ca_certificate: '{{ .CERT }}'"),
+			},
+			wantSpecs: map[string]*specs.Spec{
+				"path/to/spec.yaml": {
+					Kind:     "Source",
+					Version:  "rudder/0.1",
+					Metadata: map[string]any{"name": "redis"},
+					Spec: map[string]any{
+						"ca_certificate": "-----BEGIN CERTIFICATE-----\nline one\nline two\n-----END CERTIFICATE-----\n",
+					},
+				},
+			},
+		},
+		{
 			// Bare 5432 (no surrounding quotes in the spec) parses as int after substitution.
 			name:        "preserves non-string scalar type",
 			substitutor: varsubst.NewSubstitutor(mapResolver{"PORT": "5432"}),

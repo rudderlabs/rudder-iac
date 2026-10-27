@@ -137,6 +137,12 @@
 - Kafka SASL validation follows the nested schema condition: require `sasl_type` and `username` only when both `ssl_enabled` and `use_sasl` are true; `password` remains optional, and `use_sasl: true` with `ssl_enabled: false` is accepted.
 - Kafka models shared `consent_management` only; do not add legacy include-key consent blocks `one_trust_cookie_categories` or `ketch_consent_purposes` unless a future task explicitly changes the destination-definition policy.
 
+## DEX-1088 — Kafka Static Versus Dynamic Pattern Validation
+<!-- ticket:DEX-1088 -->
+- Kafka `host_name`, `port`, `topic`, `username`, and `ssh.{host,port,user,public_key}` use plain `pattern=kafka_*` validation because their upstream schema properties expose only static regexes; accepting templates locally would make validation pass values that the backend rejects during apply.
+- Kafka topic-mapping fields remain dynamic where their own upstream properties explicitly include a template alternative: `event_type_to_topic_map[].to` and `event_to_topic_map[].{from,to}` use `dynamic_or_pattern`.
+- Decide template support per upstream property, not per destination or shared named regex; Kafka intentionally mixes static and template-capable fields.
+
 ## DEX-487 — ActiveCampaign Config Surface
 <!-- ticket:DEX-487 -->
 - ActiveCampaign models shared `consent_management` only; reject legacy include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` as unknown config keys for this onboarding.
