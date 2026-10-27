@@ -173,10 +173,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "intercom",
-		APIType:    "INTERCOM",
-		Version:    1,
-		Properties: properties,
+		Type:        "intercom",
+		DisplayName: "Intercom",
+		APIType:     "INTERCOM",
+		Version:     1,
+		Properties:  properties,
 		ConfigValidateFuncs: []rules.CustomValidateFunc{
 			{Tag: "intercom_app_id_required", Func: intercomModeConditional("device", intercomDeviceSources), CallEvenIfNull: true},
 			{Tag: "intercom_api_key_required", Func: intercomModeConditional("cloud", intercomCloudSources), CallEvenIfNull: true},

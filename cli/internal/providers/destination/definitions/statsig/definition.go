@@ -54,11 +54,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "statsig",
-		APIType:    "STATSIG",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"secret_key"},
+		Type:        "statsig",
+		DisplayName: "Statsig",
+		APIType:     "STATSIG",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"secret_key"},
 		NewConfig: func() any {
 			return &statsigConfig{}
 		},

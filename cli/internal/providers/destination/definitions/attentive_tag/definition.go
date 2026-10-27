@@ -71,11 +71,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "attentive_tag",
-		APIType:    "ATTENTIVE_TAG",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"api_key"},
+		Type:        "attentive_tag",
+		DisplayName: "Attentive Tag",
+		APIType:     "ATTENTIVE_TAG",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"api_key"},
 		NewConfig: func() any {
 			return &attentiveTagConfig{}
 		},

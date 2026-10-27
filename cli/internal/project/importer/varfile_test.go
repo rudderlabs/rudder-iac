@@ -61,6 +61,8 @@ func TestScaffoldSecretsVarFile(t *testing.T) {
 	raw, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.Contains(t, string(raw), "# Variables referenced by the imported specs")
+	assert.Contains(t, string(raw), "# For a multi-line value such as a PEM certificate or key, use a YAML literal")
+	assert.Contains(t, string(raw), "# The generated '{{ .VAR }}' references keep those line breaks.")
 	assert.Contains(t, string(raw), "BOOKS_ACCESS_KEY:\n")
 }
 

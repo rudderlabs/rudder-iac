@@ -154,10 +154,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "mp",
-		APIType:    "MP",
-		Version:    1,
-		Properties: properties,
+		Type:        "mp",
+		DisplayName: "Mixpanel",
+		APIType:     "MP",
+		Version:     1,
+		Properties:  properties,
 		// Deliberately broader than db-config secretKeys, which lists only
 		// gdprApiToken. token is Sensitive in terraform, and serviceAccountSecret
 		// is a credential by name and function though neither source classifies it

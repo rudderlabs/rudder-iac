@@ -57,6 +57,7 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:            "eventstreamonly",
+		DisplayName:     "Test",
 		Version:         1,
 		NewConfig:       func() any { return &endpointOnlyTestConfig{} },
 		SourceTypes:     []string{common.SourceTypeWeb},
@@ -64,6 +65,7 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 	}))
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:            "mirroronly",
+		DisplayName:     "Test",
 		Version:         1,
 		NewConfig:       func() any { return &endpointOnlyTestConfig{} },
 		SourceTypes:     []string{common.SourceTypeWarehouse},
@@ -72,6 +74,7 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 	}))
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:                 "hyphen-mapper",
+		DisplayName:          "Test",
 		APIType:              "HYPHEN-MAPPER",
 		Version:              1,
 		NewConfig:            func() any { return &endpointOnlyTestConfig{} },

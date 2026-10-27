@@ -28,8 +28,10 @@ func registeredWithConfig(t *testing.T, newConfig func() any) *RegisteredDefinit
 
 	def := GA4TestDefinition()
 	def.NewConfig = newConfig
-	// These stubs replace GA4's config surface; scope its required keys to match.
+	// These stubs replace GA4's config surface; scope its required and secret
+	// keys to match.
 	def.ConnectionRequiredKeys = nil
+	def.SecretKeys = nil
 
 	registered, err := newRegisteredDefinition(def)
 	require.NoError(t, err)
