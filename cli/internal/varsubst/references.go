@@ -120,8 +120,17 @@ func (r Replaced) SourcePosition(line, column int) (int, int) {
 	if written == before {
 		return line, column
 	}
-	lineStart := strings.LastIndexByte(written, '\n') + 1
-	return strings.Count(written, "\n") + 1, utf8.RuneCountInString(written[lineStart:]) + 1
+	line, lineStart := 1, 0
+	for i := 0; i < len(written); {
+		if n := breakLen([]byte(written[i:])); n > 0 {
+			i += n
+			line, lineStart = line+1, i
+			continue
+		}
+		_, size := utf8.DecodeRuneInString(written[i:])
+		i += size
+	}
+	return line, utf8.RuneCountInString(written[lineStart:]) + 1
 }
 
 // offsetOf returns the byte offset in data of a 1-indexed line and column,
@@ -129,15 +138,48 @@ func (r Replaced) SourcePosition(line, column int) (int, int) {
 func offsetOf(data []byte, line, column int) int {
 	offset := 0
 	for ; line > 1; line-- {
-		next := bytes.IndexByte(data[offset:], '\n')
-		if next < 0 {
+		for offset < len(data) && breakLen(data[offset:]) == 0 {
+			_, size := utf8.DecodeRune(data[offset:])
+			offset += size
+		}
+		if offset == len(data) {
 			return len(data)
 		}
-		offset += next + 1
+		offset += breakLen(data[offset:])
 	}
-	for ; column > 1 && offset < len(data) && data[offset] != '\n'; column-- {
+	for ; column > 1 && offset < len(data) && breakLen(data[offset:]) == 0; column-- {
 		_, size := utf8.DecodeRune(data[offset:])
 		offset += size
 	}
 	return offset
+}
+
+// Line breaks other than LF and CR that the YAML parser counts as one.
+var (
+	nextLine           = []byte("\u0085")
+	lineSeparator      = []byte("\u2028")
+	paragraphSeparator = []byte("\u2029")
+)
+
+// breakLen returns the length in bytes of the line break data starts with, or
+// 0. It counts what the YAML parser counts as one line break: LF, CR, CRLF,
+// NEL, LS and PS. A file with CR line endings would otherwise read as one
+// line.
+func breakLen(data []byte) int {
+	switch {
+	case len(data) == 0:
+		return 0
+	case data[0] == '\n':
+		return 1
+	case data[0] == '\r':
+		if len(data) > 1 && data[1] == '\n' {
+			return 2
+		}
+		return 1
+	case bytes.HasPrefix(data, nextLine):
+		return len(nextLine)
+	case bytes.HasPrefix(data, lineSeparator), bytes.HasPrefix(data, paragraphSeparator):
+		return len(lineSeparator)
+	}
+	return 0
 }

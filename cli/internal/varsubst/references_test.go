@@ -1,6 +1,7 @@
 package varsubst
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -165,30 +166,37 @@ func TestReplaced_Restore_LiteralPlaceholder(t *testing.T) {
 // than their placeholders, after a default holding a character wider than a
 // byte, and below a reference that spans two lines.
 func TestReplaced_SourcePosition(t *testing.T) {
-	input := []byte("a: '{{ .A }}'\n" +
-		"b: {from: '{{ .HDR_NAME }}', to: '{{ .SHARED }}', at: 1}\n" +
-		"c: {x: '{{ .X | \"é\" }}', y: 2}\n" +
-		"d: '{{ .D |\n  \"multi\" }}'\n" +
-		"e: {z: 3}\n")
-	replaced := ReplaceReferences(input)
-	require.Len(t, replaced.References, 5)
+	// The YAML parser counts CR and CRLF as line breaks too, so a file with
+	// those endings must map the same way.
+	for name, lineBreak := range map[string]string{"LF": "\n", "CRLF": "\r\n", "CR": "\r"} {
+		t.Run(name, func(t *testing.T) {
+			input := []byte(strings.ReplaceAll("a: '{{ .A }}'\n"+
+				"b: {from: '{{ .HDR_NAME }}', to: '{{ .SHARED }}', at: 1}\n"+
+				"c: {x: '{{ .X | \"é\" }}', y: 2}\n"+
+				"d: '{{ .D |\n  \"multi\" }}'\n"+
+				"e: {z: 3}\n", "\n", lineBreak))
+			replaced := ReplaceReferences(input)
+			require.Len(t, replaced.References, 5)
 
-	written, placeholders := keyPositions(t, input), keyPositions(t, replaced.Data)
-	require.Len(t, placeholders, len(written))
-	for key, position := range placeholders {
-		line, column := replaced.SourcePosition(position[0], position[1])
-		assert.Equal(t, written[key], [2]int{line, column}, key)
-	}
+			written, placeholders := keyPositions(t, input), keyPositions(t, replaced.Data)
+			require.Len(t, placeholders, len(written))
+			for key, position := range placeholders {
+				line, column := replaced.SourcePosition(position[0], position[1])
+				assert.Equal(t, written[key], [2]int{line, column}, key)
+			}
 
-	// These keys sit elsewhere in the placeholder copy, so the loop checks
-	// more than positions that stay put.
-	var moved []string
-	for key, position := range placeholders {
-		if position != written[key] {
-			moved = append(moved, key)
-		}
+			// These keys sit elsewhere in the placeholder copy, so the loop
+			// checks more than positions that stay put.
+			var moved []string
+			for key, position := range placeholders {
+				if position != written[key] {
+					moved = append(moved, key)
+				}
+			}
+			assert.ElementsMatch(t, []string{"b/to", "b/at", "c/y", "e", "e/z"}, moved)
+			assert.Equal(t, [2]int{6, 1}, written["e"], "the parser breaks lines at each ending")
+		})
 	}
-	assert.ElementsMatch(t, []string{"b/to", "b/at", "c/y", "e", "e/z"}, moved)
 }
 
 // keyPositions returns the line and column of every mapping key in data, keyed
