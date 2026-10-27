@@ -142,3 +142,25 @@ func TestAFailedWriteIsReportedOnceAndCountsTheLoss(t *testing.T) {
 	require.Equal(t, 1, out.writes)
 	require.Equal(t, 3, s.Lost())
 }
+
+// partialWriter writes the first n bytes it is given, then fails, as a disk
+// that fills in the middle of a write does.
+type partialWriter struct{ n int }
+
+func (w *partialWriter) Write(p []byte) (int, error) {
+	return min(w.n, len(p)), errors.New("no space left on device")
+}
+
+// A write that fails part way still wrote its whole lines, so only the events
+// after them are lost: the one cut short and the ones not reached.
+func TestAPartialWriteCountsOnlyTheEventsItDidNotWrite(t *testing.T) {
+	t.Parallel()
+	first := `{"event":"A"}` + "\n"
+	out := &partialWriter{n: len(first) + 3}
+	s := newStreamSink(out, io.Discard, "")
+
+	s.Capture(accepted(`{"event":"A"}`, `{"event":"B"}`, `{"event":"C"}`))
+
+	require.EqualError(t, <-s.failed, "no space left on device")
+	require.Equal(t, 2, s.Lost())
+}

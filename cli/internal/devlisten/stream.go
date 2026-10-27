@@ -73,10 +73,13 @@ func (s *streamSink) Capture(c *ingest.Capture) {
 		s.stamp(c.ReceivedAt)
 		s.buf.WriteByte('\n')
 	}
-	if _, err := s.out.Write(s.buf.Bytes()); err != nil {
+	if n, err := s.out.Write(s.buf.Bytes()); err != nil {
 		// The SDK still gets its answer, so the loss must stop the listener
-		// and show on stderr instead.
-		s.failure, s.lost = err, len(c.Events)
+		// and show on stderr instead. A write that failed part way, as on a
+		// disk that filled, still wrote the whole lines before n, and each
+		// line holds one event.
+		written := bytes.Count(s.buf.Bytes()[:n], []byte{'\n'})
+		s.failure, s.lost = err, len(c.Events)-written
 		s.failed <- err
 	}
 }
