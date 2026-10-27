@@ -56,7 +56,8 @@ type Config struct {
 	// Out gets each accepted event as one JSON line; nil discards them.
 	Out io.Writer
 	// Stamp adds a _dev object with serverId, seq and receivedAt to each
-	// line on Out, for a file that must say which listener wrote it.
+	// line on Out, for a file that must say which listener wrote it. It goes
+	// first, or last when the event has a _dev of its own.
 	Stamp bool
 	// Log gets one line per refused ingestion request; nil discards them.
 	Log io.Writer

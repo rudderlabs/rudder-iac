@@ -66,7 +66,8 @@ func newCmdListen() *cobra.Command {
 
 			--out FILE writes the events to FILE instead of stdout. It refuses a file that exists, so two
 			listeners never share one, and each line starts with a _dev object: the listener's serverId,
-			the line's seq from 1, and receivedAt. If an event cannot be written, to stdout or to FILE,
+			the line's seq from 1, and receivedAt. An event with a _dev of its own gets the listener's
+			last instead, where jq reads it. If an event cannot be written, to stdout or to FILE,
 			the listener stops and exits 1 with output_failed on stderr.
 
 			--port 0 lets the system pick a free port, so parallel runs never collide. A fixed port that

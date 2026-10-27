@@ -143,6 +143,39 @@ func TestAFailedWriteIsReportedOnceAndCountsTheLoss(t *testing.T) {
 	require.Equal(t, 3, s.Lost())
 }
 
+// An event can carry a _dev member of its own. The listener's then goes last,
+// where jq and encoding/json, which keep the last of two members with one
+// name, read it. A _dev deeper in the event is no collision.
+func TestStampedLinesKeepTheListenersDevWhenTheEventHasOne(t *testing.T) {
+	t.Parallel()
+	var out strings.Builder
+	s := newStreamSink(&out, io.Discard, "9f3ac1d2b7e4c601")
+
+	s.Capture(accepted(
+		`{"_dev":{"serverId":"fake-spoofed","seq":99},"event":"A"}`,
+		`{"_dev":"fake-escaped","event":"B"}`,
+		`{"properties":{"_dev":"nested"},"event":"C"}`,
+	))
+
+	const dev = `"_dev":{"serverId":"9f3ac1d2b7e4c601","seq":%s,"receivedAt":"2026-10-16T12:00:00.000005Z"}`
+	lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
+	require.Equal(t, []string{
+		`{"_dev":{"serverId":"fake-spoofed","seq":99},"event":"A",` + strings.Replace(dev, "%s", "1", 1) + `}`,
+		`{"_dev":"fake-escaped","event":"B",` + strings.Replace(dev, "%s", "2", 1) + `}`,
+		`{` + strings.Replace(dev, "%s", "3", 1) + `,"properties":{"_dev":"nested"},"event":"C"}`,
+	}, lines)
+
+	for i, line := range lines {
+		var got map[string]any
+		require.NoError(t, json.Unmarshal([]byte(line), &got))
+		require.Equal(t, map[string]any{
+			"serverId":   "9f3ac1d2b7e4c601",
+			"seq":        float64(i + 1),
+			"receivedAt": "2026-10-16T12:00:00.000005Z",
+		}, got["_dev"], line)
+	}
+}
+
 // partialWriter writes the first n bytes it is given, then fails, as a disk
 // that fills in the middle of a write does.
 type partialWriter struct{ n int }

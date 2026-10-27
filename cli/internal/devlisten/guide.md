@@ -86,7 +86,9 @@ event as stdout prints it:
 
 `serverId` matches the ready line, `seq` counts the lines from 1, and `receivedAt`
 is when the request arrived. The jq checks above work on these lines as they are.
-Only the file's owner can read it.
+Only the file's owner can read it. An event that sends a `_dev` member of its own
+keeps it, and the listener's `_dev` goes last on that line instead, so jq, which
+keeps the last of two members with one name, still reads the listener's.
 
 ## Point an app at the listener
 

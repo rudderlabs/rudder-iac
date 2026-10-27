@@ -22,6 +22,7 @@ type streamSink struct {
 	log  io.Writer
 	buf  bytes.Buffer
 	line bytes.Buffer
+	dev  bytes.Buffer
 
 	// serverID is set when each line carries a _dev object, so lines from
 	// two listeners can be told apart. seq counts the lines written.
@@ -85,7 +86,10 @@ func (s *streamSink) Capture(c *ingest.Capture) {
 }
 
 // stamp writes the line to buf. With a server id, a _dev object goes first
-// inside the event, and the rest of the line is the event as it is.
+// inside the event, and the rest of the line is the event as it is. An event
+// that has a _dev member of its own gets the listener's _dev last instead, so
+// that jq and JSON parsers, which keep the last of two members with one name,
+// read the listener's.
 func (s *streamSink) stamp(receivedAt time.Time) {
 	event := s.line.Bytes()
 	if s.serverID == "" || len(event) < 2 || event[0] != '{' {
@@ -93,19 +97,61 @@ func (s *streamSink) stamp(receivedAt time.Time) {
 		return
 	}
 	s.seq++
-	s.buf.WriteString(`{"_dev":{"serverId":`)
-	s.buf.WriteString(strconv.Quote(s.serverID))
-	s.buf.WriteString(`,"seq":`)
-	s.buf.WriteString(strconv.FormatUint(s.seq, 10))
-	s.buf.WriteString(`,"receivedAt":"`)
-	s.buf.WriteString(receivedAt.UTC().Format(time.RFC3339Nano))
-	s.buf.WriteString(`"}`)
-	if rest := event[1:]; rest[0] != '}' {
+	dev := &s.dev
+	dev.Reset()
+	dev.WriteString(`"_dev":{"serverId":`)
+	dev.WriteString(strconv.Quote(s.serverID))
+	dev.WriteString(`,"seq":`)
+	dev.WriteString(strconv.FormatUint(s.seq, 10))
+	dev.WriteString(`,"receivedAt":"`)
+	dev.WriteString(receivedAt.UTC().Format(time.RFC3339Nano))
+	dev.WriteString(`"}`)
+
+	switch {
+	case event[1] == '}':
+		s.buf.WriteByte('{')
+		s.buf.Write(dev.Bytes())
+		s.buf.WriteByte('}')
+	case hasMember(event, "_dev"):
+		s.buf.Write(event[:len(event)-1])
 		s.buf.WriteByte(',')
-		s.buf.Write(rest)
-		return
+		s.buf.Write(dev.Bytes())
+		s.buf.WriteByte('}')
+	default:
+		s.buf.WriteByte('{')
+		s.buf.Write(dev.Bytes())
+		s.buf.WriteByte(',')
+		s.buf.Write(event[1:])
 	}
-	s.buf.WriteByte('}')
+}
+
+// hasMember reports whether object is a valid JSON object with a member named
+// name at its top level, however the name is escaped.
+func hasMember(object []byte, name string) bool {
+	if !bytes.Contains(object, []byte(name)) && !bytes.Contains(object, []byte(`\u`)) {
+		return false
+	}
+	if !json.Valid(object) {
+		return false
+	}
+	dec := json.NewDecoder(bytes.NewReader(object))
+	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
+		return false
+	}
+	for dec.More() {
+		key, err := dec.Token()
+		if err != nil {
+			return false
+		}
+		if key == name {
+			return true
+		}
+		var value json.RawMessage
+		if err := dec.Decode(&value); err != nil {
+			return false
+		}
+	}
+	return false
 }
 
 // Lost is the number of accepted events the sink could not write.
