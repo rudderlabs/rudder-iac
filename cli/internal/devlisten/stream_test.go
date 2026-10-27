@@ -153,7 +153,7 @@ func TestStampedLinesKeepTheListenersDevWhenTheEventHasOne(t *testing.T) {
 
 	s.Capture(accepted(
 		`{"_dev":{"serverId":"fake-spoofed","seq":99},"event":"A"}`,
-		`{"_dev":"fake-escaped","event":"B"}`,
+		`{"\u005fdev":"fake-escaped","event":"B"}`,
 		`{"properties":{"_dev":"nested"},"event":"C"}`,
 	))
 
@@ -161,7 +161,7 @@ func TestStampedLinesKeepTheListenersDevWhenTheEventHasOne(t *testing.T) {
 	lines := strings.Split(strings.TrimSuffix(out.String(), "\n"), "\n")
 	require.Equal(t, []string{
 		`{"_dev":{"serverId":"fake-spoofed","seq":99},"event":"A",` + strings.Replace(dev, "%s", "1", 1) + `}`,
-		`{"_dev":"fake-escaped","event":"B",` + strings.Replace(dev, "%s", "2", 1) + `}`,
+		`{"\u005fdev":"fake-escaped","event":"B",` + strings.Replace(dev, "%s", "2", 1) + `}`,
 		`{` + strings.Replace(dev, "%s", "3", 1) + `,"properties":{"_dev":"nested"},"event":"C"}`,
 	}, lines)
 
