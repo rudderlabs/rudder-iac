@@ -254,16 +254,30 @@ func TestSpecSyntaxValidRuleEmptyRegistry(t *testing.T) {
 func TestSpecSyntaxValidRuleInvalidVersion(t *testing.T) {
 	t.Parallel()
 
-	spec := validSpecMap()
-	spec["definition_version"] = 2
+	cases := []struct {
+		name    string
+		version int
+	}{
+		{name: "unregistered version", version: 2},
+		{name: "zero is an invalid version, not a missing one", version: 0},
+	}
 
-	results := runSyntaxRule(t, ruleTestRegistry(t), spec)
-	assert.Equal(t, []vrules.ValidationResult{
-		{
-			Reference: "/spec/definition_version",
-			Message:   "version not valid for destination type 'WEBHOOK'; valid versions: 1",
-		},
-	}, results)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			spec := validSpecMap()
+			spec["definition_version"] = c.version
+
+			results := runSyntaxRule(t, ruleTestRegistry(t), spec)
+			assert.Equal(t, []vrules.ValidationResult{
+				{
+					Reference: "/spec/definition_version",
+					Message:   "version not valid for destination type 'WEBHOOK'; valid versions: 1",
+				},
+			}, results)
+		})
+	}
 }
 
 func TestSpecSyntaxValidRuleTransformationRefFormat(t *testing.T) {

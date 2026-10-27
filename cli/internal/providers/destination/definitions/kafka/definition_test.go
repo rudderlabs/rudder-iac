@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -721,7 +722,7 @@ func TestKafkaDestinationSpecExtraction(t *testing.T) {
 		DisplayName:       "Kafka Production",
 		Type:              "kafka",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Config: map[string]any{
 			"host_name": "broker1.example.com",
 			"port":      "9092",

@@ -53,3 +53,7 @@
 - Destination definition defaults intentionally support scalar default tags only; `cli/internal/providers/destination/definitions/defaults.go` rejects slice defaults, and that refusal is asserted in `defaults_test.go`.
 - Slack is currently the only registered destination whose schema declares non-scalar top-level defaults, so its empty-array defaults need fixture/snapshot pinning until DEX-704 teaches the defaults/converter layer to preserve empty arrays.
 - `converter.ArrayWithStrings` can drop explicitly empty lists because of its non-empty-content guard, so fixing array defaults requires both defaults-engine support and empty-list preservation in converters rather than only adding `default:"[]"` tags.
+
+## DEX-1079 — Raw Decoder Text For Wrong-Typed Destination Envelope Fields
+<!-- ticket:DEX-1079 -->
+- `decodeDestinationSpec` (`cli/internal/providers/destination/rule_spec_syntax_valid.go`) returns mapstructure's error verbatim at reference `/spec`, so a wrong-typed envelope field such as `definition_version: "1"` reports a multi-line `decoding spec: decoding failed due to the following error(s): 'definition_version' expected type 'int64', got unconvertible type 'string'` pointing at the `spec:` line instead of a per-field message at `/spec/definition_version`. DEX-1079 reported it; that fix covered only `0`.
