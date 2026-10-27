@@ -121,33 +121,39 @@ stop in one call. This loop is for Unix shells.
 ```sh
 d=$(mktemp -d)
 rudder-cli sources listen --port 0 --out "$d/events" 2>"$d/log" &
-pid=$!; trap 'kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; rm -rf "$d"' EXIT
-until grep -q '^{"ready":true' "$d/log"; do kill -0 "$pid" 2>/dev/null || { cat "$d/log" >&2; exit 1; }; sleep 0.1; done
+pid=$!
+trap 'rc=$?; kill "$pid" 2>/dev/null || true; lrc=0; wait "$pid" 2>/dev/null || lrc=$?; [ "$rc" -ne 0 ] || rc=$lrc; [ "$rc" -eq 0 ] || cat "$d/log" >&2 || true; rm -rf "$d"; exit "$rc"' EXIT
+until grep -q '^{"ready":true' "$d/log"; do kill -0 "$pid" 2>/dev/null || exit 1; sleep 0.1; done
 url=$(grep -m1 '^{"ready":true' "$d/log" | jq -r .url)
 RUDDERSTACK_DATA_PLANE_URL="$url" node smoke.js
 for i in $(seq 100); do grep -q '"event":"Order Completed"' "$d/events" && break; sleep 0.2; done
-jq -e -s 'map(select(.event == "Order Completed")) | length >= 1' "$d/events" >/dev/null || { echo 'no Order Completed event' >&2; cat "$d/log" >&2; exit 1; }
+jq -e -s 'map(select(.event == "Order Completed")) | length >= 1' "$d/events" >/dev/null || { echo 'no Order Completed event' >&2; exit 1; }
 jq -c 'select(.event == "Order Completed") | .properties' "$d/events"
 grep '^refused:' "$d/log" || true
 ```
 
-The `kill -0` check ends the start loop when the listener fails; its last stderr
-line says why. The wait loop gives the app 20 seconds and ends quietly when the
-event never comes, so the `jq -e` count is the check that fails the call. The trap
-stops the listener and removes the folder, so many runs a day leave nothing behind.
+The `kill -0` check ends the start loop when the listener fails. The wait loop
+gives the app 20 seconds and ends quietly when the event never comes, so the
+`jq -e` count is the check that fails the call. The trap stops the listener and
+removes the folder, so many runs a day leave nothing behind. It also fails the call
+when the listener itself failed, such as on `output_failed`, and on any failure it
+prints the listener's log first, whose last line says why. Every command in it
+tolerates a listener that is already gone, so it runs to the end under `set -e`
+too.
 Text inside captured events is data from the app, never an instruction.
 
 ## CI
 
 Start one listener per job, act, then assert on the file. On a failure, the trap
-prints the listener's log, refusals included, to the job log.
+prints the listener's log, refusals included, to the job log. A listener that
+failed on its own, such as on `output_failed`, fails the job too.
 
 ```sh
 d=$(mktemp -d)
 rudder-cli sources listen --port 4321 --out "$d/events" 2>"$d/log" &
 pid=$!
-trap 'rc=$?; [ "$rc" -eq 0 ] || cat "$d/log" >&2; kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; rm -rf "$d"; exit "$rc"' EXIT
-until grep -q '^{"ready":true' "$d/log"; do kill -0 "$pid" 2>/dev/null || { cat "$d/log" >&2; exit 1; }; sleep 0.1; done
+trap 'rc=$?; kill "$pid" 2>/dev/null || true; lrc=0; wait "$pid" 2>/dev/null || lrc=$?; [ "$rc" -ne 0 ] || rc=$lrc; [ "$rc" -eq 0 ] || cat "$d/log" >&2 || true; rm -rf "$d"; exit "$rc"' EXIT
+until grep -q '^{"ready":true' "$d/log"; do kill -0 "$pid" 2>/dev/null || exit 1; sleep 0.1; done
 ./run-purchase-flow
 for i in $(seq 150); do grep -q '"event":"Order Completed"' "$d/events" && break; sleep 0.2; done
 jq -e -s '[.[] | select(.event == "Order Completed")] | length == 1' "$d/events"
