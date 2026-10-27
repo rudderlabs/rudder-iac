@@ -193,17 +193,65 @@ func (pi *PathIndex) walkNode(node *yaml.Node, path string, key *yaml.Node) {
 func (pi *PathIndex) walkChildren(node *yaml.Node, path string) {
 	switch node.Kind {
 	case yaml.MappingNode:
-		// Mapping nodes contain alternating key-value pairs
-		for i := 0; i+1 < len(node.Content); i += 2 {
-			keyNode, valueNode := node.Content[i], node.Content[i+1]
-			pi.walkNode(valueNode, fmt.Sprintf("%s/%s", path, keyNode.Value), keyNode)
-		}
+		pi.walkMapping(node, path, map[string]bool{})
 
 	case yaml.SequenceNode:
 		for idx, item := range node.Content {
 			pi.walkNode(item, fmt.Sprintf("%s/%d", path, idx), nil)
 		}
 	}
+}
+
+// walkMapping walks the values of a mapping below path, skipping the keys in
+// indexed. A merge key (<<) adds the keys of the mappings it names at their
+// own lines, below path, as the decoded spec has them: a key the mapping
+// writes wins over a merged one, and among merged mappings the first wins, as
+// the YAML decoder merges them. Without this a diagnostic on a merged key
+// printed the mapping's line, which for a list item shows its first
+// property, such as a secret.
+func (pi *PathIndex) walkMapping(node *yaml.Node, path string, indexed map[string]bool) {
+	var merges []*yaml.Node
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		keyNode, valueNode := node.Content[i], node.Content[i+1]
+		if keyNode.ShortTag() == "!!merge" {
+			merges = append(merges, valueNode)
+			continue
+		}
+		if indexed[keyNode.Value] {
+			continue
+		}
+		indexed[keyNode.Value] = true
+		pi.walkNode(valueNode, fmt.Sprintf("%s/%s", path, keyNode.Value), keyNode)
+	}
+
+	for _, merge := range merges {
+		sources := []*yaml.Node{merge}
+		if merge.Kind == yaml.SequenceNode {
+			sources = merge.Content
+		}
+		for _, source := range sources {
+			pi.walkMerged(source, path, indexed)
+		}
+	}
+}
+
+// walkMerged walks one mapping a merge key names, directly or through an
+// alias, below path.
+func (pi *PathIndex) walkMerged(source *yaml.Node, path string, indexed map[string]bool) {
+	if source.Kind != yaml.AliasNode {
+		if source.Kind == yaml.MappingNode {
+			pi.walkMapping(source, path, indexed)
+		}
+		return
+	}
+	target := source.Alias
+	if target == nil || target.Kind != yaml.MappingNode || pi.expanding[target] || pi.aliasBudget <= 0 {
+		return
+	}
+	pi.aliasBudget--
+	pi.expanding[target] = true
+	defer delete(pi.expanding, target)
+	pi.walkMapping(target, path, indexed)
 }
 
 // recordPosition records a position for a given path

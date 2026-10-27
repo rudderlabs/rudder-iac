@@ -588,3 +588,49 @@ func TestPathIndex_AliasWalksAreCapped(t *testing.T) {
 	_, err = pi.PositionLookup("/g/9/9/9/9/9/9")
 	require.ErrorIs(t, err, ErrPathNotFound, "walks past the cap are not")
 }
+
+// A merge key (<<) adds the keys of the mappings it names at their own lines,
+// as the decoder merges them: a key the mapping writes wins, and among merged
+// mappings the first wins.
+func TestPathIndex_MergeKeys(t *testing.T) {
+	t.Parallel()
+
+	pi, err := NewPathIndexer([]byte(`base: &base
+  to: X-Base
+  from: sk-fake-base
+other: &other
+  to: X-Other
+  method: POST
+rows:
+  - from: sk-fake-row
+    <<: *base
+  - <<: [*other, *base]
+`))
+	require.NoError(t, err)
+
+	cases := []struct {
+		path string
+		want Position
+	}{
+		// Merged from base, at base's line.
+		{path: "/rows/0/to", want: Position{Line: 2, Column: 3, LineText: "to: X-Base"}},
+		// Written in the row, so the row's own key wins.
+		{path: "/rows/0/from", want: Position{Line: 8, Column: 5, LineText: "from: sk-fake-row"}},
+		// other comes first in the list, so its to wins over base's.
+		{path: "/rows/1/to", want: Position{Line: 5, Column: 3, LineText: "to: X-Other"}},
+		{path: "/rows/1/method", want: Position{Line: 6, Column: 3, LineText: "method: POST"}},
+		{path: "/rows/1/from", want: Position{Line: 3, Column: 3, LineText: "from: sk-fake-base"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.path, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := pi.PositionLookup(tc.path)
+			require.NoError(t, err)
+			assert.Equal(t, &tc.want, got)
+		})
+	}
+
+	_, err = pi.PositionLookup("/rows/0/<<")
+	require.ErrorIs(t, err, ErrPathNotFound, "a merge key is no path of the decoded spec")
+}
