@@ -315,6 +315,18 @@ func TestSpecSyntaxValidRuleConfigErrors(t *testing.T) {
 	}, results)
 }
 
+func TestSpecSyntaxValidRuleConfigNullValue(t *testing.T) {
+	t.Parallel()
+
+	spec := validSpecMap()
+	spec["config"] = map[string]any{"webhook_url": nil}
+
+	results := runSyntaxRule(t, ruleTestRegistry(t), spec)
+	assert.Equal(t, []vrules.ValidationResult{
+		{Reference: "/spec/config/webhook_url", Message: "'webhook_url' must not be null; set a value or remove the key"},
+	}, results)
+}
+
 func TestSpecSyntaxValidRuleSourceTypeKeys(t *testing.T) {
 	t.Parallel()
 
@@ -328,6 +340,19 @@ func TestSpecSyntaxValidRuleSourceTypeKeys(t *testing.T) {
 			config: map[string]any{
 				"webhook_url":     "https://example.com/hook",
 				"connection_mode": map[string]any{"ios": "cloud"},
+			},
+			expected: []vrules.ValidationResult{
+				{
+					Reference: "/spec/config/connection_mode/ios",
+					Message:   "source type 'ios' is not supported by destination type 'WEBHOOK'; supported source types: web, react_native",
+				},
+			},
+		},
+		{
+			name: "null under an unsupported source type",
+			config: map[string]any{
+				"webhook_url":     "https://example.com/hook",
+				"connection_mode": map[string]any{"ios": nil},
 			},
 			expected: []vrules.ValidationResult{
 				{
