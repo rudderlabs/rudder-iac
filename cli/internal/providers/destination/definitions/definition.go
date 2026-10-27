@@ -94,11 +94,12 @@ type RegisteredDefinition struct {
 func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigError {
 	// A null under an unknown key isn't reported: removing the key fixes both.
 	nullErrors := errorsOutside(findNullValues(config, ""), findUnknownKeys(config, d.configType, ""))
+	rawErrors := slices.Concat(nullErrors, findEmptyEnumValues(config, d.fields))
 	config = d.ApplyDefaults(config)
 	errors := validateConfigModel(config, d.configType, "", d.ConfigValidateFuncs...)
 	errors = append(errors, d.validateConsentManagement(config)...)
 	errors = append(errors, d.validateConnectionMode(config)...)
-	return append(nullErrors, errorsOutside(errors, nullErrors)...)
+	return append(rawErrors, errorsOutside(errors, rawErrors)...)
 }
 
 func (d *RegisteredDefinition) LocalToAPI(local map[string]any) (map[string]any, error) {

@@ -37,7 +37,7 @@ type describeAuth struct {
 type describeConfig struct {
 	APIKey            string                   `mapstructure:"api_key" validate:"required,dynamic_or_pattern=describe_short"`
 	Region            string                   `mapstructure:"region" validate:"required,oneof=us eu"`
-	Mode              *string                  `mapstructure:"mode" validate:"omitempty,dynamic_or_oneof=fast safe"`
+	Mode              *string                  `mapstructure:"mode" validate:"omitempty,dynamic_or_oneof='' fast safe"`
 	UseAuth           *bool                    `mapstructure:"use_auth" default:"false"`
 	AuthKey           string                   `mapstructure:"auth_key" validate:"required_if=UseAuth true Region eu,max=20"`
 	Fallback          string                   `mapstructure:"fallback" validate:"required_unless=Region us,required_with=AuthKey"`
@@ -83,6 +83,48 @@ func describeDefinition() *definitions.DestinationDefinition {
 
 func intPtr(v int) *int { return &v }
 
+// oneof and dynamic_or_oneof read members the way go-playground does: quotes
+// group a member that holds spaces, and a pair with nothing between them is "".
+func TestDescribeReadsQuotedOneOfMembers(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "quoted",
+		DisplayName: "Quoted",
+		Version:     1,
+		NewConfig: func() any {
+			return &struct {
+				Middle string `mapstructure:"middle" validate:"omitempty,oneof=a '' b"`
+				End    string `mapstructure:"end" validate:"omitempty,dynamic_or_oneof=a b ''"`
+				Alone  string `mapstructure:"alone" validate:"omitempty,oneof=''"`
+				Spaced string `mapstructure:"spaced" validate:"omitempty,dynamic_or_oneof='Page View' Track"`
+			}{}
+		},
+	}))
+	registered, err := registry.Get("quoted", 1)
+	require.NoError(t, err)
+
+	enums := map[string][]any{}
+	for _, field := range registered.Describe().Fields {
+		enums[field.Key] = field.Enum
+	}
+	assert.Equal(t, map[string][]any{
+		"middle": {"a", "", "b"},
+		"end":    {"a", "b", ""},
+		"alone":  {""},
+		"spaced": {"Page View", "Track"},
+	}, enums)
+
+	assert.Empty(t, registered.ValidateConfig(map[string]any{"middle": "", "end": "", "alone": "", "spaced": "Page View"}))
+	want := []definitions.ConfigError{{
+		Path:    "/spaced",
+		Message: `'spaced' must be one of ["Page View" Track] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})`,
+	}}
+	assert.Equal(t, want, registered.ValidateConfig(map[string]any{"spaced": "Page"}))
+	assert.Equal(t, want, registered.ValidateConfig(map[string]any{"spaced": ""}))
+}
+
 func TestDescribeReadsTheConfigModel(t *testing.T) {
 	t.Parallel()
 
@@ -108,7 +150,7 @@ func TestDescribeReadsTheConfigModel(t *testing.T) {
 		Fields: []definitions.Field{
 			{Key: "api_key", Type: "string", Required: true, Pattern: "describe_short", AcceptsTemplate: true, Secret: true},
 			{Key: "region", Type: "string", Required: true, Enum: []any{"us", "eu"}},
-			{Key: "mode", Type: "string", Enum: []any{"fast", "safe"}, OpenEnum: true, AcceptsTemplate: true},
+			{Key: "mode", Type: "string", Enum: []any{"", "fast", "safe"}, OpenEnum: true, AcceptsTemplate: true},
 			{Key: "use_auth", Type: "boolean", Default: false, HasDefault: true},
 			{
 				Key:  "auth_key",
@@ -431,6 +473,15 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 			wantErr: `reading config key "tags": validate rule "max" after dive would be described as a rule on the list`,
 		},
 		{
+			name: "omitempty next to an enum on each item of a list",
+			newConfig: func() any {
+				return &struct {
+					Tags []string `mapstructure:"tags" validate:"omitempty,dive,omitempty,oneof=a b"`
+				}{}
+			},
+			wantErr: `reading config key "tags": omitempty after dive skips the enum on an empty item`,
+		},
+		{
 			name: "required inside a block that is not a pointer",
 			newConfig: func() any {
 				return &struct {
@@ -555,10 +606,11 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 			name: "a quoted parameter",
 			newConfig: func() any {
 				return &struct {
-					Event string `mapstructure:"event" validate:"omitempty,oneof='Page View' Track"`
+					Event string `mapstructure:"event" validate:"omitempty,excluded_if=Mode 'fast mode'"`
+					Mode  string `mapstructure:"mode"`
 				}{}
 			},
-			wantErr: `reading config key "event": validate rule "oneof='Page View' Track" uses |, a quote or an escaped character`,
+			wantErr: `reading config key "event": validate rule "excluded_if=Mode 'fast mode'" uses |, a quote or an escaped character`,
 		},
 		{
 			name: "an escaped comma",

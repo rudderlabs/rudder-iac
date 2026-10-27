@@ -36,7 +36,7 @@ var connectionModes = map[string][]string{
 
 type offlineConversionTypeMapping struct {
 	From string `mapstructure:"from" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	To   string `mapstructure:"to" validate:"omitempty,oneof=click call store"`
+	To   string `mapstructure:"to" validate:"omitempty,oneof='' click call store"`
 }
 
 type eventNameMapping struct {

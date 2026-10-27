@@ -33,7 +33,7 @@ Translate constraints to `validate` struct tags on the config struct:
 | --- | --- |
 | key in `required` | `required` |
 | `minLength`/`maxLength` keywords (not a pattern) | `min=N` / `max=N` |
-| `enum: ["a","b"]` | `oneof=a b`, unless schema.json declares a `{{ … \|\| … }}` alternative for that field — then `dynamic_or_oneof=a b`. See "Let schema.json decide whether a value may be dynamic" below |
+| `enum: ["a","b"]` | `oneof=a b`, unless schema.json declares a `{{ … \|\| … }}` alternative for that field — then `dynamic_or_oneof=a b`. See "Let schema.json decide whether a value may be dynamic" and "Let schema.json decide whether an enum may be empty" below |
 | any `pattern` | a named pattern from the shared registry (see "Enforcing regex patterns" below). `dynamic_or_pattern=<name>` when schema.json wraps the regex in a `{{ … \|\| … }}` alternative (the usual shape): passes `{{ path \|\| fallback }}` templates, otherwise enforces the named pattern. Plain `pattern=<name>` when schema.json declares the bare regex, so templates are rejected too. See "Let schema.json decide whether a value may be dynamic" below |
 | `minLength`/`maxLength` | `min=N` / `max=N` |
 | `if/then` or `allOf` conditionals | `required_if=Field value`, `excluded_if=Field value` (see S3 `iam_role_arn`/`access_key` for the pattern). See "Conditional requiredness" below — the built-ins cover every shape upstream uses |
@@ -63,6 +63,12 @@ Notes:
   `(^\{\{.*\|\|(.*)\}\}$)|(^env[.].+)|<real>`, and only the `{{ … || … }}` branch
   counts. Disregard `(^env[.].+)` wherever it appears — in schema.json and in
   terraform validators alike.
+- **Let schema.json decide whether an enum may be empty.** An optional enum still
+  rejects an explicitly configured `""` unless its schema enum includes the empty
+  member. List that member only where schema.json does, as a quoted empty value:
+  `oneof='' a b` or `dynamic_or_oneof='' a b`. Never infer empty-string support
+  from `omitempty`, because that tag only controls whether validation runs for a
+  Go zero value and the backend still receives a present empty key.
 - **Let schema.json decide whether a value may be dynamic.** Pick the tag from
   what the property declares, not from the shape of the constraint: if it admits
   the `{{ path || fallback }}` form, use `dynamic_or_pattern` / `dynamic_or_oneof`;
