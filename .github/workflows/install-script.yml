@@ -7,9 +7,14 @@ on:
       - "install.sh"
       - ".github/workflows/install-script.yml"
   workflow_dispatch:
-  # Lets the release workflow run these jobs once goreleaser has uploaded a
-  # release's assets. No workflow calls it yet.
+  # release.yml calls this with the tag it released, once it has attached
+  # install.sh to that release. Only the release-asset job runs then.
   workflow_call:
+    inputs:
+      tag:
+        description: release tag whose install.sh to test, such as v0.29.0
+        type: string
+        required: true
 
 # In a called workflow, github.workflow is the caller's name, so the group
 # starts with this workflow's own name instead.
@@ -22,6 +27,7 @@ permissions:
 
 jobs:
   shellcheck:
+    if: inputs.tag == ''
     name: shellcheck install.sh
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -41,7 +47,18 @@ jobs:
           shellcheck --version
           shellcheck install.sh
 
+      - name: keep the line that release.yml sets
+        run: |
+          # release.yml sets RELEASE_TAG in the copy it attaches to a release by
+          # matching this whole line, so it must appear exactly once, unchanged.
+          n=$(grep -c '^RELEASE_TAG=""$' install.sh || true)
+          if [ "$n" -ne 1 ]; then
+            echo "::error file=install.sh::install.sh needs exactly one line RELEASE_TAG=\"\" (found $n)"
+            exit 1
+          fi
+
   install:
+    if: inputs.tag == ''
     name: install on ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -76,6 +93,17 @@ jobs:
         run: |
           sh install.sh
           "$RUDDER_CLI_INSTALL_DIR/rudder-cli" --version | grep -Fx "rudder-cli version 0.27.0"
+
+      - name: install the release that RELEASE_TAG names, and let RUDDER_CLI_VERSION override it
+        env:
+          RUDDER_CLI_INSTALL_DIR: ${{ runner.temp }}/stamped
+        run: |
+          # The edit release.yml makes to the copy it attaches to a release.
+          sed 's/^RELEASE_TAG=""$/RELEASE_TAG="v0.27.0"/' install.sh >"$RUNNER_TEMP/stamped.sh"
+          sh "$RUNNER_TEMP/stamped.sh"
+          "$RUDDER_CLI_INSTALL_DIR/rudder-cli" --version | grep -Fx "rudder-cli version 0.27.0"
+          RUDDER_CLI_VERSION=0.26.0 sh "$RUNNER_TEMP/stamped.sh"
+          "$RUDDER_CLI_INSTALL_DIR/rudder-cli" --version | grep -Fx "rudder-cli version 0.26.0"
 
       - name: name the copy that runs when another one comes first on PATH
         env:
@@ -159,6 +187,7 @@ jobs:
           test ! -e "$RUDDER_CLI_INSTALL_DIR/rudder-cli"
 
   busybox:
+    if: inputs.tag == ''
     # Alpine has no curl, so this runs the wget branches under busybox sh, with
     # the script read from stdin as the README's curl | sh delivers it.
     name: install with busybox wget and sh on alpine
@@ -190,3 +219,29 @@ jobs:
             grep -Fx "rudder-cli install: release v9.9.9 does not exist; see https://github.com/rudderlabs/rudder-iac/releases" /tmp/missing.txt
             test ! -e /tmp/missing
           '
+
+  release-asset:
+    if: inputs.tag != ''
+    name: install ${{ inputs.tag }} from its release on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: install with the README's command, from the tag's install.sh
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::the tag input is not a vX.Y.Z tag"
+            exit 1
+          fi
+          curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/install.sh" | sh
+          "$HOME/.local/bin/rudder-cli" --version | grep -Fx "rudder-cli version ${TAG#v}"

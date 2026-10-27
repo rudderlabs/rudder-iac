@@ -26,18 +26,26 @@
 On macOS and Linux, this command installs the latest release:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh | sh
+curl -fsSL https://github.com/rudderlabs/rudder-iac/releases/latest/download/install.sh | sh
 ```
+
+Each release from 0.29.0 on has its own copy of the script, which installs that release:
+
+```sh
+curl -fsSL https://github.com/rudderlabs/rudder-iac/releases/download/v0.29.0/install.sh | sh
+```
+
+For about five minutes after a new release is published, its files are still uploading and the first command fails with a 404. Run it again after that.
 
 The script picks the release archive for your OS and CPU, checks it against the release's checksums file, and installs `rudder-cli` into `~/.local/bin` without `sudo`. It runs the new binary once before it replaces anything, so a release that cannot run on your system leaves an existing `rudder-cli` in place. If that directory is not on your `PATH`, the script prints the line to add to your shell profile. If another `rudder-cli` comes earlier on your `PATH`, such as one that the manual steps below put in `/usr/local/bin`, the script names the copy that runs and prints the same line, which puts the new one first.
 
 Set these variables on the `sh` side of the pipe to change the defaults:
 
-- `RUDDER_CLI_VERSION` installs a specific release, such as `0.27.0` or `v0.27.0`. The default is the latest release.
+- `RUDDER_CLI_VERSION` installs a specific release, such as `0.27.0` or `v0.27.0`, including releases from before 0.29.0. The default is the release the script belongs to, which for the first command above is the latest.
 - `RUDDER_CLI_INSTALL_DIR` installs into a different directory.
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh | RUDDER_CLI_VERSION=0.27.0 RUDDER_CLI_INSTALL_DIR="$HOME/bin" sh
+curl -fsSL https://github.com/rudderlabs/rudder-iac/releases/latest/download/install.sh | RUDDER_CLI_VERSION=0.27.0 RUDDER_CLI_INSTALL_DIR="$HOME/bin" sh
 ```
 
 The script does not support Windows. Download the `.zip` for your CPU from the [latest release](https://github.com/rudderlabs/rudder-iac/releases/latest) instead.

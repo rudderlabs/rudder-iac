@@ -1,10 +1,14 @@
 #!/bin/sh
 # Installs rudder-cli from the GitHub releases of rudderlabs/rudder-iac.
 #
-#   curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh | sh
+#   curl -fsSL https://github.com/rudderlabs/rudder-iac/releases/latest/download/install.sh | sh
+#
+# Each release from v0.29.0 on has its own copy of this script, which installs
+# that release: releases/download/v0.29.0/install.sh installs v0.29.0.
 #
 # Environment variables:
-#   RUDDER_CLI_VERSION      release to install, such as 0.28.0 or v0.28.0 (default: latest)
+#   RUDDER_CLI_VERSION      release to install, such as 0.28.0 or v0.28.0 (default: the
+#                           release this copy belongs to; latest for the copy in the repository)
 #   RUDDER_CLI_INSTALL_DIR  directory to install into (default: $HOME/.local/bin)
 #
 # The script checks the archive against the release's checksums file and refuses
@@ -15,6 +19,11 @@ set -eu
 REPO="rudderlabs/rudder-iac"
 BIN="rudder-cli"
 RELEASES="https://github.com/$REPO/releases"
+# The release workflow (.github/workflows/release.yml) sets this to the tag, such
+# as v0.29.0, in the copy it attaches to that release. The copy in the repository
+# leaves it empty and installs the latest release. The workflow and CI match the
+# whole line, so keep it exactly as it is.
+RELEASE_TAG=""
 
 # Messages go through printf, not echo: the echo of dash and of macOS sh rewrites
 # backslash sequences such as \c, which a folder name can contain.
@@ -124,7 +133,7 @@ main() {
     arch="arm64"
   fi
 
-  version="${RUDDER_CLI_VERSION:-latest}"
+  version="${RUDDER_CLI_VERSION:-${RELEASE_TAG:-latest}}"
   if [ "$version" = "latest" ]; then
     tag=$(latest_tag) || tag=""
     case "$tag" in
