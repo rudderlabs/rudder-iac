@@ -78,10 +78,9 @@ func (r *secretReferenceUniqueRule) ValidateSources(specs map[string]*vrules.Val
 		// Each slot holds exactly one reference, and the line is read before
 		// substitution, so it shows no secret, and maskSecretLines leaves it.
 		for i, slot := range slots {
-			others := slices.Concat(slots[:i], slots[i+1:])
 			results[slot.file] = append(results[slot.file], vrules.ValidationResult{
 				Reference: slot.reference,
-				Message:   sharedVariableMessage(slot, others),
+				Message:   sharedVariableMessage(slots, i),
 			})
 		}
 	}
@@ -93,17 +92,25 @@ func (r *secretReferenceUniqueRule) ValidateSources(specs map[string]*vrules.Val
 // the output grow with the square of their number.
 const maxNamedLocations = 3
 
-func sharedVariableMessage(slot secretSlot, others []secretSlot) string {
+// sharedVariableMessage is the warning for slots[i], naming the other slots
+// that share its variable. It reads only the slots it names, so the warnings
+// for a group cost time in proportion to the group, not to its square.
+func sharedVariableMessage(slots []secretSlot, i int) string {
+	slot := slots[i]
+	others := len(slots) - 1
 	named := others
-	if len(others) > maxNamedLocations {
-		named = others[:maxNamedLocations-1]
+	if others > maxNamedLocations {
+		named = maxNamedLocations - 1
 	}
 
-	locations := make([]string, 0, len(named)+1)
-	for _, other := range named {
-		locations = append(locations, fmt.Sprintf("secret key %q of %s", other.key, other.destination))
+	locations := make([]string, 0, named+1)
+	for j := 0; len(locations) < named; j++ {
+		if j == i {
+			continue
+		}
+		locations = append(locations, fmt.Sprintf("secret key %q of %s", slots[j].key, slots[j].destination))
 	}
-	if rest := len(others) - len(named); rest > 0 {
+	if rest := others - named; rest > 0 {
 		locations = append(locations, fmt.Sprintf("%d other secret keys", rest))
 	}
 
