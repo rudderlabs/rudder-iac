@@ -391,7 +391,7 @@ func TestHTTPConfigValidation(t *testing.T) {
 		errors := registered.ValidateConfig(config)
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/max_batch_size", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "expected type 'string'")
+		assert.Equal(t, "'max_batch_size' must be a string", errors[0].Message)
 	})
 
 	t.Run("max_batch_size range rejected", func(t *testing.T) {
