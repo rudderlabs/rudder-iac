@@ -74,6 +74,7 @@ var entries = []entry{
 	{NewDefinition: bqstream.NewDefinition, Verified: true},
 	{NewDefinition: s3.NewDefinition, Verified: true},
 	{NewDefinition: httpdest.NewDefinition, Verified: true},
+	{NewDefinition: httpdest.NewDefinitionV2, Verified: true},
 	{NewDefinition: activecampaign.NewDefinition, Verified: true},
 	{NewDefinition: attentivetag.NewDefinition, Verified: true},
 	{NewDefinition: bq.NewDefinition, Verified: true},

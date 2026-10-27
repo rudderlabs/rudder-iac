@@ -8,6 +8,16 @@ A destination type's history starts at the first release that made it available 
 
 ## Upcoming (unreleased)
 
+### HTTP Webhook definition version 2 (opt-in)
+
+**Scope:** spec
+
+**Types:** `http`
+
+**Why:** Version 2 shapes the entire JSON request body with JSONata, supports message-type filtering, and allows batches up to 5,000. Its body model replaces `properties_mapping` and `is_default_mapping`; XML/FORM payloads and `xml_root_key` are not supported in v2. Request-field values beginning with `$` are JSONata instead of v1 JSONPath. Version 1 stays registered unchanged, so existing specs need no action.
+
+**Migration:** Only if opting in, change `definition_version: 1` to `2`, replace mappings with `request_body_template` over `$$.events` (use `$$.events` for pass-through), and set `supported_message_types` as needed. Review any literal containing `$` that did not previously start with `$`; v2's discriminator treats it as a literal. Verify JSONata in the HTTP template verifier before applying and keep `max_batch_size` quoted; v2 accepts `1`–`5000`, v1 still accepts `1`–`100`. Keep XML/FORM specs on v1. See [HTTP Webhook](http/README.md#version-2-jsonata-request-shaping).
+
 ### Null config values rejected
 
 **Scope:** spec

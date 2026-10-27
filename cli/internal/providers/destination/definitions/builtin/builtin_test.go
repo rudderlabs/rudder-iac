@@ -15,8 +15,10 @@ func TestNewRegistryRegistersTheTable(t *testing.T) {
 	var verified, all []string
 	for _, entry := range entries {
 		def := entry.NewDefinition()
-		all = append(all, def.Type)
-		if entry.Verified {
+		if !slices.Contains(all, def.Type) {
+			all = append(all, def.Type)
+		}
+		if entry.Verified && !slices.Contains(verified, def.Type) {
 			verified = append(verified, def.Type)
 		}
 		assert.Equal(t, entry.Verified, IsVerified(def.Type, def.Version), def.Type)
@@ -33,6 +35,24 @@ func TestNewRegistryRegistersTheTable(t *testing.T) {
 	assert.Equal(t, all, on.SupportedTypes())
 
 	assert.False(t, IsVerified("not_a_type", 1))
+}
+
+func TestHTTPVersionsRegisteredSeparately(t *testing.T) {
+	t.Parallel()
+
+	registry, err := NewRegistry(false)
+	require.NoError(t, err)
+	v1, err := registry.Get("http", 1)
+	require.NoError(t, err)
+	v2, err := registry.Get("http", 2)
+	require.NoError(t, err)
+	assert.NotSame(t, v1, v2)
+	assert.Equal(t, "HTTP", v2.APIType)
+	byAPI, err := registry.GetByAPIType("HTTP", 2)
+	require.NoError(t, err)
+	assert.Same(t, v2, byAPI)
+	assert.True(t, IsVerified("http", 1))
+	assert.True(t, IsVerified("http", 2))
 }
 
 // Registration describes every config model, so a definition whose tags the

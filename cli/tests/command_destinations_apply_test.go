@@ -231,6 +231,11 @@ func TestDestinationsApply(t *testing.T) {
 // testdata/expected/upstream/destinations/<dir>, mirroring verifyState.
 func verifyDestinationState(t *testing.T, dir string) {
 	t.Helper()
+	verifyDestinationStateAt(t, filepath.Join("testdata", "expected", "upstream", "destinations", dir))
+}
+
+func verifyDestinationStateAt(t *testing.T, expectedStateDir string) {
+	t.Helper()
 
 	config.InitConfig(config.DefaultConfigFile())
 	apiClient, err := client.New(
@@ -240,7 +245,6 @@ func verifyDestinationState(t *testing.T, dir string) {
 	)
 	require.NoError(t, err)
 
-	expectedStateDir := filepath.Join("testdata", "expected", "upstream", "destinations", dir)
 	fileManager, err := helpers.NewSnapshotFileManager(expectedStateDir)
 	require.NoError(t, err)
 
@@ -250,5 +254,5 @@ func verifyDestinationState(t *testing.T, dir string) {
 		destinationSnapshotIgnore,
 	)
 	assert.NoError(t, tester.SnapshotTest(context.Background()),
-		"upstream destination state verification failed for %q", dir)
+		"upstream destination state verification failed for %q", expectedStateDir)
 }

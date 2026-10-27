@@ -53,3 +53,7 @@
 - Destination definition defaults intentionally support scalar default tags only; `cli/internal/providers/destination/definitions/defaults.go` rejects slice defaults, and that refusal is asserted in `defaults_test.go`.
 - Slack is currently the only registered destination whose schema declares non-scalar top-level defaults, so its empty-array defaults need fixture/snapshot pinning until DEX-704 teaches the defaults/converter layer to preserve empty arrays.
 - `converter.ArrayWithStrings` can drop explicitly empty lists because of its non-empty-content guard, so fixing array defaults requires both defaults-engine support and empty-list preservation in converters rather than only adding `default:"[]"` tags.
+
+## INT-7453 — HTTP v2 Schema and Snapshot Verification Gap
+
+- The integrations-config HTTP `versions/2` definition was not available to the CLI implementation locally. HTTP v2 field/default assumptions and the dedicated create/update expected-upstream snapshots were derived from the ticket, existing converter behavior, and v1 default conventions, not confirmed against a live v2 backend. Compare the contract and capture/verify snapshots in an explicitly disposable, v2-entitled workspace before enabling `RUN_HTTP_V2_E2E`; keep the shared v1 fixture suite independent.

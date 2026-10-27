@@ -267,3 +267,8 @@
 <!-- ticket:DEX-1082 -->
 - `RegisteredDefinition.ValidateConfig` rejects a null anywhere in destination `config` (a top-level key, a key inside a list item, or a list item) with `'<key>' must not be null; set a value or remove the key`. `consent_management` and `connection_mode` are skipped because their own checks already reject nulls with type-specific messages, and report a null under an unsupported source type as unsupported. Later errors at a null's path or below it are dropped, so a null on a required key reports once. A null under an unknown key isn't reported: the unknown-key error covers it.
 - Do not drop nulls in the converter instead. The plan compares the raw spec config against the remote, so a null the CLI drops before sending still diffs against a remote that never stores the key, and a null on a defaulted key also blocks `ApplyDefaults`, which only fills absent keys. Either way the destination re-applies on every plan.
+
+## INT-7453 — Isolated HTTP v2 Live Fixtures
+
+- Keep HTTP v2 create/update fixtures in `cli/tests/testdata/destinations/http-v2/{create,update}` with paired `cli/tests/testdata/expected/upstream/destinations/http-v2` snapshots, rather than adding them to the shared `destinations/{create,update}` fixture directories. `TestDestinationsApply` applies every shared fixture to a live workspace and lacks an HTTP-v2 entitlement gate; adding v2 there would break v1 coverage on workspaces without the v2 rollout.
+- `TestHTTPV2Apply` uses the separate `RUN_HTTP_V2_E2E=1` opt-in and must target an explicitly disposable v2-entitled workspace. Its snapshots require live verification before that switch is enabled.

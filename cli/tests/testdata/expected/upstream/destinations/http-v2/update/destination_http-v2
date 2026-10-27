@@ -1,0 +1,25 @@
+{
+  "config": {
+    "apiUrl": "https://webhooks.example.com/rudder/v2",
+    "auth": "noAuth",
+    "connectionMode": {"web": "cloud"},
+    "format": "JSON",
+    "headers": [{"to": "X-Event-Type", "from": "$.type"}],
+    "isBatchingEnabled": true,
+    "maxBatchSize": "2500",
+    "method": "PUT",
+    "pathParams": [{"path": "$.properties.accountId"}],
+    "queryParams": [{"to": "source", "from": "rudderstack"}],
+    "requestBodyTemplate": "$$.events.{\"customer\": {\"id\": userId}, \"order\": {\"items\": properties.items}}",
+    "supportedMessageTypes": ["track", "identify", "page"]
+  },
+  "createdAt": "<ignored>",
+  "enabled": true,
+  "externalId": "http-v2",
+  "id": "<ignored>",
+  "name": "E2E HTTP JSONata Updated",
+  "type": "HTTP",
+  "updatedAt": "<ignored>",
+  "version": "<ignored>",
+  "workspaceId": "<ignored>"
+}
