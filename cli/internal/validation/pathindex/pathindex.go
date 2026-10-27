@@ -169,12 +169,14 @@ func (pi *PathIndex) walkNode(node *yaml.Node, path string, key *yaml.Node) {
 		pi.recordPosition(path, node, key)
 
 	case yaml.AliasNode:
-		// An alias reads as the node its anchor names, so its path and every
-		// path below it are indexed too: the alias at its own place with its
-		// anchor's value, and the paths below at the anchor's lines. Without
-		// this a diagnostic on an aliased value printed an ancestor's line,
-		// such as a list item's first property, which can be a secret that the
-		// masking, deciding on the aliased path, did not mask.
+		// An alias is indexed at its own place, and its line shows the alias
+		// as written, such as "to: *bad", never the anchor's value, which can
+		// be a secret under a key the masking does not treat as one. The paths
+		// below an alias are indexed at the anchor's lines. Without this a
+		// diagnostic on an aliased value printed an ancestor's line, such as a
+		// list item's first property, which can be a secret the masking, deciding
+		// on the aliased path, did not mask.
+		pi.recordPosition(path, node, key)
 		target := node.Alias
 		if target == nil || pi.expanding[target] || pi.aliasBudget <= 0 {
 			return
@@ -182,8 +184,6 @@ func (pi *PathIndex) walkNode(node *yaml.Node, path string, key *yaml.Node) {
 		pi.aliasBudget--
 		pi.expanding[target] = true
 		defer delete(pi.expanding, target)
-
-		pi.recordAt(path, node, target, key)
 		pi.walkChildren(target, path)
 	}
 }
@@ -236,7 +236,9 @@ func (pi *PathIndex) walkMapping(node *yaml.Node, path string, indexed map[strin
 }
 
 // walkMerged walks one mapping a merge key names, directly or through an
-// alias, below path.
+// alias, below path. Past the alias cap, or inside the anchor it names, the
+// mapping's keys are indexed at the alias, whose line shows only the alias,
+// so a diagnostic on one never falls back to a line that shows a value.
 func (pi *PathIndex) walkMerged(source *yaml.Node, path string, indexed map[string]bool) {
 	if source.Kind != yaml.AliasNode {
 		if source.Kind == yaml.MappingNode {
@@ -245,7 +247,16 @@ func (pi *PathIndex) walkMerged(source *yaml.Node, path string, indexed map[stri
 		return
 	}
 	target := source.Alias
-	if target == nil || target.Kind != yaml.MappingNode || pi.expanding[target] || pi.aliasBudget <= 0 {
+	if target == nil || target.Kind != yaml.MappingNode {
+		return
+	}
+	if pi.expanding[target] || pi.aliasBudget <= 0 {
+		for i := 0; i+1 < len(target.Content); i += 2 {
+			if name := target.Content[i].Value; !indexed[name] {
+				indexed[name] = true
+				pi.recordPosition(fmt.Sprintf("%s/%s", path, name), source, nil)
+			}
+		}
 		return
 	}
 	pi.aliasBudget--
@@ -260,13 +271,6 @@ func (pi *PathIndex) recordPosition(
 	node *yaml.Node,
 	key *yaml.Node,
 ) {
-	pi.recordAt(path, node, node, key)
-}
-
-// recordAt records path at place, or at key when there is one, with the line
-// text of node. They differ for an alias, which sits at place and reads as
-// node.
-func (pi *PathIndex) recordAt(path string, place, node, key *yaml.Node) {
 	if path == "" {
 		return
 	}
@@ -275,8 +279,8 @@ func (pi *PathIndex) recordAt(path string, place, node, key *yaml.Node) {
 	lineText := extractLineText(node, key)
 
 	var (
-		line   = place.Line
-		column = place.Column
+		line   = node.Line
+		column = node.Column
 	)
 
 	// If the key is not nil, we are in a situation
@@ -372,6 +376,13 @@ func extractLineText(node *yaml.Node, key *yaml.Node) string {
 			return fmt.Sprintf("%s: [...]", key.Value)
 		}
 		return "[...]"
+
+	case yaml.AliasNode:
+		// The alias as written, not the value of its anchor.
+		if key != nil {
+			return fmt.Sprintf("%s: *%s", key.Value, node.Value)
+		}
+		return "*" + node.Value
 
 	default:
 		if key != nil {

@@ -471,9 +471,34 @@ spec:
 	require.ErrorContains(t, err, "syntax validation failed")
 
 	assert.Contains(t, out, "   18 | to: X-Bad:Name\n")
-	assert.Contains(t, out, "   20 | to: X-Bad:Name\n")
+	assert.Contains(t, out, "   20 | to: *bad\n")
 	assert.NotContains(t, out, "fake-first-secret")
 	assert.NotContains(t, out, "fake-second-secret")
+}
+
+// An alias of a secret under a key that is not one prints the alias, not the
+// secret it resolves to.
+func TestValidatePrintsAnAliasOfASecretAsWritten(t *testing.T) {
+	t.Parallel()
+
+	out, err := renderLoad(t, map[string]string{"dest.yaml": `version: rudder/v1
+kind: destination
+metadata:
+  name: shop-amplitude
+spec:
+  id: shop-amplitude
+  display_name: Shop Amplitude
+  type: am
+  definition_version: 1
+  enabled: true
+  config:
+    api_key: &key '{{ .SECRET }}'
+    residency_server: *key
+`}, map[string]string{"SECRET": "fake-amplitude-secret"})
+	require.ErrorContains(t, err, "syntax validation failed")
+
+	assert.Contains(t, out, "   13 | residency_server: *key\n")
+	assert.NotContains(t, out, "fake-amplitude-secret")
 }
 
 // A key beside a secret can come from a merge key. Its error prints the merged

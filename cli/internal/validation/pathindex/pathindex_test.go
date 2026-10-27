@@ -507,9 +507,8 @@ func TestPathIndex_MaskedPosition(t *testing.T) {
 	}
 }
 
-// An alias reads as its anchor's node, so its path and the paths below it are
-// indexed: the alias at its own place with the anchor's value, and the paths
-// below at the anchor's lines.
+// An alias is indexed at its own place, with its line showing the alias as
+// written, and the paths below it at the anchor's lines.
 func TestPathIndex_Aliases(t *testing.T) {
 	t.Parallel()
 
@@ -529,11 +528,11 @@ func TestPathIndex_Aliases(t *testing.T) {
 		want       Position
 		wantMasked string
 	}{
-		// A scalar alias sits on its own line and shows the anchor's value.
-		{path: "/config/headers/1/to", want: Position{Line: 7, Column: 7, LineText: "to: X-Bad:Name"}, wantMasked: "to: ***"},
-		// A mapping alias shows its anchor's first property, masked as the
-		// anchor's line is, and the paths below it are the anchor's.
-		{path: "/config/headers/2", want: Position{Line: 8, Column: 7, LineText: "- from: sk-fake-value"}, wantMasked: "- from: ***"},
+		// An alias line shows the alias, never the anchor's value, which may
+		// be a secret under a key that is not one.
+		{path: "/config/headers/1/to", want: Position{Line: 7, Column: 7, LineText: "to: *bad"}, wantMasked: "to: *bad"},
+		{path: "/config/headers/2", want: Position{Line: 8, Column: 7, LineText: "*first"}, wantMasked: "*first"},
+		// The paths below a mapping alias are the anchor's.
 		{path: "/config/headers/2/to", want: Position{Line: 5, Column: 7, LineText: "to: X-Bad:Name"}, wantMasked: "to: ***"},
 		{path: "/config/headers/2/from", want: Position{Line: 4, Column: 7, LineText: "from: sk-fake-value"}, wantMasked: "from: ***"},
 	}
@@ -550,7 +549,7 @@ func TestPathIndex_Aliases(t *testing.T) {
 }
 
 // An alias inside its own anchor is walked once, and the same alias met again
-// inside that walk ends it instead of looping.
+// inside that walk is indexed but not walked, instead of looping.
 func TestPathIndex_AliasInsideItsAnchor(t *testing.T) {
 	t.Parallel()
 
@@ -563,7 +562,10 @@ func TestPathIndex_AliasInsideItsAnchor(t *testing.T) {
 	pos, err := pi.PositionLookup("/loop/1/0")
 	require.NoError(t, err)
 	assert.Equal(t, "x", pos.LineText)
-	_, err = pi.PositionLookup("/loop/1/1")
+	pos, err = pi.PositionLookup("/loop/1/1")
+	require.NoError(t, err)
+	assert.Equal(t, "*a", pos.LineText)
+	_, err = pi.PositionLookup("/loop/1/1/0")
 	require.ErrorIs(t, err, ErrPathNotFound)
 }
 
@@ -587,6 +589,41 @@ func TestPathIndex_AliasWalksAreCapped(t *testing.T) {
 	require.NoError(t, err, "the first aliases are walked")
 	_, err = pi.PositionLookup("/g/9/9/9/9/9/9")
 	require.ErrorIs(t, err, ErrPathNotFound, "walks past the cap are not")
+}
+
+// Past the cap an alias is still indexed at its own line, and the keys a merge
+// key adds are indexed at the merge's alias, so no diagnostic on them falls
+// back to a line that shows a value.
+func TestPathIndex_AliasesPastTheCap(t *testing.T) {
+	t.Parallel()
+
+	var doc strings.Builder
+	doc.WriteString("a: &a [x, x, x, x, x, x, x, x, x, x]\n")
+	prev := "a"
+	for _, name := range []string{"b", "c", "d", "e"} {
+		fmt.Fprintf(&doc, "%s: &%s [*%s, *%s, *%s, *%s, *%s, *%s, *%s, *%s, *%s, *%s]\n", name, name, prev, prev, prev, prev, prev, prev, prev, prev, prev, prev)
+		prev = name
+	}
+	doc.WriteString(`base: &base
+  to: X-Base
+bad: &bad 'X-Bad:Name'
+rows:
+  - from: sk-fake-first
+    to: *bad
+  - from: sk-fake-second
+    <<: *base
+`)
+
+	pi, err := NewPathIndexer([]byte(doc.String()))
+	require.NoError(t, err)
+	require.LessOrEqual(t, pi.(*PathIndex).aliasBudget, 0, "the document uses up the cap first")
+
+	pos, err := pi.PositionLookup("/rows/0/to")
+	require.NoError(t, err)
+	assert.Equal(t, "to: *bad", pos.LineText)
+	pos, err = pi.PositionLookup("/rows/1/to")
+	require.NoError(t, err)
+	assert.Equal(t, "*base", pos.LineText)
 }
 
 // A merge key (<<) adds the keys of the mappings it names at their own lines,
