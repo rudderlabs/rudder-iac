@@ -225,10 +225,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "braze",
-		APIType:    "BRAZE",
-		Version:    1,
-		Properties: properties,
+		Type:        "braze",
+		DisplayName: "Braze",
+		APIType:     "BRAZE",
+		Version:     1,
+		Properties:  properties,
 		// db-config declares only restApiKey as a secret. Terraform also marks appKey
 		// sensitive, but db-config is authoritative for CLI write-only wrapping.
 		ConfigValidateFuncs: []rules.CustomValidateFunc{

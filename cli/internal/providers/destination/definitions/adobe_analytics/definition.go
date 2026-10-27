@@ -200,10 +200,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "adobe_analytics",
-		APIType:    "ADOBE_ANALYTICS",
-		Version:    1,
-		Properties: properties,
+		Type:        "adobe_analytics",
+		DisplayName: "Adobe Analytics",
+		APIType:     "ADOBE_ANALYTICS",
+		Version:     1,
+		Properties:  properties,
 		NewConfig: func() any {
 			return &adobeAnalyticsConfig{}
 		},

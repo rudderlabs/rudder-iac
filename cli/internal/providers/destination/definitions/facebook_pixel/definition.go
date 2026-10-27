@@ -186,10 +186,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "facebook_pixel",
-		APIType:    "FACEBOOK_PIXEL",
-		Version:    1,
-		Properties: properties,
+		Type:        "facebook_pixel",
+		DisplayName: "Facebook Pixel",
+		APIType:     "FACEBOOK_PIXEL",
+		Version:     1,
+		Properties:  properties,
 		ConfigValidateFuncs: []rules.CustomValidateFunc{
 			{Tag: "facebook_pixel_access_token_required", Func: accessTokenConditional},
 		},

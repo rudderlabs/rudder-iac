@@ -64,9 +64,10 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
-		Type:      "webhook",
-		Version:   1,
-		NewConfig: func() any { return &webhookTestConfig{} },
+		Type:        "webhook",
+		DisplayName: "Test",
+		Version:     1,
+		NewConfig:   func() any { return &webhookTestConfig{} },
 		SourceTypes: []string{
 			"web",
 			"android",
@@ -85,9 +86,10 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 		},
 	}))
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
-		Type:      "mode-aware",
-		Version:   1,
-		NewConfig: func() any { return &modeAwareTestConfig{} },
+		Type:        "mode-aware",
+		DisplayName: "Test",
+		Version:     1,
+		NewConfig:   func() any { return &modeAwareTestConfig{} },
 		SourceTypes: []string{
 			"web",
 			"android",
@@ -106,6 +108,7 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 	}))
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "barebones",
+		DisplayName: "Test",
 		Version:     1,
 		NewConfig:   func() any { return &barebonesTestConfig{} },
 		SourceTypes: []string{"web", "ios"},
@@ -117,6 +120,7 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:            "multimode",
+		DisplayName:     "Test",
 		Version:         1,
 		NewConfig:       func() any { return &multiModeTestConfig{} },
 		SourceTypes:     []string{"web", "android"},

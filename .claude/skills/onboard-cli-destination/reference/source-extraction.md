@@ -33,8 +33,8 @@ Translate constraints to `validate` struct tags on the config struct:
 | --- | --- |
 | key in `required` | `required` |
 | `minLength`/`maxLength` keywords (not a pattern) | `min=N` / `max=N` |
-| `enum: ["a","b"]` | `oneof=a b`, unless schema.json declares a `{{ … \|\| … }}` alternative for that field — then `dynamic_or_oneof=a b`. See "Let schema.json decide whether an enum may be dynamic" below |
-| any `pattern` | `dynamic_or_pattern=<name>` via the shared named-pattern registry (see "Enforcing regex patterns" below): passes `{{ path \|\| fallback }}` templates, otherwise enforces the named pattern. Use plain `pattern=<name>` only when the field must reject templates too |
+| `enum: ["a","b"]` | `oneof=a b`, unless schema.json declares a `{{ … \|\| … }}` alternative for that field — then `dynamic_or_oneof=a b`. See "Let schema.json decide whether a value may be dynamic" below |
+| any `pattern` | a named pattern from the shared registry (see "Enforcing regex patterns" below). `dynamic_or_pattern=<name>` when schema.json wraps the regex in a `{{ … \|\| … }}` alternative (the usual shape): passes `{{ path \|\| fallback }}` templates, otherwise enforces the named pattern. Plain `pattern=<name>` when schema.json declares the bare regex, so templates are rejected too. See "Let schema.json decide whether a value may be dynamic" below |
 | `minLength`/`maxLength` | `min=N` / `max=N` |
 | `if/then` or `allOf` conditionals | `required_if=Field value`, `excluded_if=Field value` (see S3 `iam_role_arn`/`access_key` for the pattern). See "Conditional requiredness" below — the built-ins cover every shape upstream uses |
 
@@ -63,21 +63,26 @@ Notes:
   `(^\{\{.*\|\|(.*)\}\}$)|(^env[.].+)|<real>`, and only the `{{ … || … }}` branch
   counts. Disregard `(^env[.].+)` wherever it appears — in schema.json and in
   terraform validators alike.
-- **Let schema.json decide whether an enum may be dynamic.** Pick the tag from
+- **Let schema.json decide whether a value may be dynamic.** Pick the tag from
   what the property declares, not from the shape of the constraint: if it admits
-  the `{{ path || fallback }}` form, use `dynamic_or_oneof`; if it does not, use
-  `oneof`, since such a value would then be stored verbatim and rejected by the
-  backend. In practice this currently splits by shape — `pattern` properties
-  carry the template branch, `enum` properties do not (checked across every
-  onboarded destination), so enums take `oneof` today — but check the property
-  rather than assuming, since an enum that did declare it would take
-  `dynamic_or_oneof`. terraform shows the same split: its enum validators carry
-  no `{{ … || … }}` branch where its pattern validators do. Many existing
+  the `{{ path || fallback }}` form, use `dynamic_or_pattern` / `dynamic_or_oneof`;
+  if it does not, use `pattern` / `oneof`, since such a value would then be
+  stored verbatim and rejected by the backend. Most `pattern` properties carry
+  the template branch and most `enum` properties do not, but check each property
+  rather than assuming: kafka's `hostName`, `port`, `topic`, `username` and
+  `ssh*` patterns are bare regexes and take plain `pattern`, while the
+  `eventToTopicMap` patterns in the same schema carry the branch. Many existing
   definitions use `dynamic_or_oneof` for strict enums; reconciling them is tracked
   separately, so check the schema rather than copying a neighbouring definition.
 - Booleans that gate conditionals (like S3 `role_based_auth`) should be
   `*bool` with `validate:"required"` so "absent" and "false" are distinct.
 - Optional booleans → `*bool` without `required`.
+- **Let schema.json decide whether a key may be null.** No onboarded schema.json
+  lists `null` in a property's `type`, so `ValidateConfig` rejects every null in
+  config and there is nothing to add per field. If a property does admit null,
+  flag it in the report rather than modelling it: accepting it needs an opt-out
+  in `findNullValues` and a converter that sends the null instead of dropping
+  it, or the spec diffs on every plan.
 - `consentManagement` and `connectionMode` subtrees in schema.json are handled
   by `common` — do not model either as an ad-hoc field. Append
   `common.Properties(sourceTypes)` and add a `ConsentManagement` field when the
@@ -180,7 +185,10 @@ Everything else in this section is for branches conditioned on ordinary
 config keys.
 
 `schema.json` states conditional requiredness as `allOf` branches, and
-go-playground's built-in tags cover every shape upstream uses. **Never write a
+go-playground's built-in tags cover every shape upstream uses. Use only the
+built-ins registration accepts, listed in definition-anatomy.md "Rules the
+registry enforces at Register()"; it rejects any other, because
+`rudder-cli docs destination` could not describe it. **Never write a
 custom validator or a `CustomValidateConfig`-style hook for this** — see the
 worked example in `definitions/postgres/definition.go`, which enforces all eight
 of its branches with built-ins alone.
@@ -281,14 +289,14 @@ in the report when a minimal named pattern can express them.
 ### Tag usage
 
 ```go
-// required shape, templates allowed (the default)
+// required shape, schema.json admits templates (the usual case)
 ConversionID string `mapstructure:"conversion_id" validate:"required,dynamic_or_pattern=googleads_conversion_id"`
 
-// optional shape, templates allowed
+// optional shape, schema.json admits templates
 ServerURL string `mapstructure:"server_url" validate:"omitempty,dynamic_or_pattern=url"`
 
-// templates must be rejected too — justify this in the report
-StrictID string `mapstructure:"strict_id" validate:"omitempty,pattern=some_strict_id"`
+// schema.json declares the bare regex, so templates are rejected too
+HostName string `mapstructure:"host_name" validate:"required,pattern=kafka_host_name"`
 ```
 
 `dynamic_or_pattern` is a strict superset of `pattern`: a nil optional pointer

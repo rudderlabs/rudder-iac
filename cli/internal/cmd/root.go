@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	datagraphPkg "github.com/rudderlabs/rudder-iac/cli/internal/cmd/datagraph"
 	d "github.com/rudderlabs/rudder-iac/cli/internal/cmd/debug"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
@@ -105,6 +106,7 @@ func init() {
 
 	rootCmd.AddCommand(typer.NewCmdTyper())
 	rootCmd.AddCommand(transformations.NewCmdTransformations())
+	rootCmd.AddCommand(docs.NewCmdDocs())
 
 	datagraphCmd = datagraphPkg.NewCmdDataGraph()
 	rootCmd.AddCommand(datagraphCmd)
@@ -158,6 +160,8 @@ var trackedCommands = []string{
 	"auth login",
 	"data-graphs validate",
 	"destroy",
+	"docs destination",
+	"docs source",
 	"import retl-sources",
 	"import workspace",
 	"migrate",

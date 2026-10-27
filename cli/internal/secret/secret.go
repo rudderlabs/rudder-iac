@@ -167,7 +167,10 @@ func (s String) MarshalYAML() (any, error) {
 	return s.masked(), nil
 }
 
-func (s String) token() string { return fmt.Sprintf("{{ .%s }}", s.varName) }
+func (s String) token() string { return Reference(s.varName) }
+
+// Reference is the "{{ .NAME }}" token that stands in for a secret in a spec.
+func Reference(varName string) string { return fmt.Sprintf("{{ .%s }}", varName) }
 
 // UnmarshalYAML reads a bare string from a spec, producing a known value.
 func (s *String) UnmarshalYAML(node *yaml.Node) error {

@@ -60,11 +60,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "gcs",
-		APIType:    "GCS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"credentials"},
+		Type:        "gcs",
+		DisplayName: "Google Cloud Storage",
+		APIType:     "GCS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"credentials"},
 		NewConfig: func() any {
 			return &gcsConfig{}
 		},

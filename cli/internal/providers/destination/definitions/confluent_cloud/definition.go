@@ -57,11 +57,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "confluent_cloud",
-		APIType:    "CONFLUENT_CLOUD",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"api_secret", "api_key"},
+		Type:        "confluent_cloud",
+		DisplayName: "Confluent Cloud",
+		APIType:     "CONFLUENT_CLOUD",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"api_secret", "api_key"},
 		NewConfig: func() any {
 			return &confluentCloudConfig{}
 		},

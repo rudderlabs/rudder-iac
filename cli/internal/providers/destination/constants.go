@@ -12,6 +12,10 @@ const (
 	destinationDisplayNameErrorMessage = "must be 2-100 characters and contain only letters, digits, underscores, spaces, periods, and hyphens"
 )
 
+// DisplayNamePattern names the registered pattern a destination spec's
+// display_name must match, for callers that write one.
+const DisplayNamePattern = destinationDisplayNameRegexTag
+
 func init() {
 	funcs.NewPattern(
 		destinationDisplayNameRegexTag,

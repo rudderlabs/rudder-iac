@@ -1,9 +1,11 @@
 package definitions
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 )
@@ -39,6 +41,10 @@ func (r *Registry) Register(def *DestinationDefinition) error {
 
 	if def.APIType == "" {
 		def.APIType = def.Type
+	}
+
+	if def.DisplayName == "" {
+		return fmt.Errorf("destination definition %s version %d has no display name", def.Type, def.Version)
 	}
 
 	if err := validateDefinitionSourceTypes(def); err != nil {
@@ -162,6 +168,23 @@ func (r *Registry) GetByAPIType(apiType string, version int64) (*RegisteredDefin
 		return nil, fmt.Errorf("destination definition for apiType %s version %d not found", apiType, version)
 	}
 	return registered, nil
+}
+
+// Definitions returns every registered definition, ordered by type and then
+// version. The docs command reads it to suggest a type by display name, and
+// tests read it to cover every definition in a stable order.
+func (r *Registry) Definitions() []*RegisteredDefinition {
+	definitions := make([]*RegisteredDefinition, 0, len(r.byTypeVersion))
+	for _, definition := range r.byTypeVersion {
+		definitions = append(definitions, definition)
+	}
+	slices.SortFunc(definitions, func(a, b *RegisteredDefinition) int {
+		if a.Type != b.Type {
+			return strings.Compare(a.Type, b.Type)
+		}
+		return cmp.Compare(a.Version, b.Version)
+	})
+	return definitions
 }
 
 func (r *Registry) SupportedTypes() []string {

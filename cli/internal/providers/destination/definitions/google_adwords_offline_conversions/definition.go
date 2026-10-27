@@ -90,11 +90,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "google_adwords_offline_conversions",
-		APIType:    "GOOGLE_ADWORDS_OFFLINE_CONVERSIONS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{},
+		Type:        "google_adwords_offline_conversions",
+		DisplayName: "Google Ads Offline Conversions",
+		APIType:     "GOOGLE_ADWORDS_OFFLINE_CONVERSIONS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{},
 		NewConfig: func() any {
 			return &googleAdwordsOfflineConversionsConfig{}
 		},

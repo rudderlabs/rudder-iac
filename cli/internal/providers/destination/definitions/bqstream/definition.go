@@ -63,11 +63,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "bqstream",
-		APIType:    "BQSTREAM",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"credentials"},
+		Type:        "bqstream",
+		DisplayName: "BigQuery Stream",
+		APIType:     "BQSTREAM",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"credentials"},
 		NewConfig: func() any {
 			return &bqstreamConfig{}
 		},
