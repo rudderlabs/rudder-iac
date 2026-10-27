@@ -18,9 +18,10 @@ for it.
 
 1. `cli/internal/providers/destination/definitions/<type>/definition.go`
 2. `cli/internal/providers/destination/definitions/<type>/definition_test.go`
-3. Registration in `cli/internal/app/dependencies.go` (`newDestinationRegistry`),
-   always inside the `UnverifiedDestinations` block, plus the matching
-   `dependencies_test.go` flag-matrix expectation
+3. Registration in the builtin table
+   (`cli/internal/providers/destination/definitions/builtin/builtin.go`),
+   always as an unverified entry, plus the matching `dependencies_test.go`
+   flag-matrix expectation
 4. Destination e2e fixtures and expected snapshots for each meaningful config
    variation, or a documented deferral reason when a live snapshot cannot be
    captured safely
@@ -101,7 +102,9 @@ to extract from each file.
 
 ### Step 3: Refuse duplicates
 
-Check `newDestinationRegistry` in `cli/internal/app/dependencies.go`. If the
+Check the builtin table in
+`cli/internal/providers/destination/definitions/builtin/builtin.go`, which
+`newDestinationRegistry` and `rudder-cli docs destination` both read. If the
 `(APIType, Version)` pair is already registered, stop and report.
 
 ### Step 4: Write definition.go
@@ -121,14 +124,17 @@ Mechanical rules:
   converter-mapping.md "Do not skip zero values").
 - `Version` = terraform's registered `Version` (currently 1 everywhere).
 - `schema.json` constraints → `validate` struct tags (see source-extraction.md
-  for the constraint translation table). Real regex patterns →
-  `dynamic_or_pattern=<name>`: reuse an existing `NewPattern` registration, or
-  register a minimal new one. Strip upstream `env.` / `{{ … }}` alternations;
-  never bake those into the CLI regex — the tag accepts `{{ path || fallback }}`
-  templates, the pattern holds only the real constraint. Note `^(.{0,100})$` is
-  a pattern, not a length limit (it forbids newlines) — reuse the shared
-  `single_line_100` rather than `max=100`. Use plain `pattern=<name>` only to
-  reject templates too (see source-extraction.md "Enforcing regex patterns").
+  for the constraint translation table). Real regex patterns → a named
+  pattern: reuse an existing `NewPattern` registration, or register a minimal
+  new one. Tag it `dynamic_or_pattern=<name>` when schema.json wraps the regex
+  in a `{{ … || … }}` alternative (the usual shape), and plain `pattern=<name>`
+  when it declares the bare regex, since the backend rejects a template there
+  (see source-extraction.md "Let schema.json decide whether a value may be
+  dynamic"). Strip upstream `env.` / `{{ … }}` alternations; never bake those
+  into the CLI regex — the tag accepts `{{ path || fallback }}` templates, the
+  pattern holds only the real constraint. Note `^(.{0,100})$` is a pattern, not
+  a length limit (it forbids newlines) — reuse the shared `single_line_100`
+  rather than `max=100`.
 - `schema.json` `default` keywords → `default:"…"` struct tags (see
   source-extraction.md "Declaring defaults"). The backend applies these when it
   persists a destination, so a spec that omits the key must still carry it or
@@ -184,37 +190,37 @@ Mechanical rules:
   every source type on `firebase`. Say so in a comment on the config struct,
   or the omission reads as an oversight to the next reader.
 
-### Step 5: Register in dependencies.go
+### Step 5: Register in the builtin table
 
 **Every newly onboarded destination registers as unverified.** Add the import
-and one block inside `newDestinationRegistry`, within the
-`cfg.ExperimentalFlags.UnverifiedDestinations` branch — never the verified
-section above it:
+and one entry to the `entries` table in
+`cli/internal/providers/destination/definitions/builtin/builtin.go`, among the
+unverified entries and without `Verified: true`:
 
 ```go
-if cfg.ExperimentalFlags.UnverifiedDestinations {
-    // ... existing unverified registrations, kept alphabetical by type ...
-    if err := registry.Register(<pkg>.NewDefinition()); err != nil {
-        return nil, fmt.Errorf("registering <type> destination definition: %w", err)
-    }
+var entries = []entry{
+    // ... verified entries, then the existing unverified ones ...
+    {NewDefinition: <pkg>.NewDefinition},
 }
 ```
 
-The unconditional verified section is reserved for definitions already proven
-against a live stack — `bqstream`, `s3`, `http`, `active_campaign`,
-`attentive_tag` and `bq` today. Promotion into it is a separate, deliberate
-change after that verification; it is never part of the onboarding PR, no matter
-how simple the destination looks.
+The definition must set `DisplayName`, the product name from integrations-config
+`db-config.json` `displayName`; registration rejects an empty one. The entries
+marked `Verified: true` are reserved for definitions already proven against a
+live stack. Marking an entry verified is a separate, deliberate change after
+that verification. It is never part of the onboarding PR, no matter how simple
+the destination looks.
 
 Then update the flag-matrix expectation in
 `cli/internal/app/dependencies_test.go`: add the new type to the
 `wantTypes` list of the unverified-destinations-enabled case only (`SupportedTypes()` is
 sorted, so insert alphabetically). The unverified-disabled case must keep only
 verified destinations; if adding the type there makes a test
-pass, the registration landed in the wrong block.
+pass, the entry was marked verified by mistake.
 
 Registration itself validates the definition (source types mapped, connection
-modes complete for every source type, consent field type). A broken definition
+modes complete for every source type, consent field type, and every validate
+rule one `rudder-cli docs destination` can describe). A broken definition
 fails every test that builds the registry — good early signal.
 
 ### Step 6: Write definition_test.go
@@ -233,7 +239,8 @@ Mirror `definitions/s3/definition_test.go` exactly in structure:
 2. `Test<Type>ConfigValidation` — subtests via `registered.ValidateConfig`:
    each required field missing, each conditional/exclusion rule, each
    pattern-validated field with an invalid literal rejected and a
-   `{{ path || fallback }}` template accepted, valid minimal config,
+   `{{ path || fallback }}` template accepted (`dynamic_or_pattern`) or
+   rejected (`pattern`), valid minimal config,
    valid full config, unknown key rejected, and (when consent is supported)
    unsupported consent source + invalid provider.
 3. `Test<Type>ConversionRoundTrip` — `testutil.AssertConversion` with paired

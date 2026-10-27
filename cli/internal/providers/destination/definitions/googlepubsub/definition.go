@@ -69,11 +69,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "googlepubsub",
-		APIType:    "GOOGLEPUBSUB",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"credentials"},
+		Type:        "googlepubsub",
+		DisplayName: "Google Cloud Pub/Sub",
+		APIType:     "GOOGLEPUBSUB",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"credentials"},
 		NewConfig: func() any {
 			return &googlePubSubConfig{}
 		},

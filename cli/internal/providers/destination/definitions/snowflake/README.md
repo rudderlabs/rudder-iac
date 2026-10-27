@@ -167,13 +167,22 @@ PEM-encoded private key whose public half is assigned to `user` in Snowflake.
 - Must include the delimiters: `-----BEGIN PRIVATE KEY-----` … `-----END PRIVATE KEY-----`, or the `ENCRYPTED PRIVATE KEY` equivalents. A bare base64 key body is rejected.
 - Templates aren't accepted. `{{ .VAR }}` references are resolved before validation, so the resolved value is what must be PEM-shaped.
 
-Load the key from a file with its line breaks written as `\n`, which the double-quoted reference turns back into line breaks:
+Environment variables can carry the key directly:
 
 ```bash
-export RUDDER_SNOWFLAKE_PRIVATE_KEY="$(awk '{printf "%s\\n", $0}' rsa_key.p8)"
+export RUDDER_SNOWFLAKE_PRIVATE_KEY="$(cat rsa_key.p8)"
 ```
 
-A raw multi-line value has its line breaks folded into spaces. That still passes the PEM check, so the broken key reaches the API.
+In a var file, use a YAML literal block:
+
+```yaml
+SNOWFLAKE_PRIVATE_KEY: |
+  -----BEGIN PRIVATE KEY-----
+  ...
+  -----END PRIVATE KEY-----
+```
+
+A reference that is the whole quoted value, such as `'{{ .SNOWFLAKE_PRIVATE_KEY }}'`, keeps the line breaks in either quote style, including the single-quoted form `import workspace` generates.
 
 #### `private_key_passphrase` — string, secret
 
@@ -418,6 +427,6 @@ config:
 
 Note that:
 
-- `private_key` spans several lines, so pass it with its line breaks written as `\n` — see [`private_key`](#private_key--string-required-secret).
+- `private_key` spans several lines. Use a YAML literal block in a var file or a multiline environment variable — see [`private_key`](#private_key--string-required-secret).
 - `gcp.credentials` is JSON, so write its reference in single quotes: `credentials: '{{ .SNOWFLAKE_GCS_CREDENTIALS }}'`. See [Secrets](../README.md#secrets).
 - `s3.iam_role_arn` and `storage_integration` aren't secrets — neither grants access on its own.

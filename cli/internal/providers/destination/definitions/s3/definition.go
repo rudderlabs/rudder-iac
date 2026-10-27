@@ -72,11 +72,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "s3",
-		APIType:    "S3",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"access_key_id", "access_key"},
+		Type:        "s3",
+		DisplayName: "Amazon S3",
+		APIType:     "S3",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"access_key_id", "access_key"},
 		NewConfig: func() any {
 			return &s3Config{}
 		},

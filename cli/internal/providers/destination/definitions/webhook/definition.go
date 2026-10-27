@@ -87,11 +87,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "webhook",
-		APIType:    "WEBHOOK",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"headers.to"},
+		Type:        "webhook",
+		DisplayName: "Webhook",
+		APIType:     "WEBHOOK",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"headers.to"},
 		NewConfig: func() any {
 			return &webhookConfig{}
 		},

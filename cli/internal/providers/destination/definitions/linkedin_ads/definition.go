@@ -73,11 +73,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "linkedin_ads",
-		APIType:    "LINKEDIN_ADS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{},
+		Type:        "linkedin_ads",
+		DisplayName: "Linkedin Ads",
+		APIType:     "LINKEDIN_ADS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{},
 		NewConfig: func() any {
 			return &linkedinAdsConfig{}
 		},

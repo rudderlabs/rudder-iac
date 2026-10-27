@@ -59,10 +59,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "linkedin_insight_tag",
-		APIType:    "LINKEDIN_INSIGHT_TAG",
-		Version:    1,
-		Properties: properties,
+		Type:        "linkedin_insight_tag",
+		DisplayName: "Linkedin Insight Tag",
+		APIType:     "LINKEDIN_INSIGHT_TAG",
+		Version:     1,
+		Properties:  properties,
 		NewConfig: func() any {
 			return &linkedinInsightTagConfig{}
 		},

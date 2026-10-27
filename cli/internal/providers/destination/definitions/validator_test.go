@@ -22,8 +22,9 @@ func TestRegisterDefinitionMissingNewConfig(t *testing.T) {
 
 	registry := definitions.NewRegistry()
 	err := registry.Register(&definitions.DestinationDefinition{
-		Type:    "GA4",
-		Version: 1,
+		Type:        "GA4",
+		DisplayName: "Test",
+		Version:     1,
 	})
 	require.Error(t, err)
 }
@@ -104,6 +105,7 @@ func TestValidateConfigRejectsUnsupportedConsentSource(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -138,6 +140,7 @@ func TestValidateConfigAppliesCanonicalConsentValidation(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -174,6 +177,7 @@ func TestValidateConfigRejectsMissingConsentProvider(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -210,6 +214,7 @@ func TestValidateConfigReplacesCanonicalConsentValidationForSource(t *testing.T)
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"ios_swift"},
 		ConnectionModes: map[string][]string{
@@ -246,6 +251,7 @@ func TestValidateConfigKeepsCanonicalConsentValidationForSiblingSource(t *testin
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"ios_swift", "web"},
 		ConnectionModes: map[string][]string{
@@ -288,6 +294,7 @@ func TestValidateConfigReportsMalformedConsentValuePath(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -320,6 +327,7 @@ func TestValidateConfigRejectsNullConsentManagement(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -350,6 +358,7 @@ func TestValidateConfigRejectsNullConsentSourceEntries(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -382,6 +391,7 @@ func TestValidateConfigRejectsNullConsentProvider(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -418,6 +428,7 @@ func TestValidateConfigRejectsNullConsentEntry(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -452,6 +463,7 @@ func TestValidateConfigRejectsNullConsents(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -488,6 +500,7 @@ func TestValidateConfigRejectsNullConsentValue(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -527,6 +540,117 @@ func registerTestDefinition(t *testing.T) *definitions.RegisteredDefinition {
 	registered, err := registry.Get("GA4", 1)
 	require.NoError(t, err)
 	return registered
+}
+
+func TestValidateConfigRejectsNullValues(t *testing.T) {
+	t.Parallel()
+
+	type mapping struct {
+		From string `mapstructure:"from"`
+		To   string `mapstructure:"to"`
+	}
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "TEST",
+		DisplayName: "Test",
+		Version:     1,
+		SourceTypes: []string{"web"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+		},
+		NewConfig: func() any {
+			return &struct {
+				Name              string                   `mapstructure:"name"`
+				RequiredName      string                   `mapstructure:"required_name" validate:"required"`
+				Enabled           *bool                    `mapstructure:"enabled"`
+				Mappings          []mapping                `mapstructure:"mappings"`
+				Tags              []string                 `mapstructure:"tags"`
+				ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
+				ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
+			}{}
+		},
+	}))
+	registered, err := registry.Get("TEST", 1)
+	require.NoError(t, err)
+
+	for _, tc := range []struct {
+		name   string
+		config map[string]any
+		want   []definitions.ConfigError
+	}{
+		{
+			name:   "top-level null",
+			config: map[string]any{"required_name": nil},
+			want:   []definitions.ConfigError{{Path: "/required_name", Message: "'required_name' must not be null; set a value or remove the key"}},
+		},
+		{
+			name:   "null inside a list item",
+			config: map[string]any{"required_name": "valid", "mappings": []any{map[string]any{"from": nil, "to": "some_event"}}},
+			want:   []definitions.ConfigError{{Path: "/mappings/0/from", Message: "'from' must not be null; set a value or remove the key"}},
+		},
+		{
+			name:   "null list item",
+			config: map[string]any{"required_name": "valid", "tags": []any{"a", nil}},
+			want:   []definitions.ConfigError{{Path: "/tags/1", Message: "list item must not be null; remove it"}},
+		},
+		{
+			name: "zero values pass",
+			config: map[string]any{
+				"name":          "",
+				"required_name": "valid",
+				"enabled":       false,
+				"mappings":      []any{map[string]any{"from": "", "to": ""}},
+				"tags":          []any{},
+			},
+		},
+		{
+			name:   "null consent_management reported once",
+			config: map[string]any{"required_name": "valid", "consent_management": nil},
+			want:   []definitions.ConfigError{{Path: "/consent_management", Message: "'consent_management' must be an object"}},
+		},
+		{
+			name: "null resolution_strategy on a non-custom provider",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{
+				"web": []any{map[string]any{"provider": "ketch", "resolution_strategy": nil, "consents": []any{"analytics"}}},
+			}},
+			want: []definitions.ConfigError{{Path: "/consent_management/web/0/resolution_strategy", Message: "'resolution_strategy' must be a string"}},
+		},
+		{
+			name:   "null connection_mode reported once",
+			config: map[string]any{"required_name": "valid", "connection_mode": nil},
+			want:   []definitions.ConfigError{{Path: "/connection_mode", Message: "'connection_mode' must be an object"}},
+		},
+		{
+			name:   "null connection_mode value reported once",
+			config: map[string]any{"required_name": "valid", "connection_mode": map[string]any{"web": nil}},
+			want:   []definitions.ConfigError{{Path: "/connection_mode/web", Message: "'web' connection mode must be a string"}},
+		},
+		{
+			name: "null resolution_strategy on a custom provider reported once",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{
+				"web": []any{map[string]any{"provider": "custom", "resolution_strategy": nil, "consents": []any{"analytics"}}},
+			}},
+			want: []definitions.ConfigError{{Path: "/consent_management/web/0/resolution_strategy", Message: "'resolution_strategy' must be a string"}},
+		},
+		{
+			name: "null provider reported once",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{
+				"web": []any{map[string]any{"provider": nil, "consents": []any{"analytics"}}},
+			}},
+			want: []definitions.ConfigError{{Path: "/consent_management/web/0/provider", Message: "'provider' must be a string"}},
+		},
+		{
+			name:   "null unknown key reported as unknown",
+			config: map[string]any{"required_name": "valid", "nmae": nil},
+			want:   []definitions.ConfigError{{Path: "/nmae", Message: `unknown config field "nmae"`}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.ElementsMatch(t, tc.want, registered.ValidateConfig(tc.config))
+		})
+	}
 }
 
 func assertConfigError(t *testing.T, errors []definitions.ConfigError, path, message string) {

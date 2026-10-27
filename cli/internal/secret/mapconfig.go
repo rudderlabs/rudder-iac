@@ -3,6 +3,7 @@ package secret
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -79,9 +80,8 @@ func MaskSecrets(config map[string]any, externalID string, secretKeys []string) 
 	if config == nil || len(secretKeys) == 0 {
 		return nil
 	}
-	prefix := strings.ToUpper(strings.ReplaceAll(externalID, "-", "_"))
-	mask := func(owner map[string]any, key, varName string) error {
-		token, err := marshalToken(NewUnknown(WithVariableName(varName)))
+	mask := func(owner map[string]any, key string, segments []string) error {
+		token, err := marshalToken(NewUnknown(WithVariableName(VariableName(externalID, segments...))))
 		if err != nil {
 			return err
 		}
@@ -89,11 +89,27 @@ func MaskSecrets(config map[string]any, externalID string, secretKeys []string) 
 		return nil
 	}
 	for _, key := range secretKeys {
-		if err := walkSecretPath(config, strings.Split(key, "."), prefix, mask); err != nil {
+		if err := walkSecretPath(config, strings.Split(key, "."), nil, mask); err != nil {
 			return fmt.Errorf("masking secret key %q: %w", key, err)
 		}
 	}
 	return nil
+}
+
+// VariableName is the variable MaskSecrets references for the secret reached
+// through segments in the spec with externalID: the ID upper-cased with "-"
+// turned into "_", then "_" and each segment upper-cased. A segment is a config
+// key or, inside a list, the item's index. `rudder-cli docs destination` names
+// variables through this function too, so a spec written from its output and
+// one import writes later use the same names.
+func VariableName(externalID string, segments ...string) string {
+	var b strings.Builder
+	b.WriteString(strings.ToUpper(strings.ReplaceAll(externalID, "-", "_")))
+	for _, segment := range segments {
+		b.WriteString("_")
+		b.WriteString(strings.ToUpper(segment))
+	}
+	return b.String()
 }
 
 // replaceSecrets copies config and swaps every leaf the secret paths resolve to
@@ -105,20 +121,21 @@ func replaceSecrets(config map[string]any, secretKeys []string, replace func(any
 		return config
 	}
 	out := cloneSecretConfig(config)
-	visit := func(owner map[string]any, key, _ string) error {
+	visit := func(owner map[string]any, key string, _ []string) error {
 		owner[key] = replace(owner[key])
 		return nil
 	}
 	for _, key := range secretKeys {
 		// visit never fails, so neither can the walk.
-		_ = walkSecretPath(out, strings.Split(key, "."), "", visit)
+		_ = walkSecretPath(out, strings.Split(key, "."), nil, visit)
 	}
 	return out
 }
 
 // secretVisitor is called once per leaf a secret path resolves to. owner[key] is
-// the leaf; varName is its export variable name.
-type secretVisitor func(owner map[string]any, key, varName string) error
+// the leaf; segments are the keys and list indexes that led to it, which
+// VariableName turns into its export variable name.
+type secretVisitor func(owner map[string]any, key string, segments []string) error
 
 // walkSecretPath resolves path against config and visits every leaf it reaches.
 // A secret path carries no container information, so dispatch is on the runtime
@@ -131,7 +148,7 @@ type secretVisitor func(owner map[string]any, key, varName string) error
 // would have to be kept in sync by hand, and the two halves of a wrap→mask round
 // trip silently stop matching the moment one of them learns a container shape
 // the other does not.
-func walkSecretPath(config map[string]any, path []string, varName string, visit secretVisitor) error {
+func walkSecretPath(config map[string]any, path []string, segments []string, visit secretVisitor) error {
 	if len(path) == 0 || path[0] == "" {
 		return nil
 	}
@@ -142,35 +159,41 @@ func walkSecretPath(config map[string]any, path []string, varName string, visit 
 		return nil
 	}
 
-	varName += "_" + strings.ToUpper(key)
+	segments = appendSegment(segments, key)
 	if len(path) == 1 {
-		return visit(config, key, varName)
+		return visit(config, key, segments)
 	}
 
-	return walkNestedSecretPath(value, path[1:], varName, visit)
+	return walkNestedSecretPath(value, path[1:], segments, visit)
 }
 
 // walkNestedSecretPath continues the walk through whatever container value turns
 // out to be. Slice members are indexed into the variable name so each exports its
 // own reference; a map hop contributes no index.
-func walkNestedSecretPath(value any, path []string, varName string, visit secretVisitor) error {
+func walkNestedSecretPath(value any, path []string, segments []string, visit secretVisitor) error {
 	switch v := value.(type) {
 	case []any:
 		for i, item := range v {
-			if err := walkNestedSecretPath(item, path, varName+"_"+strconv.Itoa(i), visit); err != nil {
+			if err := walkNestedSecretPath(item, path, appendSegment(segments, strconv.Itoa(i)), visit); err != nil {
 				return err
 			}
 		}
 	case []map[string]any:
 		for i := range v {
-			if err := walkSecretPath(v[i], path, varName+"_"+strconv.Itoa(i), visit); err != nil {
+			if err := walkSecretPath(v[i], path, appendSegment(segments, strconv.Itoa(i)), visit); err != nil {
 				return err
 			}
 		}
 	case map[string]any:
-		return walkSecretPath(v, path, varName, visit)
+		return walkSecretPath(v, path, segments, visit)
 	}
 	return nil
+}
+
+// appendSegment copies before appending, because sibling list members extend
+// the same parent segments and must not overwrite each other's.
+func appendSegment(segments []string, segment string) []string {
+	return append(slices.Clip(segments), segment)
 }
 
 func cloneSecretConfig(config map[string]any) map[string]any {

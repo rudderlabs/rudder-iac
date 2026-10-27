@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -20,6 +22,9 @@ var sourceTypeConfigKeys = []string{
 type DestinationDefinition struct {
 	// Type is the local YAML / registry key (e.g. "s3").
 	Type string
+	// DisplayName is the destination's product name (e.g. "Amazon S3"), which
+	// `rudder-cli docs destination` prints next to Type. Registration requires it.
+	DisplayName string
 	// APIType is the upstream API destination type (e.g. "S3").
 	// When empty at registration, it defaults to Type.
 	APIType         string
@@ -72,15 +77,22 @@ type RegisteredDefinition struct {
 	// configDefaults holds the config model's `default` tags keyed by local
 	// config key, applied to local specs via ApplyDefaults.
 	configDefaults map[string]any
+	// fields and patterns are the described config model, built once at
+	// registration so a definition Describe cannot read fails to register.
+	fields   []Field
+	patterns map[string]funcs.PatternInfo
 }
 
 // ValidateConfig validates config with its defaults applied, since that is what
 // apply sends: a default can satisfy a conditional requirement or trigger one.
 func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigError {
+	// A null under an unknown key isn't reported: removing the key fixes both.
+	nullErrors := errorsOutside(findNullValues(config, ""), findUnknownKeys(config, d.configType, ""))
 	config = d.ApplyDefaults(config)
 	errors := validateConfigModel(config, d.configType, "", d.ConfigValidateFuncs...)
 	errors = append(errors, d.validateConsentManagement(config)...)
-	return append(errors, d.validateConnectionMode(config)...)
+	errors = append(errors, d.validateConnectionMode(config)...)
+	return append(nullErrors, errorsOutside(errors, nullErrors)...)
 }
 
 func (d *RegisteredDefinition) LocalToAPI(local map[string]any) (map[string]any, error) {
@@ -258,12 +270,52 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 		return nil, fmt.Errorf("building config defaults: %w", err)
 	}
 
+	fields, patterns, err := describeConfig(def, configType, keyPathSourceTypes, configDefaults)
+	if err != nil {
+		return nil, fmt.Errorf("describing config model: %w", err)
+	}
+
+	if err := validateSecretKeys(def.SecretKeys, fields); err != nil {
+		return nil, fmt.Errorf("validating secret keys: %w", err)
+	}
+
 	return &RegisteredDefinition{
 		DestinationDefinition: def,
 		configType:            configType,
 		keyPathSourceTypes:    keyPathSourceTypes,
 		configDefaults:        configDefaults,
+		fields:                fields,
+		patterns:              patterns,
 	}, nil
+}
+
+// snakeCaseKey is a dotted path of snake_case segments. secret.VariableName
+// upper-cases each segment into the secret's variable name, so such a key
+// always adds valid characters and only the spec ID can make the name invalid.
+var snakeCaseKey = regexp.MustCompile(`^[a-z0-9_]+(\.[a-z0-9_]+)*$`)
+
+// validateSecretKeys requires every secret key to name a string field of the
+// described config, through nested objects and lists of objects. Apply, import
+// and the docs command all act on these paths, and a path the config model
+// lacks would leave a secret unmasked with nothing to flag it.
+func validateSecretKeys(secretKeys []string, fields []Field) error {
+	types := make(map[string]string, len(fields))
+	for _, f := range fields {
+		types[strings.ReplaceAll(f.Key, "[]", "")] = f.Type
+	}
+	for _, key := range secretKeys {
+		fieldType, ok := types[key]
+		if !ok {
+			return fmt.Errorf("secret key %q does not name a string field of the config model", key)
+		}
+		if fieldType != "string" {
+			return fmt.Errorf("secret key %q names a field of type %s, not string", key, fieldType)
+		}
+		if !snakeCaseKey.MatchString(key) {
+			return fmt.Errorf("secret key %q is not snake_case, so its secret's variable name could be invalid", key)
+		}
+	}
+	return nil
 }
 
 // validateConnectionRequiredKeys rejects entries for source types outside

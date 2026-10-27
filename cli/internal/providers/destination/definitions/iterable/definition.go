@@ -238,11 +238,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "iterable",
-		APIType:    "ITERABLE",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"register_device_or_browser_api_key", "api_key"},
+		Type:        "iterable",
+		DisplayName: "Iterable",
+		APIType:     "ITERABLE",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"register_device_or_browser_api_key", "api_key"},
 		ConfigValidateFuncs: []rules.CustomValidateFunc{
 			{Tag: "iterable_package_name_required", Func: packageNameConditional},
 		},
