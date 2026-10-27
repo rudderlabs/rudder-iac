@@ -6,7 +6,16 @@ on:
     paths:
       - "install.sh"
       - ".github/workflows/install-script.yml"
+      - ".github/workflows/release.yml"
+  # With a tag, only the release-asset job runs, as after a release; use it to
+  # check an install.sh attached by hand (see release.yml).
   workflow_dispatch:
+    inputs:
+      tag:
+        description: release tag whose install.sh to test, such as v0.29.0; leave empty to test the repository copy
+        type: string
+        required: false
+        default: ""
   # release.yml calls this with the tag it released, once it has attached
   # install.sh to that release. Only the release-asset job runs then.
   workflow_call:
@@ -17,9 +26,10 @@ on:
         required: true
 
 # In a called workflow, github.workflow is the caller's name, so the group
-# starts with this workflow's own name instead.
+# starts with this workflow's own name instead. The tag comes first, so a manual
+# run on main's head does not cancel the test of a release, or the reverse.
 concurrency:
-  group: install-script-${{ github.head_ref || github.sha }}
+  group: install-script-${{ inputs.tag || github.head_ref || github.sha }}
   cancel-in-progress: true
 
 permissions:
@@ -56,6 +66,24 @@ jobs:
             echo "::error file=install.sh::install.sh needs exactly one line RELEASE_TAG=\"\" (found $n)"
             exit 1
           fi
+
+      - name: run release.yml's upload step, with a gh that only records its arguments
+        env:
+          TAG: v0.29.0
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          cat >"$RUNNER_TEMP/bin/gh" <<'EOF'
+          #!/bin/sh
+          printf '%s\n' "$*" >"$RUNNER_TEMP/gh-args.txt"
+          EOF
+          chmod +x "$RUNNER_TEMP/bin/gh"
+          yq e -e '.jobs."upload-install-script".steps[] | select(.name == "Upload install.sh with the tag set") | .run' \
+            .github/workflows/release.yml >"$RUNNER_TEMP/upload.sh"
+          PATH="$RUNNER_TEMP/bin:$PATH" bash -e "$RUNNER_TEMP/upload.sh"
+          grep -Fx "release upload $TAG $RUNNER_TEMP/install.sh --clobber --repo $GITHUB_REPOSITORY" "$RUNNER_TEMP/gh-args.txt"
+          # The uploaded copy is install.sh with only that line set to the tag.
+          test "$(grep -cx "RELEASE_TAG=\"$TAG\"" "$RUNNER_TEMP/install.sh")" -eq 1
+          diff <(grep -vx 'RELEASE_TAG=""' install.sh) <(grep -vx "RELEASE_TAG=\"$TAG\"" "$RUNNER_TEMP/install.sh")
 
   install:
     if: inputs.tag == ''
@@ -98,7 +126,8 @@ jobs:
         env:
           RUDDER_CLI_INSTALL_DIR: ${{ runner.temp }}/stamped
         run: |
-          # The edit release.yml makes to the copy it attaches to a release.
+          # The edit release.yml makes to the copy it attaches to a release. The
+          # first job in this file runs release.yml's own step.
           sed 's/^RELEASE_TAG=""$/RELEASE_TAG="v0.27.0"/' install.sh >"$RUNNER_TEMP/stamped.sh"
           sh "$RUNNER_TEMP/stamped.sh"
           "$RUDDER_CLI_INSTALL_DIR/rudder-cli" --version | grep -Fx "rudder-cli version 0.27.0"
@@ -235,7 +264,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: install with the README's command, from the tag's install.sh
+      - name: install from the tag's install.sh, after checking that release.yml set the tag in it
         env:
           TAG: ${{ inputs.tag }}
         run: |
@@ -243,5 +272,10 @@ jobs:
             echo "::error::the tag input is not a vX.Y.Z tag"
             exit 1
           fi
-          curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/install.sh" | sh
+          # Into a file, not curl | sh: without pipefail a 404 would pass the
+          # pipe, and a copy without the tag set installs the latest release,
+          # which right after a release is this one too.
+          curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/install.sh" -o "$RUNNER_TEMP/install.sh"
+          grep -Fx "RELEASE_TAG=\"$TAG\"" "$RUNNER_TEMP/install.sh"
+          sh "$RUNNER_TEMP/install.sh"
           "$HOME/.local/bin/rudder-cli" --version | grep -Fx "rudder-cli version ${TAG#v}"

@@ -22,12 +22,24 @@ jobs:
         with:
           egress-policy: audit
 
+      # Whoever sends the dispatch sets client_payload.tag, so it reaches the
+      # shell only through env, and only once it looks like a release tag.
+      - name: Check the tag
+        env:
+          TAG: ${{ github.event.client_payload.tag }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::client_payload.tag is not a vX.Y.Z tag"
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
-          # For repository_dispatch, checkout the specific tag
-          ref: ${{ github.event.client_payload.tag || github.ref }}
+          # refs/tags/, because for a bare name checkout takes a branch of that
+          # name over the tag.
+          ref: refs/tags/${{ github.event.client_payload.tag }}
           persist-credentials: false
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
@@ -52,6 +64,21 @@ jobs:
   # install.sh is. It is a job of its own because a rerun of the goreleaser job
   # stops on the archives it already uploaded: "Re-run failed jobs" repeats only
   # this upload, and --clobber replaces a copy from an earlier attempt.
+  #
+  # Keep slow or fallible steps out of the goreleaser job, and put them in a job
+  # that needs this one. Until this job ends, releases/latest/download/install.sh
+  # answers 404, and a goreleaser failure skips this job.
+  #
+  # If a release still ends up without install.sh, because the goreleaser job
+  # failed after its uploads or this job was wrong when the release ran (a rerun
+  # uses the workflow file of the first run), attach it by hand from a clone that
+  # has the tag, with gh signed in to an account that can write to releases:
+  #
+  #   tag=v0.29.0 d=$(mktemp -d)
+  #   git show "refs/tags/$tag:install.sh" | sed "s/^RELEASE_TAG=\"\"\$/RELEASE_TAG=\"$tag\"/" >"$d/install.sh"
+  #   grep -Fx "RELEASE_TAG=\"$tag\"" "$d/install.sh" && gh release upload "$tag" "$d/install.sh" --clobber --repo rudderlabs/rudder-iac
+  #
+  # Then run the "install script" workflow by hand with that tag to check it.
   upload-install-script:
     needs: goreleaser
     runs-on: ubuntu-latest
@@ -77,7 +104,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          ref: ${{ github.event.client_payload.tag }}
+          # refs/tags/, because for a bare name checkout takes a branch of that
+          # name over the tag.
+          ref: refs/tags/${{ github.event.client_payload.tag }}
           persist-credentials: false
 
       - name: Upload install.sh with the tag set
