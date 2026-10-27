@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -112,15 +114,8 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 		}
 		return fmt.Sprintf("'%s' does not match the required pattern", fieldName)
 
-	case "oneof":
-		return fmt.Sprintf("'%s' must be one of [%s]", fieldName, oneOfText(err.Param()))
-
-	case "dynamic_or_oneof":
-		return fmt.Sprintf(
-			"'%s' must be one of [%s] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})",
-			fieldName,
-			oneOfText(err.Param()),
-		)
+	case "oneof", "dynamic_or_oneof":
+		return OneOfMessage(fieldName, OneOfMembers(err.Param()), err.ActualTag() == "dynamic_or_oneof")
 
 	case "dynamic_or_pattern":
 		if msg, ok := getPatternErrorMessage(err.Param()); ok {
@@ -225,10 +220,35 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 	}
 }
 
-// oneOfText renders a oneof parameter for a message, showing the empty member,
-// which a tag writes as a pair of single quotes, as "" the way the docs do.
-func oneOfText(param string) string {
-	return strings.ReplaceAll(param, "''", `""`)
+// OneOfMembers splits a oneof or dynamic_or_oneof parameter the way
+// go-playground's oneof does: a member in single quotes may hold spaces, and
+// a pair of quotes with nothing between them is the empty string.
+func OneOfMembers(param string) []string {
+	members := oneOfMemberPattern.FindAllString(param, -1)
+	for i, member := range members {
+		members[i] = strings.ReplaceAll(member, "'", "")
+	}
+	return members
+}
+
+var oneOfMemberPattern = regexp.MustCompile(`'[^']*'|\S+`)
+
+// OneOfMessage is the message for a value outside an enum, shared so every
+// check words it alike. A member that is empty or holds a space is quoted, so
+// each reads as one member.
+func OneOfMessage(field string, members []string, dynamic bool) string {
+	shown := make([]string, len(members))
+	for i, member := range members {
+		shown[i] = member
+		if member == "" || strings.ContainsFunc(member, unicode.IsSpace) {
+			shown[i] = strconv.Quote(member)
+		}
+	}
+	message := fmt.Sprintf("'%s' must be one of [%s]", field, strings.Join(shown, " "))
+	if dynamic {
+		message += " or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})"
+	}
+	return message
 }
 
 // resolveFieldDisplayName is a helper function to help resolve the field display name

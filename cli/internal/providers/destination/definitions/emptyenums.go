@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 )
 
 // findEmptyEnumValues reports an explicit "" on a string enum unless the enum
@@ -62,9 +64,9 @@ func walkConfigPath(value any, segments []string, path string, visit func(any, s
 
 func enumErrorMessage(field Field) string {
 	key := strings.TrimPrefix(field.Key, parentKey(field.Key)+".")
-	message := fmt.Sprintf("'%s' must be one of %v", strings.TrimSuffix(key, "[]"), field.Enum)
-	if field.OpenEnum {
-		message += " or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})"
+	members := make([]string, len(field.Enum))
+	for i, member := range field.Enum {
+		members[i] = fmt.Sprint(member)
 	}
-	return message
+	return funcs.OneOfMessage(strings.TrimSuffix(key, "[]"), members, field.OpenEnum)
 }

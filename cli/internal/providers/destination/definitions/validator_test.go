@@ -144,6 +144,33 @@ func TestValidateConfigRejectsExplicitEmptyEnum(t *testing.T) {
 	})
 }
 
+func TestValidateConfigRejectsOmittedEnumWithoutOmitempty(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "enums",
+		DisplayName: "Enums",
+		Version:     1,
+		NewConfig: func() any {
+			// Without omitempty, an enum runs on an omitted key once required_if
+			// passes; dynamic_or_oneof rejects it as oneof does.
+			return &struct {
+				Flag    *bool   `mapstructure:"flag"`
+				Static  string  `mapstructure:"static" validate:"required_if=Flag true,oneof=a b"`
+				Dynamic *string `mapstructure:"dynamic" validate:"required_if=Flag true,dynamic_or_oneof=a b"`
+			}{}
+		},
+	}))
+	registered, err := registry.Get("enums", 1)
+	require.NoError(t, err)
+
+	assert.Equal(t, []definitions.ConfigError{
+		{Path: "/static", Message: "'static' must be one of [a b]"},
+		{Path: "/dynamic", Message: "'dynamic' must be one of [a b] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})"},
+	}, registered.ValidateConfig(map[string]any{"flag": false}))
+}
+
 func TestValidateConfigDecodeTypeError(t *testing.T) {
 	t.Parallel()
 

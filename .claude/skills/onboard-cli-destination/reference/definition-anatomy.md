@@ -154,6 +154,9 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 - Registration also rejects rule shapes the docs would misstate:
   - after `dive`, any rule but `oneof`, `dynamic_or_oneof`, `pattern`,
     `dynamic_or_pattern` or a custom tag;
+  - `omitempty` after `dive` next to `oneof` or `dynamic_or_oneof`: a list
+    item is never omitted, so it would only let `""` skip the enum. List `''`
+    as a member to allow an empty item;
   - `required` on a key inside a nested block that is not a pointer, since
     go-playground checks it even when the spec leaves the block out;
   - a `required*` rule on a `bool` or number that is not a pointer, since it

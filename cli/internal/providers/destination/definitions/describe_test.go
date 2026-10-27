@@ -117,10 +117,12 @@ func TestDescribeReadsQuotedOneOfMembers(t *testing.T) {
 	}, enums)
 
 	assert.Empty(t, registered.ValidateConfig(map[string]any{"middle": "", "end": "", "alone": "", "spaced": "Page View"}))
-	assert.Equal(t, []definitions.ConfigError{{
+	want := []definitions.ConfigError{{
 		Path:    "/spaced",
-		Message: "'spaced' must be one of ['Page View' Track] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})",
-	}}, registered.ValidateConfig(map[string]any{"spaced": "Page"}))
+		Message: `'spaced' must be one of ["Page View" Track] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})`,
+	}}
+	assert.Equal(t, want, registered.ValidateConfig(map[string]any{"spaced": "Page"}))
+	assert.Equal(t, want, registered.ValidateConfig(map[string]any{"spaced": ""}))
 }
 
 func TestDescribeReadsTheConfigModel(t *testing.T) {
@@ -451,6 +453,15 @@ func TestRegisterRejectsValidateRulesDescribeCannotRead(t *testing.T) {
 				}{}
 			},
 			wantErr: `reading config key "tags": validate rule "max" after dive would be described as a rule on the list`,
+		},
+		{
+			name: "omitempty next to an enum on each item of a list",
+			newConfig: func() any {
+				return &struct {
+					Tags []string `mapstructure:"tags" validate:"omitempty,dive,omitempty,oneof=a b"`
+				}{}
+			},
+			wantErr: `reading config key "tags": omitempty after dive skips the enum on an empty item`,
 		},
 		{
 			name: "required inside a block that is not a pointer",

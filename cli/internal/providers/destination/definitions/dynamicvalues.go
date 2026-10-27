@@ -78,6 +78,9 @@ func dynamicOrPattern(fl validator.FieldLevel) bool {
 	return funcs.MatchPattern(fl.Param(), value)
 }
 
+// dynamicOrOneOf accepts a dynamic config value, otherwise defers to the
+// members as oneof does: "" passes only when listed, so an optional key needs
+// omitempty, as it does with oneof.
 func dynamicOrOneOf(fl validator.FieldLevel) bool {
 	value, ok := stringFieldValue(fl)
 	if !ok {
@@ -88,7 +91,7 @@ func dynamicOrOneOf(fl validator.FieldLevel) bool {
 		return true
 	}
 
-	for _, option := range oneOfMembers(fl.Param()) {
+	for _, option := range funcs.OneOfMembers(fl.Param()) {
 		if value == option {
 			return true
 		}
