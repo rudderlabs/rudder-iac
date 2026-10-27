@@ -117,7 +117,7 @@ func TestSecretReferenceReportedWhenSubstitutionFails(t *testing.T) {
 func TestSubstitutionErrorMasksSecretLine(t *testing.T) {
 	t.Parallel()
 
-	out, err := renderLoad(t, map[string]string{"amplitude.yaml": `version: rudder/v1
+	spec := `version: rudder/v1
 kind: destination
 metadata:
   name: shop-amplitude
@@ -130,12 +130,21 @@ spec:
   config:
     api_key: 'fake-literal-prefix{{ .UNDEF }}'
     residency_server: standard
-`}, nil)
-	require.ErrorContains(t, err, "variable substitution failed")
+`
+	// The substitution error must land on the line the secret warning masked
+	// with every line ending the YAML parser reads.
+	for name, lineBreak := range map[string]string{"LF": "\n", "CRLF": "\r\n", "CR": "\r"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.Contains(t, out, `error[project/var-substitution]: undefined variable "UNDEF"`)
-	assert.Equal(t, 2, strings.Count(out, "   12 | api_key: ***\n"), out)
-	assert.NotContains(t, out, "fake-literal-prefix")
+			out, err := renderLoad(t, map[string]string{"amplitude.yaml": strings.ReplaceAll(spec, "\n", lineBreak)}, nil)
+			require.ErrorContains(t, err, "variable substitution failed")
+
+			assert.Contains(t, out, `error[project/var-substitution]: undefined variable "UNDEF"`)
+			assert.Equal(t, 2, strings.Count(out, "   12 | api_key: ***\n"), out)
+			assert.NotContains(t, out, "fake-literal-prefix")
+		})
+	}
 }
 
 // A shared variable's line holds only the reference, so neither the warning
