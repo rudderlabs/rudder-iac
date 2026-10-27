@@ -3,6 +3,7 @@ package pathindex
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -229,21 +230,34 @@ func (pi *PathIndex) recordPosition(
 // maskedLineText returns lineText, built by extractLineText, with the value it
 // shows replaced by maskedValue. A scalar shows its value after its key, or
 // alone as a list item. A list item that is a mapping shows its first
-// property's value. Other lines show no value, and an empty value is left as
-// it is.
+// property's value. Other lines show no value, and an empty value or a null is
+// left as it is.
 func maskedLineText(node *yaml.Node, key *yaml.Node, lineText string) string {
 	switch {
-	case node.Kind == yaml.ScalarNode && node.Value != "":
+	case showsValue(node):
 		if key != nil {
 			return fmt.Sprintf("%s: %s", key.Value, maskedValue)
 		}
 		return maskedValue
 
-	case node.Kind == yaml.MappingNode && key == nil && len(node.Content) >= 2 &&
-		node.Content[1].Kind == yaml.ScalarNode && node.Content[1].Value != "":
+	case node.Kind == yaml.MappingNode && key == nil && len(node.Content) >= 2 && showsValue(node.Content[1]):
 		return fmt.Sprintf("- %s: %s", node.Content[0].Value, maskedValue)
 	}
 	return lineText
+}
+
+// nullSpellings are the plain scalars YAML reads as null.
+var nullSpellings = []string{"~", "null", "Null", "NULL"}
+
+// showsValue reports whether node is a scalar whose line text shows a value
+// that could be a secret. An empty value does not, and neither does a null
+// written as ~ or null: masking it would hide the null that a check such as
+// "must not be null" reports. A value tagged !!null by hand is still masked.
+func showsValue(node *yaml.Node) bool {
+	if node.Kind != yaml.ScalarNode || node.Value == "" {
+		return false
+	}
+	return node.ShortTag() != "!!null" || !slices.Contains(nullSpellings, node.Value)
 }
 
 // extractLineText constructs a readable text representation from the node

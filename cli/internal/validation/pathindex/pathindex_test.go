@@ -457,6 +457,13 @@ func TestPathIndex_MaskedPosition(t *testing.T) {
     - fake-token
     - 'sk_fake_PART1: PART2'
   nested: {}
+  null_tilde: ~
+  null_word: null
+  null_quoted: 'null'
+  null_tagged: !!null sk-fake-tagged
+  nulls:
+    - ~
+    - from: null
 `))
 	require.NoError(t, err)
 
@@ -465,6 +472,15 @@ func TestPathIndex_MaskedPosition(t *testing.T) {
 		want string
 	}{
 		{path: "/config/api_key", want: "api_key: ***"},
+		// A null shows no value, so the line keeps it as written.
+		{path: "/config/null_tilde", want: "null_tilde: ~"},
+		{path: "/config/null_word", want: "null_word: null"},
+		{path: "/config/nulls/0", want: "~"},
+		{path: "/config/nulls/1", want: "- from: null"},
+		// A quoted 'null' is a string, and a value tagged !!null by hand is
+		// not a null spelling, so both are masked.
+		{path: "/config/null_quoted", want: "null_quoted: ***"},
+		{path: "/config/null_tagged", want: "null_tagged: ***"},
 		{path: "/config/headers/0", want: "- from: ***"},
 		{path: "/config/headers/0/to", want: "to: ***"},
 		{path: "/config/tokens/0", want: "***"},

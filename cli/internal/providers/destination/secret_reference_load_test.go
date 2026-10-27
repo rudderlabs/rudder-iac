@@ -352,6 +352,66 @@ spec:
 	}
 }
 
+// A multi-line value in a quoted reference keeps its line breaks after
+// substitution, so it fails a single-line secret key's pattern. The error
+// must print the key's line masked, with no line of the value.
+func TestValidateMasksMultiLineSecret(t *testing.T) {
+	t.Parallel()
+
+	for _, quoted := range []string{`'{{ .SECRET }}'`, `"{{ .SECRET }}"`} {
+		t.Run(quoted, func(t *testing.T) {
+			t.Parallel()
+
+			out, err := renderLoad(t, map[string]string{"dest.yaml": `version: rudder/v1
+kind: destination
+metadata:
+  name: shop-amplitude
+spec:
+  id: shop-amplitude
+  display_name: Shop Amplitude
+  type: am
+  definition_version: 1
+  enabled: true
+  config:
+    api_key: ` + quoted + `
+    residency_server: standard
+`}, map[string]string{"SECRET": "fake-secret-line-one\nfake-secret-line-two\n"})
+			require.ErrorContains(t, err, "syntax validation failed")
+
+			assert.Contains(t, out, "must not contain line breaks")
+			assert.Contains(t, out, "   12 | api_key: ***\n")
+			assert.NotContains(t, out, "fake-secret-line")
+		})
+	}
+}
+
+// A null secret key holds no value to hide, so the error that it must not be
+// null prints its line as written.
+func TestValidatePrintsNullSecretKeyAsWritten(t *testing.T) {
+	t.Parallel()
+
+	out, err := renderLoad(t, map[string]string{"dest.yaml": `version: rudder/v1
+kind: destination
+metadata:
+  name: shop-amplitude
+spec:
+  id: shop-amplitude
+  display_name: Shop Amplitude
+  type: am
+  definition_version: 1
+  enabled: true
+  config:
+    api_key: '{{ .SECRET }}'
+    api_secret: ~
+    residency_server: standard
+`}, map[string]string{"SECRET": "fake-amplitude-key"})
+	require.ErrorContains(t, err, "syntax validation failed")
+
+	assert.Contains(t, out, "'api_secret' must not be null")
+	assert.Contains(t, out, "   13 | api_secret: ~\n")
+	assert.NotContains(t, out, "fake-amplitude-key")
+}
+
 // A config error on a key beside a secret prints that key's own line, which
 // holds no secret, so the value the user has to fix stays visible.
 func TestValidatePrintsLinesBesideSecrets(t *testing.T) {
