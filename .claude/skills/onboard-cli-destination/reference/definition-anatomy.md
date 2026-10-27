@@ -154,6 +154,9 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 - Registration also rejects rule shapes the docs would misstate:
   - after `dive`, any rule but `oneof`, `dynamic_or_oneof`, `pattern`,
     `dynamic_or_pattern` or a custom tag;
+  - `omitempty` after `dive` next to `oneof` or `dynamic_or_oneof`: a list
+    item is never omitted, so it would only let `""` skip the enum. List `''`
+    as a member to allow an empty item;
   - `required` on a key inside a nested block that is not a pointer, since
     go-playground checks it even when the spec leaves the block out;
   - a `required*` rule on a `bool` or number that is not a pointer, since it
@@ -175,7 +178,8 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
     bool or a block, since go-playground panics on them;
   - `pattern`, `dynamic_or_pattern` or `dynamic_or_oneof` on anything but a
     string, since they read only strings;
-  - `|`, a quoted value, or a `0x2C` or `0x7C` escape in a tag.
+  - `|`, a quoted value outside a `oneof` or `dynamic_or_oneof` list, or a
+    `0x2C` or `0x7C` escape in a tag.
 
 ## Validation semantics to remember
 
@@ -191,6 +195,10 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
   source-extraction.md "Enforcing regex patterns".
 - Error paths are JSON pointers over local keys (`/bucket_name`,
   `/consent_management/web/0/provider`) — assert them in tests.
+- An explicitly configured empty string is rejected for enum fields before
+  defaults are applied. Omitted enum keys may still receive defaults; only a
+  schema enum that contains `""` should list it, as the quoted member `''`
+  (`oneof='' a b`).
 
 ## Test template
 
