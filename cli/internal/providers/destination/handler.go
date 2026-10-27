@@ -72,7 +72,7 @@ func (h *HandlerImpl) NewSpec() *DestinationSpec {
 // secret keys present in the spec are wrapped as *secret.String so the
 // differ's secret-aware branch owns comparison.
 func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) (map[string]*DestinationResource, error) {
-	registered, err := h.registry.Get(spec.Type, spec.DefinitionVersion)
+	registered, err := h.registry.Get(spec.Type, *spec.DefinitionVersion)
 	if err != nil {
 		return nil, fmt.Errorf("getting destination definition: %w", err)
 	}
@@ -86,7 +86,7 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) 
 		DisplayName:       spec.DisplayName,
 		Type:              spec.Type,
 		Enabled:           spec.Enabled,
-		DefinitionVersion: spec.DefinitionVersion,
+		DefinitionVersion: *spec.DefinitionVersion,
 		Config:            secret.WrapKnownSecrets(config, registered.SecretKeys()),
 	}
 

@@ -657,7 +657,7 @@ func mapKeys[V any](m map[string]V) []string {
 
 // The JSON contract carries what the walker reads about nested required keys
 // and open enums, not only the Markdown cells.
-func TestDescribeCarriesNestedRequiredAndOpenEnums(t *testing.T) {
+func TestDescribeCarriesNestedRequiredOpenAndEmptyEnums(t *testing.T) {
 	t.Parallel()
 
 	docs, _ := newDestinations(t)
@@ -680,6 +680,9 @@ func TestDescribeCarriesNestedRequiredAndOpenEnums(t *testing.T) {
 		OpenEnum:        true,
 		AcceptsTemplate: true,
 	}, braze["data_center"])
+
+	adobe := fieldsByKey(describe(t, docs, specdocs.DescribeOptions{Type: "adobe_analytics"}))
+	assert.Contains(t, adobe["events_to_types[].to"].Enum, "")
 }
 
 func fieldsByKey(doc specdocs.DestinationDoc) map[string]specdocs.Field {

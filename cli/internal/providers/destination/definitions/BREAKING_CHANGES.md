@@ -8,6 +8,22 @@ A destination type's history starts at the first release that made it available 
 
 ## Upcoming (unreleased)
 
+### Empty enum values rejected
+
+**Scope:** spec
+
+**Types:** `am`, `bq`, `braze`, `customerio`, `facebook_conversions`, `facebook_pixel`, `ga4`, `hs`, `http`, `iterable`, `mp`, `postgres`, `posthog`, `rs`, `s3_datalake`, `snowflake`, `tiktok_ads`, `webhook`
+
+**Why:** An empty string on a key that takes one of a fixed set of values, written as `key: ""` or `key: ''`, now fails validation:
+
+```text
+'webhook_method' must be one of [POST PUT PATCH GET DELETE]
+```
+
+Earlier releases accepted it, and the API then rejected it on apply. A key whose upstream schema lists `""` as a value still accepts it: the `to` of an event mapping on `facebook_conversions`, `facebook_pixel`, `googleads` and `tiktok_ads`.
+
+**Migration:** Remove the key to leave it unset, or set one of the listed values.
+
 ### Null config values rejected
 
 **Scope:** spec

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -200,6 +201,32 @@ func TestKafkaConfigValidation(t *testing.T) {
 		assert.Empty(t, errors)
 	})
 
+	for _, value := range []string{"env.REGION", `{{ message.x || "plain" }}`} {
+		t.Run("sasl_type rejects dynamic value "+value, func(t *testing.T) {
+			t.Parallel()
+			config := minimalConfig()
+			config["sasl_type"] = value
+
+			errors := registered.ValidateConfig(config)
+
+			assert.Equal(t, []definitions.ConfigError{
+				{Path: "/sasl_type", Message: "'sasl_type' must be one of [plain sha256 sha512]"},
+			}, errors)
+		})
+
+		t.Run("event type mapping rejects dynamic type "+value, func(t *testing.T) {
+			t.Parallel()
+			config := minimalConfig()
+			config["event_type_to_topic_map"] = []any{map[string]any{"from": value, "to": "tracks"}}
+
+			errors := registered.ValidateConfig(config)
+
+			assert.Equal(t, []definitions.ConfigError{
+				{Path: "/event_type_to_topic_map/0/from", Message: "'from' must be one of [identify page screen group alias]"},
+			}, errors)
+		})
+	}
+
 	t.Run("sasl_type rejects unsupported value", func(t *testing.T) {
 		t.Parallel()
 		config := minimalConfig()
@@ -223,7 +250,20 @@ func TestKafkaConfigValidation(t *testing.T) {
 		assertError(t, errors, "/username", "required")
 
 		config["sasl_type"] = ""
-		assertError(t, registered.ValidateConfig(config), "/sasl_type", "required")
+		errors = registered.ValidateConfig(config)
+		require.Len(t, errors, 2)
+		assertError(t, errors, "/sasl_type", "must be one of")
+	})
+
+	t.Run("sasl type rejects explicit empty when conditional is inactive", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["sasl_type"] = ""
+
+		errors := registered.ValidateConfig(config)
+
+		require.Len(t, errors, 1)
+		assertError(t, errors, "/sasl_type", "must be one of")
 	})
 
 	t.Run("sasl fields not required when ssl is disabled", func(t *testing.T) {
@@ -322,6 +362,25 @@ func TestKafkaConfigValidation(t *testing.T) {
 
 			assertError(t, registered.ValidateConfig(config), tc.path, "")
 		}
+	})
+
+	t.Run("event type mapping rejects explicit empty type", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["event_type_to_topic_map"] = []any{map[string]any{"from": "", "to": "tracks"}}
+
+		errors := registered.ValidateConfig(config)
+
+		require.Len(t, errors, 1)
+		assertError(t, errors, "/event_type_to_topic_map/0/from", "must be one of")
+	})
+
+	t.Run("event type mapping permits omitted type", func(t *testing.T) {
+		t.Parallel()
+		config := minimalConfig()
+		config["event_type_to_topic_map"] = []any{map[string]any{"to": "tracks"}}
+
+		assert.Empty(t, registered.ValidateConfig(config))
 	})
 
 	t.Run("event type mapping rejects unsupported type", func(t *testing.T) {
@@ -663,7 +722,7 @@ func TestKafkaDestinationSpecExtraction(t *testing.T) {
 		DisplayName:       "Kafka Production",
 		Type:              "kafka",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Config: map[string]any{
 			"host_name": "broker1.example.com",
 			"port":      "9092",

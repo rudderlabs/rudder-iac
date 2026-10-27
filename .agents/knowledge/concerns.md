@@ -53,3 +53,15 @@
 - Destination definition defaults intentionally support scalar default tags only; `cli/internal/providers/destination/definitions/defaults.go` rejects slice defaults, and that refusal is asserted in `defaults_test.go`.
 - Slack is currently the only registered destination whose schema declares non-scalar top-level defaults, so its empty-array defaults need fixture/snapshot pinning until DEX-704 teaches the defaults/converter layer to preserve empty arrays.
 - `converter.ArrayWithStrings` sends an explicitly empty list as `[]` since DEX-1089, as `ArrayWithObjects` already did, so fixing array defaults now needs only defaults-engine support for `default:"[]"` tags.
+
+## DEX-1079 — Raw Decoder Text For Wrong-Typed Destination Envelope Fields
+<!-- ticket:DEX-1079 -->
+- `decodeDestinationSpec` (`cli/internal/providers/destination/rule_spec_syntax_valid.go`) returns mapstructure's error verbatim at reference `/spec`, so a wrong-typed envelope field such as `definition_version: "1"` reports a multi-line `decoding spec: decoding failed due to the following error(s): 'definition_version' expected type 'int64', got unconvertible type 'string'` pointing at the `spec:` line instead of a per-field message at `/spec/definition_version`. DEX-1079 reported it; that fix covered only `0`.
+
+## DEX-1081 — Destination Decode Error Follow-Ups
+<!-- ticket:DEX-1081 -->
+- Resolved: DEX-1079's "Raw Decoder Text For Wrong-Typed Destination Envelope Fields". Wrong-typed envelope and config values now report per field through `definitions.DecodeErrors`, e.g. `'definition_version' must be an integer` at `/spec/definition_version`.
+- mapstructure truncates a float into an int field without error, even with `WeaklyTypedInput: false`. So `definition_version: 1.5` validates as version 1, and a `*int` config field truncates the same way. rETL rejects fractions with the `rejectFractionalInts` decode hook in `cli/internal/providers/retl/rules/connection/connection_spec_valid.go`; `decodeDestinationSpec` and `definitions.decodeConfig` have no such hook.
+- `extractLineText` (`cli/internal/validation/pathindex/pathindex.go`) renders a scalar from `node.Value`, which drops YAML quotes. So `enabled: "true"` shows as `enabled: true` under `'enabled' must be a boolean`. A fix must render from `node.Style`, which is a bitmask: test it with `&`, not `==`.
+- An unsupported `connection_mode` source-type key with a non-string value (`foo: true`) reports both `'foo' must be a string` and `source type 'foo' is not supported …` at the same anchor. `sourceTypeKeyResults` runs in `specSyntaxValidRule.Validate`, outside the owner precedence in `RegisteredDefinition.ValidateConfig`.
+- `flattenDecodeErrors` is duplicated in `cli/internal/providers/retl/rules/connection/connection_spec_valid.go` and `cli/internal/providers/destination/definitions/validator.go`.
