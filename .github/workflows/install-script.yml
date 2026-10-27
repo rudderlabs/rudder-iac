@@ -33,6 +33,8 @@ jobs:
 
       - name: checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: shellcheck
         run: |
@@ -56,6 +58,8 @@ jobs:
 
       - name: checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: install the latest release
         env:
@@ -114,8 +118,62 @@ jobs:
           RUDDER_CLI_VERSION: "9.9.9"
           RUDDER_CLI_INSTALL_DIR: ${{ runner.temp }}/missing
         run: |
-          if sh install.sh; then
+          if sh install.sh 2>"$RUNNER_TEMP/missing.txt"; then
             echo "install.sh exited 0 for a release that does not exist"
             exit 1
           fi
+          grep -Fx "rudder-cli install: release v9.9.9 does not exist; see https://github.com/rudderlabs/rudder-iac/releases" "$RUNNER_TEMP/missing.txt"
           test ! -e "$RUDDER_CLI_INSTALL_DIR"
+
+      - name: refuse an archive whose checksum does not match
+        env:
+          RUDDER_CLI_INSTALL_DIR: ${{ runner.temp }}/tampered
+        run: |
+          # A curl first on PATH runs the real one, then appends a byte to any
+          # archive it wrote, as a download changed on the way would arrive.
+          real_curl=$(command -v curl)
+          mkdir -p "$RUNNER_TEMP/tamper-bin"
+          printf '%s\n' '#!/bin/sh' "\"$real_curl\" \"\$@\" || exit \$?" \
+            'out=""' \
+            'while [ $# -gt 0 ]; do if [ "$1" = "-o" ]; then out=$2; fi; shift; done' \
+            'case "$out" in *.tar.gz) printf x >>"$out" ;; esac' >"$RUNNER_TEMP/tamper-bin/curl"
+          chmod +x "$RUNNER_TEMP/tamper-bin/curl"
+          rc=0
+          PATH="$RUNNER_TEMP/tamper-bin:$PATH" sh install.sh 2>"$RUNNER_TEMP/tampered.txt" || rc=$?
+          cat "$RUNNER_TEMP/tampered.txt"
+          test "$rc" -eq 1
+          grep -F "rudder-cli install: checksum mismatch for rudder-cli_" "$RUNNER_TEMP/tampered.txt"
+          test ! -e "$RUDDER_CLI_INSTALL_DIR/rudder-cli"
+
+  busybox:
+    # Alpine has no curl, so this runs the wget branches under busybox sh, with
+    # the script read from stdin as the README's curl | sh delivers it.
+    name: install with busybox wget and sh on alpine
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: install, and fail on a release that does not exist
+        run: |
+          docker run --rm -v "$PWD:/w:ro" alpine@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f sh -c '
+            set -eu
+            if command -v curl; then echo "this image has curl"; exit 1; fi
+            sh </w/install.sh
+            /root/.local/bin/rudder-cli --version
+            if RUDDER_CLI_VERSION=9.9.9 RUDDER_CLI_INSTALL_DIR=/tmp/missing sh </w/install.sh 2>/tmp/missing.txt; then
+              echo "install.sh exited 0 for a release that does not exist"
+              exit 1
+            fi
+            cat /tmp/missing.txt
+            grep -Fx "rudder-cli install: release v9.9.9 does not exist; see https://github.com/rudderlabs/rudder-iac/releases" /tmp/missing.txt
+            test ! -e /tmp/missing
+          '
