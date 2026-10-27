@@ -3,6 +3,7 @@ package definitions
 import (
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -57,9 +58,10 @@ func DecodeErrors(err error, root reflect.Type, basePath string) []ConfigError {
 
 	errors := make([]ConfigError, 0, len(decodeErrors))
 	for _, decodeErr := range decodeErrors {
-		segments := strings.FieldsFunc(decodeErr.Name(), func(r rune) bool {
-			return r == '.' || r == '[' || r == ']'
-		})
+		segments := decodeNameSegment.FindAllString(decodeErr.Name(), -1)
+		for i, segment := range segments {
+			segments[i] = strings.TrimSuffix(strings.TrimPrefix(segment, "["), "]")
+		}
 		path := basePath
 		for _, segment := range segments {
 			path = joinConfigPath(path, segment)
@@ -71,6 +73,11 @@ func DecodeErrors(err error, root reflect.Type, basePath string) []ConfigError {
 	}
 	return errors
 }
+
+// decodeNameSegment matches one key of a mapstructure field name such as
+// consent_management[web][0].provider: a struct field name, or a list index or
+// map key in brackets, kept whole because a source-type key can hold a dot.
+var decodeNameSegment = regexp.MustCompile(`\[[^\]]*\]|[^.\[\]]+`)
 
 // flattenDecodeErrors collects the DecodeError on every branch of the joined
 // error tree mapstructure returns; each one carries its field's path.

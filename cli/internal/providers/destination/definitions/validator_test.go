@@ -752,6 +752,21 @@ func TestValidateConfigRejectsWrongTypes(t *testing.T) {
 				Message: "source type 'ios' is not supported by destination type 'TEST'; supported source types: web",
 			}},
 		},
+		{
+			name: "dotted consent source type reported over its shape",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{
+				"a.b": []any{map[string]any{"provider": 1}},
+			}},
+			want: []definitions.ConfigError{{
+				Path:    "/consent_management/a.b",
+				Message: "source type 'a.b' is not supported by destination type 'TEST'; supported source types: web",
+			}},
+		},
+		{
+			name:   "dotted connection_mode key keeps its path",
+			config: map[string]any{"required_name": "valid", "connection_mode": map[string]any{"a.b": true}},
+			want:   []definitions.ConfigError{{Path: "/connection_mode/a.b", Message: "'a.b' must be a string"}},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
