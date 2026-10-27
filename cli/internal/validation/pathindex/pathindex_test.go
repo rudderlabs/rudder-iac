@@ -1,6 +1,8 @@
 package pathindex
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -503,4 +505,86 @@ func TestPathIndex_MaskedPosition(t *testing.T) {
 			assert.Equal(t, &Position{Line: pos.Line, Column: pos.Column, LineText: tc.want}, pi.MaskedPosition(tc.path))
 		})
 	}
+}
+
+// An alias reads as its anchor's node, so its path and the paths below it are
+// indexed: the alias at its own place with the anchor's value, and the paths
+// below at the anchor's lines.
+func TestPathIndex_Aliases(t *testing.T) {
+	t.Parallel()
+
+	pi, err := NewPathIndexer([]byte(`config:
+  headers:
+    - &first
+      from: sk-fake-value
+      to: &bad 'X-Bad:Name'
+    - from: sk-fake-other
+      to: *bad
+    - *first
+`))
+	require.NoError(t, err)
+
+	cases := []struct {
+		path       string
+		want       Position
+		wantMasked string
+	}{
+		// A scalar alias sits on its own line and shows the anchor's value.
+		{path: "/config/headers/1/to", want: Position{Line: 7, Column: 7, LineText: "to: X-Bad:Name"}, wantMasked: "to: ***"},
+		// A mapping alias shows its anchor's first property, masked as the
+		// anchor's line is, and the paths below it are the anchor's.
+		{path: "/config/headers/2", want: Position{Line: 8, Column: 7, LineText: "- from: sk-fake-value"}, wantMasked: "- from: ***"},
+		{path: "/config/headers/2/to", want: Position{Line: 5, Column: 7, LineText: "to: X-Bad:Name"}, wantMasked: "to: ***"},
+		{path: "/config/headers/2/from", want: Position{Line: 4, Column: 7, LineText: "from: sk-fake-value"}, wantMasked: "from: ***"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.path, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := pi.PositionLookup(tc.path)
+			require.NoError(t, err)
+			assert.Equal(t, &tc.want, got)
+			assert.Equal(t, tc.wantMasked, pi.MaskedPosition(tc.path).LineText)
+		})
+	}
+}
+
+// An alias inside its own anchor is walked once, and the same alias met again
+// inside that walk ends it instead of looping.
+func TestPathIndex_AliasInsideItsAnchor(t *testing.T) {
+	t.Parallel()
+
+	pi, err := NewPathIndexer([]byte(`loop: &a
+  - x
+  - *a
+`))
+	require.NoError(t, err)
+
+	pos, err := pi.PositionLookup("/loop/1/0")
+	require.NoError(t, err)
+	assert.Equal(t, "x", pos.LineText)
+	_, err = pi.PositionLookup("/loop/1/1")
+	require.ErrorIs(t, err, ErrPathNotFound)
+}
+
+// Each alias repeats its anchor's subtree, so the walk stops after
+// maxAliasWalks of them, and the paths past that fall back to an ancestor.
+func TestPathIndex_AliasWalksAreCapped(t *testing.T) {
+	t.Parallel()
+
+	var doc strings.Builder
+	doc.WriteString("a: &a [x, x, x, x, x, x, x, x, x, x]\n")
+	prev := "a"
+	for _, name := range []string{"b", "c", "d", "e", "f", "g"} {
+		fmt.Fprintf(&doc, "%s: &%s [*%s, *%s, *%s, *%s, *%s, *%s, *%s, *%s, *%s, *%s]\n", name, name, prev, prev, prev, prev, prev, prev, prev, prev, prev, prev)
+		prev = name
+	}
+
+	pi, err := NewPathIndexer([]byte(doc.String()))
+	require.NoError(t, err)
+
+	_, err = pi.PositionLookup("/b/0/0")
+	require.NoError(t, err, "the first aliases are walked")
+	_, err = pi.PositionLookup("/g/9/9/9/9/9/9")
+	require.ErrorIs(t, err, ErrPathNotFound, "walks past the cap are not")
 }

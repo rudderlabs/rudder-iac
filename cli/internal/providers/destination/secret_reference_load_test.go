@@ -442,6 +442,40 @@ spec:
 	assert.NotContains(t, out, "fake-header-secret")
 }
 
+// A key beside a secret can hold an alias. Its error prints the alias's own
+// line, not the list item's, whose first property is the secret.
+func TestValidatePrintsAnAliasedLineBesideASecret(t *testing.T) {
+	t.Parallel()
+
+	out, err := renderLoad(t, map[string]string{"dest.yaml": `version: rudder/v1
+kind: destination
+metadata:
+  name: shop-http
+spec:
+  id: shop-http
+  display_name: Shop HTTP
+  type: http
+  definition_version: 1
+  enabled: true
+  config:
+    api_url: https://example.com/events
+    auth: noAuth
+    method: POST
+    format: JSON
+    headers:
+      - from: '{{ .FIRST }}'
+        to: &bad 'X-Bad:Name'
+      - from: '{{ .SECOND }}'
+        to: *bad
+`}, map[string]string{"FIRST": "fake-first-secret", "SECOND": "fake-second-secret"})
+	require.ErrorContains(t, err, "syntax validation failed")
+
+	assert.Contains(t, out, "   18 | to: X-Bad:Name\n")
+	assert.Contains(t, out, "   20 | to: X-Bad:Name\n")
+	assert.NotContains(t, out, "fake-first-secret")
+	assert.NotContains(t, out, "fake-second-secret")
+}
+
 // validate --json prints no line text, so masking has nothing to do there,
 // but the secret warnings must still reach its diagnostics array with severity
 // warning, and no value from a spec or the var file may reach any field.

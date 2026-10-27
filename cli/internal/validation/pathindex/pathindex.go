@@ -36,7 +36,18 @@ type PathIndex struct {
 	// It is built with the index, because only the YAML node tells a scalar
 	// list item's bare value apart from a "key: value" line.
 	maskedLineTexts map[string]string
+
+	// expanding holds the anchored nodes whose aliases are being walked, so an
+	// alias inside its own anchor ends the walk there. aliasBudget caps how
+	// many aliases are walked, since each repeats its anchor's whole subtree.
+	expanding   map[*yaml.Node]bool
+	aliasBudget int
 }
+
+// maxAliasWalks caps the aliases one index walks. A path below an alias past
+// the cap falls back to its nearest indexed ancestor, as every alias did
+// before aliases were walked.
+const maxAliasWalks = 1000
 
 var StartingPosition = Position{
 	Line:     1,
@@ -64,6 +75,8 @@ func NewPathIndexer(content []byte) (PathIndexer, error) {
 	pi := &PathIndex{
 		positions:       make(map[string]Position),
 		maskedLineTexts: make(map[string]string),
+		expanding:       make(map[*yaml.Node]bool),
+		aliasBudget:     maxAliasWalks,
 	}
 
 	// Record root position "/" at line 1, column 1
@@ -146,42 +159,50 @@ func (pi *PathIndex) walkNode(node *yaml.Node, path string, key *yaml.Node) {
 			pi.walkNode(node.Content[0], path, nil)
 		}
 
-	case yaml.MappingNode:
-		// Mapping nodes contain alternating key-value pairs
-		// Record position for the mapping itself if it has a path
+	case yaml.MappingNode, yaml.SequenceNode:
+		// Record position for the mapping or array itself, then its children
 		pi.recordPosition(path, node, key)
-
-		// Process key-value pairs
-		for i := 0; i < len(node.Content); i += 2 {
-			if i+1 >= len(node.Content) {
-				break
-			}
-
-			var (
-				keyNode   = node.Content[i]
-				valueNode = node.Content[i+1]
-			)
-
-			pi.walkNode(
-				valueNode,
-				fmt.Sprintf("%s/%s", path, keyNode.Value),
-				keyNode,
-			)
-		}
-
-	case yaml.SequenceNode:
-		// Record position for the array itself
-		pi.recordPosition(path, node, key)
-
-		// Process array elements
-		for idx, item := range node.Content {
-			arrayPath := fmt.Sprintf("%s/%d", path, idx)
-			pi.walkNode(item, arrayPath, nil)
-		}
+		pi.walkChildren(node, path)
 
 	case yaml.ScalarNode:
 		// Terminal node - record its position
 		pi.recordPosition(path, node, key)
+
+	case yaml.AliasNode:
+		// An alias reads as the node its anchor names, so its path and every
+		// path below it are indexed too: the alias at its own place with its
+		// anchor's value, and the paths below at the anchor's lines. Without
+		// this a diagnostic on an aliased value printed an ancestor's line,
+		// such as a list item's first property, which can be a secret that the
+		// masking, deciding on the aliased path, did not mask.
+		target := node.Alias
+		if target == nil || pi.expanding[target] || pi.aliasBudget <= 0 {
+			return
+		}
+		pi.aliasBudget--
+		pi.expanding[target] = true
+		defer delete(pi.expanding, target)
+
+		pi.recordAt(path, node, target, key)
+		pi.walkChildren(target, path)
+	}
+}
+
+// walkChildren walks the values of a mapping or the items of a sequence,
+// below path.
+func (pi *PathIndex) walkChildren(node *yaml.Node, path string) {
+	switch node.Kind {
+	case yaml.MappingNode:
+		// Mapping nodes contain alternating key-value pairs
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			keyNode, valueNode := node.Content[i], node.Content[i+1]
+			pi.walkNode(valueNode, fmt.Sprintf("%s/%s", path, keyNode.Value), keyNode)
+		}
+
+	case yaml.SequenceNode:
+		for idx, item := range node.Content {
+			pi.walkNode(item, fmt.Sprintf("%s/%d", path, idx), nil)
+		}
 	}
 }
 
@@ -191,6 +212,13 @@ func (pi *PathIndex) recordPosition(
 	node *yaml.Node,
 	key *yaml.Node,
 ) {
+	pi.recordAt(path, node, node, key)
+}
+
+// recordAt records path at place, or at key when there is one, with the line
+// text of node. They differ for an alias, which sits at place and reads as
+// node.
+func (pi *PathIndex) recordAt(path string, place, node, key *yaml.Node) {
 	if path == "" {
 		return
 	}
@@ -199,8 +227,8 @@ func (pi *PathIndex) recordPosition(
 	lineText := extractLineText(node, key)
 
 	var (
-		line   = node.Line
-		column = node.Column
+		line   = place.Line
+		column = place.Column
 	)
 
 	// If the key is not nil, we are in a situation
