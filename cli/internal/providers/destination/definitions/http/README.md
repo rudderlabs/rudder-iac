@@ -1,11 +1,55 @@
 # HTTP Webhook (`http`)
 
-HTTP Webhook sends each event to an HTTP endpoint you own. You choose the method, body format, authentication, and — when the default passthrough doesn't suit the endpoint — how RudderStack maps the event onto the outgoing request.
+HTTP Webhook sends events to an HTTP endpoint you own. You choose the method and authentication; version 1 uses passthrough or field mappings, while version 2 shapes the JSON request with a JSONata template.
 
 In an HTTP Webhook destination spec:
 
 - `type: http`
-- `definition_version: 1`
+- `definition_version: 1` for the original mapping format, or `2` for JSONata request shaping. Existing version-1 specs need no changes.
+
+## Version 2: JSONata request shaping
+
+Version 2 accepts only `format: JSON`. Set `request_body_template` to a JSONata expression over `$$.events` to build the entire body, including nested objects and arrays. Use `supported_message_types` to restrict delivery by message type (`track`, `identify`, `page`, `screen`, `group`, `alias`). `max_batch_size` is a string integer from `1` to `5000` when `is_batching_enabled: true`; v1 retains its `1`–`100` bound. Verify the template and request-field expressions with the HTTP template verification endpoint before saving; CLI validation checks field shapes, not JSONata syntax.
+
+```yaml
+version: rudder/v1
+kind: destination
+metadata:
+  name: orders-webhook-v2
+spec:
+  id: orders-webhook-v2
+  display_name: Orders Webhook v2
+  type: http
+  definition_version: 2
+  enabled: true
+  config:
+    api_url: https://api.example.com/v2/events
+    auth: noAuth
+    method: POST
+    format: JSON
+    request_body_template: '$$.events.{"customer": {"id": userId}, "items": properties.items}'
+    supported_message_types: [track, identify]
+    headers:
+      - to: X-Event-Type
+        from: $.type
+    query_params:
+      - to: source
+        from: rudderstack
+    path_params:
+      - path: $.properties.accountId
+    is_batching_enabled: true
+    max_batch_size: "5000"
+    connection_mode:
+      web: cloud
+```
+
+Version 2 keeps `api_url`, `auth` and its credentials, `method`, `format`, `headers`, `query_params`, `path_params`, `is_batching_enabled`, `event_filtering`, `connection_mode`, and `consent_management`. Request-field **values** (`from` and `path`) starting with `$` are JSONata expressions; other values are literals. Header and query parameter **names** (`to`) stay literal. Header `from` values are still treated as secrets by the CLI, including expressions; use variable references for credentials. `properties_mapping`, `is_default_mapping`, and `xml_root_key` are v1-only keys and fail validation in v2. The v1 JSONPath and literal restrictions below do not apply to v2 request-field values.
+
+To migrate intentionally, set `definition_version: 2`, replace `properties_mapping`/`is_default_mapping` with a `request_body_template` (pass through `$$.events` if the body was unchanged), choose the accepted message types, and verify the template before applying. Migrate XML/FORM payloads to JSON or remain on v1. See [Breaking changes](../BREAKING_CHANGES.md) for details.
+
+## Version 1: field mappings
+
+The rest of this page describes **version 1** only.
 
 ## Sample configuration
 

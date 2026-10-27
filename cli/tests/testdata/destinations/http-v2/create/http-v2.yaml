@@ -1,0 +1,31 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: http-v2
+spec:
+  id: http-v2
+  display_name: E2E HTTP JSONata
+  type: http
+  enabled: true
+  definition_version: 2
+  config:
+    api_url: https://webhooks.example.com/rudder/v2
+    auth: noAuth
+    method: POST
+    format: JSON
+    request_body_template: '$$.events.{"customer": {"id": userId}, "items": properties.items}'
+    supported_message_types:
+      - track
+      - identify
+    headers:
+      - to: X-Event-Type
+        from: $.type
+    query_params:
+      - to: source
+        from: rudderstack
+    path_params:
+      - path: $.properties.accountId
+    is_batching_enabled: true
+    max_batch_size: "5000"
+    connection_mode:
+      web: cloud

@@ -299,3 +299,9 @@
 - Customer.io device-mode-v2 requiredness counts only an explicit `sdk_version.web: v2`. The nested `v2` default fills only an `sdk_version` block the spec carries, so an omitted block is sent absent, and upstream's `allOf` conditionals and the web SDK both read an absent version as v1. Treating it as `v2` during validation rejects existing web device-mode destinations that upstream accepts.
 - Attach the conditional `write_key` requirement to the top-level `WriteKey` pointer and register it with `CallEvenIfNull`; validating only nested `write_key.web` cannot catch a completely omitted `write_key` block.
 - Customer.io `write_key.web` uses plain `pattern=single_line_100`: upstream's pattern has no template branch, so a template is judged as a literal and gets no length exemption.
+
+## INT-7453 — HTTP v2 Validation and Header Secrecy
+
+- HTTP v2 CLI validation requires a nonempty `request_body_template`, limits `supported_message_types` to `track`, `identify`, `page`, `screen`, `group`, and `alias`, and bounds the string-valued `max_batch_size` to 1–5000. JSONata syntax belongs to the transformer `/http/parse-template` verifier, not a Go regex/parser in CLI validation.
+- HTTP v2 accepts dynamic `api_url` expressions beginning with `$` without imposing v1's static URL pattern on those expressions; do not repurpose v1 JSONPath validation for JSONata.
+- Preserve v1's local `headers.from` secret path in HTTP v2 even though header values can be JSONata expressions: otherwise static credential headers would leak through export. Imported headers can remain unknown until the user supplies the secret again.

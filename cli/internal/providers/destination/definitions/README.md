@@ -6,7 +6,7 @@ The rules in this file apply to every type. The per-type READMEs cover only what
 
 ## Supported destination types
 
-Use the `type` value in YAML. Every type below takes `definition_version: 1`.
+Use the `type` value in YAML. Every type below takes `definition_version: 1`; HTTP Webhook also supports `definition_version: 2` for JSONata request shaping. Its [README](http/README.md) documents both versions.
 
 | Destination | Type |
 | :-----| :-----|
