@@ -53,7 +53,7 @@ func readSecretSlots(registry *definitions.Registry, ctx *vrules.ValidationConte
 		replaced = ctx.References
 		spec     = readSourceSpec(ctx.Spec)
 	)
-	secretKeys := specSecretKeys(registry, spec)
+	secretKeys, jsonPathKeys := specSecretKeys(registry, spec)
 	if len(secretKeys) == 0 {
 		return nil
 	}
@@ -71,7 +71,7 @@ func readSecretSlots(registry *definitions.Registry, ctx *vrules.ValidationConte
 
 	var slots []secretSlot
 	secret.WalkSecrets(spec.config, secretKeys, func(segments []string, value any) {
-		if value == nil || value == "" || readsEvent(value) {
+		if value == nil || value == "" || readsEvent(value, slices.Contains(jsonPathKeys, secretKeyPath(segments))) {
 			return
 		}
 
@@ -111,6 +111,18 @@ func secretKeyName(segments []string) string {
 	return b.String()
 }
 
+// secretKeyPath writes the segments that lead to a secret value as the
+// definition lists the key, without list indexes, such as "headers.from".
+func secretKeyPath(segments []string) string {
+	keys := make([]string, 0, len(segments))
+	for _, segment := range segments {
+		if _, err := strconv.Atoi(segment); err != nil {
+			keys = append(keys, segment)
+		}
+	}
+	return strings.Join(keys, ".")
+}
+
 // suggestedVariable is the variable import writes for the secret value
 // segments lead to in the spec with id. A missing id, which the syntax rule
 // reports, would give a name with no prefix, and an id that makes no valid
@@ -126,45 +138,54 @@ func suggestedVariable(id string, segments []string) string {
 	return name
 }
 
-// specSecretKeys returns the secret keys of the definition the spec names.
+// specSecretKeys returns the secret keys of the definition the spec names,
+// and those of them whose value may be a JSONPath read from each event.
 // When definition_version names no registered version, because it is missing,
 // a reference or wrong, the syntax rule reports that. The keys of every
 // registered version of the type are used then, so a literal secret is still
 // reported.
-func specSecretKeys(registry *definitions.Registry, spec sourceSpec) []string {
+func specSecretKeys(registry *definitions.Registry, spec sourceSpec) (secretKeys, jsonPathKeys []string) {
 	if def, err := registry.Get(spec.destinationType, spec.definitionVersion); err == nil {
-		return def.SecretKeys()
+		return def.SecretKeys(), def.JSONPathSecretKeys()
 	}
 
 	versions, err := registry.Versions(spec.destinationType)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
-	var secretKeys []string
 	for _, version := range versions {
 		def, err := registry.Get(spec.destinationType, version)
 		if err != nil {
 			continue
 		}
-		for _, key := range def.SecretKeys() {
-			if !slices.Contains(secretKeys, key) {
-				secretKeys = append(secretKeys, key)
-			}
+		secretKeys = appendNew(secretKeys, def.SecretKeys())
+		jsonPathKeys = appendNew(jsonPathKeys, def.JSONPathSecretKeys())
+	}
+	return secretKeys, jsonPathKeys
+}
+
+// appendNew appends the keys that keys does not hold yet.
+func appendNew(keys, more []string) []string {
+	for _, key := range more {
+		if !slices.Contains(keys, key) {
+			keys = append(keys, key)
 		}
 	}
-	return secretKeys
+	return keys
 }
 
 // readsEvent reports whether value is one the destination reads from each
-// event at delivery, so it holds no secret: a JSONPath such as $.messageId, or
-// a template such as {{ message.userId || "" }} with an empty fallback. A
-// template with a fallback is still reported, since the fallback is a literal.
-func readsEvent(value any) bool {
+// event at delivery, so it holds no secret: a JSONPath such as $.messageId in
+// a key that reads one, or a template such as {{ message.userId || "" }} with
+// an empty fallback. A JSONPath in a key that does not read one, such as a
+// basic auth password, is a literal and is reported, and so is a template with
+// a fallback, since the fallback is a literal.
+func readsEvent(value any, readsJSONPath bool) bool {
 	s, ok := value.(string)
 	if !ok {
 		return false
 	}
-	if strings.HasPrefix(s, "$.") || strings.HasPrefix(s, "$[") {
+	if readsJSONPath && (strings.HasPrefix(s, "$.") || strings.HasPrefix(s, "$[")) {
 		return true
 	}
 	fallback, ok := definitions.TemplateFallback(s)

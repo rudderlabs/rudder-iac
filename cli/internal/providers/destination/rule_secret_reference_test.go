@@ -188,6 +188,36 @@ func TestSecretReferenceRule(t *testing.T) {
 `,
 		},
 		{
+			// Only http's headers.from reads a JSONPath. Elsewhere a value that
+			// looks like one is a literal.
+			name:            "JSONPath in a key that does not read one",
+			id:              "shop-http",
+			destinationType: "http",
+			config: `    api_url: https://example.com/events
+    auth: basicAuth
+    username: '{{ .SHOP_HTTP_USERNAME }}'
+    password: $.fake-password
+`,
+			want: []vrules.ValidationResult{{
+				Reference: "/spec/config/password",
+				Message:   `secret key "password" must hold only a variable reference with no default, such as '{{ .SHOP_HTTP_PASSWORD }}'` + fix,
+			}},
+		},
+		{
+			name:            "JSONPath in a webhook header value",
+			id:              "shop-webhook",
+			destinationType: "webhook",
+			config: `    webhook_url: https://example.com/hook
+    headers:
+      - from: Authorization
+        to: $['fake-token']
+`,
+			want: []vrules.ValidationResult{{
+				Reference: "/spec/config/headers/0/to",
+				Message:   `secret key "headers[0].to" must hold only a variable reference with no default, such as '{{ .SHOP_WEBHOOK_HEADERS_0_TO }}'` + fix,
+			}},
+		},
+		{
 			// A template resolves per event. Its fallback is a literal, so a
 			// template with one is still reported.
 			name:            "templates read from each event",

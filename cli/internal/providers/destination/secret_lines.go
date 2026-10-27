@@ -72,7 +72,8 @@ func (r *secretLinesRule) lineShowsSecret(ctx *vrules.ValidationContext, referen
 	}
 
 	spec := readSourceSpec(ctx.Spec)
-	if !showsSecret(specSecretKeys(r.registry, spec), spec.config, configPath) {
+	secretKeys, _ := specSecretKeys(r.registry, spec)
+	if !showsSecret(secretKeys, spec.config, configPath) {
 		return false
 	}
 	for _, slot := range readSecretSlots(r.registry, ctx) {
