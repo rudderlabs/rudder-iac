@@ -27,28 +27,47 @@ has() {
   command -v "$1" >/dev/null 2>&1
 }
 
-# download URL FILE
+# download URL FILE: on a failure the downloader's own reason goes to stderr.
 download() {
   if has curl; then
-    curl -fsL --retry 3 -o "$2" "$1"
+    curl -fsSL --retry 3 -o "$2" "$1"
   else
-    wget -q -O "$2" "$1" 2>/dev/null
+    # wget -q would hide the reason, and without it wget prints progress, so
+    # its output is kept and only its last line, the error, is shown.
+    wget -O "$2" "$1" 2>"$tmp/wget.log" || {
+      sed '/^ *$/d' "$tmp/wget.log" | tail -n 1 >&2
+      return 1
+    }
   fi
 }
 
-# exists URL: succeeds when URL answers with a success status.
-exists() {
+# status URL: prints the HTTP status that github.com answers for URL itself,
+# without following a redirect: 302 for a release asset that exists, 404 for
+# one that does not, and 200 or 404 for a release page.
+status() {
   if has curl; then
-    curl -fsLI -o /dev/null "$1"
+    curl -sI -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || true
   else
-    wget -q --spider "$1" 2>/dev/null
+    wget -S --spider "$1" 2>&1 | sed -n 's/^ *HTTP\/[0-9.]* \([0-9][0-9]*\).*/\1/p' | head -n 1
   fi
 }
 
+# missing ASSET URL: explains why the asset at URL did not download, and exits.
 # The release-please workflow publishes a release before goreleaser uploads its
 # assets, so for a few minutes after a release, the release exists without them.
-not_uploaded() {
-  fail "release $tag has no asset $1 yet (it may still be uploading); try again in a few minutes"
+# A failure for an asset that exists, such as a proxy that blocks the asset host,
+# a full disk or a dropped connection, is not that, and the downloader's reason
+# above the message says what it is.
+missing() {
+  case "$(status "$2")" in
+    404)
+      case "$(status "$RELEASES/tag/$tag")" in
+        200) fail "release $tag has no asset $1 yet (it may still be uploading); try again in a few minutes, or set RUDDER_CLI_VERSION to an earlier release" ;;
+        404) fail "release $tag does not exist; see $RELEASES" ;;
+      esac
+      ;;
+  esac
+  fail "could not download $2"
 }
 
 # Prints the tag that releases/latest redirects to, such as v0.28.0.
@@ -131,10 +150,8 @@ main() {
 
   # Check the release before touching the install directory, so a version that
   # does not exist leaves nothing behind.
-  download "$RELEASES/download/$tag/$checksums" "$tmp/$checksums" || {
-    exists "$RELEASES/tag/$tag" && not_uploaded "$checksums"
-    fail "could not download $RELEASES/download/$tag/$checksums; check that release $tag exists at $RELEASES"
-  }
+  download "$RELEASES/download/$tag/$checksums" "$tmp/$checksums" ||
+    missing "$checksums" "$RELEASES/download/$tag/$checksums"
 
   want=$(awk -v f="$archive" '$2 == f { print $1 }' "$tmp/$checksums")
   [ -n "$want" ] || fail "release $tag has no $archive for $os $arch; see $RELEASES/tag/$tag"
@@ -146,10 +163,8 @@ main() {
     fail "cannot write to $dir; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
 
   printf '%s\n' "Installing $BIN $tag ($os $arch) into $dir"
-  download "$RELEASES/download/$tag/$archive" "$tmp/$archive" || {
-    exists "$RELEASES/download/$tag/$archive" || not_uploaded "$archive"
-    fail "could not download $RELEASES/download/$tag/$archive"
-  }
+  download "$RELEASES/download/$tag/$archive" "$tmp/$archive" ||
+    missing "$archive" "$RELEASES/download/$tag/$archive"
 
   # Hash from stdin, because GNU sha256sum and shasum put a backslash before
   # the hash when the file's path holds one.
@@ -170,12 +185,18 @@ main() {
   # script is interrupted.
   partial=$(mktemp "$dir/.$BIN.XXXXXX" 2>/dev/null) ||
     fail "could not write to $dir; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
-  { cp "$tmp/$BIN" "$partial" && chmod 755 "$partial" && mv -f "$partial" "$dir/$BIN"; } 2>/dev/null ||
+  { cp "$tmp/$BIN" "$partial" && chmod 755 "$partial"; } 2>/dev/null ||
+    fail "could not write $dir/$BIN; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
+
+  # Run the new binary before it replaces anything, so a release that cannot run
+  # here, such as one built for a newer macOS, leaves a working rudder-cli in
+  # place. rudder-cli prints startup errors, such as a missing HOME, on stdout.
+  kept="nothing was installed"
+  if [ -e "$dir/$BIN" ]; then kept="$dir/$BIN is unchanged"; fi
+  installed=$("$partial" --version) || fail "$BIN $tag failed to run on this system${installed:+: $installed}; $kept"
+  mv -f "$partial" "$dir/$BIN" 2>/dev/null ||
     fail "could not write $dir/$BIN; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
   partial=""
-
-  # rudder-cli prints startup errors, such as a missing HOME, on stdout.
-  installed=$("$dir/$BIN" --version) || fail "installed $dir/$BIN but it failed to run${installed:+: $installed}"
   printf '%s\n' "Installed $installed at $dir/$BIN"
 
   # Which binary a plain 'rudder-cli' starts in this shell. Shells print it as
@@ -213,6 +234,8 @@ main() {
         done
       fi
       ;;
+    # fish reads neither file, and its export accepts the line below.
+    */fish) profile=".config/fish/config.fish" ;;
     *) profile=".profile" ;;
   esac
   # The user pastes these lines into a shell, so the folder goes in as a shell word.

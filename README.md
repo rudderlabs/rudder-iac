@@ -29,7 +29,7 @@ On macOS and Linux, this command installs the latest release:
 curl -fsSL https://raw.githubusercontent.com/rudderlabs/rudder-iac/main/install.sh | sh
 ```
 
-The script picks the release archive for your OS and CPU, checks it against the release's checksums file, and installs `rudder-cli` into `~/.local/bin` without `sudo`. If that directory is not on your `PATH`, the script prints the line to add to your shell profile. If another `rudder-cli` comes earlier on your `PATH`, such as one that the manual steps below put in `/usr/local/bin`, the script names the copy that runs and prints the same line, which puts the new one first.
+The script picks the release archive for your OS and CPU, checks it against the release's checksums file, and installs `rudder-cli` into `~/.local/bin` without `sudo`. It runs the new binary once before it replaces anything, so a release that cannot run on your system leaves an existing `rudder-cli` in place. If that directory is not on your `PATH`, the script prints the line to add to your shell profile. If another `rudder-cli` comes earlier on your `PATH`, such as one that the manual steps below put in `/usr/local/bin`, the script names the copy that runs and prints the same line, which puts the new one first.
 
 Set these variables on the `sh` side of the pipe to change the defaults:
 
