@@ -2,6 +2,7 @@ package varsubst
 
 import (
 	"bytes"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -30,6 +31,21 @@ type Replaced struct {
 	prefix string
 	// byPlaceholder maps each placeholder in Data to its reference.
 	byPlaceholder map[string]Reference
+
+	// written is the spec as written. spans holds where each placeholder sits
+	// in Data and where its reference sits in written, in order, and
+	// dataLines and writtenLines hold where each line of Data and of written
+	// starts. SourcePosition reads them, so it costs no scan of the file.
+	// They are set only when the spec holds a reference.
+	written                 []byte
+	spans                   []span
+	dataLines, writtenLines []int
+}
+
+// span is one placeholder's bytes in Data and its reference's bytes in the
+// spec as written.
+type span struct {
+	dataStart, dataEnd, writtenStart, writtenEnd int
 }
 
 // A placeholder is placeholderPrefix, the reference's index and
@@ -75,10 +91,17 @@ func ReplaceReferences(data []byte) Replaced {
 		replaced.References = append(replaced.References, ref)
 
 		out = append(out, data[last:start]...)
+		replaced.spans = append(replaced.spans, span{
+			dataStart: len(out), dataEnd: len(out) + len(placeholder), writtenStart: start, writtenEnd: end,
+		})
 		out = append(out, placeholder...)
 		last = end
 	}
 	replaced.Data = append(out, data[last:]...)
+	if len(replaced.spans) > 0 {
+		replaced.written = data
+		replaced.dataLines, replaced.writtenLines = lineStarts(replaced.Data), lineStarts(data)
+	}
 	return replaced
 }
 
@@ -114,44 +137,59 @@ func (r Replaced) Restore(text string) string {
 // as the YAML parser reports them. A placeholder and its reference differ in
 // length, and a reference may span lines, so a key that follows a reference
 // moves when the reference goes back.
+//
+// It reads the offsets ReplaceReferences recorded, so a call costs a binary
+// search and a walk along one line, however many references the file holds.
 func (r Replaced) SourcePosition(line, column int) (int, int) {
-	before := string(r.Data[:offsetOf(r.Data, line, column)])
-	written := r.Restore(before)
-	if written == before {
+	if len(r.spans) == 0 {
 		return line, column
 	}
-	line, lineStart := 1, 0
-	for i := 0; i < len(written); {
-		if n := breakLen([]byte(written[i:])); n > 0 {
-			i += n
-			line, lineStart = line+1, i
-			continue
-		}
-		_, size := utf8.DecodeRuneInString(written[i:])
-		i += size
+	offset := r.dataOffset(line, column)
+
+	// The last placeholder that starts before the position. With none, the
+	// text before it is as written.
+	i := sort.Search(len(r.spans), func(i int) bool { return r.spans[i].dataStart >= offset }) - 1
+	if i < 0 {
+		return line, column
 	}
-	return line, utf8.RuneCountInString(written[lineStart:]) + 1
+	s := r.spans[i]
+	at := s.writtenStart
+	if offset >= s.dataEnd {
+		at = s.writtenEnd + offset - s.dataEnd
+	}
+
+	l := sort.Search(len(r.writtenLines), func(j int) bool { return r.writtenLines[j] > at }) - 1
+	return l + 1, utf8.RuneCount(r.written[r.writtenLines[l]:at]) + 1
 }
 
-// offsetOf returns the byte offset in data of a 1-indexed line and column,
+// dataOffset returns the byte offset in Data of a 1-indexed line and column,
 // with columns counted in characters.
-func offsetOf(data []byte, line, column int) int {
-	offset := 0
-	for ; line > 1; line-- {
-		for offset < len(data) && breakLen(data[offset:]) == 0 {
-			_, size := utf8.DecodeRune(data[offset:])
-			offset += size
-		}
-		if offset == len(data) {
-			return len(data)
-		}
-		offset += breakLen(data[offset:])
+func (r Replaced) dataOffset(line, column int) int {
+	if line > len(r.dataLines) {
+		return len(r.Data)
 	}
-	for ; column > 1 && offset < len(data) && breakLen(data[offset:]) == 0; column-- {
-		_, size := utf8.DecodeRune(data[offset:])
+	offset := r.dataLines[max(line, 1)-1]
+	for ; column > 1 && offset < len(r.Data) && breakLen(r.Data[offset:]) == 0; column-- {
+		_, size := utf8.DecodeRune(r.Data[offset:])
 		offset += size
 	}
 	return offset
+}
+
+// lineStarts returns the offset where each line of data starts, breaking
+// lines where the YAML parser does.
+func lineStarts(data []byte) []int {
+	starts := []int{0}
+	for i := 0; i < len(data); {
+		if n := breakLen(data[i:]); n > 0 {
+			i += n
+			starts = append(starts, i)
+			continue
+		}
+		_, size := utf8.DecodeRune(data[i:])
+		i += size
+	}
+	return starts
 }
 
 // Line breaks other than LF and CR that the YAML parser counts as one.
