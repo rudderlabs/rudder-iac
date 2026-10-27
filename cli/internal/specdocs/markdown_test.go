@@ -54,6 +54,8 @@ func TestAllowedCellReadsLimits(t *testing.T) {
 		allowedCell(Field{Pattern: "short", AcceptsTemplate: true, Min: &two, Max: &eight}))
 	assert.Equal(t, "`a`, `b`; no two items of the list may share a value",
 		allowedCell(Field{Enum: []any{"a", "b"}, Unique: true}))
+	assert.Equal(t, "`\"\"`, `a`, `b`",
+		allowedCell(Field{Enum: []any{"", "a", "b"}}))
 }
 
 func TestSecretCellNamesTheVariableAndSlot(t *testing.T) {

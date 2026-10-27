@@ -166,6 +166,24 @@ func TestGetErrorMessage(t *testing.T) {
 			expected: "'EventType' must be one of [track screen identify group page]",
 		},
 		{
+			name: "oneof tag with an empty member",
+			err: mockFieldError{
+				field:     "To",
+				actualTag: "oneof",
+				param:     "'' click call store",
+			},
+			expected: `'To' must be one of ["" click call store]`,
+		},
+		{
+			name: "dynamic_or_oneof tag with an empty member",
+			err: mockFieldError{
+				field:     "To",
+				actualTag: "dynamic_or_oneof",
+				param:     "Lead '' Signup",
+			},
+			expected: `'To' must be one of [Lead "" Signup] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})`,
+		},
+		{
 			name: "min tag with number",
 			err: mockFieldError{
 				field:     "Priority",

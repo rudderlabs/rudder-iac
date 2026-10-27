@@ -42,7 +42,7 @@ type conversionEntry struct {
 
 type eventMapping struct {
 	From string `mapstructure:"from" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	To   string `mapstructure:"to" validate:"omitempty,oneof=Lead PageVisit ViewCategory Signup WatchVideo Checkout Search AddToCart purchase"`
+	To   string `mapstructure:"to" validate:"omitempty,oneof='' Lead PageVisit ViewCategory Signup WatchVideo Checkout Search AddToCart purchase"`
 }
 
 type eventFilteringConfig struct {

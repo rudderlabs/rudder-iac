@@ -47,9 +47,9 @@ func findNullValues(value any, basePath string) []ConfigError {
 }
 
 // errorsOutside drops the errors at or under an owner error's path, so the
-// owner is the one error reported there. Decoding null into a Go zero value can
-// otherwise make model validation report a second, misleading error for the
-// same path or one of its children.
+// owner is the one error reported there. A null or an empty enum value decodes
+// to a Go zero value, so model validation can otherwise report a second,
+// misleading error for the same path or one of its children.
 func errorsOutside(errors, owners []ConfigError) []ConfigError {
 	return slices.DeleteFunc(errors, func(configError ConfigError) bool {
 		return slices.ContainsFunc(owners, func(owner ConfigError) bool {
