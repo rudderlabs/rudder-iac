@@ -16,7 +16,7 @@ Package: `cli/internal/providers/destination/definitions/converter`
 | `c.Conditional(apiKey, tfKey, cond)` | `converter.Conditional(apiKey, localKey, cond)` | Identical |
 | `c.Equals(key, value)` | `converter.Equals(key, value)` | Identical |
 | `c.Discriminator(apiKey, values)` | `converter.Discriminator(apiKey, values)` | Identical; `DiscriminatorValues` = `map[string]any` keyed by local key |
-| `c.ArrayWithStrings(rootAPIKey, nestedField, tfKey)` | `converter.ArrayWithStrings(rootAPIKey, nestedField, localKey)` | Identical: `["a"]` ↔ `[{nestedField: "a"}]` |
+| `c.ArrayWithStrings(rootAPIKey, nestedField, tfKey)` | `converter.ArrayWithStrings(rootAPIKey, nestedField, localKey)` | `["a"]` ↔ `[{nestedField: "a"}]`. Unlike terraform, an empty list is sent as `[]`: the plan compares the spec's `[]` with what the backend stored, so dropping it never converges |
 | `c.ArrayWithObjects(rootAPIKey, tfKey, fields)` | `converter.ArrayWithObjects(rootAPIKey, localKey, fields)` | Identical; `fields` maps API field → local field name (string) or `converter.APINestedObject{LocalKey, NestedKey}` |
 | `c.Negated(apiKey, tfKey)` | **no equivalent** | Rare. If needed, add `Negated` to the converter package (mirror the terraform implementation) rather than inlining a custom `ConfigProperty` in the definition |
 | `GetCommonConfigMeta(sourceTypes)` | `common.Properties(sourceTypes)` | Consent management; CLI takes **local** source types |
