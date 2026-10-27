@@ -485,6 +485,50 @@ spec:
 	assert.NotContains(t, out, "fake-second-secret")
 }
 
+// A header row aliased or merged into a path that holds no secret keeps its
+// secret out of the error on that path: the line under the alias or merge
+// shows the value masked.
+func TestValidateMasksAliasedAndMergedRows(t *testing.T) {
+	t.Parallel()
+
+	for name, mapping := range map[string]string{
+		"alias": `    properties_mapping:
+      - *row`,
+		"merge": `    properties_mapping:
+      - to: $.context.secretish
+        <<: *row`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			out, err := renderLoad(t, map[string]string{"dest.yaml": `version: rudder/v1
+kind: destination
+metadata:
+  name: shop-http
+spec:
+  id: shop-http
+  display_name: Shop HTTP
+  type: http
+  definition_version: 1
+  enabled: true
+  config:
+    api_url: https://example.com/events
+    auth: noAuth
+    method: POST
+    format: JSON
+    headers:
+      - &row
+        from: '{{ .SECRET }}'
+        to: X-Api-Key
+` + mapping + "\n"}, map[string]string{"SECRET": "fake/secret"})
+			require.ErrorContains(t, err, "syntax validation failed")
+
+			assert.Contains(t, out, "from: ***")
+			assert.NotContains(t, out, "fake/secret")
+		})
+	}
+}
+
 // An alias of a secret under a key that is not one prints the alias, not the
 // secret it resolves to.
 func TestValidatePrintsAnAliasOfASecretAsWritten(t *testing.T) {

@@ -532,9 +532,11 @@ func TestPathIndex_Aliases(t *testing.T) {
 		// be a secret under a key that is not one.
 		{path: "/config/headers/1/to", want: Position{Line: 7, Column: 7, LineText: "to: *bad"}, wantMasked: "to: *bad"},
 		{path: "/config/headers/2", want: Position{Line: 8, Column: 7, LineText: "*first"}, wantMasked: "*first"},
-		// The paths below a mapping alias are the anchor's.
-		{path: "/config/headers/2/to", want: Position{Line: 5, Column: 7, LineText: "to: X-Bad:Name"}, wantMasked: "to: ***"},
-		{path: "/config/headers/2/from", want: Position{Line: 4, Column: 7, LineText: "from: sk-fake-value"}, wantMasked: "from: ***"},
+		// The paths below a mapping alias sit at the anchor's lines, with
+		// their values masked: the anchor was written for another path, where
+		// a value may be a secret this path does not mark as one.
+		{path: "/config/headers/2/to", want: Position{Line: 5, Column: 7, LineText: "to: ***"}, wantMasked: "to: ***"},
+		{path: "/config/headers/2/from", want: Position{Line: 4, Column: 7, LineText: "from: ***"}, wantMasked: "from: ***"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.path, func(t *testing.T) {
@@ -561,7 +563,7 @@ func TestPathIndex_AliasInsideItsAnchor(t *testing.T) {
 
 	pos, err := pi.PositionLookup("/loop/1/0")
 	require.NoError(t, err)
-	assert.Equal(t, "x", pos.LineText)
+	assert.Equal(t, "***", pos.LineText)
 	pos, err = pi.PositionLookup("/loop/1/1")
 	require.NoError(t, err)
 	assert.Equal(t, "*a", pos.LineText)
@@ -627,8 +629,8 @@ rows:
 }
 
 // A merge key (<<) adds the keys of the mappings it names at their own lines,
-// as the decoder merges them: a key the mapping writes wins, and among merged
-// mappings the first wins.
+// with their values masked, as the decoder merges them: a key the mapping
+// writes wins, and among merged mappings the first wins.
 func TestPathIndex_MergeKeys(t *testing.T) {
 	t.Parallel()
 
@@ -650,13 +652,13 @@ rows:
 		want Position
 	}{
 		// Merged from base, at base's line.
-		{path: "/rows/0/to", want: Position{Line: 2, Column: 3, LineText: "to: X-Base"}},
+		{path: "/rows/0/to", want: Position{Line: 2, Column: 3, LineText: "to: ***"}},
 		// Written in the row, so the row's own key wins.
 		{path: "/rows/0/from", want: Position{Line: 8, Column: 5, LineText: "from: sk-fake-row"}},
 		// other comes first in the list, so its to wins over base's.
-		{path: "/rows/1/to", want: Position{Line: 5, Column: 3, LineText: "to: X-Other"}},
-		{path: "/rows/1/method", want: Position{Line: 6, Column: 3, LineText: "method: POST"}},
-		{path: "/rows/1/from", want: Position{Line: 3, Column: 3, LineText: "from: sk-fake-base"}},
+		{path: "/rows/1/to", want: Position{Line: 5, Column: 3, LineText: "to: ***"}},
+		{path: "/rows/1/method", want: Position{Line: 6, Column: 3, LineText: "method: ***"}},
+		{path: "/rows/1/from", want: Position{Line: 3, Column: 3, LineText: "from: ***"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.path, func(t *testing.T) {

@@ -42,6 +42,11 @@ type PathIndex struct {
 	// many aliases are walked, since each repeats its anchor's whole subtree.
 	expanding   map[*yaml.Node]bool
 	aliasBudget int
+	// throughAlias counts the aliases the walk is below. A node reached
+	// through an alias is written for another path, where its value may be a
+	// secret that the path being indexed does not mark as one, so its line
+	// text shows the value masked.
+	throughAlias int
 }
 
 // maxAliasWalks caps the aliases one index walks. A path below an alias past
@@ -183,7 +188,11 @@ func (pi *PathIndex) walkNode(node *yaml.Node, path string, key *yaml.Node) {
 		}
 		pi.aliasBudget--
 		pi.expanding[target] = true
-		defer delete(pi.expanding, target)
+		pi.throughAlias++
+		defer func() {
+			delete(pi.expanding, target)
+			pi.throughAlias--
+		}()
 		pi.walkChildren(target, path)
 	}
 }
@@ -261,7 +270,11 @@ func (pi *PathIndex) walkMerged(source *yaml.Node, path string, indexed map[stri
 	}
 	pi.aliasBudget--
 	pi.expanding[target] = true
-	defer delete(pi.expanding, target)
+	pi.throughAlias++
+	defer func() {
+		delete(pi.expanding, target)
+		pi.throughAlias--
+	}()
 	pi.walkMapping(target, path, indexed)
 }
 
@@ -297,6 +310,11 @@ func (pi *PathIndex) recordPosition(
 		column = key.Column
 	}
 
+	masked := maskedLineText(node, key, lineText)
+	if pi.throughAlias > 0 {
+		lineText = masked
+	}
+
 	pos := Position{
 		Line:     line,
 		Column:   column,
@@ -304,7 +322,7 @@ func (pi *PathIndex) recordPosition(
 	}
 
 	pi.positions[path] = pos
-	pi.maskedLineTexts[path] = maskedLineText(node, key, lineText)
+	pi.maskedLineTexts[path] = masked
 }
 
 // maskedLineText returns lineText, built by extractLineText, with the value it
