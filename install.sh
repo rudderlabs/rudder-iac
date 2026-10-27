@@ -161,6 +161,9 @@ main() {
   # An absolute path, without a trailing slash, for the PATH check and the PATH line below.
   dir=$(CDPATH='' cd -- "$dir" && pwd) ||
     fail "cannot write to $dir; set RUDDER_CLI_INSTALL_DIR to a directory you can write to"
+  # mv would move the binary into a directory of that name, not replace it.
+  [ ! -d "$dir/$BIN" ] ||
+    fail "$dir/$BIN is a directory; remove it, or set RUDDER_CLI_INSTALL_DIR to another directory"
 
   printf '%s\n' "Installing $BIN $tag ($os $arch) into $dir"
   download "$RELEASES/download/$tag/$archive" "$tmp/$archive" ||

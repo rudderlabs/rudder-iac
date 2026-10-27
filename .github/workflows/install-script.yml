@@ -125,6 +125,19 @@ jobs:
           grep -Fx "rudder-cli install: release v9.9.9 does not exist; see https://github.com/rudderlabs/rudder-iac/releases" "$RUNNER_TEMP/missing.txt"
           test ! -e "$RUDDER_CLI_INSTALL_DIR"
 
+      - name: refuse a directory where the binary goes
+        env:
+          RUDDER_CLI_INSTALL_DIR: ${{ runner.temp }}/dirdest
+        run: |
+          mkdir -p "$RUDDER_CLI_INSTALL_DIR/rudder-cli"
+          if sh install.sh 2>"$RUNNER_TEMP/dirdest.txt"; then
+            echo "install.sh exited 0 with a directory where the binary goes"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/dirdest.txt"
+          grep -F "rudder-cli is a directory" "$RUNNER_TEMP/dirdest.txt"
+          test -z "$(ls -A "$RUDDER_CLI_INSTALL_DIR/rudder-cli")"
+
       - name: refuse an archive whose checksum does not match
         env:
           RUDDER_CLI_INSTALL_DIR: ${{ runner.temp }}/tampered
