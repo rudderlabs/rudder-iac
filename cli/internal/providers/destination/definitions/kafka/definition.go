@@ -74,7 +74,7 @@ type kafkaConfig struct {
 	SSLEnabled          *bool                    `mapstructure:"ssl_enabled"`
 	CACertificate       string                   `mapstructure:"ca_certificate"`
 	UseSASL             *bool                    `mapstructure:"use_sasl"`
-	SASLType            string                   `mapstructure:"sasl_type" validate:"required_if=SSLEnabled true UseSASL true,omitempty,dynamic_or_oneof=plain sha256 sha512" default:"plain"`
+	SASLType            string                   `mapstructure:"sasl_type" validate:"required_if=SSLEnabled true UseSASL true,omitempty,oneof=plain sha256 sha512" default:"plain"`
 	Username            string                   `mapstructure:"username" validate:"required_if=SSLEnabled true UseSASL true,omitempty,pattern=kafka_user_name"`
 	Password            string                   `mapstructure:"password" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	ConvertToAvro       *bool                    `mapstructure:"convert_to_avro"`
@@ -133,7 +133,7 @@ type avroSchema struct {
 }
 
 type eventTypeTopicMapping struct {
-	From string `mapstructure:"from" validate:"omitempty,dynamic_or_oneof=identify page screen group alias"`
+	From string `mapstructure:"from" validate:"omitempty,oneof=identify page screen group alias"`
 	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_pattern=kafka_mapping_value"`
 }
 
