@@ -86,8 +86,9 @@ func newCmdListen() *cobra.Command {
 			# Keep only the Order Completed events
 			$ rudder-cli sources listen --port 4321 | grep '"event":"Order Completed"'
 
-			# Background for an agent or CI job, in a fresh d=$(mktemp -d): events to a new file,
-			# the ready line in the log
+			# Background for an agent or CI job, in a fresh folder: events to a new file, the
+			# ready line in the log
+			$ d=$(mktemp -d)
 			$ rudder-cli sources listen --port 0 --out "$d/events" 2> "$d/log" &
 
 			# Keep requests in memory for sources events and the review page
