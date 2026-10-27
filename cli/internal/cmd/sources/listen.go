@@ -237,6 +237,14 @@ func runListen(ctx context.Context, stdout, stderr io.Writer, opts listenOptions
 		// Close has dropped the connections left, so the stop still succeeded.
 		log.Warn("shutdown deadline exceeded", "serverId", ready.ServerID, "error", err)
 	}
+	if outFailed == nil {
+		// A write can fail while a signal or a serve error stops the
+		// listener, or while Close drains the requests in flight.
+		select {
+		case outFailed = <-srv.OutFailed():
+		default:
+		}
+	}
 	if outFailed != nil {
 		// Counted after Close, so it includes the requests that drained.
 		lost := srv.Lost()
