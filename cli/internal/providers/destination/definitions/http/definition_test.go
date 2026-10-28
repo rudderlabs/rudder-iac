@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -124,7 +125,7 @@ func TestHTTPSpecMatchesRemoteStateWithDefaults(t *testing.T) {
 		DisplayName:       "HTTP No Auth",
 		Type:              "http",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Config:            validMinimalConfig(),
 	})
 	require.NoError(t, err)
@@ -390,7 +391,7 @@ func TestHTTPConfigValidation(t *testing.T) {
 		errors := registered.ValidateConfig(config)
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/max_batch_size", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "expected type 'string'")
+		assert.Equal(t, "'max_batch_size' must be a string", errors[0].Message)
 	})
 
 	t.Run("max_batch_size range rejected", func(t *testing.T) {
@@ -924,7 +925,7 @@ func TestHTTPSecretKeysUseLocalConfigKeys(t *testing.T) {
 		DisplayName:       "HTTP Production",
 		Type:              "http",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Config: map[string]any{
 			"api_url":       "https://example.com/webhook",
 			"auth":          "apiKeyAuth",

@@ -6,7 +6,7 @@ on:
     types: [release-created]
 
 permissions:
-  contents: write
+  contents: read
   # packages: write
   # issues: write
   # id-token: write
@@ -14,18 +14,33 @@ permissions:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # goreleaser uploads the archives to the release
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
         with:
           egress-policy: audit
 
+      # Whoever sends the dispatch sets client_payload.tag, so it reaches the
+      # shell only through env, and only once it looks like a release tag.
+      - name: Check the tag
+        env:
+          TAG: ${{ github.event.client_payload.tag }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::client_payload.tag is not a vX.Y.Z tag"
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
-          # For repository_dispatch, checkout the specific tag
-          ref: ${{ github.event.client_payload.tag || github.ref }}
+          # refs/tags/, because for a bare name checkout takes a branch of that
+          # name over the tag.
+          ref: refs/tags/${{ github.event.client_payload.tag }}
+          persist-credentials: false
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
@@ -41,3 +56,79 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TELEMETRY_WRITE_KEY: ${{ vars.TELEMETRY_WRITE_KEY }}
           TELEMETRY_DATAPLANE_URL: ${{ vars.TELEMETRY_DATAPLANE_URL }}
+
+  # Attaches install.sh to the release, with RELEASE_TAG set to the tag, so
+  # releases/download/<tag>/install.sh installs that release and
+  # releases/latest/download/install.sh installs the latest one. It runs after
+  # goreleaser, so the archives and the checksums file are on the release before
+  # install.sh is. It is a job of its own because a rerun of the goreleaser job
+  # stops on the archives it already uploaded: "Re-run failed jobs" repeats only
+  # this upload, and --clobber replaces a copy from an earlier attempt.
+  #
+  # Keep slow or fallible steps out of the goreleaser job, and put them in a job
+  # that needs this one. Until this job ends, releases/latest/download/install.sh
+  # answers 404, and a goreleaser failure skips this job.
+  #
+  # If a release still ends up without install.sh, because the goreleaser job
+  # failed after its uploads or this job was wrong when the release ran (a rerun
+  # uses the workflow file of the first run), attach it by hand from a clone that
+  # has the tag, with gh signed in to an account that can write to releases:
+  #
+  #   tag=v0.29.0 d=$(mktemp -d)
+  #   git show "refs/tags/$tag:install.sh" | sed "s/^RELEASE_TAG=\"\"\$/RELEASE_TAG=\"$tag\"/" >"$d/install.sh"
+  #   grep -Fx "RELEASE_TAG=\"$tag\"" "$d/install.sh" && gh release upload "$tag" "$d/install.sh" --clobber --repo rudderlabs/rudder-iac
+  #
+  # Then run the "install script" workflow by hand with that tag to check it.
+  upload-install-script:
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # gh release upload
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      # Whoever sends the dispatch sets client_payload.tag, so it reaches the
+      # shell only through env, and only once it looks like a release tag.
+      - name: Check the tag
+        env:
+          TAG: ${{ github.event.client_payload.tag }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::client_payload.tag is not a vX.Y.Z tag"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          # refs/tags/, because for a bare name checkout takes a branch of that
+          # name over the tag.
+          ref: refs/tags/${{ github.event.client_payload.tag }}
+          persist-credentials: false
+
+      - name: Upload install.sh with the tag set
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.client_payload.tag }}
+        run: |
+          # Without that line, the copy would install the latest release, not this one.
+          if [ "$(grep -c '^RELEASE_TAG=""$' install.sh)" -ne 1 ]; then
+            echo "::error file=install.sh::install.sh needs exactly one line RELEASE_TAG=\"\""
+            exit 1
+          fi
+          sed "s/^RELEASE_TAG=\"\"\$/RELEASE_TAG=\"$TAG\"/" install.sh >"$RUNNER_TEMP/install.sh"
+          grep -Fx "RELEASE_TAG=\"$TAG\"" "$RUNNER_TEMP/install.sh"
+          gh release upload "$TAG" "$RUNNER_TEMP/install.sh" --clobber --repo "$GITHUB_REPOSITORY"
+
+  # Installs from the uploaded copy on Linux and both kinds of Mac, and checks
+  # that it installed this release.
+  test-install-script:
+    needs: upload-install-script
+    permissions:
+      contents: read
+    uses: ./.github/workflows/install-script.yml
+    with:
+      tag: ${{ github.event.client_payload.tag }}

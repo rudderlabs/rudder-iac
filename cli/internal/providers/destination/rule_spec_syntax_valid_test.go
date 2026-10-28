@@ -1,6 +1,7 @@
 package destination
 
 import (
+	"maps"
 	"strings"
 	"testing"
 
@@ -79,13 +80,46 @@ func TestSpecSyntaxValidRuleMetadata(t *testing.T) {
 func TestSpecSyntaxValidRuleDecodeFailure(t *testing.T) {
 	t.Parallel()
 
-	spec := validSpecMap()
-	spec["definition_version"] = "abc"
+	cases := []struct {
+		name      string
+		overrides map[string]any
+		want      []vrules.ValidationResult
+	}{
+		{
+			name:      "string definition_version",
+			overrides: map[string]any{"definition_version": "1"},
+			want:      []vrules.ValidationResult{{Reference: "/spec/definition_version", Message: "'definition_version' must be an integer"}},
+		},
+		{
+			name:      "string enabled",
+			overrides: map[string]any{"enabled": "true"},
+			want:      []vrules.ValidationResult{{Reference: "/spec/enabled", Message: "'enabled' must be a boolean"}},
+		},
+		{
+			name:      "list config",
+			overrides: map[string]any{"config": []any{}},
+			want:      []vrules.ValidationResult{{Reference: "/spec/config", Message: "'config' must be an object"}},
+		},
+		{
+			name:      "every wrong type reported",
+			overrides: map[string]any{"display_name": 5, "enabled": "yes"},
+			want: []vrules.ValidationResult{
+				{Reference: "/spec/display_name", Message: "'display_name' must be a string"},
+				{Reference: "/spec/enabled", Message: "'enabled' must be a boolean"},
+			},
+		},
+	}
 
-	results := runSyntaxRule(t, ruleTestRegistry(t), spec)
-	require.Len(t, results, 1)
-	assert.Equal(t, "/spec", results[0].Reference)
-	assert.Contains(t, results[0].Message, "definition_version")
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			spec := validSpecMap()
+			maps.Copy(spec, c.overrides)
+
+			assert.Equal(t, c.want, runSyntaxRule(t, ruleTestRegistry(t), spec))
+		})
+	}
 }
 
 func TestSpecSyntaxValidRuleUnknownEnvelopeKeys(t *testing.T) {
@@ -254,16 +288,30 @@ func TestSpecSyntaxValidRuleEmptyRegistry(t *testing.T) {
 func TestSpecSyntaxValidRuleInvalidVersion(t *testing.T) {
 	t.Parallel()
 
-	spec := validSpecMap()
-	spec["definition_version"] = 2
+	cases := []struct {
+		name    string
+		version int
+	}{
+		{name: "unregistered version", version: 2},
+		{name: "zero is an invalid version, not a missing one", version: 0},
+	}
 
-	results := runSyntaxRule(t, ruleTestRegistry(t), spec)
-	assert.Equal(t, []vrules.ValidationResult{
-		{
-			Reference: "/spec/definition_version",
-			Message:   "version not valid for destination type 'WEBHOOK'; valid versions: 1",
-		},
-	}, results)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			spec := validSpecMap()
+			spec["definition_version"] = c.version
+
+			results := runSyntaxRule(t, ruleTestRegistry(t), spec)
+			assert.Equal(t, []vrules.ValidationResult{
+				{
+					Reference: "/spec/definition_version",
+					Message:   "version not valid for destination type 'WEBHOOK'; valid versions: 1",
+				},
+			}, results)
+		})
+	}
 }
 
 func TestSpecSyntaxValidRuleTransformationRefFormat(t *testing.T) {

@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    tracking_id: UA-123456-1
+    tracking_id: "{{ .GA_TRACKING_ID }}"
     double_click: true
     enhanced_link_attribution: true
     include_search: false
@@ -39,7 +39,7 @@ spec:
     domain:
       web: auto
     optimize:
-      web: OPT-E2ECREATE
+      web: "{{ .GA_OPTIMIZE_WEB }}"
     use_google_amp_client_id:
       web: false
     named_tracker:
