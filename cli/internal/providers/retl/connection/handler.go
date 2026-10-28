@@ -56,8 +56,8 @@ type Handler struct {
 
 // EnableSourceKinds narrows the source kinds remote rows may use to those whose
 // resource type is registered. The provider calls it after every option, so a
-// connection on a kind whose flag is off is skipped with that flag named,
-// rather than exported as a reference this CLI cannot load.
+// connection on an unregistered kind is skipped rather than exported as a
+// reference this CLI cannot load.
 func (h *Handler) EnableSourceKinds(resourceTypes ...string) {
 	h.enabledSourceTypes = make(map[string]bool, len(resourceTypes))
 	for _, rt := range resourceTypes {
@@ -525,7 +525,7 @@ func (h *Handler) remoteConnection(
 		return nil, fmt.Errorf("connection %q: rETL source type %q is not supported", conn.ID, source.SourceType)
 	}
 	if !h.sourceKindEnabled(sourceKind) {
-		return nil, fmt.Errorf("connection %q: its source is a %s, which is not enabled (set %s=true)", conn.ID, sourceKind.Kind, sourceKind.Flag)
+		return nil, fmt.Errorf("connection %q: its source is a %s, which this provider does not register", conn.ID, sourceKind.Kind)
 	}
 	// The workspace is what an import entry is filed under; without one there
 	// is no valid import metadata to write for the row.
