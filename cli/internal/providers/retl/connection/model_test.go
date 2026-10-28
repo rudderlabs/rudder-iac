@@ -211,7 +211,7 @@ func TestSpecValidateTags(t *testing.T) {
 	assert.Equal(t, []rules.ValidationResult{
 		{Reference: "/connections/0/id", Message: "'id' is required"},
 		{Reference: "/connections/0/destination", Message: "'destination' is required"},
-		{Reference: "/connections/0/config/sync_behaviour", Message: "'sync_behaviour' must be one of [upsert mirror full]"},
+		{Reference: "/connections/0/config/sync_behaviour", Message: "'sync_behaviour' must be one of [upsert full]"},
 		{Reference: "/connections/0/config/schedule/type", Message: "'type' is required"},
 		{Reference: "/connections/0/config/identifiers/0/to", Message: "'to' is required"},
 	}, funcs.ParseValidationErrors(errs, nil))
