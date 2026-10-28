@@ -131,7 +131,14 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 			name:   "unsupported sync_behaviour",
 			mutate: func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "replace" },
 			expected: []rules.ValidationResult{
-				{Reference: "/connections/0/config/sync_behaviour", Message: "'sync_behaviour' must be one of [upsert mirror full]"},
+				{Reference: "/connections/0/config/sync_behaviour", Message: "'sync_behaviour' must be one of [upsert full]"},
+			},
+		},
+		{
+			name:   "mirror sync_behaviour",
+			mutate: func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "mirror" },
+			expected: []rules.ValidationResult{
+				{Reference: "/connections/0/config/sync_behaviour", Message: "'sync_behaviour' must be one of [upsert full]"},
 			},
 		},
 		{
@@ -320,7 +327,7 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 		{
 			name: "cursor column outside an upsert sync",
 			mutate: func(c *retlConnection.ConnectionSpec) {
-				c.Config.SyncBehaviour = "mirror"
+				c.Config.SyncBehaviour = "full"
 				c.Config.CursorColumn = "updated_at"
 			},
 			expected: []rules.ValidationResult{
@@ -329,7 +336,7 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 		},
 		{
 			name:     "no cursor column outside an upsert sync",
-			mutate:   func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "mirror" },
+			mutate:   func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "full" },
 			expected: []rules.ValidationResult{},
 		},
 		{

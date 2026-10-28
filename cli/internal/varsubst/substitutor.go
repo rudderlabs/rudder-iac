@@ -428,10 +428,13 @@ func computePositions(original []byte, rawErrors []rawError) []SubstitutionError
 	// walk through original bytes once, tracking line/col as we go.
 	// when the current byte offset matches the next error's offset,
 	// scan forward to find the end of the line and emit the error.
-	for i := range original {
+	// Lines break where the YAML parser breaks them (breakLen), CR and CRLF
+	// included, so the line matches the one validate places other
+	// diagnostics on.
+	for i := 0; i < len(original); {
 		if i == rawErrors[errorIdx].offset {
 			lineEnd := i
-			for lineEnd < len(original) && original[lineEnd] != '\n' {
+			for lineEnd < len(original) && breakLen(original[lineEnd:]) == 0 {
 				lineEnd++
 			}
 
@@ -451,10 +454,13 @@ func computePositions(original []byte, rawErrors []rawError) []SubstitutionError
 			}
 		}
 
-		if original[i] == '\n' {
+		if n := breakLen(original[i:]); n > 0 {
+			i += n
 			line++
-			lineStart = i + 1
+			lineStart = i
+			continue
 		}
+		i++
 	}
 
 	return result

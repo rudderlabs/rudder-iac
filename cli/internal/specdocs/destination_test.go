@@ -718,9 +718,9 @@ func TestDescribeMarksUnverifiedTypes(t *testing.T) {
 		"RUDDERSTACK_X_UNVERIFIED_DESTINATIONS": "true",
 	}
 
-	adj := describe(t, docs, specdocs.DescribeOptions{Type: "adj"})
-	assert.False(t, adj.Verified)
-	assert.Equal(t, enable, adj.Enable)
+	linkedinAds := describe(t, docs, specdocs.DescribeOptions{Type: "linkedin_ads"})
+	assert.False(t, linkedinAds.Verified)
+	assert.Equal(t, enable, linkedinAds.Enable)
 
 	webhook := describe(t, docs, specdocs.DescribeOptions{Type: "webhook"})
 	assert.True(t, webhook.Verified)

@@ -2,8 +2,11 @@ package project_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/exp/project"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,4 +39,40 @@ func TestProjectLoad(t *testing.T) {
 		_, err := project.Load(context.Background(), "non/existent/path")
 		require.Error(t, err, "expected error when loading non-existent project")
 	})
+}
+
+// A program that loads a project may write its own output on stdout, so the
+// warnings the load reports go to stderr.
+func TestProjectLoadPrintsDiagnosticsOnStderr(t *testing.T) {
+	// Load builds the API client, which needs a token, but makes no call.
+	t.Setenv("RUDDERSTACK_ACCESS_TOKEN", "fake-token")
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "destination.yaml"), []byte(`version: rudder/v1
+kind: destination
+metadata:
+  name: shop-amplitude
+spec:
+  id: shop-amplitude
+  display_name: Shop Amplitude
+  type: am
+  definition_version: 1
+  enabled: true
+  config:
+    api_key: fake-literal-amplitude-key
+    residency_server: standard
+`), 0o600))
+
+	var stdout string
+	stderr := testutils.CaptureStderr(t, func() {
+		stdout = testutils.CaptureStdout(t, func() {
+			graph, err := project.Load(context.Background(), dir)
+			require.NoError(t, err)
+			require.NotNil(t, graph)
+		})
+	})
+
+	assert.Empty(t, stdout)
+	assert.Contains(t, stderr, `warning[destination/secret-reference]: secret key "api_key" must hold only a variable reference with no default`)
+	assert.NotContains(t, stderr, "fake-literal-amplitude-key")
 }

@@ -17,10 +17,21 @@ const FakeWorkspaceID = "ws-fake"
 // command gets past authentication and then fails at its first real API call.
 func UseFakeAPI(t *testing.T) {
 	t.Helper()
+	UseFakeAPIWith(t, nil)
+}
+
+// UseFakeAPIWith is UseFakeAPI with more answers: the fake API answers a
+// request for each path in responses with that JSON body, whatever the method.
+func UseFakeAPIWith(t *testing.T, responses map[string]string) {
+	t.Helper()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v2/workspace" {
 			fmt.Fprintf(w, `{"workspace":{"id":%q}}`, FakeWorkspaceID)
+			return
+		}
+		if body, ok := responses[r.URL.Path]; ok {
+			fmt.Fprint(w, body)
 			return
 		}
 		w.WriteHeader(http.StatusInternalServerError)

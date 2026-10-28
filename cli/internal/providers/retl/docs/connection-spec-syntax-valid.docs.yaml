@@ -131,6 +131,36 @@ match_behavior:
             reference: "/spec/connections/0/config/schedule/every_minutes"
             severity: "error"
             message_contains: "'every_minutes' must be greater than or equal to 5"
+      - example_id: "retl-connection-spec-mirror-sync-behaviour"
+        title: "Mirror sync, which this CLI does not support"
+        files:
+          model.yaml: *users-model
+          destination.yaml: *http-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: mirror
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/sync_behaviour"
+            severity: "error"
+            message_contains: "'sync_behaviour' must be one of [upsert full]"
       - example_id: "retl-connection-spec-cron-malformed"
         title: "Cron expression that does not parse"
         description: "Minute 70 does not exist. The backend would store the expression unparsed and the connection would never sync, so this is an error rather than a warning."
@@ -272,7 +302,7 @@ match_behavior:
                   destination: "#destination:my-bing-destination"
                   config:
                     object: ""
-                    sync_behaviour: mirror
+                    sync_behaviour: upsert
                     schedule:
                       type: manual
                     identifiers:
@@ -303,7 +333,7 @@ match_behavior:
                   destination: "#destination:my-bing-destination"
                   config:
                     object: " conversions "
-                    sync_behaviour: mirror
+                    sync_behaviour: upsert
                     schedule:
                       type: manual
                     identifiers:

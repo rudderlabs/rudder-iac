@@ -1,6 +1,8 @@
 package pathindex
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -440,4 +442,234 @@ spec:
 			})
 		}
 	})
+}
+
+// TestPathIndex_MaskedPosition masks the line text the indexer builds for each
+// node kind, so the cases cannot drift from extractLineText.
+func TestPathIndex_MaskedPosition(t *testing.T) {
+	t.Parallel()
+
+	pi, err := NewPathIndexer([]byte(`config:
+  api_key: sk-fake-value
+  empty:
+  headers:
+    - from: X-Fake-Header
+      to: fake-header-value
+  tokens:
+    - fake-token
+    - 'sk_fake_PART1: PART2'
+  nested: {}
+  null_tilde: ~
+  null_word: null
+  null_quoted: 'null'
+  null_tagged: !!null sk-fake-tagged
+  nulls:
+    - ~
+    - from: null
+`))
+	require.NoError(t, err)
+
+	cases := []struct {
+		path string
+		want string
+	}{
+		{path: "/config/api_key", want: "api_key: ***"},
+		// A null shows no value, so the line keeps it as written.
+		{path: "/config/null_tilde", want: "null_tilde: ~"},
+		{path: "/config/null_word", want: "null_word: null"},
+		{path: "/config/nulls/0", want: "~"},
+		{path: "/config/nulls/1", want: "- from: null"},
+		// A quoted 'null' is a string, and a value tagged !!null by hand is
+		// not a null spelling, so both are masked.
+		{path: "/config/null_quoted", want: "null_quoted: ***"},
+		{path: "/config/null_tagged", want: "null_tagged: ***"},
+		{path: "/config/headers/0", want: "- from: ***"},
+		{path: "/config/headers/0/to", want: "to: ***"},
+		{path: "/config/tokens/0", want: "***"},
+		// A scalar list item has no key, so ": " inside its value is not one.
+		{path: "/config/tokens/1", want: "***"},
+		{path: "/config/empty", want: "empty: "},
+		{path: "/config/headers", want: "headers: [...]"},
+		{path: "/config", want: "config: {...}"},
+		{path: "/config/nested", want: "nested: {}"},
+		// A missing path prints its nearest ancestor's line, masked.
+		{path: "/config/headers/0/missing", want: "- from: ***"},
+		{path: "/missing", want: ""},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.path, func(t *testing.T) {
+			t.Parallel()
+
+			pos := pi.NearestPosition(tc.path)
+			assert.Equal(t, &Position{Line: pos.Line, Column: pos.Column, LineText: tc.want}, pi.MaskedPosition(tc.path))
+		})
+	}
+}
+
+// An alias is indexed at its own place, with its line showing the alias as
+// written, and the paths below it at the anchor's lines.
+func TestPathIndex_Aliases(t *testing.T) {
+	t.Parallel()
+
+	pi, err := NewPathIndexer([]byte(`config:
+  headers:
+    - &first
+      from: sk-fake-value
+      to: &bad 'X-Bad:Name'
+    - from: sk-fake-other
+      to: *bad
+    - *first
+`))
+	require.NoError(t, err)
+
+	cases := []struct {
+		path       string
+		want       Position
+		wantMasked string
+	}{
+		// An alias line shows the alias, never the anchor's value, which may
+		// be a secret under a key that is not one.
+		{path: "/config/headers/1/to", want: Position{Line: 7, Column: 7, LineText: "to: *bad"}, wantMasked: "to: *bad"},
+		{path: "/config/headers/2", want: Position{Line: 8, Column: 7, LineText: "*first"}, wantMasked: "*first"},
+		// The paths below a mapping alias sit at the anchor's lines, with
+		// their values masked: the anchor was written for another path, where
+		// a value may be a secret this path does not mark as one.
+		{path: "/config/headers/2/to", want: Position{Line: 5, Column: 7, LineText: "to: ***"}, wantMasked: "to: ***"},
+		{path: "/config/headers/2/from", want: Position{Line: 4, Column: 7, LineText: "from: ***"}, wantMasked: "from: ***"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.path, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := pi.PositionLookup(tc.path)
+			require.NoError(t, err)
+			assert.Equal(t, &tc.want, got)
+			assert.Equal(t, tc.wantMasked, pi.MaskedPosition(tc.path).LineText)
+		})
+	}
+}
+
+// An alias inside its own anchor is walked once, and the same alias met again
+// inside that walk is indexed but not walked, instead of looping.
+func TestPathIndex_AliasInsideItsAnchor(t *testing.T) {
+	t.Parallel()
+
+	pi, err := NewPathIndexer([]byte(`loop: &a
+  - x
+  - *a
+`))
+	require.NoError(t, err)
+
+	pos, err := pi.PositionLookup("/loop/1/0")
+	require.NoError(t, err)
+	assert.Equal(t, "***", pos.LineText)
+	pos, err = pi.PositionLookup("/loop/1/1")
+	require.NoError(t, err)
+	assert.Equal(t, "*a", pos.LineText)
+	_, err = pi.PositionLookup("/loop/1/1/0")
+	require.ErrorIs(t, err, ErrPathNotFound)
+}
+
+// Each alias repeats its anchor's subtree, so the walk stops after
+// maxAliasWalks of them, and the paths past that fall back to an ancestor.
+func TestPathIndex_AliasWalksAreCapped(t *testing.T) {
+	t.Parallel()
+
+	var doc strings.Builder
+	doc.WriteString("a: &a [x, x, x, x, x, x, x, x, x, x]\n")
+	prev := "a"
+	for _, name := range []string{"b", "c", "d", "e", "f", "g"} {
+		fmt.Fprintf(&doc, "%s: &%s [*%s, *%s, *%s, *%s, *%s, *%s, *%s, *%s, *%s, *%s]\n", name, name, prev, prev, prev, prev, prev, prev, prev, prev, prev, prev)
+		prev = name
+	}
+
+	pi, err := NewPathIndexer([]byte(doc.String()))
+	require.NoError(t, err)
+
+	_, err = pi.PositionLookup("/b/0/0")
+	require.NoError(t, err, "the first aliases are walked")
+	_, err = pi.PositionLookup("/g/9/9/9/9/9/9")
+	require.ErrorIs(t, err, ErrPathNotFound, "walks past the cap are not")
+}
+
+// Past the cap an alias is still indexed at its own line, and the keys a merge
+// key adds are indexed at the merge's alias, so no diagnostic on them falls
+// back to a line that shows a value.
+func TestPathIndex_AliasesPastTheCap(t *testing.T) {
+	t.Parallel()
+
+	var doc strings.Builder
+	doc.WriteString("a: &a [x, x, x, x, x, x, x, x, x, x]\n")
+	prev := "a"
+	for _, name := range []string{"b", "c", "d", "e"} {
+		fmt.Fprintf(&doc, "%s: &%s [*%s, *%s, *%s, *%s, *%s, *%s, *%s, *%s, *%s, *%s]\n", name, name, prev, prev, prev, prev, prev, prev, prev, prev, prev, prev)
+		prev = name
+	}
+	doc.WriteString(`base: &base
+  to: X-Base
+bad: &bad 'X-Bad:Name'
+rows:
+  - from: sk-fake-first
+    to: *bad
+  - from: sk-fake-second
+    <<: *base
+`)
+
+	pi, err := NewPathIndexer([]byte(doc.String()))
+	require.NoError(t, err)
+	require.LessOrEqual(t, pi.(*PathIndex).aliasBudget, 0, "the document uses up the cap first")
+
+	pos, err := pi.PositionLookup("/rows/0/to")
+	require.NoError(t, err)
+	assert.Equal(t, "to: *bad", pos.LineText)
+	pos, err = pi.PositionLookup("/rows/1/to")
+	require.NoError(t, err)
+	assert.Equal(t, "*base", pos.LineText)
+}
+
+// A merge key (<<) adds the keys of the mappings it names at their own lines,
+// with their values masked, as the decoder merges them: a key the mapping
+// writes wins, and among merged mappings the first wins.
+func TestPathIndex_MergeKeys(t *testing.T) {
+	t.Parallel()
+
+	pi, err := NewPathIndexer([]byte(`base: &base
+  to: X-Base
+  from: sk-fake-base
+other: &other
+  to: X-Other
+  method: POST
+rows:
+  - from: sk-fake-row
+    <<: *base
+  - <<: [*other, *base]
+`))
+	require.NoError(t, err)
+
+	cases := []struct {
+		path string
+		want Position
+	}{
+		// Merged from base, at base's line.
+		{path: "/rows/0/to", want: Position{Line: 2, Column: 3, LineText: "to: ***"}},
+		// Written in the row, so the row's own key wins.
+		{path: "/rows/0/from", want: Position{Line: 8, Column: 5, LineText: "from: sk-fake-row"}},
+		// other comes first in the list, so its to wins over base's.
+		{path: "/rows/1/to", want: Position{Line: 5, Column: 3, LineText: "to: ***"}},
+		{path: "/rows/1/method", want: Position{Line: 6, Column: 3, LineText: "method: ***"}},
+		{path: "/rows/1/from", want: Position{Line: 3, Column: 3, LineText: "from: ***"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.path, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := pi.PositionLookup(tc.path)
+			require.NoError(t, err)
+			assert.Equal(t, &tc.want, got)
+		})
+	}
+
+	_, err = pi.PositionLookup("/rows/0/<<")
+	require.ErrorIs(t, err, ErrPathNotFound, "a merge key is no path of the decoded spec")
 }
