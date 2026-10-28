@@ -7,9 +7,6 @@ In a Slack destination spec:
 - `type: slack`
 - `definition_version: 1`
 
-> [!NOTE]
-> `slack` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -57,7 +54,7 @@ spec:
             - analytics
 ```
 
-The above example routes `track` events by webhook URL, so each channel entry carries its own `webhook` — see [Channel routing](#channel-routing). The webhook URLs are `{{ .VAR }}` references even though Rudder CLI doesn't treat them as secrets — see [Secrets](#secrets).
+The above example routes `track` events by webhook URL, so each channel entry carries its own `webhook` — see [Channel routing](#channel-routing). The webhook URLs are secrets, written as `{{ .VAR }}` references — see [Secrets](#secrets).
 
 ## Config keys
 
@@ -68,13 +65,15 @@ The above example routes `track` events by webhook URL, so each channel entry ca
 
 ### Connection
 
-#### `webhook_url` — string, required
+#### `webhook_url` — string, required, secret
 
 Slack incoming webhook URL. RudderStack posts every `identify` message here, and every `track` message that [channel routing](#channel-routing) doesn't send elsewhere.
 
 - At most 100 characters, and must not contain line breaks.
 - Any value containing `.ngrok.io` is rejected.
 - A spec that omits this key fails validation with `'webhook_url' is required`.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 ### Channel routing
 
@@ -94,7 +93,7 @@ Routes `track` events to channels by event name. RudderStack uses the first entr
 - `name` — event name to match. At most 100 characters, and must not contain line breaks. It also must not contain a parenthesized group that holds `*`, `+`, `{`, or `|` and is followed by `*`, `+`, `?`, or `{` — such as `(a|b)+` — even when `regex` is `false`.
 - `regex` — boolean. `true` treats `name` as a regular expression, which matches anywhere in the event name — anchor it with `^` and `$` to match the whole name. Omit it, or set `false`, for an exact match.
 - `channel` — channel to post to when `incoming_webhooks_type` is `legacy`: a channel name such as `#orders`, or `@user` for a direct message. At most 100 characters, and must not contain line breaks. Quote it, since an unquoted `#` starts a YAML comment.
-- `webhook` — incoming webhook URL to post to when `incoming_webhooks_type` is `modern`. Same limits as `webhook_url`, including the `.ngrok.io` ban.
+- `webhook` — incoming webhook URL to post to when `incoming_webhooks_type` is `modern`. Same limits as `webhook_url`, including the `.ngrok.io` ban. **Secret** — see [Secrets](#secrets).
 
 Rudder CLI doesn't check that an entry carries the field its webhook type uses. RudderStack skips an entry without it, as though its `name` never matched.
 
@@ -201,20 +200,17 @@ Slack accepts events from these source types in the mentioned connection modes:
 | `react_native` | `cloud` |
 | `flutter` | `cloud` |
 | `cordova` | `cloud` |
+| `warehouse` | `cloud` |
 
 Every source type is `cloud` only — RudderStack posts to Slack from its servers, never in device mode.
 
-The dashboard also accepts `warehouse` for Slack, but this definition doesn't, so Rudder CLI can't connect a Reverse ETL source to it.
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
-
-```text
-destination 'slack-prod' (type 'slack') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -224,15 +220,16 @@ destination 'slack-prod' config has no 'connection_mode' entry for source type '
 
 Slack needs no additional config keys to connect a source of any type.
 
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
+
 ## Secrets
 
-Slack has no secret keys. Rudder CLI writes `webhook_url` and each entry's `webhook` to YAML in plain text, and `import` writes them as literals.
-
-An incoming webhook URL lets anyone who holds it post to its channel, so keep it out of version control with a `{{ .VAR }}` reference anyway, as the sample does — [Secrets](../README.md#secrets) covers supplying the value:
+`webhook_url` and each `event_channel_settings` entry's `webhook` are the secret keys. Write each one you use as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
   webhook_url: "{{ .SLACK_WEBHOOK_URL }}"
+  event_channel_settings:
+    - name: Order Completed
+      webhook: "{{ .SLACK_ORDERS_WEBHOOK_URL }}"
 ```
-
-Replace the literal URLs in an imported spec with references before you commit it.

@@ -7,9 +7,6 @@ In a VWO destination spec:
 - `type: vwo`
 - `definition_version: 1`
 
-> [!NOTE]
-> `vwo` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -24,7 +21,7 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    account_id: "654321"
+    account_id: "{{ .VWO_ACCOUNT_ID }}"
 
     send_experiment_track: true
     send_experiment_identify: true
@@ -59,18 +56,16 @@ The above example sets the SmartCode keys, which take effect only when the page 
 
 ### Connection
 
-#### `account_id` — string, required
+#### `account_id` — string, required, secret
 
 Your VWO account ID, from **Account Details** in VWO's account settings. The SDK uses it when it loads VWO's SmartCode itself — see [SmartCode settings](#smartcode-settings).
 
-- Written as a string. Quote a numeric ID: `"654321"`, not `654321`.
+- Written as a string, so quote its reference: `"{{ .VWO_ACCOUNT_ID }}"`. Substitution happens before YAML parsing, so an unquoted reference to a numeric ID becomes a number and fails validation.
 - At most 100 characters, and must not contain line breaks.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
 - A spec that omits this key fails validation with `'account_id' is required`.
 
-```yaml
-account_id: "654321"
-```
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 ### Experiment reporting
 
@@ -209,4 +204,11 @@ VWO needs no additional config keys to connect a web source.
 
 ## Secrets
 
-VWO has no secret keys. Rudder CLI treats none of its keys as secret, and the dashboard masks none of them, so `import` writes every value to YAML in plain text — including `account_id`, which the page's JavaScript carries anyway.
+`account_id` is the only secret key. Write it as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
+
+```yaml
+config:
+  account_id: "{{ .VWO_ACCOUNT_ID }}"
+```
+
+The account ID is embedded in the page's JavaScript, so masking it protects your YAML, not the value itself.

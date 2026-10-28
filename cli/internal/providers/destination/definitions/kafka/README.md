@@ -7,9 +7,6 @@ In an Apache Kafka destination spec:
 - `type: kafka`
 - `definition_version: 1`
 
-> [!NOTE]
-> `kafka` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -24,14 +21,14 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    host_name: broker-1.kafka.example.com,broker-2.kafka.example.com
+    host_name: "{{ .KAFKA_HOST_NAME }}"
     port: "9093"
     topic: rudder-events
 
     ssl_enabled: true
     use_sasl: true
     sasl_type: sha512
-    username: rudderstack
+    username: "{{ .KAFKA_USERNAME }}"
     password: "{{ .KAFKA_PASSWORD }}"
 
     enable_multi_topic: true
@@ -65,12 +62,14 @@ The above example connects over SSL with SCRAM-SHA-512 authentication — see [S
 
 ### Connection
 
-#### `host_name` — string, required
+#### `host_name` — string, required, secret
 
 Host name of your Kafka broker. To list several brokers, separate them with commas.
 
 - Each name consists of dot-separated labels of letters, digits, and hyphens, with no port and no scheme — `port` supplies the port.
 - Validation accepts a space after a comma, but RudderStack appends `:<port>` to each name exactly as written, so leave the spaces out.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `port` — string, required
 
@@ -127,13 +126,15 @@ SASL mechanism: `plain` for PLAIN, `sha256` for SCRAM-SHA-256, or `sha512` for S
 
 - Applies when `ssl_enabled` and `use_sasl` are both `true`.
 
-#### `username` — string, required
+#### `username` — string, required, secret
 
 SASL username.
 
 - Required when `ssl_enabled` and `use_sasl` are both `true`. Leave it unset otherwise.
 - 1 to 32 characters: letters, digits, `_`, and `-`.
 - A missing value fails validation with `'username' is required when 'ssl_enabled' is true`, which names only the first of the two conditions.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `password` — string, secret
 
@@ -243,7 +244,7 @@ Bastion host connection details. RudderStack logs in with a private key it holds
 - A spec that sets `use_ssh: true` and misses any of the four fields fails validation.
 - `host` — host name or IP address of the bastion host. Validation accepts a `host:port` form, but RudderStack appends `port` to this value, so leave the port out.
 - `port` — SSH port of the bastion host, from `1` to `65535`, written as a string.
-- `user` — user RudderStack logs in as. 1 to 32 characters: letters, digits, `_`, and `-`.
+- `user` — user RudderStack logs in as. 1 to 32 characters: letters, digits, `_`, and `-`. **Secret** — see [Secrets](#secrets).
 - `public_key` — an `ssh-rsa`, `ssh-ed25519`, or `ssh-dss` public key, optionally followed by a `user@host` comment.
 
 ```yaml
@@ -251,7 +252,7 @@ use_ssh: true
 ssh:
   host: bastion.example.com
   port: "22"
-  user: rudderstack
+  user: "{{ .KAFKA_SSH_USER }}"
   public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl rudderstack@bastion"
 ```
 
@@ -291,20 +292,17 @@ Apache Kafka accepts events from these source types in the mentioned connection 
 | `react_native` | `cloud` |
 | `flutter` | `cloud` |
 | `cordova` | `cloud` |
+| `warehouse` | `cloud` |
 
 Every source type is `cloud` only — events reach Kafka from RudderStack's servers, never in device mode.
 
-The dashboard also accepts `warehouse` for Apache Kafka, but this definition doesn't, so Rudder CLI can't connect a Reverse ETL source to it.
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
-
-```text
-destination 'kafka-prod' (type 'kafka') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -314,13 +312,17 @@ destination 'kafka-prod' config has no 'connection_mode' entry for source type '
 
 Apache Kafka needs no additional config keys to connect a source of any type.
 
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
+
 ## Secrets
 
-`password` is the only secret key, and applies only when `ssl_enabled` and `use_sasl` are both `true`. Write it as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
+`host_name`, `username`, `password`, and `ssh.user` are the secret keys. `username` and `password` apply only when `ssl_enabled` and `use_sasl` are both `true`, and `ssh.user` only when `use_ssh` is `true`. Write each one you use as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
+  host_name: "{{ .KAFKA_HOST_NAME }}"
+  username: "{{ .KAFKA_USERNAME }}"
   password: "{{ .KAFKA_PASSWORD }}"
 ```
 
-`ca_certificate` isn't a secret — a CA certificate is public by design.
+`ca_certificate` and `ssh.public_key` aren't secrets — a CA certificate and a public key are public by design.

@@ -11,29 +11,51 @@ Use the `type` value in YAML. Every type below takes `definition_version: 1`.
 | Destination | Type |
 | :-----| :-----|
 | [ActiveCampaign](active_campaign/README.md) | `active_campaign` |
+| [Adjust](adj/README.md) | `adj` |
+| [Adobe Analytics](adobe_analytics/README.md) | `adobe_analytics` |
+| [Amazon Kinesis](kinesis/README.md) | `kinesis` |
 | [Amazon Redshift](rs/README.md) | `rs` |
 | [Amazon S3](s3/README.md) | `s3` |
 | [Amplitude](am/README.md) | `am` |
+| [Apache Kafka](kafka/README.md) | `kafka` |
 | [Attentive Tag](attentive_tag/README.md) | `attentive_tag` |
 | [BigQuery](bq/README.md) | `bq` |
 | [BigQuery Stream](bqstream/README.md) | `bqstream` |
 | [Braze](braze/README.md) | `braze` |
+| [Confluent Cloud](confluent_cloud/README.md) | `confluent_cloud` |
 | [Customer.io](customerio/README.md) | `customerio` |
 | [Facebook Conversions](facebook_conversions/README.md) | `facebook_conversions` |
 | [Facebook Pixel](facebook_pixel/README.md) | `facebook_pixel` |
+| [Firebase](firebase/README.md) | `firebase` |
 | [Google Ads](googleads/README.md) | `googleads` |
+| [Google Analytics](ga/README.md) | `ga` |
 | [Google Analytics 4](ga4/README.md) | `ga4` |
+| [Google Cloud Pub/Sub](googlepubsub/README.md) | `googlepubsub` |
 | [Google Cloud Storage](gcs/README.md) | `gcs` |
+| [Google Sheets](googlesheets/README.md) | `googlesheets` |
+| [Google Tag Manager](gtm/README.md) | `gtm` |
 | [HTTP Webhook](http/README.md) | `http` |
 | [HubSpot](hs/README.md) | `hs` |
+| [Intercom](intercom/README.md) | `intercom` |
 | [Iterable](iterable/README.md) | `iterable` |
+| [LinkedIn Insight Tag](linkedin_insight_tag/README.md) | `linkedin_insight_tag` |
+| [Marketo](marketo/README.md) | `marketo` |
 | [Mixpanel](mp/README.md) | `mp` |
 | [PostgreSQL](postgres/README.md) | `postgres` |
 | [PostHog](posthog/README.md) | `posthog` |
+| [Qualtrics](qualtrics/README.md) | `qualtrics` |
+| [Redis](redis/README.md) | `redis` |
 | [S3 Data Lake](s3_datalake/README.md) | `s3_datalake` |
+| [Salesforce](salesforce/README.md) | `salesforce` |
+| [Sentry](sentry/README.md) | `sentry` |
+| [Slack](slack/README.md) | `slack` |
 | [Snowflake](snowflake/README.md) | `snowflake` |
+| [Snowflake Streaming](snowpipe_streaming/README.md) | `snowpipe_streaming` |
+| [Statsig](statsig/README.md) | `statsig` |
 | [TikTok Ads](tiktok_ads/README.md) | `tiktok_ads` |
+| [VWO](vwo/README.md) | `vwo` |
 | [Webhook](webhook/README.md) | `webhook` |
+| [Zendesk](zendesk/README.md) | `zendesk` |
 
 These are the verified definitions, which Rudder CLI always registers. The [unverified destination types](#unverified-destination-types) register only behind an experimental flag. Any other `type` fails validation.
 
@@ -65,32 +87,10 @@ Or persist it in `~/.rudder/config.json`:
 
 | Destination | Type |
 | :-----| :-----|
-| [Adjust](adj/README.md) | `adj` |
-| [Adobe Analytics](adobe_analytics/README.md) | `adobe_analytics` |
-| [Amazon Kinesis](kinesis/README.md) | `kinesis` |
-| [Apache Kafka](kafka/README.md) | `kafka` |
 | [BingAds Offline Conversions](bingads_offline_conversions/README.md) | `bingads_offline_conversions` |
-| [Confluent Cloud](confluent_cloud/README.md) | `confluent_cloud` |
 | [Customer.io Audience](customerio_audience/README.md) | `customerio_audience` |
-| [Firebase](firebase/README.md) | `firebase` |
 | [Google Ads Offline Conversions](google_adwords_offline_conversions/README.md) | `google_adwords_offline_conversions` |
-| [Google Analytics](ga/README.md) | `ga` |
-| [Google Cloud Pub/Sub](googlepubsub/README.md) | `googlepubsub` |
-| [Google Sheets](googlesheets/README.md) | `googlesheets` |
-| [Google Tag Manager](gtm/README.md) | `gtm` |
-| [Intercom](intercom/README.md) | `intercom` |
 | [LinkedIn Ads](linkedin_ads/README.md) | `linkedin_ads` |
-| [LinkedIn Insight Tag](linkedin_insight_tag/README.md) | `linkedin_insight_tag` |
-| [Marketo](marketo/README.md) | `marketo` |
-| [Qualtrics](qualtrics/README.md) | `qualtrics` |
-| [Redis](redis/README.md) | `redis` |
-| [Salesforce](salesforce/README.md) | `salesforce` |
-| [Sentry](sentry/README.md) | `sentry` |
-| [Slack](slack/README.md) | `slack` |
-| [Snowflake Streaming](snowpipe_streaming/README.md) | `snowpipe_streaming` |
-| [Statsig](statsig/README.md) | `statsig` |
-| [VWO](vwo/README.md) | `vwo` |
-| [Zendesk](zendesk/README.md) | `zendesk` |
 
 Every unverified type takes `definition_version: 1`, and the [config key rules](#config-key-rules) apply to them as they do to verified types.
 

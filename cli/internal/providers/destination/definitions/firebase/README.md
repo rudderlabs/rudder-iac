@@ -7,9 +7,6 @@ In a Firebase destination spec:
 - `type: firebase`
 - `definition_version: 1`
 
-> [!NOTE]
-> `firebase` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml

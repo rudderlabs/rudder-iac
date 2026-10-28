@@ -7,9 +7,6 @@ In a Google Tag Manager destination spec:
 - `type: gtm`
 - `definition_version: 1`
 
-> [!NOTE]
-> `gtm` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -24,10 +21,10 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    container_id: GTM-ABC1234
+    container_id: "{{ .GTM_CONTAINER_ID }}"
     server_url: https://tags.example.com
     environment_id: env-5
-    authorization_token: d7bhUC_Zj4q1FRT5KWOuQ
+    authorization_token: "{{ .GTM_AUTHORIZATION_TOKEN }}"
 
     event_filtering:
       blacklist:
@@ -57,12 +54,14 @@ The above example loads the container's staging environment from a custom domain
 
 ### Container
 
-#### `container_id` — string, required
+#### `container_id` — string, required, secret
 
 ID of the Tag Manager container to load, in the form `GTM-XXXXXXX`, from the **Admin** section of Tag Manager.
 
 - At most 100 characters, and must not contain line breaks.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `server_url` — string
 
@@ -88,13 +87,14 @@ ID of the environment to load — the `gtm_preview` value, such as `env-5`.
 - Templates aren't accepted in place of a literal; a template is measured as text against the same limit.
 - Set it together with `authorization_token`. Rudder CLI accepts either one without the other.
 
-#### `authorization_token` — string
+#### `authorization_token` — string, secret
 
 Authorization token of that environment — the `gtm_auth` value.
 
 - At most 100 characters, and must not contain line breaks.
 - Templates aren't accepted in place of a literal; a template is measured as text against the same limit.
-- Not secret — the SDK adds it to the `gtm.js` URL the browser requests.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 ### Event filtering
 
@@ -172,4 +172,12 @@ Google Tag Manager needs no additional config keys to connect a web source.
 
 ## Secrets
 
-Google Tag Manager has no secret keys. Rudder CLI treats none of its keys as secret, and the dashboard masks none of them, so `import` writes every value to YAML in plain text — including `authorization_token`, which the browser sends in its request for `gtm.js` anyway.
+`container_id` and `authorization_token` are the secret keys. Write each one you use as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
+
+```yaml
+config:
+  container_id: "{{ .GTM_CONTAINER_ID }}"
+  authorization_token: "{{ .GTM_AUTHORIZATION_TOKEN }}"
+```
+
+The browser requests `gtm.js` with these values in its URL, so masking them protects your YAML, not the values themselves.

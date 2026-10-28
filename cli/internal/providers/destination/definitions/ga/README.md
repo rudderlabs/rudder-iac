@@ -7,9 +7,6 @@ In a Google Analytics destination spec:
 - `type: ga`
 - `definition_version: 1`
 
-> [!NOTE]
-> `ga` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 > [!WARNING]
 > RudderStack has deprecated the Google Analytics destination, since Google has sunset Universal Analytics. To send events to Google Analytics 4, use the [`ga4`](../ga4/README.md) type instead.
 
@@ -27,7 +24,7 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    tracking_id: UA-123456789-1
+    tracking_id: "{{ .GA_TRACKING_ID }}"
     send_user_id: true
     anonymize_ip: true
     enhanced_ecommerce: true
@@ -83,7 +80,7 @@ The above example loads `analytics.js` on web sources in `device` mode, where th
 
 ### Connection
 
-#### `tracking_id` — string, required
+#### `tracking_id` — string, required, secret
 
 Tracking ID of your Universal Analytics property, from **Admin** > **Tracking Info** > **Tracking Code** in Google Analytics.
 
@@ -91,6 +88,8 @@ Tracking ID of your Universal Analytics property, from **Admin** > **Tracking In
 - A Google Analytics 4 measurement ID (`G-…`) is rejected. GA4 properties take the [`ga4`](../ga4/README.md) type.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
 - A spec that omits this key fails validation with `'tracking_id' is required`.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 ### Tracking
 
@@ -252,7 +251,7 @@ Domain the `_ga` cookie is set on. The dashboard calls it **Cookie Domain Name**
 
 Google Optimize container ID. With it set, the SDK loads the Optimize plugin.
 
-- `web` — string, at most 100 characters, or a template.
+- `web` — string, at most 100 characters, or a template. **Secret** — see [Secrets](#secrets).
 
 #### `set_all_mapped_props` — object
 
@@ -335,20 +334,17 @@ Google Analytics accepts events from these source types in the mentioned connect
 | `react_native` | `cloud` |
 | `flutter` | `cloud` |
 | `cordova` | `cloud` |
+| `warehouse` | `cloud` |
 
 Only `web` offers `device` mode, which loads `analytics.js` in the browser.
 
-The dashboard also accepts `warehouse` for Google Analytics, but this definition doesn't, so Rudder CLI can't connect a Reverse ETL source to it.
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
-
-```text
-destination 'google-analytics-prod' (type 'ga') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -358,11 +354,20 @@ destination 'google-analytics-prod' config has no 'connection_mode' entry for so
 
 Google Analytics needs no additional config keys to connect a source of any type, in any mode.
 
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
+
 ## Secrets
 
-Google Analytics has no secret keys. Rudder CLI treats none of its keys as a secret, and the dashboard masks none, so every value is written to YAML in plain text and `rudder-cli import` brings every value back.
+`tracking_id` and `optimize.web` are the secret keys. Write each one you use as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
+
+```yaml
+config:
+  tracking_id: "{{ .GA_TRACKING_ID }}"
+  optimize:
+    web: "{{ .GA_OPTIMIZE_CONTAINER_ID }}"
+```
 
 Note that:
 
-- In web device mode the tracking ID is embedded in the page's JavaScript anyway.
+- In web device mode the tracking ID and the Optimize container ID are embedded in the page's JavaScript, so masking them protects your YAML, not the values themselves.
 - `rudder_delete_account_id` only identifies the Google account connected in the dashboard. The account's credentials stay in RudderStack.

@@ -7,9 +7,6 @@ In a Google Sheets destination spec:
 - `type: googlesheets`
 - `definition_version: 1`
 
-> [!NOTE]
-> `googlesheets` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -137,20 +134,17 @@ Google Sheets accepts events from these source types in the mentioned connection
 | `react_native` | `cloud` |
 | `flutter` | `cloud` |
 | `cordova` | `cloud` |
+| `warehouse` | `cloud` |
 
 Every source type is `cloud` only — RudderStack writes to the spreadsheet from its servers, never in device mode.
 
-The dashboard also accepts `warehouse` for Google Sheets, but this definition doesn't, so Rudder CLI can't connect a Reverse ETL source to it.
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
-
-```text
-destination 'google-sheets-prod' (type 'googlesheets') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -159,6 +153,8 @@ destination 'google-sheets-prod' config has no 'connection_mode' entry for sourc
 ```
 
 Google Sheets needs no additional config keys to connect a source of any type.
+
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
 
 ## Secrets
 

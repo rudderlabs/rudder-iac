@@ -215,20 +215,17 @@ Google Ads Offline Conversions accepts events from these source types in the men
 | `react_native` | `cloud` |
 | `flutter` | `cloud` |
 | `cordova` | `cloud` |
+| `warehouse` | `cloud` |
 
 Every source type is `cloud` only — RudderStack uploads conversions from its servers, never in device mode.
 
-The dashboard also accepts `warehouse` for Google Ads Offline Conversions, but this definition doesn't, so Rudder CLI can't connect a Reverse ETL source to it.
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
-
-```text
-destination 'google-ads-offline-prod' (type 'google_adwords_offline_conversions') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -237,6 +234,8 @@ destination 'google-ads-offline-prod' config has no 'connection_mode' entry for 
 ```
 
 Google Ads Offline Conversions needs no additional config keys to connect a source of any type. The OAuth account in `rudder_account_id` isn't checked at `validate` time.
+
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
 
 ## Secrets
 

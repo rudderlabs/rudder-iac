@@ -7,9 +7,6 @@ In a LinkedIn Insight Tag destination spec:
 - `type: linkedin_insight_tag`
 - `definition_version: 1`
 
-> [!NOTE]
-> `linkedin_insight_tag` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -24,7 +21,7 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    partner_id: "1234567"
+    partner_id: "{{ .LINKEDIN_PARTNER_ID }}"
     event_to_conversion_id_map:
       - from: Order Completed
         to: "12345678"
@@ -40,7 +37,7 @@ spec:
             - marketing
 ```
 
-The above example sends LinkedIn a conversion for `Order Completed` and `Signed Up` events, and nothing for any other `track` event — see [Conversion tracking](#conversion-tracking). The partner ID and conversion IDs are quoted, because each is a string of digits.
+The above example sends LinkedIn a conversion for `Order Completed` and `Signed Up` events, and nothing for any other `track` event — see [Conversion tracking](#conversion-tracking). The conversion IDs and the reference that supplies the partner ID are quoted, because each value is a string of digits.
 
 ## Config keys
 
@@ -51,13 +48,14 @@ The above example sends LinkedIn a conversion for `Order Completed` and `Signed 
 
 ### Connection
 
-#### `partner_id` — string, required
+#### `partner_id` — string, required, secret
 
 Your LinkedIn partner ID — the `_linkedin_partner_id` value in LinkedIn's Insight Tag code. Each Insight Tag has its own partner ID; if it doesn't match the one in your ad account, the tag collects neither page loads nor conversions.
 
-- Write it in quotes: `"1234567"`, not `1234567`. An unquoted number fails validation.
+- Written as a string, so quote its reference: `"{{ .LINKEDIN_PARTNER_ID }}"`. Substitution happens before YAML parsing, so an unquoted reference to a numeric ID becomes a number and fails validation.
 - Not validated locally beyond being present.
-- The dashboard masks this field, but Rudder CLI doesn't treat it as a secret — see [Secrets](#secrets).
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 ### Conversion tracking
 
@@ -156,6 +154,11 @@ LinkedIn Insight Tag needs no additional config keys to connect a web source.
 
 ## Secrets
 
-Rudder CLI treats none of LinkedIn Insight Tag's keys as secret.
+`partner_id` is the only secret key. Write it as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
-The dashboard masks `partner_id` (**Partner ID**). Rudder CLI doesn't treat it as a secret, so it's written to YAML in plain text. The partner ID is embedded in the page's JavaScript in any case, so masking it would protect your YAML, not the value itself.
+```yaml
+config:
+  partner_id: "{{ .LINKEDIN_PARTNER_ID }}"
+```
+
+The partner ID is embedded in the page's JavaScript, so masking it protects your YAML, not the value itself.

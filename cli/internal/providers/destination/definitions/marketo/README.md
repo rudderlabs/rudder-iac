@@ -7,9 +7,6 @@ In a Marketo destination spec:
 - `type: marketo`
 - `definition_version: 1`
 
-> [!NOTE]
-> `marketo` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -25,7 +22,7 @@ spec:
   enabled: true
   config:
     account_id: 123-ABC-456
-    client_id: 53b1934e-8f2a-4c1d-9e3b-92612c41515f
+    client_id: "{{ .MARKETO_CLIENT_ID }}"
     client_secret: "{{ .MARKETO_CLIENT_SECRET }}"
 
     track_anonymous_events: false
@@ -71,12 +68,14 @@ Munchkin account ID of your Marketo instance, such as `123-ABC-456`. RudderStack
 - A `{{ path || fallback }}` template is accepted in place of a literal.
 - A spec that omits this key fails validation with `'account_id' is required`.
 
-#### `client_id` — string, required
+#### `client_id` — string, required, secret
 
 Client ID of the Marketo REST API service RudderStack authenticates as — a custom LaunchPoint service tied to an API-only user.
 
 - At most 100 characters, and must not contain line breaks.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `client_secret` — string, required, secret
 
@@ -186,20 +185,17 @@ Marketo accepts events from these source types in the mentioned connection modes
 | `react_native` | `cloud` |
 | `flutter` | `cloud` |
 | `cordova` | `cloud` |
+| `warehouse` | `cloud` |
 
 Every source type is `cloud` only — events reach Marketo from RudderStack's servers, never in device mode.
 
-The dashboard also accepts `warehouse` for Marketo, but this definition doesn't, so Rudder CLI can't connect a Reverse ETL source to it.
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
-
-```text
-destination 'marketo-prod' (type 'marketo') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -209,13 +205,14 @@ destination 'marketo-prod' config has no 'connection_mode' entry for source type
 
 Marketo needs no additional config keys to connect a source of any type.
 
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
+
 ## Secrets
 
-`client_secret` is the only secret key. Write it as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
+`client_id` and `client_secret` are the secret keys. Write each as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
+  client_id: "{{ .MARKETO_CLIENT_ID }}"
   client_secret: "{{ .MARKETO_CLIENT_SECRET }}"
 ```
-
-`client_id` isn't a secret — it identifies the API service, but doesn't authenticate without the secret.

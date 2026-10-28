@@ -7,9 +7,6 @@ In an Adobe Analytics destination spec:
 - `type: adobe_analytics`
 - `definition_version: 1`
 
-> [!NOTE]
-> `adobe_analytics` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -25,9 +22,9 @@ spec:
   enabled: true
   config:
     report_suite_ids: acmeprod,acmeglobal
-    tracking_server_url: acme.sc.omtrdc.net
+    tracking_server_url: "{{ .ADOBE_TRACKING_SERVER_URL }}"
     tracking_server_secure_url: acme.sc.omtrdc.net
-    marketing_cloud_org_id: 1A2B3C4D5E6F7A8B9C0D1E2F@AdobeOrg
+    marketing_cloud_org_id: "{{ .ADOBE_MARKETING_CLOUD_ORG_ID }}"
 
     drop_visitor_id: false
     timestamp_option: disabled
@@ -61,7 +58,7 @@ spec:
       - revenue
     product_identifier: sku
 
-    heartbeat_tracking_server_url: acme.hb.omtrdc.net
+    heartbeat_tracking_server_url: "{{ .ADOBE_HEARTBEAT_TRACKING_SERVER_URL }}"
     events_to_types:
       - from: Video Playback Started
         to: heartbeatPlaybackStarted
@@ -106,13 +103,15 @@ Report suite IDs RudderStack sends events to, separated by commas — for exampl
 - A `{{ path || fallback }}` template is accepted in place of a literal.
 - A spec that omits this key fails validation with `'report_suite_ids' is required`.
 
-#### `tracking_server_url` — string
+#### `tracking_server_url` — string, secret
 
 Hostname of your Adobe Analytics tracking server — Adobe's `trackingServer` variable — without `http://` or `https://`, for example `acme.sc.omtrdc.net`.
 
 - Applies to `device` mode on `web` sources only.
 - At most 100 characters, and must not contain line breaks. Any value containing `.ngrok.io` is rejected.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `tracking_server_secure_url` — string
 
@@ -123,12 +122,14 @@ Hostname of your Adobe Analytics tracking server for HTTPS requests — Adobe's 
 - At most 100 characters, and must not contain line breaks. Any value containing `.ngrok.io` is rejected.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
 
-#### `marketing_cloud_org_id` — string
+#### `marketing_cloud_org_id` — string, secret
 
 Your Adobe Marketing Cloud organization ID, for example `1A2B3C4D5E6F7A8B9C0D1E2F@AdobeOrg`. In web device mode, setting it starts Adobe's Visitor ID service (`visitorAPI.js`) with this ID; in cloud mode it's sent with each event.
 
 - Applies to `cloud` mode and to web sources in `device` mode.
 - At most 100 characters, and must not contain line breaks.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 ### Identity and timestamps
 
@@ -309,12 +310,14 @@ Product field that identifies each product to Adobe, which accepts only one.
 
 These keys configure Adobe's heartbeat tracking for video, so they apply only to sources connected in `device` mode — web, Android, or iOS.
 
-#### `heartbeat_tracking_server_url` — string
+#### `heartbeat_tracking_server_url` — string, secret
 
 Hostname of your Adobe heartbeat tracking server, such as `acme.hb.omtrdc.net`. Adobe provides it. Setting it turns on heartbeat tracking — on web, RudderStack loads Adobe's heartbeat library in place of the standard one.
 
 - At most 100 characters, and must not contain line breaks. Any value containing `.ngrok.io` is rejected.
 - Templates are rejected — the value must be a literal.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `ssl_heartbeat` — boolean, default `true`
 
@@ -402,20 +405,17 @@ Adobe Analytics accepts events from these source types in the mentioned connecti
 | `flutter` | `cloud` |
 | `cordova` | `cloud` |
 | `cloud` | `cloud` |
+| `warehouse` | `cloud` |
 
 `web`, `android`, and `ios` offer `device` mode. On mobile, device mode runs through the legacy Android (Java) and iOS (Obj-C) SDKs, which load Adobe's mobile SDK in the app; the Kotlin and Swift SDKs — `android_kotlin` and `ios_swift` — are `cloud` only.
 
-The dashboard also accepts `warehouse` for Adobe Analytics, but this definition doesn't, so Rudder CLI can't connect a Reverse ETL source to it.
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
-
-```text
-destination 'adobe-analytics-prod' (type 'adobe_analytics') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -425,6 +425,20 @@ destination 'adobe-analytics-prod' config has no 'connection_mode' entry for sou
 
 Rudder CLI requires no additional config keys to connect a source of any type, in any mode — though `cloud` mode can't deliver events without [`tracking_server_secure_url`](#tracking_server_secure_url--string).
 
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
+
 ## Secrets
 
-Adobe Analytics has no secret keys. Rudder CLI treats none of its keys as a secret, and the dashboard masks none, so every value is written to YAML in plain text and `rudder-cli import` brings every value back. In web device mode, the report suite IDs and tracking servers are embedded in the page's JavaScript anyway.
+`tracking_server_url`, `marketing_cloud_org_id`, and `heartbeat_tracking_server_url` are the secret keys. Write each one you use as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
+
+```yaml
+config:
+  tracking_server_url: "{{ .ADOBE_TRACKING_SERVER_URL }}"
+  marketing_cloud_org_id: "{{ .ADOBE_MARKETING_CLOUD_ORG_ID }}"
+  heartbeat_tracking_server_url: "{{ .ADOBE_HEARTBEAT_TRACKING_SERVER_URL }}"
+```
+
+Note that:
+
+- `tracking_server_secure_url` isn't a secret, though it often names the same host as `tracking_server_url`, so `import` writes it in plain text.
+- In web device mode these values are embedded in the page's JavaScript, so masking them protects your YAML, not the values themselves.

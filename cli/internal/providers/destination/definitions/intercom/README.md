@@ -7,9 +7,6 @@ In an Intercom destination spec:
 - `type: intercom`
 - `definition_version: 1`
 
-> [!NOTE]
-> `intercom` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -24,14 +21,14 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    app_id: fll5vd90
+    app_id: "{{ .INTERCOM_APP_ID }}"
     api_key: "{{ .INTERCOM_ACCESS_TOKEN }}"
     api_version: v2
     api_server: standard
     send_anonymous_id: true
 
-    mobile_api_key_android: android_sdk-3f8a1c2d4e5b6a7980c1d2e3f4a5b6c7d8e9f0a1
-    mobile_api_key_ios: ios_sdk-9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c
+    mobile_api_key_android: "{{ .INTERCOM_ANDROID_API_KEY }}"
+    mobile_api_key_ios: "{{ .INTERCOM_IOS_API_KEY }}"
 
     event_filtering:
       blacklist:
@@ -75,7 +72,7 @@ Android and iOS device mode also need their platform's mobile API key, which Rud
 
 ### Connection
 
-#### `app_id` — string, required
+#### `app_id` — string, required, secret
 
 ID of your Intercom workspace, which Intercom's web Messenger and mobile SDKs load with. The dashboard calls it **App Id**.
 
@@ -83,6 +80,8 @@ ID of your Intercom workspace, which Intercom's web Messenger and mobile SDKs lo
 - Applies to `device` mode only.
 - 1 to 100 characters, and must not contain line breaks.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `api_key` — string, required, secret
 
@@ -142,7 +141,7 @@ These keys configure Intercom's mobile SDKs. Each is a plain string, not keyed b
 > [!WARNING]
 > Rudder CLI doesn't require these keys, even when `android` or `ios` connects in `device` mode. Without the platform's key, the SDK doesn't initialize Intercom, so no device-mode events from that platform reach it.
 
-#### `mobile_api_key_android` — string
+#### `mobile_api_key_android` — string, secret
 
 Intercom API key for Android, from the Android installation settings in Intercom. The Android SDK initializes Intercom with it and `app_id`. The dashboard calls it **Android API Key**.
 
@@ -150,13 +149,17 @@ Intercom API key for Android, from the Android installation settings in Intercom
 - At most 100 characters, and must not contain line breaks.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
 
-#### `mobile_api_key_ios` — string
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
+
+#### `mobile_api_key_ios` — string, secret
 
 Intercom API key for iOS, used on the same terms as `mobile_api_key_android`. The dashboard calls it **iOS API Key**.
 
 - Applies to `device` mode on `ios` sources only.
 - At most 100 characters, and must not contain line breaks.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 ### Event filtering
 
@@ -211,20 +214,17 @@ Intercom accepts events from these source types in the mentioned connection mode
 | `react_native` | `cloud` |
 | `flutter` | `cloud` |
 | `cordova` | `cloud` |
+| `warehouse` | `cloud` |
 
 `web`, `android`, and `ios` offer `device` mode. The Kotlin and Swift SDKs — `android_kotlin` and `ios_swift` — are `cloud` only.
 
-The dashboard also accepts `warehouse` for Intercom, but this definition doesn't, so Rudder CLI can't connect a Reverse ETL source to it.
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
 ## Connect a source
 
 An event stream connection to this destination is checked against three rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
-
-```text
-destination 'intercom-prod' (type 'intercom') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -238,19 +238,24 @@ destination 'intercom-prod' config has no 'connection_mode' entry for source typ
 destination 'intercom-prod' config is missing fields required to connect a 'android' source: app_id
 ```
 
-A source connecting in `cloud` mode needs `api_key`, except `cloud`, `android_kotlin`, and `ios_swift`, which connect without it:
+A source connecting in `cloud` mode needs `api_key`, except `cloud`, `android_kotlin`, `ios_swift`, and `warehouse`, which connect without it:
 
 ```text
 destination 'intercom-prod' config is missing fields required to connect a 'web' source: api_key
 ```
 
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
+
 ## Secrets
 
-`api_key` is the only secret key. Write it as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
+`api_key`, `app_id`, `mobile_api_key_android`, and `mobile_api_key_ios` are the secret keys. Write each one you use as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
+  app_id: "{{ .INTERCOM_APP_ID }}"
   api_key: "{{ .INTERCOM_ACCESS_TOKEN }}"
+  mobile_api_key_android: "{{ .INTERCOM_ANDROID_API_KEY }}"
+  mobile_api_key_ios: "{{ .INTERCOM_IOS_API_KEY }}"
 ```
 
-`app_id` and the mobile API keys aren't secrets — device mode embeds them in the page or app, and `import` writes them as they are.
+In device mode `app_id` and the mobile API keys are embedded in the page or app, so masking them protects your YAML, not the values themselves.

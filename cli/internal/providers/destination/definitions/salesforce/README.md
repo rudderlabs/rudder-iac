@@ -7,9 +7,6 @@ In a Salesforce destination spec:
 - `type: salesforce`
 - `definition_version: 1`
 
-> [!NOTE]
-> `salesforce` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 > [!WARNING]
 > The dashboard marks this destination as deprecated in favor of Salesforce V2, which Rudder CLI doesn't support.
 
@@ -27,7 +24,7 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    user_name: rudderstack-integration@acme.com
+    user_name: "{{ .SALESFORCE_USER_NAME }}"
     password: "{{ .SALESFORCE_PASSWORD }}"
     initial_access_token: "{{ .SALESFORCE_SECURITY_TOKEN }}"
     sandbox: false
@@ -58,12 +55,14 @@ The above example signs in to a production org. `initial_access_token` holds the
 
 RudderStack signs in as a Salesforce user through the OAuth 2.0 username-password flow, which your org must allow. It sends `password` with `initial_access_token` appended, as Salesforce expects for API sign-ins.
 
-#### `user_name` — string, required
+#### `user_name` — string, required, secret
 
 Username of the Salesforce user RudderStack signs in as.
 
 - At most 100 characters, and must not contain line breaks.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `password` — string, required, secret
 
@@ -142,20 +141,17 @@ Salesforce accepts events from these source types in the mentioned connection mo
 | `react_native` | `cloud` |
 | `flutter` | `cloud` |
 | `cordova` | `cloud` |
+| `warehouse` | `cloud` |
 
 Every source type is `cloud` only — events reach Salesforce from RudderStack's servers, never in device mode.
 
-The dashboard also accepts `warehouse` for Salesforce, but this definition doesn't, so Rudder CLI can't connect a Reverse ETL source to it.
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
-
-```text
-destination 'salesforce-prod' (type 'salesforce') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -165,14 +161,15 @@ destination 'salesforce-prod' config has no 'connection_mode' entry for source t
 
 Salesforce needs no additional config keys to connect a source of any type.
 
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
+
 ## Secrets
 
-`password` and `initial_access_token` are the secret keys. Write each as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
+`user_name`, `password`, and `initial_access_token` are the secret keys. Write each as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
+  user_name: "{{ .SALESFORCE_USER_NAME }}"
   password: "{{ .SALESFORCE_PASSWORD }}"
   initial_access_token: "{{ .SALESFORCE_SECURITY_TOKEN }}"
 ```
-
-`user_name` isn't a secret — it doesn't sign in without the password and security token.

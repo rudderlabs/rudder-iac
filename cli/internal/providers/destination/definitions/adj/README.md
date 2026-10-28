@@ -7,9 +7,6 @@ In an Adjust destination spec:
 - `type: adj`
 - `definition_version: 1`
 
-> [!NOTE]
-> `adj` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -24,7 +21,7 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    app_token: t1yurrb968zk
+    app_token: "{{ .ADJUST_APP_TOKEN }}"
     environment: true
 
     custom_mappings:
@@ -68,12 +65,14 @@ The above example loads Adjust's SDK in Kotlin and Swift apps in `device` mode a
 
 ### Connection
 
-#### `app_token` — string, required
+#### `app_token` — string, required, secret
 
 Token of your Adjust app, which identifies it to Adjust in both modes. The dashboard calls it **APP Token**.
 
 - At most 100 characters, and must not contain line breaks.
 - Templates aren't accepted in place of a literal; a template is measured as text against the same limit.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `environment` — boolean, default `false`
 
@@ -192,10 +191,13 @@ Adjust accepts events from these source types in the mentioned connection modes:
 | `flutter` | `cloud`, `device` |
 | `cordova` | `cloud` |
 | `cloud` | `cloud` |
+| `warehouse` | `cloud` |
 
 `android`, `android_kotlin`, `ios`, `ios_swift`, `unity`, and `flutter` offer `device` mode. `react_native` and `cordova` are `cloud` only.
 
-Adjust doesn't accept `web` sources, even in the dashboard. The dashboard also accepts `warehouse` for Adjust, but this definition doesn't, so Rudder CLI can't connect a Reverse ETL source to it.
+Adjust doesn't accept `web` sources, even in the dashboard.
+
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
 ## Connect a source
 
@@ -205,13 +207,7 @@ An event stream connection to this destination is checked against two rules at `
 
 ```text
 destination 'adjust-prod' (type 'adj') does not support source 'my-web-app':
-source type 'web' is not among supported source types: android, android_kotlin, ios, ios_swift, unity, react_native, flutter, cordova, cloud
-```
-
-A Reverse ETL connection, whose source resolves to `warehouse`, is refused too:
-
-```text
-destination 'adjust-prod' (type 'adj') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
+source type 'web' is not among supported source types: android, android_kotlin, ios, ios_swift, unity, react_native, flutter, cordova, cloud, warehouse
 ```
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
@@ -222,6 +218,15 @@ destination 'adjust-prod' config has no 'connection_mode' entry for source type 
 
 Adjust needs no additional config keys to connect a source of any type, in any mode.
 
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
+
 ## Secrets
 
-Adjust has no secret keys. Rudder CLI treats none of its keys as secret, and the dashboard masks none of them, so `import` writes every value to YAML in plain text — including `app_token`, which device mode embeds in the app anyway.
+`app_token` is the only secret key. Write it as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
+
+```yaml
+config:
+  app_token: "{{ .ADJUST_APP_TOKEN }}"
+```
+
+In device mode the app token is embedded in the app, so masking it protects your YAML, not the value itself.

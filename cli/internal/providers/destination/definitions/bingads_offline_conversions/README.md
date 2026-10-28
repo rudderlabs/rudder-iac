@@ -33,7 +33,7 @@ spec:
       warehouse: cloud
 ```
 
-The above example has RudderStack hash email addresses and phone numbers before upload — see [`is_hash_required`](#is_hash_required--boolean-default-false). BingAds Offline Conversions takes only Reverse ETL sources, so `connection_mode` has a single `warehouse` entry, and the connection itself has to meet extra conditions — see [Connect a source](#connect-a-source).
+The above example has RudderStack hash email addresses and phone numbers before upload — see [`is_hash_required`](#is_hash_required--boolean-default-false). BingAds Offline Conversions takes only Reverse ETL sources, so `connection_mode` has a single `warehouse` entry, though Rudder CLI can't connect one to it — see [Connect a source](#connect-a-source).
 
 ## Config keys
 
@@ -108,6 +108,9 @@ BingAds Offline Conversions accepts events from these source types in the mentio
 
 ## Connect a source
 
+> [!WARNING]
+> Rudder CLI can't connect any source to BingAds Offline Conversions. It refuses every event stream source by type, and every Reverse ETL connection by sync behaviour. Connect a Reverse ETL source to this destination in the dashboard instead.
+
 Only a Reverse ETL connection can reach BingAds Offline Conversions. Reverse ETL connections sit behind the `retlConnectionSupport` experimental flag — see [Source types](../README.md#source-types). A connection is checked against these rules at `validate` time.
 
 **The source's type must be supported.** BingAds Offline Conversions accepts only `warehouse`, the type a Reverse ETL source resolves to. Every event stream source resolves to a type it doesn't accept — a JavaScript source to `web`, and webhook and server-side SDK sources to `cloud` — and reports, for example:
@@ -123,29 +126,19 @@ source type 'web' is not among supported source types: warehouse
 destination 'bing-offline-conversions-prod' config has no 'connection_mode' entry for source type 'warehouse'
 ```
 
-BingAds Offline Conversions needs no additional config keys to connect a source.
-
-**The connection must use object mapping and the `mirror` sync behaviour.** BingAds Offline Conversions accepts only `mirror`, which only object mapping can use. A connection runs object mapping when its `config` sets `object`; without `object` it runs the JSON mapper, and no sync behaviour is left:
+**The connection needs a sync behaviour that both sides offer, and none is left.** BingAds Offline Conversions accepts only `mirror`, which Rudder CLI doesn't support. A connection that sets `sync_behaviour: mirror` fails validation:
 
 ```text
-source definition 'postgres' and destination 'bing-offline-conversions-prod' share no sync behaviour for the json_mapper flow; the connection cannot sync
+'sync_behaviour' must be one of [upsert full]
 ```
 
-With `object` set, `sync_behaviour` has to be `mirror`:
+With `upsert` or `full`, the connection is refused instead. One that sets `object` runs object mapping and reports the following; without `object`, the message names the `json_mapper` flow:
 
 ```text
-'sync_behaviour' must be one of [mirror] for source definition 'postgres' and destination 'bing-offline-conversions-prod' on the object_mapping flow
+source definition 'postgres' and destination 'bing-offline-conversions-prod' share no sync behaviour for the object_mapping flow; the connection cannot sync
 ```
 
-Note that:
-
-- Object mapping takes exactly one identifier, and no `constants` or `event`.
-- Rudder CLI checks only that `object` is set, not that BingAds Offline Conversions offers an object of that name.
-- The source's warehouse must offer `mirror` as well. S3 and SFTP sources offer only `upsert`, so they can't sync to this destination.
-- The OAuth account in `rudder_account_id` isn't checked at `validate` time.
-
-> [!WARNING]
-> These checks run locally. Applying a Reverse ETL connection to an OAuth-linked destination like this one hasn't been verified against a live workspace yet, which is why `bingads_offline_conversions` stays unverified.
+The OAuth account in `rudder_account_id` isn't checked at `validate` time.
 
 ## Secrets
 

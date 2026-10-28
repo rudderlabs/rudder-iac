@@ -7,9 +7,6 @@ In a Qualtrics destination spec:
 - `type: qualtrics`
 - `definition_version: 1`
 
-> [!NOTE]
-> `qualtrics` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -24,7 +21,7 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    project_id: ZN_blw7AbCTWxCGung
+    project_id: "{{ .QUALTRICS_PROJECT_ID }}"
     brand_id: acmecorp
     enable_generic_page_title:
       web: false
@@ -55,13 +52,14 @@ The above example connects web, Android, and iOS sources, all in `device` mode. 
 
 ### Connection
 
-#### `project_id` — string, required
+#### `project_id` — string, required, secret
 
 ID of the Qualtrics Website/App Feedback project whose intercepts RudderStack loads, such as `ZN_blw7AbCTWxCGung`. It's listed under the project's **Project IDs** settings, next to the brand ID.
 
 - Used on web, Android, and iOS.
 - Not validated locally beyond being present.
-- The dashboard masks this field, but Rudder CLI doesn't treat it as a secret — see [Secrets](#secrets).
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `brand_id` — string, required
 
@@ -161,6 +159,11 @@ Qualtrics needs no additional config keys to connect a source of any supported t
 
 ## Secrets
 
-Rudder CLI treats none of Qualtrics' keys as secret.
+`project_id` is the only secret key. Write it as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
-The dashboard masks `project_id` (**Project ID**). Rudder CLI doesn't treat it as a secret, so it's written to YAML in plain text. On web the project ID is part of the intercept code's URL in the page, so masking it would protect your YAML, not the value itself.
+```yaml
+config:
+  project_id: "{{ .QUALTRICS_PROJECT_ID }}"
+```
+
+On web the project ID is part of the intercept code's URL in the page, so masking it protects your YAML, not the value itself.

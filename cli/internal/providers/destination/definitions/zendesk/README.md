@@ -7,9 +7,6 @@ In a Zendesk destination spec:
 - `type: zendesk`
 - `definition_version: 1`
 
-> [!NOTE]
-> `zendesk` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -24,7 +21,7 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    email: support-admin@acme.com
+    email: "{{ .ZENDESK_EMAIL }}"
     api_token: "{{ .ZENDESK_API_TOKEN }}"
     domain: acme
     source_name: Acme Web
@@ -55,12 +52,14 @@ The above example makes the email in each `identify` event the user's primary em
 
 ### Connection
 
-#### `email` — string, required
+#### `email` — string, required, secret
 
 Email address of the Zendesk agent or admin RudderStack authenticates as, together with `api_token`.
 
 - At most 100 characters, and must not contain line breaks. The email format isn't checked.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `api_token` — string, required, secret
 
@@ -145,20 +144,17 @@ Zendesk accepts events from these source types in the mentioned connection modes
 | `flutter` | `cloud` |
 | `cordova` | `cloud` |
 | `cloud` | `cloud` |
+| `warehouse` | `cloud` |
 
 Every source type is `cloud` only — events reach Zendesk from RudderStack's servers, never in device mode.
 
-The dashboard also accepts `warehouse` for Zendesk, but this definition doesn't, so Rudder CLI can't connect a Reverse ETL source to it.
+`warehouse` is the token a Reverse ETL source resolves to — see [Source types](../README.md#source-types).
 
 ## Connect a source
 
 An event stream connection to this destination is checked against two rules at `validate` time.
 
-**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every event stream source type is supported here, so only a Reverse ETL connection, whose source resolves to `warehouse`, fails it:
-
-```text
-destination 'zendesk-prod' (type 'zendesk') does not accept rETL sources: source type 'warehouse' is not among supported source types: android, android_kotlin, ...
-```
+**The source's type must be supported.** A source's type resolves to one of the tokens above before the check — a JavaScript source resolves to `web`, and webhook and server-side SDK sources resolve to `cloud`. Every type an event stream or Reverse ETL source can resolve to is supported here, so this check always passes.
 
 **The destination config must carry a `connection_mode` entry for that source type.** This lives on the destination spec, not on the connection spec. Without it:
 
@@ -168,13 +164,14 @@ destination 'zendesk-prod' config has no 'connection_mode' entry for source type
 
 Zendesk needs no additional config keys to connect a source of any type.
 
+A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
+
 ## Secrets
 
-`api_token` is the only secret key. Write it as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
+`email` and `api_token` are the secret keys. Write each as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
+  email: "{{ .ZENDESK_EMAIL }}"
   api_token: "{{ .ZENDESK_API_TOKEN }}"
 ```
-
-`email` isn't a secret — it doesn't authenticate without the token.

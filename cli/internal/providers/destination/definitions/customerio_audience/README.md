@@ -24,7 +24,7 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    site_id: 88f02580a3b9c4d7cf18
+    site_id: "{{ .CUSTOMERIO_SITE_ID }}"
     api_key: "{{ .CUSTOMERIO_TRACK_API_KEY }}"
     app_api_key: "{{ .CUSTOMERIO_APP_API_KEY }}"
     region: US
@@ -33,7 +33,7 @@ spec:
       warehouse: cloud
 ```
 
-The above example uses `{{ .VAR }}` references for both API keys — see [Secrets](#secrets). Rudder CLI creates and updates the destination, but it can't connect any source to it — see [Connect a source](#connect-a-source).
+The above example uses `{{ .VAR }}` references for the site ID and both API keys — see [Secrets](#secrets). Rudder CLI creates and updates the destination, but it can't connect any source to it — see [Connect a source](#connect-a-source).
 
 ## Config keys
 
@@ -44,12 +44,14 @@ The above example uses `{{ .VAR }}` references for both API keys — see [Secret
 
 ### Connection
 
-#### `site_id` — string, required
+#### `site_id` — string, required, secret
 
 Customer.io site ID, listed with its Track API key under **API Credentials** in your Customer.io account settings. RudderStack pairs it with `api_key` to authenticate to Customer.io's Track API.
 
 - At most 100 characters, and must not contain line breaks.
 - Templates aren't accepted in place of a literal; a template is measured as text against the same limit.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `api_key` — string, required, secret
 
@@ -127,12 +129,11 @@ Neither refusal depends on the destination config, so no `config` change clears 
 
 ## Secrets
 
-`api_key` and `app_api_key` are the secret keys. Write each as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
+`site_id`, `api_key`, and `app_api_key` are the secret keys. Write each as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
+  site_id: "{{ .CUSTOMERIO_SITE_ID }}"
   api_key: "{{ .CUSTOMERIO_TRACK_API_KEY }}"
   app_api_key: "{{ .CUSTOMERIO_APP_API_KEY }}"
 ```
-
-`site_id` isn't a secret, though RudderStack sends it alongside `api_key` to authenticate.

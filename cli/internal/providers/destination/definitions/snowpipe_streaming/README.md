@@ -7,9 +7,6 @@ In a Snowflake Streaming destination spec:
 - `type: snowpipe_streaming`
 - `definition_version: 1`
 
-> [!NOTE]
-> `snowpipe_streaming` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -27,7 +24,7 @@ spec:
     account: xy12345.us-east-2.aws
     database: RUDDER_EVENTS
     warehouse: RUDDER_WAREHOUSE
-    user: RUDDER_USER
+    user: "{{ .SNOWFLAKE_USER }}"
     role: RUDDER_ROLE
     namespace: rudder_events
 
@@ -81,12 +78,14 @@ Name of the Snowflake virtual warehouse RudderStack runs its connection checks a
 - At most 100 characters, and must not contain line breaks.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
 
-#### `user` — string, required
+#### `user` — string, required, secret
 
 Snowflake user RudderStack connects as. The user authenticates with `private_key` — Snowflake Streaming doesn't support password authentication.
 
 - At most 100 characters, and must not contain line breaks.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 #### `role` — string
 
@@ -260,15 +259,13 @@ Snowflake Streaming needs no additional config keys to connect a source of any t
 
 ## Secrets
 
-`private_key` and `private_key_passphrase` are the secret keys. Write each one you use as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
+`user`, `private_key`, and `private_key_passphrase` are the secret keys. Write each one you use as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
 ```yaml
 config:
+  user: "{{ .SNOWFLAKE_USER }}"
   private_key: "{{ .SNOWFLAKE_PRIVATE_KEY }}"
   private_key_passphrase: "{{ .SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}"
 ```
 
-Note that:
-
-- `private_key` spans several lines. Use a YAML literal block in a var file or a multiline environment variable — see [`private_key`](#private_key--string-required-secret).
-- Unlike [Snowflake](../snowflake/README.md#secrets), `user` isn't a secret here, so `import` writes it in plain text.
+`private_key` spans several lines. Use a YAML literal block in a var file or a multiline environment variable — see [`private_key`](#private_key--string-required-secret).

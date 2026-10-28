@@ -7,9 +7,6 @@ In a Sentry destination spec:
 - `type: sentry`
 - `definition_version: 1`
 
-> [!NOTE]
-> `sentry` is an [unverified destination type](../README.md#unverified-destination-types). Rudder CLI registers it only when the `unverifiedDestinations` experimental flag is on.
-
 ## Sample configuration
 
 ```yaml
@@ -24,7 +21,7 @@ spec:
   definition_version: 1
   enabled: true
   config:
-    dsn: https://4f8b2c1d9e7a4b3c8d2e1f0a9b8c7d6e@o991473.ingest.sentry.io/5948763
+    dsn: "{{ .SENTRY_DSN }}"
     environment: production
     custom_version_property: APP_VERSION
     release: web-app@2.3.12
@@ -61,13 +58,14 @@ The above example reports the version in `window.APP_VERSION` as the release, fa
 
 ### Connection
 
-#### `dsn` — string, required
+#### `dsn` — string, required, secret
 
 Public DSN of your Sentry project — the URL Sentry's browser SDK reports errors to, from the project's **Client Keys (DSN)** settings. The dashboard calls it **Public DSN**.
 
 - At most 300 characters, and must not contain line breaks.
 - A `{{ path || fallback }}` template is accepted in place of a literal.
-- The dashboard masks this field, but Rudder CLI doesn't treat it as a secret — see [Secrets](#secrets).
+
+Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
 ### Error context
 
@@ -225,6 +223,11 @@ Sentry needs no additional config keys to connect a web source.
 
 ## Secrets
 
-Rudder CLI treats none of Sentry's keys as secret.
+`dsn` is the only secret key. Write it as a `{{ .VAR }}` reference — [Secrets](../README.md#secrets) covers supplying the values and what `import` writes:
 
-The dashboard masks `dsn` (**Public DSN**). Rudder CLI doesn't treat it as a secret, so it's written to YAML in plain text. The DSN is embedded in the page's JavaScript in any case, so masking it would protect your YAML, not the value itself.
+```yaml
+config:
+  dsn: "{{ .SENTRY_DSN }}"
+```
+
+The DSN is embedded in the page's JavaScript, so masking it protects your YAML, not the value itself.
