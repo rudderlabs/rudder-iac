@@ -7,9 +7,7 @@ import (
 )
 
 // Warehouse-only destinations may declare warehouse when integrations-config has
-// no event-stream source types for them. The CLI cannot produce that source token
-// yet, so keep these definitions unverified until warehouse/account-linked apply
-// flows can be proven against a live stack. Current examples are
+// no event-stream source types for them. Current examples are
 // customerio_audience and bingads_offline_conversions.
 var sourceTypes = []string{
 	common.SourceTypeWarehouse,
