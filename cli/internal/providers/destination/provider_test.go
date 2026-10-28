@@ -10,9 +10,11 @@ import (
 func TestProviderRules(t *testing.T) {
 	p := NewProvider(nil, ruleTestRegistry(t))
 
-	syntactic := p.SyntacticRules()
-	require.Len(t, syntactic, 1)
-	assert.Equal(t, SpecSyntaxValidRuleID, syntactic[0].ID())
+	var syntactic []string
+	for _, rule := range p.SyntacticRules() {
+		syntactic = append(syntactic, rule.ID())
+	}
+	assert.Equal(t, []string{SpecSyntaxValidRuleID, SecretReferenceRuleID, SecretReferenceUniqueRuleID}, syntactic)
 
 	semantic := p.SemanticRules()
 	require.Len(t, semantic, 1)

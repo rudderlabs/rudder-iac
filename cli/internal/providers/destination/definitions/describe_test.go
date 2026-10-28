@@ -362,6 +362,24 @@ func TestRegisterRequiresSecretKeysToResolveToStrings(t *testing.T) {
 	}
 }
 
+// A JSONPath secret key exempts a secret key from validate's secret-reference
+// warning, so it must be one.
+func TestRegisterRequiresJSONPathSecretKeysToBeSecretKeys(t *testing.T) {
+	t.Parallel()
+
+	def := describeDefinition()
+	def.SecretKeys = []string{"headers.to"}
+	def.JSONPathSecretKeys = []string{"headers.to"}
+	require.NoError(t, definitions.NewRegistry().Register(def))
+
+	def = describeDefinition()
+	def.SecretKeys = []string{"headers.to"}
+	def.JSONPathSecretKeys = []string{"api_key"}
+	err := definitions.NewRegistry().Register(def)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `JSONPath secret key "api_key" is not a secret key`)
+}
+
 // The docs check only the spec ID when they name a secret's variable, which
 // holds because every key segment is snake_case.
 func TestRegisterRequiresSnakeCaseSecretKeys(t *testing.T) {

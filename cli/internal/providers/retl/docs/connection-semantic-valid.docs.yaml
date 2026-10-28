@@ -329,7 +329,7 @@ match_behavior:
               enabled: true
               definition_version: 1
               config:
-                conversion_id: AW-123456789
+                conversion_id: '{{ .MY_GOOGLEADS_DESTINATION_CONVERSION_ID }}'
           connections.yaml: |
             version: rudder/v1
             kind: retl-connections
@@ -398,7 +398,7 @@ match_behavior:
               enabled: true
               definition_version: 1
               config:
-                pixel_id: "123456789012345"
+                pixel_id: '{{ .MY_PIXEL_DESTINATION_PIXEL_ID }}'
                 connection_mode:
                   warehouse: cloud
           connections.yaml: |
@@ -446,9 +446,9 @@ match_behavior:
               enabled: true
               definition_version: 1
               config:
-                site_id: example-site-id
-                api_key: example-api-key
-                app_api_key: example-app-api-key
+                site_id: '{{ .MY_CUSTOMERIO_AUDIENCE_SITE_ID }}'
+                api_key: '{{ .MY_CUSTOMERIO_AUDIENCE_API_KEY }}'
+                app_api_key: '{{ .MY_CUSTOMERIO_AUDIENCE_APP_API_KEY }}'
                 region: US
                 connection_mode:
                   warehouse: cloud

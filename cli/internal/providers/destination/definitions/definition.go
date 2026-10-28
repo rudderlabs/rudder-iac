@@ -27,13 +27,19 @@ type DestinationDefinition struct {
 	DisplayName string
 	// APIType is the upstream API destination type (e.g. "S3").
 	// When empty at registration, it defaults to Type.
-	APIType         string
-	Version         int64
-	Properties      []converter.ConfigProperty
-	SecretKeys      []string
-	NewConfig       func() any
-	SourceTypes     []string
-	ConnectionModes map[string][]string
+	APIType    string
+	Version    int64
+	Properties []converter.ConfigProperty
+	SecretKeys []string
+	// JSONPathSecretKeys lists the secret keys whose value the destination
+	// reads from each event at delivery when it is a JSONPath, such as http's
+	// headers.from set to $.messageId. Such a value holds no secret, so
+	// validate does not ask for a variable there. A JSONPath in any other
+	// secret key is a literal value. Every entry must be in SecretKeys.
+	JSONPathSecretKeys []string
+	NewConfig          func() any
+	SourceTypes        []string
+	ConnectionModes    map[string][]string
 	// ConnectionRequiredKeys lists, per local source type and connection mode,
 	// the local config keys a source of that type must carry to connect in that
 	// mode. Both dimensions matter: Braze needs rest_api_key from a cloud-mode
@@ -137,6 +143,15 @@ func (d *RegisteredDefinition) SecretKeys() []string {
 		return []string{}
 	}
 	return append([]string(nil), d.DestinationDefinition.SecretKeys...)
+}
+
+// JSONPathSecretKeys returns the secret keys whose value may be a JSONPath
+// read from each event.
+func (d *RegisteredDefinition) JSONPathSecretKeys() []string {
+	if d.DestinationDefinition == nil {
+		return nil
+	}
+	return slices.Clone(d.DestinationDefinition.JSONPathSecretKeys)
 }
 
 func (d *RegisteredDefinition) SupportedSourceTypes() []string {
@@ -281,6 +296,11 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 
 	if err := validateSecretKeys(def.SecretKeys, fields); err != nil {
 		return nil, fmt.Errorf("validating secret keys: %w", err)
+	}
+	for _, key := range def.JSONPathSecretKeys {
+		if !slices.Contains(def.SecretKeys, key) {
+			return nil, fmt.Errorf("validating secret keys: JSONPath secret key %q is not a secret key", key)
+		}
 	}
 
 	return &RegisteredDefinition{

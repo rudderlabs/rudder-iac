@@ -1,13 +1,10 @@
 package retl_test
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/project"
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
@@ -22,8 +19,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
-	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs/docstest"
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -86,7 +83,7 @@ func TestProviderRuleDocs(t *testing.T) {
 				t.Run(example.ExampleID, func(t *testing.T) {
 					diagnostics, err := loadExample(t, registry, example.Files)
 					assert.NoError(t, err)
-					assert.Empty(t, diagnostics, "unexpected diagnostics:\n%s", describe(diagnostics))
+					assert.Empty(t, diagnostics, "unexpected diagnostics:\n%s", docstest.Describe(diagnostics))
 				})
 			}
 			if !connection {
@@ -95,7 +92,7 @@ func TestProviderRuleDocs(t *testing.T) {
 			for _, example := range behaviour.Invalid {
 				t.Run(example.ExampleID, func(t *testing.T) {
 					diagnostics, err := loadExample(t, registry, example.Files)
-					assertExpectedDiagnostics(t, entry.RuleID, example, diagnostics, err)
+					docstest.AssertExpectedDiagnostics(t, entry.RuleID, example, diagnostics, err)
 				})
 			}
 		}
@@ -120,70 +117,25 @@ func loadExample(t *testing.T, registry *definitions.Registry, files map[string]
 	})
 	require.NoError(t, err)
 
-	recorder := &diagnosticsRecorder{}
-	err = project.New(cp, project.WithLoader(exampleFiles(files)), project.WithRenderer(recorder)).Load("example")
-	return recorder.diagnostics, err
+	return docstest.LoadDiagnostics(cp, files, varsubst.NewSubstitutor(exampleVariables))
 }
 
-// assertExpectedDiagnostics requires the example to produce exactly its
-// expected diagnostics, at least one of them from the rule it documents.
-// Diagnostics carry positions rather than JSON pointers, so each reference is
-// resolved against its file. The lookup is exact: the engine's fallback to the
-// nearest ancestor would let a pointer to a missing key match its parent.
-func assertExpectedDiagnostics(t *testing.T, ruleID string, example docs.InvalidExample, diagnostics validation.Diagnostics, loadErr error) {
-	t.Helper()
-
-	// Warnings alone must not fail the load, or validate would exit non-zero on them.
-	wantErr := slices.ContainsFunc(example.ExpectedDiagnostics, func(d docs.ExpectedDiagnostic) bool {
-		return d.Severity == rules.Error.String()
-	})
-	assert.Equal(t, wantErr, loadErr != nil, "load error: %v", loadErr)
-	assert.Len(t, diagnostics, len(example.ExpectedDiagnostics), "diagnostics:\n%s\nload error: %v", describe(diagnostics), loadErr)
-	for _, expected := range example.ExpectedDiagnostics {
-		indexer, err := pathindex.NewPathIndexer([]byte(example.Files[expected.File]))
-		require.NoError(t, err)
-		position, err := indexer.PositionLookup(expected.Reference)
-		require.NoError(t, err)
-
-		assert.True(t, slices.ContainsFunc(diagnostics, func(d validation.Diagnostic) bool {
-			return d.File == expected.File &&
-				d.Position.Line == position.Line &&
-				d.Position.Column == position.Column &&
-				d.Severity.String() == expected.Severity &&
-				strings.Contains(d.Message, expected.MessageContains)
-		}), "expected %+v, got:\n%s\n(load error: %v)", expected, describe(diagnostics), loadErr)
-	}
-
-	assert.True(t, slices.ContainsFunc(diagnostics, func(d validation.Diagnostic) bool {
-		return d.RuleID == ruleID
-	}), "no diagnostic from %s, got:\n%s", ruleID, describe(diagnostics))
+// exampleVariables stands in for the var file a project passes with
+// --var-file. The examples write account and destination secrets as
+// references, as destination/secret-reference asks, and validate substitutes
+// them before the destination config is checked against its patterns.
+var exampleVariables = variables{
+	"PG_PASSWORD":                            "example-password",
+	"MY_GOOGLEADS_DESTINATION_CONVERSION_ID": "AW-123456789",
+	"MY_PIXEL_DESTINATION_PIXEL_ID":          "123456789012345",
+	"MY_CUSTOMERIO_AUDIENCE_API_KEY":         "example-api-key",
+	"MY_CUSTOMERIO_AUDIENCE_APP_API_KEY":     "example-app-api-key",
+	"MY_CUSTOMERIO_AUDIENCE_SITE_ID":         "example-site-id",
 }
 
-// describe renders diagnostics for failure output. Printing the structs
-// directly buries the four fields that matter under LineText and Examples.
-func describe(diagnostics validation.Diagnostics) string {
-	described := make([]string, 0, len(diagnostics))
-	for _, d := range diagnostics {
-		described = append(described, fmt.Sprintf("%s:%d:%d %s[%s] %s", d.File, d.Position.Line, d.Position.Column, d.Severity, d.RuleID, d.Message))
-	}
-	return strings.Join(described, "\n")
-}
+type variables map[string]string
 
-type exampleFiles map[string]string
-
-func (f exampleFiles) Load(string) (map[string]*specs.RawSpec, error) {
-	raw := make(map[string]*specs.RawSpec, len(f))
-	for name, content := range f {
-		raw[name] = &specs.RawSpec{Data: []byte(content)}
-	}
-	return raw, nil
-}
-
-type diagnosticsRecorder struct {
-	diagnostics validation.Diagnostics
-}
-
-func (r *diagnosticsRecorder) Render(diagnostics validation.Diagnostics) error {
-	r.diagnostics = append(r.diagnostics, diagnostics...)
-	return nil
+func (v variables) Resolve(name string) (string, bool) {
+	value, ok := v[name]
+	return value, ok
 }
