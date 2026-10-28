@@ -120,7 +120,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:     "SLACK",
 		Version:     1,
 		Properties:  properties,
-		SecretKeys:  []string{},
+		SecretKeys:  []string{"webhook_url", "event_channel_settings.webhook"},
 		NewConfig: func() any {
 			return &slackConfig{}
 		},
