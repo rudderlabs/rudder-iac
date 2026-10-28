@@ -45,17 +45,24 @@ type Matcher struct {
 
 // MultipleClaimed reports two remote resources that both matched the same
 // local resource: ClaimedByRemoteID won (matched first, sorted), RemoteID is
-// the extra. Matcher predicates are meant to mirror upstream uniqueness, so a
-// claim collision signals flawed matching or dirty upstream data — the caller
-// is expected to fail fast on any of these.
+// the extra. When Managed is set, the local is already managed and RemoteID
+// matched it anyway; there is no ClaimedByRemoteID. Matcher predicates are
+// meant to mirror upstream uniqueness, so a claim collision signals flawed
+// matching, dirty upstream data or a local rename — the caller is expected to
+// fail fast on any of these.
 type MultipleClaimed struct {
 	ResourceType      string
 	LocalURN          string
 	ClaimedByRemoteID string
 	RemoteID          string
+	Managed           bool
 }
 
 func (c MultipleClaimed) String() string {
+	if c.Managed {
+		return fmt.Sprintf("local resource %q is already managed, but remote %q matches it too",
+			c.LocalURN, c.RemoteID)
+	}
 	return fmt.Sprintf("local resource %q is matched by multiple remotes %q and %q",
 		c.LocalURN, c.ClaimedByRemoteID, c.RemoteID)
 }
@@ -92,6 +99,18 @@ func Mark(scope Scope, matchers []Matcher) []MultipleClaimed {
 				continue
 			}
 
+			// A managed local is already claimed by its own remote. Linking would
+			// be ignored at apply, which updates the managed resource instead.
+			if isManaged(scope, local) {
+				multipleClaimed = append(multipleClaimed, MultipleClaimed{
+					ResourceType: m.ResourceType,
+					LocalURN:     local.URN(),
+					RemoteID:     remote.ID,
+					Managed:      true,
+				})
+				continue
+			}
+
 			if claimer, ok := claimedBy[local.ID()]; ok {
 				multipleClaimed = append(multipleClaimed, MultipleClaimed{
 					ResourceType:      m.ResourceType,
@@ -111,6 +130,16 @@ func Mark(scope Scope, matchers []Matcher) []MultipleClaimed {
 		}
 	}
 	return multipleClaimed
+}
+
+// isManaged reports whether the local resource is already in the managed
+// remote state.
+func isManaged(scope Scope, local *resources.Resource) bool {
+	if scope.RemoteGraph == nil {
+		return false
+	}
+	_, ok := scope.RemoteGraph.GetResource(local.URN())
+	return ok
 }
 
 // ByData finds the local resource of the given type whose Data() map satisfies
