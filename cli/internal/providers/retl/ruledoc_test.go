@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/am"
 	bingads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bingads_offline_conversions"
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
 	facebookpixel "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_pixel"
@@ -35,8 +36,8 @@ import (
 // fragments cover their rules too; without them those fragments would be
 // orphans, which is exactly what the gen-rule-docs workflow sets the flags for.
 func TestProviderRuleDocs(t *testing.T) {
-	// http, Google Ads and Facebook Pixel are verified, so a default CLI
-	// registers them and the examples using them run as written. Bing and
+	// http, Amplitude, Google Ads and Facebook Pixel are verified, so a default
+	// CLI registers them and the examples using them run as written. Bing and
 	// Customer.io Audience are unverified and registered only behind a flag; the
 	// examples use them for Bing's mirror-only object mapping and Customer.io
 	// Audience's own rETL flow, their fragments name the flag, and it is
@@ -44,6 +45,7 @@ func TestProviderRuleDocs(t *testing.T) {
 	registry := definitions.NewRegistry()
 	for _, definition := range []*definitions.DestinationDefinition{
 		httpdest.NewDefinition(),
+		am.NewDefinition(),
 		googleads.NewDefinition(),
 		facebookpixel.NewDefinition(),
 		bingads.NewDefinition(),
@@ -128,6 +130,7 @@ var exampleVariables = variables{
 	"PG_PASSWORD":                            "example-password",
 	"MY_GOOGLEADS_DESTINATION_CONVERSION_ID": "AW-123456789",
 	"MY_PIXEL_DESTINATION_PIXEL_ID":          "123456789012345",
+	"MY_AMPLITUDE_DESTINATION_API_KEY":       "example-api-key",
 	"MY_CUSTOMERIO_AUDIENCE_API_KEY":         "example-api-key",
 	"MY_CUSTOMERIO_AUDIENCE_APP_API_KEY":     "example-app-api-key",
 	"MY_CUSTOMERIO_AUDIENCE_SITE_ID":         "example-site-id",
