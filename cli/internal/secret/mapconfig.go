@@ -96,6 +96,21 @@ func MaskSecrets(config map[string]any, externalID string, secretKeys []string) 
 	return nil
 }
 
+// WalkSecrets calls visit once for each value the secret keys resolve to in
+// config, found the way every helper in this file finds them. segments are
+// the keys and list indexes that lead to the value, as VariableName takes
+// them. config is left as it is.
+func WalkSecrets(config map[string]any, secretKeys []string, visit func(segments []string, value any)) {
+	leaf := func(owner map[string]any, key string, segments []string) error {
+		visit(segments, owner[key])
+		return nil
+	}
+	for _, key := range secretKeys {
+		// leaf never fails, so neither can the walk.
+		_ = walkSecretPath(config, strings.Split(key, "."), nil, leaf)
+	}
+}
+
 // VariableName is the variable MaskSecrets references for the secret reached
 // through segments in the spec with externalID: the ID upper-cased with "-"
 // turned into "_", then "_" and each segment upper-cased. A segment is a config

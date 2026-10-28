@@ -14,7 +14,7 @@
     "sshHost": "bastion.rudder-cli-e2e.internal:22",
     "sshPort": "22",
     "sshPublicKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5rudderE2E rudder@rudder-cli-e2e",
-    "sshUser": "rudder-updated",
+    "sshUser": "rudderCliE2eKafkaSshUserUpdated",
     "sslEnabled": false,
     "topic": "rudder-cli-e2e-ssh-updated",
     "useSASL": false,

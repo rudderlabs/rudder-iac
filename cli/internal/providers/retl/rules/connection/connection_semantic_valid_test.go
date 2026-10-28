@@ -34,8 +34,8 @@ type endpointOnlyTestConfig struct {
 }
 
 // newTestRegistry holds the real definitions the fixtures name — http reaches
-// warehouse sources through the JSON mapper, bingads also supports the visual
-// mapper, customerio_audience drives its own destination-specific flow, braze
+// warehouse sources through the JSON mapper, am supports the visual mapper,
+// bingads does too but accepts only mirror, customerio_audience drives its own destination-specific flow, braze
 // and facebook_pixel demand config before a warehouse source connects (V-C5) —
 // plus three
 // minimal fakes for the cases no shipped definition can produce:
@@ -50,6 +50,7 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(httpdest.NewDefinition()))
+	require.NoError(t, registry.Register(am.NewDefinition()))
 	require.NoError(t, registry.Register(bingads.NewDefinition()))
 	require.NoError(t, registry.Register(customerioaudience.NewDefinition()))
 	require.NoError(t, registry.Register(braze.NewDefinition()))
@@ -80,7 +81,7 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 		NewConfig:            func() any { return &endpointOnlyTestConfig{} },
 		SourceTypes:          []string{common.SourceTypeWarehouse},
 		ConnectionModes:      map[string][]string{common.SourceTypeWarehouse: {"cloud"}},
-		SyncBehaviours:       []string{"mirror"},
+		SyncBehaviours:       []string{"upsert"},
 		SupportsVisualMapper: true,
 	}))
 	return registry
@@ -116,6 +117,15 @@ func httpDestination() destinationFixture {
 			"auth":            "noAuth",
 			"connection_mode": map[string]any{"warehouse": "cloud"},
 		},
+	}
+}
+
+func amplitudeDestination() destinationFixture {
+	return destinationFixture{
+		id:      "my-amplitude-destination",
+		typ:     "am",
+		enabled: true,
+		config:  map[string]any{"connection_mode": map[string]any{"warehouse": "cloud"}},
 	}
 }
 
@@ -581,8 +591,17 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 		},
 		{
 			name:        "a visual mapper destination on the object mapping flow",
+			destination: amplitudeDestination(),
+			mutate:      objectMappingEntry,
+		},
+		{
+			name:        "a visual mapper destination that accepts only mirror",
 			destination: bingDestination(),
 			mutate:      objectMappingEntry,
+			expected: []rules.ValidationResult{{
+				Reference: "/connections/0/config/sync_behaviour",
+				Message:   "source definition 'postgres' and destination 'my-bing-destination' share no sync behaviour for the object_mapping flow; the connection cannot sync",
+			}},
 		},
 	}
 
@@ -733,7 +752,7 @@ func TestConnectionSemanticValid_Mappings(t *testing.T) {
 		},
 		{
 			name:        "object mapping carrying constants",
-			destination: bingDestination(),
+			destination: amplitudeDestination(),
 			mutate: func(c *retlConnection.ConnectionSpec) {
 				objectMappingEntry(c)
 				c.Config.Constants = []retlConnection.ConstantSpec{{Key: "source", Value: "warehouse"}}
@@ -745,7 +764,7 @@ func TestConnectionSemanticValid_Mappings(t *testing.T) {
 		},
 		{
 			name:        "object mapping carrying an event",
-			destination: bingDestination(),
+			destination: amplitudeDestination(),
 			mutate: func(c *retlConnection.ConnectionSpec) {
 				objectMappingEntry(c)
 				c.Config.Event = &retlConnection.EventSpec{Type: "track", Name: "Signed Up"}
@@ -757,7 +776,7 @@ func TestConnectionSemanticValid_Mappings(t *testing.T) {
 		},
 		{
 			name:        "object mapping carrying more than one identifier",
-			destination: bingDestination(),
+			destination: amplitudeDestination(),
 			mutate: func(c *retlConnection.ConnectionSpec) {
 				objectMappingEntry(c)
 				c.Config.Identifiers = []retlConnection.MappingSpec{
@@ -772,7 +791,7 @@ func TestConnectionSemanticValid_Mappings(t *testing.T) {
 		},
 		{
 			name:        "an object mapping aimed at user_id",
-			destination: bingDestination(),
+			destination: amplitudeDestination(),
 			mutate: func(c *retlConnection.ConnectionSpec) {
 				objectMappingEntry(c)
 				c.Config.Mappings = []retlConnection.MappingSpec{{From: "legacy_id", To: "user_id"}}
@@ -784,7 +803,7 @@ func TestConnectionSemanticValid_Mappings(t *testing.T) {
 		},
 		{
 			name:        "an object mapping aimed at the external id",
-			destination: bingDestination(),
+			destination: amplitudeDestination(),
 			mutate: func(c *retlConnection.ConnectionSpec) {
 				objectMappingEntry(c)
 				c.Config.Mappings = []retlConnection.MappingSpec{{From: "crm_id", To: "context.externalId[0].id"}}
@@ -796,7 +815,7 @@ func TestConnectionSemanticValid_Mappings(t *testing.T) {
 		},
 		{
 			name:        "the anonymous id target is not reserved on the object mapping flow",
-			destination: bingDestination(),
+			destination: amplitudeDestination(),
 			mutate: func(c *retlConnection.ConnectionSpec) {
 				objectMappingEntry(c)
 				c.Config.Mappings = []retlConnection.MappingSpec{{From: "device_id", To: "anonymous_id"}}
@@ -818,12 +837,10 @@ func TestConnectionSemanticValid_Mappings(t *testing.T) {
 }
 
 // objectMappingEntry turns the base entry into the object mapping shape the
-// visual-mapper destinations run: an object, no mappings, and the only sync
-// behaviour those destinations accept.
+// visual-mapper destinations run: an object and no mappings.
 func objectMappingEntry(c *retlConnection.ConnectionSpec) {
 	c.Config.Object = lo.ToPtr("Audience")
 	c.Config.Mappings = nil
-	c.Config.SyncBehaviour = "mirror"
 }
 
 func TestConnectionSemanticValid_SourceCapability(t *testing.T) {
@@ -902,6 +919,19 @@ func TestConnectionSemanticValid_SourceCapability(t *testing.T) {
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/config/sync_behaviour",
 				Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-http-destination' on the json_mapper flow",
+			}},
+		},
+		{
+			name:        "the object mapping flow has no mirror to offer either",
+			model:       postgresModel(),
+			destination: amplitudeDestination(),
+			mutate: func(c *retlConnection.ConnectionSpec) {
+				objectMappingEntry(c)
+				c.Config.SyncBehaviour = "mirror"
+			},
+			expected: []rules.ValidationResult{{
+				Reference: "/connections/0/config/sync_behaviour",
+				Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-amplitude-destination' on the object_mapping flow",
 			}},
 		},
 		{

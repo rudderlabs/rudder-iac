@@ -47,16 +47,22 @@ func (p *Provider) SupportedMatchPatterns() []vrules.MatchPattern {
 	return prules.V1VersionPatterns(DestinationSpecKind)
 }
 
+// SyntacticRules returns the destination syntactic rules. Each is wrapped by
+// maskSecretLines, so a result whose line can show a secret is masked.
 func (p *Provider) SyntacticRules() []vrules.Rule {
-	return []vrules.Rule{
+	return maskSecretLines(p.registry,
 		NewSpecSyntaxValidRule(p.registry),
-	}
+		NewSecretReferenceRule(p.registry),
+		NewSecretReferenceUniqueRule(p.registry),
+	)
 }
 
+// SemanticRules returns the destination semantic rules, wrapped like the
+// syntactic ones.
 func (p *Provider) SemanticRules() []vrules.Rule {
-	return []vrules.Rule{
+	return maskSecretLines(p.registry,
 		NewSemanticValidRule(),
-	}
+	)
 }
 
 // RuleDocEntries returns the authored documentation fragments embedded with

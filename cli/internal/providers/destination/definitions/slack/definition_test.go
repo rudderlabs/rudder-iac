@@ -24,12 +24,12 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "slack", registered.Type)
 	assert.Equal(t, "SLACK", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Empty(t, registered.SecretKeys())
+	assert.Equal(t, []string{"webhook_url", "event_channel_settings.webhook"}, registered.SecretKeys())
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
-		"cloud", "react_native", "flutter", "cordova",
+		"cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -38,6 +38,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"cloud"}, modes)
 	}
+
+	// db-config.json declares neither rETL field, so the backend fallback applies.
+	assert.Nil(t, slack.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	byAPI, err := registry.GetByAPIType("SLACK", 1)
 	require.NoError(t, err)
@@ -495,6 +500,7 @@ func TestSlackConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 

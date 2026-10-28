@@ -9,10 +9,10 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    app_id: rudderCliE2eDeviceAppIdUpdated
+    app_id: "{{ .INTERCOM_NO_API_KEY_APP_ID_UPDATED }}"
     api_server: au
     api_version: v2
     send_anonymous_id: true
     update_last_request_at: false
-    mobile_api_key_android: rudderCliE2eDeviceAndroidKeyUpdated
-    mobile_api_key_ios: rudderCliE2eDeviceIosKeyUpdated
+    mobile_api_key_android: "{{ .INTERCOM_NO_API_KEY_MOBILE_API_KEY_ANDROID_UPDATED }}"
+    mobile_api_key_ios: "{{ .INTERCOM_NO_API_KEY_MOBILE_API_KEY_IOS_UPDATED }}"

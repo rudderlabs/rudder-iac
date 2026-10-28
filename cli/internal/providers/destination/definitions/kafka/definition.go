@@ -49,6 +49,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -62,6 +63,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // kafkaConfig is the local YAML config model. Field set mirrors
@@ -184,7 +186,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:     "KAFKA",
 		Version:     1,
 		Properties:  properties,
-		SecretKeys:  []string{"password"},
+		SecretKeys: []string{
+			"password",
+			"host_name",
+			"ssh.user",
+			"username",
+		},
 		NewConfig: func() any {
 			return &kafkaConfig{}
 		},

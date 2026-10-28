@@ -44,6 +44,17 @@ func IsTemplateConfigValue(value string) bool {
 	return uiTemplateValueRegex.MatchString(value)
 }
 
+// TemplateFallback returns the fallback of a value in the RudderStack UI
+// template syntax `{{ path || fallback }}`: the text after the last "||", as
+// written, spaces included. ok is false when value does not use that syntax.
+func TemplateFallback(value string) (fallback string, ok bool) {
+	match := uiTemplateValueRegex.FindStringSubmatch(value)
+	if match == nil {
+		return "", false
+	}
+	return match[1], true
+}
+
 func configValidateFuncs() []rules.CustomValidateFunc {
 	return []rules.CustomValidateFunc{
 		{

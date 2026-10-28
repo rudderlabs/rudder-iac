@@ -18,6 +18,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -31,6 +32,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // The Marketo native-SDK toggle is deliberately absent. schema.json declares it
@@ -100,11 +102,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:     "MARKETO",
 		Version:     1,
 		Properties:  properties,
-		SecretKeys:  []string{"client_secret"},
+		SecretKeys:  []string{"client_secret", "client_id"},
 		NewConfig: func() any {
 			return &marketoConfig{}
 		},
-		SourceTypes:     append([]string(nil), sourceTypes...),
-		ConnectionModes: connectionModes,
+		SourceTypes:          append([]string(nil), sourceTypes...),
+		ConnectionModes:      connectionModes,
+		SupportsVisualMapper: true,
 	}
 }

@@ -83,39 +83,24 @@ match_behavior:
                       - from: email
                         to: traits.email
       - example_id: "retl-connection-semantic-valid-object-mapper"
-        title: "Object mapping connection to Bing Ads Offline Conversions"
-        description: "Bing supports the visual mapper, so naming an object runs the object mapping flow: one identifier, no constants or event, and the only sync behaviour Bing accepts, mirror."
+        title: "Object mapping connection to Amplitude"
+        description: "Amplitude supports the visual mapper, so naming an object runs the object mapping flow: one identifier, no constants or event, and an upsert or full sync."
         files:
-          model.yaml: &conversions-model |
-            version: rudder/v1
-            kind: retl-source-sql-model
-            metadata:
-              name: conversions-model
-            spec:
-              id: conversions-model
-              display_name: Offline Conversions
-              account_id: acc-123
-              primary_key: conversion_id
-              source_definition: postgres
-              sql: SELECT conversion_id, click_id, conversion_name, conversion_time FROM conversions
-          destination.yaml: &bing-destination |
-            # bingads_offline_conversions is unverified: validate this project
-            # with RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is
-            # unknown.
+          model.yaml: *users-model
+          destination.yaml: &amplitude-destination |
             version: rudder/v1
             kind: destination
             metadata:
-              name: my-bing-destination
+              name: my-amplitude-destination
             spec:
-              id: my-bing-destination
-              display_name: Bing Offline Conversions
-              type: bingads_offline_conversions
+              id: my-amplitude-destination
+              display_name: Amplitude
+              type: am
               enabled: true
               definition_version: 1
               config:
-                rudder_account_id: my-bing-account
-                customer_account_id: "1234567"
-                customer_id: "7654321"
+                api_key: '{{ .MY_AMPLITUDE_DESTINATION_API_KEY }}'
+                residency_server: standard
                 connection_mode:
                   warehouse: cloud
           connections.yaml: |
@@ -125,23 +110,21 @@ match_behavior:
               name: retl-connections
             spec:
               connections:
-                - id: conversions-to-bing
-                  source: "#retl-source-sql-model:conversions-model"
-                  destination: "#destination:my-bing-destination"
+                - id: users-to-amplitude
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-amplitude-destination"
                   config:
-                    object: conversions
-                    sync_behaviour: mirror
+                    object: users
+                    sync_behaviour: upsert
                     schedule:
                       type: basic
                       every_minutes: 60
                     identifiers:
-                      - from: click_id
-                        to: microsoftClickId
+                      - from: user_id
+                        to: user_id
                     mappings:
-                      - from: conversion_name
-                        to: conversionName
-                      - from: conversion_time
-                        to: conversionTime
+                      - from: email
+                        to: email
     invalid:
       - example_id: "retl-connection-semantic-source-not-found"
         title: "Connection whose rETL source does not exist in the project"
@@ -329,7 +312,7 @@ match_behavior:
               enabled: true
               definition_version: 1
               config:
-                conversion_id: AW-123456789
+                conversion_id: '{{ .MY_GOOGLEADS_DESTINATION_CONVERSION_ID }}'
           connections.yaml: |
             version: rudder/v1
             kind: retl-connections
@@ -398,7 +381,7 @@ match_behavior:
               enabled: true
               definition_version: 1
               config:
-                pixel_id: "123456789012345"
+                pixel_id: '{{ .MY_PIXEL_DESTINATION_PIXEL_ID }}'
                 connection_mode:
                   warehouse: cloud
           connections.yaml: |
@@ -446,9 +429,9 @@ match_behavior:
               enabled: true
               definition_version: 1
               config:
-                site_id: example-site-id
-                api_key: example-api-key
-                app_api_key: example-app-api-key
+                site_id: '{{ .MY_CUSTOMERIO_AUDIENCE_SITE_ID }}'
+                api_key: '{{ .MY_CUSTOMERIO_AUDIENCE_API_KEY }}'
+                app_api_key: '{{ .MY_CUSTOMERIO_AUDIENCE_APP_API_KEY }}'
                 region: US
                 connection_mode:
                   warehouse: cloud
@@ -463,7 +446,7 @@ match_behavior:
                   source: "#retl-source-sql-model:users-model"
                   destination: "#destination:my-customerio-audience"
                   config:
-                    sync_behaviour: mirror
+                    sync_behaviour: upsert
                     schedule:
                       type: manual
                     identifiers:
@@ -602,40 +585,8 @@ match_behavior:
       - example_id: "retl-connection-semantic-reserved-mapping-target-external-id"
         title: "Object mapping aimed at the external id, which the backend reserves for the identifier"
         files:
-          model.yaml: *conversions-model
-          destination.yaml: *bing-destination
-          connections.yaml: |
-            version: rudder/v1
-            kind: retl-connections
-            metadata:
-              name: retl-connections
-            spec:
-              connections:
-                - id: conversions-to-bing
-                  source: "#retl-source-sql-model:conversions-model"
-                  destination: "#destination:my-bing-destination"
-                  config:
-                    object: conversions
-                    sync_behaviour: mirror
-                    schedule:
-                      type: manual
-                    identifiers:
-                      - from: click_id
-                        to: microsoftClickId
-                    mappings:
-                      - from: conversion_id
-                        to: context.externalId[0].id
-        expected_diagnostics:
-          - file: "connections.yaml"
-            reference: "/spec/connections/0/config/mappings/0/to"
-            severity: "error"
-            message_contains: "'to' is not valid: mapping to 'context.externalId[0].id' is reserved for identifiers"
-      - example_id: "retl-connection-semantic-json-mapper-mirror"
-        title: "Mirror sync on the JSON mapper flow"
-        description: "Postgres and the HTTP destination both accept mirror, but mirror is offered for object mapping only."
-        files:
           model.yaml: *users-model
-          destination.yaml: *http-destination
+          destination.yaml: *amplitude-destination
           connections.yaml: |
             version: rudder/v1
             kind: retl-connections
@@ -643,11 +594,12 @@ match_behavior:
               name: retl-connections
             spec:
               connections:
-                - id: users-to-webhook
+                - id: users-to-amplitude
                   source: "#retl-source-sql-model:users-model"
-                  destination: "#destination:my-http-destination"
+                  destination: "#destination:my-amplitude-destination"
                   config:
-                    sync_behaviour: mirror
+                    object: users
+                    sync_behaviour: upsert
                     schedule:
                       type: manual
                     identifiers:
@@ -655,17 +607,48 @@ match_behavior:
                         to: user_id
                     mappings:
                       - from: email
-                        to: traits.email
+                        to: context.externalId[0].id
         expected_diagnostics:
           - file: "connections.yaml"
-            reference: "/spec/connections/0/config/sync_behaviour"
+            reference: "/spec/connections/0/config/mappings/0/to"
             severity: "error"
-            message_contains: "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-http-destination' on the json_mapper flow"
+            message_contains: "'to' is not valid: mapping to 'context.externalId[0].id' is reserved for identifiers"
       - example_id: "retl-connection-semantic-bing-upsert"
         title: "Upsert sync to Bing, which accepts mirror only"
+        description: "Bing accepts only mirror, which this CLI does not support, so the connection has no sync behaviour left."
         files:
-          model.yaml: *conversions-model
-          destination.yaml: *bing-destination
+          model.yaml: |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: conversions-model
+            spec:
+              id: conversions-model
+              display_name: Offline Conversions
+              account_id: acc-123
+              primary_key: conversion_id
+              source_definition: postgres
+              sql: SELECT conversion_id, click_id, conversion_name, conversion_time FROM conversions
+          destination.yaml: |
+            # bingads_offline_conversions is unverified: validate this project
+            # with RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is
+            # unknown.
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-bing-destination
+            spec:
+              id: my-bing-destination
+              display_name: Bing Offline Conversions
+              type: bingads_offline_conversions
+              enabled: true
+              definition_version: 1
+              config:
+                rudder_account_id: my-bing-account
+                customer_account_id: "1234567"
+                customer_id: "7654321"
+                connection_mode:
+                  warehouse: cloud
           connections.yaml: |
             version: rudder/v1
             kind: retl-connections
@@ -691,43 +674,12 @@ match_behavior:
           - file: "connections.yaml"
             reference: "/spec/connections/0/config/sync_behaviour"
             severity: "error"
-            message_contains: "'sync_behaviour' must be one of [mirror] for source definition 'postgres' and destination 'my-bing-destination' on the object_mapping flow"
-      - example_id: "retl-connection-semantic-bing-json-mapper"
-        title: "Bing connection without an object"
-        description: "Without an object the connection runs the JSON mapper flow, which drops mirror, the only behaviour Bing accepts; no sync behaviour is left."
-        files:
-          model.yaml: *conversions-model
-          destination.yaml: *bing-destination
-          connections.yaml: |
-            version: rudder/v1
-            kind: retl-connections
-            metadata:
-              name: retl-connections
-            spec:
-              connections:
-                - id: conversions-to-bing
-                  source: "#retl-source-sql-model:conversions-model"
-                  destination: "#destination:my-bing-destination"
-                  config:
-                    sync_behaviour: mirror
-                    schedule:
-                      type: manual
-                    identifiers:
-                      - from: click_id
-                        to: user_id
-                    mappings:
-                      - from: conversion_name
-                        to: properties.conversion_name
-        expected_diagnostics:
-          - file: "connections.yaml"
-            reference: "/spec/connections/0/config/sync_behaviour"
-            severity: "error"
-            message_contains: "source definition 'postgres' and destination 'my-bing-destination' share no sync behaviour for the json_mapper flow; the connection cannot sync"
+            message_contains: "source definition 'postgres' and destination 'my-bing-destination' share no sync behaviour for the object_mapping flow; the connection cannot sync"
       - example_id: "retl-connection-semantic-object-mapping-constants"
         title: "Constants on an object mapping connection"
         files:
-          model.yaml: *conversions-model
-          destination.yaml: *bing-destination
+          model.yaml: *users-model
+          destination.yaml: *amplitude-destination
           connections.yaml: |
             version: rudder/v1
             kind: retl-connections
@@ -735,23 +687,23 @@ match_behavior:
               name: retl-connections
             spec:
               connections:
-                - id: conversions-to-bing
-                  source: "#retl-source-sql-model:conversions-model"
-                  destination: "#destination:my-bing-destination"
+                - id: users-to-amplitude
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-amplitude-destination"
                   config:
-                    object: conversions
-                    sync_behaviour: mirror
+                    object: users
+                    sync_behaviour: upsert
                     schedule:
                       type: manual
                     identifiers:
-                      - from: click_id
-                        to: microsoftClickId
+                      - from: user_id
+                        to: user_id
                     mappings:
-                      - from: conversion_name
-                        to: conversionName
+                      - from: email
+                        to: email
                     constants:
-                      - key: conversionCurrencyCode
-                        value: USD
+                      - key: plan
+                        value: free
         expected_diagnostics:
           - file: "connections.yaml"
             reference: "/spec/connections/0/config/constants"
@@ -760,8 +712,8 @@ match_behavior:
       - example_id: "retl-connection-semantic-object-mapping-event"
         title: "Event on an object mapping connection"
         files:
-          model.yaml: *conversions-model
-          destination.yaml: *bing-destination
+          model.yaml: *users-model
+          destination.yaml: *amplitude-destination
           connections.yaml: |
             version: rudder/v1
             kind: retl-connections
@@ -769,23 +721,23 @@ match_behavior:
               name: retl-connections
             spec:
               connections:
-                - id: conversions-to-bing
-                  source: "#retl-source-sql-model:conversions-model"
-                  destination: "#destination:my-bing-destination"
+                - id: users-to-amplitude
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-amplitude-destination"
                   config:
-                    object: conversions
-                    sync_behaviour: mirror
+                    object: users
+                    sync_behaviour: upsert
                     schedule:
                       type: manual
                     identifiers:
-                      - from: click_id
-                        to: microsoftClickId
+                      - from: user_id
+                        to: user_id
                     mappings:
-                      - from: conversion_name
-                        to: conversionName
+                      - from: email
+                        to: email
                     event:
                       type: track
-                      name: Offline Conversion
+                      name: User Synced
         expected_diagnostics:
           - file: "connections.yaml"
             reference: "/spec/connections/0/config/event"

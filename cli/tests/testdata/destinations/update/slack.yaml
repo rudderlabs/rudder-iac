@@ -9,13 +9,13 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    webhook_url: https://hooks.slack.com/services/T000/B000/example
+    webhook_url: "{{ .SLACK_WEBHOOK_URL }}"
     incoming_webhooks_type: modern
     identify_template: Identify user
     event_channel_settings:
       - name: Order Completed
         channel: orders
-        webhook: https://hooks.slack.com/services/T000/B111/orders
+        webhook: "{{ .SLACK_EVENT_CHANNEL_SETTINGS_WEBHOOK }}"
         regex: false
       - name: ^Cart
         channel: commerce

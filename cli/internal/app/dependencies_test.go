@@ -155,7 +155,7 @@ func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
 		{
 			name:                   "unverifiedDestinations disabled registers verified destinations",
 			unverifiedDestinations: false,
-			wantTypes:              []string{"active_campaign", "am", "attentive_tag", "bq", "bqstream", "braze", "customerio", "facebook_conversions", "facebook_pixel", "ga4", "gcs", "googleads", "hs", "http", "iterable", "mp", "postgres", "posthog", "rs", "s3", "s3_datalake", "snowflake", "tiktok_ads", "webhook"},
+			wantTypes:              []string{"active_campaign", "adj", "adobe_analytics", "am", "attentive_tag", "bq", "bqstream", "braze", "confluent_cloud", "customerio", "facebook_conversions", "facebook_pixel", "firebase", "ga", "ga4", "gcs", "googleads", "googlepubsub", "googlesheets", "gtm", "hs", "http", "intercom", "iterable", "kafka", "kinesis", "linkedin_insight_tag", "marketo", "mp", "postgres", "posthog", "qualtrics", "redis", "rs", "s3", "s3_datalake", "salesforce", "sentry", "slack", "snowflake", "snowpipe_streaming", "statsig", "tiktok_ads", "vwo", "webhook", "zendesk"},
 		},
 		{
 			name:                   "unverifiedDestinations enabled registers verified and unverified destinations",

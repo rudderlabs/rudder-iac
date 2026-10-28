@@ -46,6 +46,7 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -59,6 +60,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type mappingEntry struct {
@@ -205,6 +207,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:     "ADOBE_ANALYTICS",
 		Version:     1,
 		Properties:  properties,
+		SecretKeys: []string{
+			"heartbeat_tracking_server_url",
+			"marketing_cloud_org_id",
+			"tracking_server_url",
+		},
 		NewConfig: func() any {
 			return &adobeAnalyticsConfig{}
 		},

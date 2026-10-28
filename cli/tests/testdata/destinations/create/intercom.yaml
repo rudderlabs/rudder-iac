@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    app_id: rudderCliE2eAppId
+    app_id: "{{ .INTERCOM_APP_ID }}"
     api_key: "{{ .INTERCOM_API_KEY }}"
     api_server: standard
     api_version: v2
@@ -18,8 +18,8 @@ spec:
     event_filtering:
       whitelist:
         - Order Completed
-    mobile_api_key_android: rudderCliE2eAndroidKey
-    mobile_api_key_ios: rudderCliE2eIosKey
+    mobile_api_key_android: "{{ .INTERCOM_MOBILE_API_KEY_ANDROID }}"
+    mobile_api_key_ios: "{{ .INTERCOM_MOBILE_API_KEY_IOS }}"
     connection_mode:
       web: cloud
       android_kotlin: cloud

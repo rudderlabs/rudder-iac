@@ -31,6 +31,11 @@ type Diagnostic struct {
 	// to do any file I/O or position lookup
 	Position pathindex.Position
 
+	// Sensitive marks a diagnostic whose line can show a secret value. The
+	// engine has already masked the value in Position.LineText, and another
+	// diagnostic on the same line should be masked too.
+	Sensitive bool
+
 	// Examples provides valid and invalid usage examples for this rule
 	// Can be nil if the rule doesn't provide examples
 	Examples rules.Examples

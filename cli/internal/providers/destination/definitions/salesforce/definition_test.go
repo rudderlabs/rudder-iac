@@ -24,12 +24,12 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "salesforce", registered.Type)
 	assert.Equal(t, "SALESFORCE", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"password", "initial_access_token"}, registered.SecretKeys())
+	assert.Equal(t, []string{"password", "initial_access_token", "user_name"}, registered.SecretKeys())
 	assert.Empty(t, registered.GatedKeyPaths())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
-		"cloud", "react_native", "flutter", "cordova",
+		"cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -38,6 +38,12 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"cloud"}, modes)
 	}
+
+	// db-config.json declares the visual mapper but no syncBehaviours, so the
+	// backend fallback applies.
+	assert.Nil(t, salesforce.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.True(t, registered.SupportsVisualMapper())
 
 	byAPI, err := registry.GetByAPIType("SALESFORCE", 1)
 	require.NoError(t, err)
@@ -314,6 +320,7 @@ func TestSalesforceConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 

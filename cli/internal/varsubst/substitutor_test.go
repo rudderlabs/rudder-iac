@@ -1,6 +1,7 @@
 package varsubst
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -473,3 +474,21 @@ func TestSubstituteBytes_ErrorPositions(t *testing.T) {
 	}
 }
 
+// An error's line breaks where the YAML parser breaks lines, so a file with CR
+// or CRLF endings gets the line the other diagnostics use, and only that
+// line's text.
+func TestSubstituteBytes_ErrorLinesBreakAtEveryLineEnding(t *testing.T) {
+	t.Parallel()
+
+	for name, lineBreak := range map[string]string{"LF": "\n", "CRLF": "\r\n", "CR": "\r"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			input := strings.Join([]string{"a: 1", "b: 2", "port: {{ .PORT }}", "c: 3"}, lineBreak)
+			_, errs := NewSubstitutor(mapResolver{}).SubstituteBytes([]byte(input))
+			require.Equal(t, []SubstitutionError{
+				{Name: "PORT", Line: 3, Column: 7, LineText: "port: {{ .PORT }}", Err: ErrUndefinedVariable},
+			}, errs)
+		})
+	}
+}

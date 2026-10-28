@@ -24,11 +24,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "adj", registered.Type)
 	assert.Equal(t, "ADJ", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Empty(t, registered.SecretKeys(), "db-config declares no secretKeys")
+	assert.Equal(t, []string{"app_token"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift",
-		"unity", "react_native", "flutter", "cordova", "cloud",
+		"unity", "react_native", "flutter", "cordova", "cloud", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -42,6 +42,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"flutter":        {"cloud", "device"},
 		"cordova":        {"cloud"},
 		"cloud":          {"cloud"},
+		"warehouse":      {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -50,7 +51,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	}
 
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
+
+	// db-config.json declares neither rETL field, so the backend fallback applies.
+	assert.Nil(t, adj.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	// One flag per platform, matching schema.json's four sub-keys and db-config's
 	// deliberately ungated, so it does not appear here.
@@ -326,12 +331,12 @@ func TestAdjustConfigValidation(t *testing.T) {
 		errors := registered.ValidateConfig(map[string]any{
 			"app_token": "abc123",
 			"consent_management": map[string]any{
-				"warehouse": []any{},
+				"amp": []any{},
 			},
 		})
 		require.Len(t, errors, 1)
-		assert.Equal(t, "/consent_management/warehouse", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "source type 'warehouse' is not supported")
+		assert.Equal(t, "/consent_management/amp", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "source type 'amp' is not supported")
 	})
 
 	t.Run("invalid consent provider rejected", func(t *testing.T) {
@@ -588,6 +593,7 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 

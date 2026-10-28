@@ -459,8 +459,8 @@ func validateSourceCapability(entry connectionEntry) []rules.ValidationResult {
 }
 
 // validateSyncBehaviour (V-R2): the behaviour has to be one both endpoints
-// accept, and the JSON mapper flow drops mirror from whatever the two agree on.
-// An empty intersection is reported as such rather than falling back to a
+// accept, minus mirror, which this CLI does not support on any flow. An empty
+// intersection is reported as such rather than falling back to a
 // permissive set — that would let a connection the backend refuses pass here.
 // A source whose capabilities are unknown is validateSourceCapability's to
 // report, so there is nothing to intersect.
@@ -477,13 +477,10 @@ func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
 	)
 
 	// SourceWarehouseMetadata hands back a clone, so filtering in place is safe.
-	// "mirror" is offered for object mapping only, so the JSON mapper flow drops
-	// it however the two endpoints feel about it.
+	// The spec rule already rejects mirror; dropping it here keeps a mirror-only
+	// destination from being offered a behaviour the spec rule would refuse.
 	accepted := slices.DeleteFunc(warehouse.SyncBehaviours, func(behaviour string) bool {
-		if entry.flow == retlConnection.FlowJSONMapper && behaviour == "mirror" {
-			return true
-		}
-		return !slices.Contains(destinationAccepted, behaviour)
+		return behaviour == "mirror" || !slices.Contains(destinationAccepted, behaviour)
 	})
 
 	if len(accepted) == 0 {

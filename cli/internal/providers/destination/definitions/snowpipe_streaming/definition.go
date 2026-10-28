@@ -106,7 +106,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:     "SNOWPIPE_STREAMING",
 		Version:     1,
 		Properties:  properties,
-		SecretKeys:  []string{"private_key", "private_key_passphrase"},
+		SecretKeys:  []string{"private_key", "private_key_passphrase", "user"},
 		NewConfig: func() any {
 			return &snowpipeStreamingConfig{}
 		},

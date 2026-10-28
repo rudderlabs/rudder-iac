@@ -231,6 +231,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"username",
 			"headers.from",
 		},
+		// A header value that is a JSONPath is read from each event.
+		JSONPathSecretKeys: []string{"headers.from"},
 		NewConfig: func() any {
 			return &httpConfig{}
 		},

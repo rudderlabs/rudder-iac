@@ -14,6 +14,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	provrules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
@@ -623,6 +624,157 @@ func TestProject_Load_RendersSyntacticWarnings(t *testing.T) {
 	}
 }
 
+// sourceRuleProvider adds a rule that reads specs as written, before
+// substitution, and warns on each spec that holds a variable reference.
+type sourceRuleProvider struct {
+	*testutils.MockProvider
+}
+
+func (p *sourceRuleProvider) SyntacticRules() []rules.Rule {
+	return []rules.Rule{referenceWarningRule{}}
+}
+
+type referenceWarningRule struct{}
+
+func (referenceWarningRule) ID() string                      { return "test/source-warning" }
+func (referenceWarningRule) Severity() rules.Severity        { return rules.Warning }
+func (referenceWarningRule) Description() string             { return "a spec holds a variable reference" }
+func (referenceWarningRule) AppliesTo() []rules.MatchPattern { return fixtureMatchPatterns }
+func (referenceWarningRule) Examples() rules.Examples        { return rules.Examples{} }
+func (referenceWarningRule) Validate(*rules.ValidationContext) []rules.ValidationResult {
+	return nil
+}
+
+func (referenceWarningRule) ValidateSources(specs map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+	results := make(map[string][]rules.ValidationResult)
+	for path, ctx := range specs {
+		if bytes.Contains(ctx.Source, []byte("{{ .")) {
+			results[path] = []rules.ValidationResult{{Reference: "/metadata/name", Message: "reference as written"}}
+		}
+	}
+	return results
+}
+
+// TestProject_Load_RendersSourceDiagnostics covers the rules that read specs
+// before substitution: substitution stops the load when a variable is
+// undefined, and their diagnostics must be rendered then too. The JSON
+// renderer must list the same diagnostics, warnings with severity warning.
+func TestProject_Load_RendersSourceDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	for _, tc := range []struct {
+		name      string
+		rawSpecs  map[string]string
+		wantErr   string
+		wantLines []string
+	}{
+		{
+			name: "substitution succeeds",
+			rawSpecs: map[string]string{
+				"a.yaml": "kind: Source\nversion: rudder/v1\nmetadata:\n  name: '{{ .NAME }}'\nspec:\n  k: v",
+			},
+			wantLines: []string{"warning[test/source-warning]: reference as written"},
+		},
+		{
+			name: "an undefined variable in another spec stops substitution",
+			rawSpecs: map[string]string{
+				"a.yaml": "kind: Source\nversion: rudder/v1\nmetadata:\n  name: '{{ .NAME }}'\nspec:\n  k: v",
+				"b.yaml": "kind: Source\nversion: rudder/v1\nmetadata:\n  name: '{{ .MISSING }}'\nspec:\n  k: v",
+			},
+			wantErr: "variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file",
+			// b.yaml's warning sits on the key, ahead of the token's error.
+			wantLines: []string{
+				"warning[test/source-warning]: reference as written",
+				"warning[test/source-warning]: reference as written",
+				"error[project/var-substitution]: undefined variable \"MISSING\"",
+			},
+		},
+		{
+			name: "syntax errors after substitution",
+			rawSpecs: map[string]string{
+				"a.yaml": "kind: Unknown\nversion: rudder/v1\nmetadata:\n  name: '{{ .NAME }}'\nspec:\n  k: v",
+				"b.yaml": "kind: Source\nversion: rudder/v1\nmetadata:\n  name: '{{ .NAME }}'\nspec:\n  k: v",
+			},
+			wantErr: "syntax validation failed",
+			wantLines: []string{
+				"error[project/spec-syntax-valid]: 'kind' must be one of [Source Destination]",
+				"warning[test/source-warning]: reference as written",
+			},
+		},
+	} {
+		for _, useJSON := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/json=%v", tc.name, useJSON), func(t *testing.T) {
+				t.Parallel()
+
+				mockProvider := &sourceRuleProvider{MockProvider: testutils.NewMockProvider(nil, nil)}
+				mockProvider.MatchPatterns = fixtureMatchPatterns
+				mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+					raw := make(map[string]*specs.RawSpec, len(tc.rawSpecs))
+					for path, data := range tc.rawSpecs {
+						raw[path] = &specs.RawSpec{Data: []byte(data)}
+					}
+					return raw, nil
+				}}
+
+				var buf bytes.Buffer
+				r := renderer.NewTextRenderer(&buf)
+				if useJSON {
+					r = renderer.NewJSONRenderer(&buf)
+				}
+				proj := project.New(mockProvider,
+					project.WithLoader(mockLoader),
+					project.WithSubstitutor(varsubst.NewSubstitutor(mapResolver{"NAME": "resolved_name"})),
+					project.WithRenderer(r),
+				)
+
+				err := proj.Load("test_dir")
+				if tc.wantErr != "" {
+					require.EqualError(t, err, tc.wantErr)
+				} else {
+					require.NoError(t, err)
+				}
+
+				var rendered []string
+				if useJSON {
+					var doc struct {
+						Diagnostics []struct {
+							RuleID   string `json:"ruleId"`
+							Severity string `json:"severity"`
+							Message  string `json:"message"`
+						} `json:"diagnostics"`
+						Summary struct {
+							Errors   int `json:"errors"`
+							Warnings int `json:"warnings"`
+						} `json:"summary"`
+					}
+					require.NoError(t, json.Unmarshal(buf.Bytes(), &doc))
+					var errorCount, warningCount int
+					for _, d := range doc.Diagnostics {
+						// The text renderer's first line, so both renderers
+						// share one list of expected diagnostics.
+						rendered = append(rendered, fmt.Sprintf("%s[%s]: %s", d.Severity, d.RuleID, d.Message))
+						switch d.Severity {
+						case "error":
+							errorCount++
+						case "warning":
+							warningCount++
+						}
+					}
+					assert.Equal(t, errorCount, doc.Summary.Errors)
+					assert.Equal(t, warningCount, doc.Summary.Warnings)
+				} else {
+					for _, line := range strings.Split(buf.String(), "\n") {
+						if strings.HasPrefix(line, "warning[") || strings.HasPrefix(line, "error[") {
+							rendered = append(rendered, line)
+						}
+					}
+				}
+				assert.Equal(t, tc.wantLines, rendered)
+			})
+		}
+	}
+}
+
 // providerWithErrorRules adds a syntactic and a semantic rule that fail the
 // fixture spec named after them, so Load stops on real engine diagnostics.
 type providerWithErrorRules struct {
@@ -747,67 +899,167 @@ func (p *providerWithUnregistrableRule) SyntacticRules() []rules.Rule {
 	)}
 }
 
-// When the registry, the engine or syntax validation fails to run, Load renders
-// the parse diagnostics it collected before the error. Under the JSON renderer
-// the document also holds the error, and under the text renderer the caller
-// still prints it.
-func TestProject_Load_SetupFailureRendersParseDiagnostics(t *testing.T) {
+// unknownFileRule is a project-wide rule that reports on a file the load does
+// not hold, so syntax validation fails to run after the specs are parsed.
+type unknownFileRule struct{}
+
+func (unknownFileRule) ID() string                      { return "test/unknown-file" }
+func (unknownFileRule) Severity() rules.Severity        { return rules.Error }
+func (unknownFileRule) Description() string             { return "reports on a file the load does not hold" }
+func (unknownFileRule) AppliesTo() []rules.MatchPattern { return fixtureMatchPatterns }
+func (unknownFileRule) Examples() rules.Examples        { return rules.Examples{} }
+func (unknownFileRule) Validate(*rules.ValidationContext) []rules.ValidationResult {
+	return nil
+}
+
+func (unknownFileRule) ValidateSpecs(map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+	return map[string][]rules.ValidationResult{"elsewhere.yaml": {{Message: "not in the load"}}}
+}
+
+// unknownSourceFileRule is a source rule that reports on a file the load does
+// not hold, so source validation fails to run before substitution.
+type unknownSourceFileRule struct{ referenceWarningRule }
+
+func (unknownSourceFileRule) ID() string { return "test/unknown-source-file" }
+func (unknownSourceFileRule) ValidateSources(map[string]*rules.ValidationContext) map[string][]rules.ValidationResult {
+	return map[string][]rules.ValidationResult{"elsewhere.yaml": {{Message: "not in the load"}}}
+}
+
+// providerWithFailingSourceRun adds a source rule that makes source validation
+// fail to run.
+type providerWithFailingSourceRun struct {
+	*testutils.MockProvider
+}
+
+func (p *providerWithFailingSourceRun) SyntacticRules() []rules.Rule {
+	return []rules.Rule{unknownSourceFileRule{}}
+}
+
+// providerWithFailingSyntaxRun adds a source rule, whose warning is collected
+// before substitution, and a rule that makes syntax validation fail to run.
+type providerWithFailingSyntaxRun struct {
+	*testutils.MockProvider
+}
+
+func (p *providerWithFailingSyntaxRun) SyntacticRules() []rules.Rule {
+	return []rules.Rule{referenceWarningRule{}, unknownFileRule{}}
+}
+
+// Load sets up the registry and the engine and runs the source rules before it
+// parses any spec, so a failure there carries no diagnostics. Syntax validation runs after parsing,
+// so when it fails to run Load renders the source and parse diagnostics it
+// collected before the error. Under the JSON renderer the document also holds
+// the error, and under the text renderer the caller still prints it.
+func TestProject_Load_SetupFailureRendersCollectedDiagnostics(t *testing.T) {
 	t.Parallel()
 
+	newMock := func() *testutils.MockProvider {
+		mock := testutils.NewMockProvider(nil, nil)
+		mock.MatchPatterns = fixtureMatchPatterns
+		return mock
+	}
+
 	for _, tc := range []struct {
-		name         string
-		newRenderer  func(*bytes.Buffer) renderer.Renderer
-		wantReported bool
-		assertOutput func(t *testing.T, out string)
+		name        string
+		newProvider func() provider.Provider
+		wantErr     string
+		wantRules   []string // ruleIds in the JSON document
+		wantMessage string   // part of the project/load-failed message
+		wantText    []string // starts of the diagnostic lines the text renderer prints
+		wantSummary string   // the text renderer's summary, empty when it prints nothing
 	}{
 		{
-			name:         "json",
-			newRenderer:  func(b *bytes.Buffer) renderer.Renderer { return renderer.NewJSONRenderer(b) },
-			wantReported: true,
-			assertOutput: func(t *testing.T, out string) {
-				var doc struct {
-					Diagnostics []struct {
-						RuleID  string `json:"ruleId"`
-						Message string `json:"message"`
-					} `json:"diagnostics"`
-				}
-				require.NoError(t, json.Unmarshal([]byte(out), &doc))
-				require.Len(t, doc.Diagnostics, 2)
-				assert.Equal(t, "project/spec-syntax-parse-valid", doc.Diagnostics[0].RuleID)
-				assert.Equal(t, "project/load-failed", doc.Diagnostics[1].RuleID)
-				assert.Contains(t, doc.Diagnostics[1].Message, "setting up registry")
-			},
+			name:        "registry setup",
+			newProvider: func() provider.Provider { return &providerWithUnregistrableRule{MockProvider: newMock()} },
+			wantErr:     "setting up registry: registering syntactic rule test/unregistrable",
+			wantRules:   []string{"project/load-failed"},
+			wantMessage: "setting up registry",
 		},
 		{
-			name:        "text",
-			newRenderer: func(b *bytes.Buffer) renderer.Renderer { return renderer.NewTextRenderer(b) },
-			assertOutput: func(t *testing.T, out string) {
-				assert.Contains(t, out, "error[project/spec-syntax-parse-valid]: failed to parse spec from path bad.yaml")
-				assert.Contains(t, out, "Found 1 error(s), 0 warning(s)")
-				assert.NotContains(t, out, "setting up registry")
+			name:        "source validation run",
+			newProvider: func() provider.Provider { return &providerWithFailingSourceRun{MockProvider: newMock()} },
+			wantErr:     "source validation: source rule test/unknown-source-file returned results for unknown file: elsewhere.yaml",
+			wantRules:   []string{"project/load-failed"},
+			wantMessage: "source validation",
+		},
+		{
+			name:        "syntax validation run",
+			newProvider: func() provider.Provider { return &providerWithFailingSyntaxRun{MockProvider: newMock()} },
+			wantErr:     "syntactic validation: project-wide validation: project rule test/unknown-file returned results for unknown file: elsewhere.yaml",
+			wantRules:   []string{"test/source-warning", "project/spec-syntax-parse-valid", "project/load-failed"},
+			wantMessage: "syntactic validation",
+			wantText: []string{
+				"warning[test/source-warning]: reference as written",
+				"error[project/spec-syntax-parse-valid]: failed to parse spec from path bad.yaml",
 			},
+			wantSummary: "Found 1 error(s), 1 warning(s)",
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
+		for _, useJSON := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/json=%v", tc.name, useJSON), func(t *testing.T) {
+				t.Parallel()
 
-			mockProvider := &providerWithUnregistrableRule{MockProvider: testutils.NewMockProvider(nil, nil)}
-			mockProvider.MatchPatterns = fixtureMatchPatterns
-			mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
-				return map[string]*specs.RawSpec{"bad.yaml": {Data: []byte("kind: [")}}, nil
-			}}
+				mockLoader := &MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+					return map[string]*specs.RawSpec{
+						"bad.yaml": {Data: []byte("kind: [")},
+						"a.yaml":   {Data: []byte("kind: Source\nversion: rudder/v1\nmetadata:\n  name: '{{ .NAME }}'\nspec:\n  k: v")},
+					}, nil
+				}}
 
-			var out bytes.Buffer
-			proj := project.New(mockProvider,
-				project.WithLoader(mockLoader),
-				project.WithRenderer(tc.newRenderer(&out)),
-			)
+				var out bytes.Buffer
+				r := renderer.NewTextRenderer(&out)
+				if useJSON {
+					r = renderer.NewJSONRenderer(&out)
+				}
+				// Each run gets its own provider, since the mock records the
+				// specs it parses.
+				proj := project.New(tc.newProvider(),
+					project.WithLoader(mockLoader),
+					project.WithSubstitutor(varsubst.NewSubstitutor(mapResolver{"NAME": "resolved_name"})),
+					project.WithRenderer(r),
+				)
 
-			err := proj.Load("test_dir")
+				err := proj.Load("test_dir")
 
-			require.ErrorContains(t, err, "setting up registry: registering syntactic rule test/unregistrable")
-			assert.Equal(t, tc.wantReported, errors.Is(err, project.ErrReported))
-			tc.assertOutput(t, out.String())
-		})
+				require.ErrorContains(t, err, tc.wantErr)
+				assert.Equal(t, useJSON, errors.Is(err, project.ErrReported))
+
+				if useJSON {
+					var doc struct {
+						Diagnostics []struct {
+							RuleID  string `json:"ruleId"`
+							Message string `json:"message"`
+						} `json:"diagnostics"`
+					}
+					require.NoError(t, json.Unmarshal(out.Bytes(), &doc))
+					var got []string
+					for _, d := range doc.Diagnostics {
+						got = append(got, d.RuleID)
+					}
+					// require, so an empty array fails this run instead of
+					// panicking on the index below and stopping every test.
+					require.Equal(t, tc.wantRules, got)
+					assert.Contains(t, doc.Diagnostics[len(doc.Diagnostics)-1].Message, tc.wantMessage)
+					return
+				}
+
+				var lines []string
+				for _, line := range strings.Split(out.String(), "\n") {
+					if strings.HasPrefix(line, "warning[") || strings.HasPrefix(line, "error[") {
+						lines = append(lines, line)
+					}
+				}
+				require.Len(t, lines, len(tc.wantText))
+				for i, want := range tc.wantText {
+					assert.True(t, strings.HasPrefix(lines[i], want), "line %d: %q", i, lines[i])
+				}
+				if tc.wantSummary == "" {
+					assert.Empty(t, out.String())
+				} else {
+					assert.Contains(t, out.String(), tc.wantSummary)
+				}
+				assert.NotContains(t, out.String(), tc.wantMessage)
+			})
+		}
 	}
 }

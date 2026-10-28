@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    host_name: kafka-avro.rudder-cli-e2e.internal
+    host_name: "{{ .KAFKA_AVRO_HOST_NAME }}"
     port: "9092"
     topic: rudder-cli-e2e-avro-updated
     ssl_enabled: false

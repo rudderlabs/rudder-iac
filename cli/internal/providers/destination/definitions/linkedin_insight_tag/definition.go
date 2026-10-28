@@ -64,6 +64,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:     "LINKEDIN_INSIGHT_TAG",
 		Version:     1,
 		Properties:  properties,
+		SecretKeys:  []string{"partner_id"},
 		NewConfig: func() any {
 			return &linkedinInsightTagConfig{}
 		},

@@ -18,6 +18,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -31,6 +32,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // salesforceConfig is the local YAML config model. Field set mirrors
@@ -66,11 +68,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:     "SALESFORCE",
 		Version:     1,
 		Properties:  properties,
-		SecretKeys:  []string{"password", "initial_access_token"},
+		SecretKeys:  []string{"password", "initial_access_token", "user_name"},
 		NewConfig: func() any {
 			return &salesforceConfig{}
 		},
-		SourceTypes:     append([]string(nil), sourceTypes...),
-		ConnectionModes: connectionModes,
+		SourceTypes:          append([]string(nil), sourceTypes...),
+		ConnectionModes:      connectionModes,
+		SupportsVisualMapper: true,
 	}
 }

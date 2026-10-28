@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    dsn: https://rudderclie2e@o0.ingest.sentry.io/0
+    dsn: "{{ .SENTRY_DSN }}"
     environment: staging
     release: 1.0.0
     server_name: rudder-cli-e2e

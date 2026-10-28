@@ -2,6 +2,7 @@ package rules
 
 import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
 
 // ValidationContext provides all the information a rule needs to perform validation.
@@ -18,6 +19,17 @@ type ValidationContext struct {
 	// Spec is the raw spec data (typically map[string]any) from the YAML.
 	// Rules can inspect this for syntactic validation before resource graph construction.
 	Spec map[string]any
+
+	// Source is the spec file as written, before variable substitution. Only
+	// rules implementing SourceRule receive it, from NewSourceContext.
+	Source []byte
+
+	// References is Source with each variable reference swapped for a
+	// placeholder. A SourceRule's Spec and Metadata are parsed from this copy,
+	// since an unquoted reference may not parse until substitution runs, so a
+	// value holding a reference reads as its placeholder, and References maps
+	// it back. Only rules implementing SourceRule receive it.
+	References varsubst.Replaced
 
 	// Kind is the spec kind (e.g., "properties", "events", "tp", "custom-types")
 	Kind string

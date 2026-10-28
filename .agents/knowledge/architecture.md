@@ -339,6 +339,10 @@
 - Every verified definition whose db-config lists `warehouse` now declares it with its full rETL metadata. Unverified eligible definitions are deferred, and the backfill promotes nothing to verified. `.claude/skills/onboard-cli-destination/reference/source-type-mapping.md` "rETL metadata" holds the derivation and the commands that reproduce it.
 - Declaring `warehouse` also maps `connectionMode.warehouse` and `consentManagement.warehouse` in both conversion directions. The webapp writes `connectionMode.<sourceType>` for every connected source type, so a UI-made destination that already has an rETL connection carries these keys. A spec imported before the backfill lacks them: after upgrading, `plan` shows an update removing them, and `apply`, which sends the full config, strips them (and any warehouse consent settings) from a destination nobody edited. Re-import those destinations after upgrading.
 
+## DEX-998 — Unverified Warehouse Metadata Backfill
+<!-- ticket:DEX-998 -->
+- Every registered definition whose db-config lists `warehouse` now declares it with its rETL metadata, verified or not. This supersedes "Unverified eligible definitions are deferred" in "DEX-834 — Verified Warehouse Metadata Backfill", and nothing else.
+
 ## CFD-160: destination definition table and docs command
 <!-- ticket:CFD-160 -->
 - The compiled destination definitions and their verified mark live in one table, `cli/internal/providers/destination/definitions/builtin/builtin.go`. `newDestinationRegistry` in `cli/internal/app/dependencies.go` only calls `builtin.NewRegistry`, and `rudder-cli docs destination` reads the same table. Register, verify or promote a definition by editing its entry there. This supersedes the "register in `cli/internal/app/dependencies.go`" placement in every earlier section of this file, and nothing else in them.
