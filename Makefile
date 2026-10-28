@@ -115,3 +115,7 @@ typer-typescript-validate: ## Validate generated TypeScript code against the Rud
 	cp typer/generator/platforms/typescript/testdata/EmptyIdentity.ts \
 	   typer/generator/platforms/typescript/testdata/validator/src/RudderTyper/EmptyIdentity.ts
 	cd typer/generator/platforms/typescript/testdata/validator && docker compose run --rm -T validator
+
+.PHONY: test-install-script
+test-install-script: ## Test scripts/install.sh against a stubbed curl
+	sh scripts/install_test.sh
