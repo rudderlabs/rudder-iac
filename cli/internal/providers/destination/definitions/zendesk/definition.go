@@ -19,6 +19,7 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -32,6 +33,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // zendeskConfig is the local YAML config model. Field set mirrors
@@ -71,7 +73,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		APIType:     "ZENDESK",
 		Version:     1,
 		Properties:  properties,
-		SecretKeys:  []string{"api_token"},
+		SecretKeys:  []string{"api_token", "email"},
 		NewConfig: func() any {
 			return &zendeskConfig{}
 		},
