@@ -1,6 +1,9 @@
 package source
 
 import (
+	"reflect"
+	"strings"
+
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -103,6 +106,18 @@ type EventConfigSpec struct {
 type TrackConfigSpec struct {
 	EventConfigSpec     `mapstructure:",squash"`
 	DropUnplannedEvents *bool `json:"drop_unplanned_events" mapstructure:"drop_unplanned_events"`
+}
+
+// SourceTypes returns the values a source spec's `type` accepts, read from the
+// SourceSpec oneof rule, so documentation lists exactly what validation accepts.
+func SourceTypes() []string {
+	field, _ := reflect.TypeOf(SourceSpec{}).FieldByName("SourceDefinition")
+	for _, rule := range strings.Split(field.Tag.Get("validate"), ",") {
+		if values, ok := strings.CutPrefix(rule, "oneof="); ok {
+			return strings.Fields(values)
+		}
+	}
+	return nil
 }
 
 // Resource structs

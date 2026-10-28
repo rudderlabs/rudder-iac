@@ -43,9 +43,10 @@ func (f YAMLFormatter) Format(data any) ([]byte, error) {
 		return nil, fmt.Errorf("closing YAML encoder: %w", err)
 	}
 
-	// Byte-level rewrite: the yaml encoder cannot emit a '{'-leading scalar
-	// unquoted, so quoted substitution tokens are unquoted after encoding.
-	return varsubst.UnquoteTokens(buf.Bytes()), nil
+	// Byte-level rewrite: the encoder double-quotes every string, but a JSON
+	// secret substituted into a double-quoted slot breaks on its own quotes
+	// and into a bare slot becomes a map, so tokens are single-quoted.
+	return varsubst.SingleQuoteTokens(buf.Bytes()), nil
 }
 
 // Extension returns "yaml" as the file extension.

@@ -88,6 +88,10 @@ func TestAccountsImportWorkspace(t *testing.T) {
 	reference := varReference.FindStringSubmatch(spec)
 	require.NotNil(t, reference, "credentials must be exported as a {{ .VAR }} reference, got:\n%s", spec)
 	varName := reference[1]
+	// A bare or double-quoted slot breaks for a JSON key (DEX-1025): the import
+	// must write the reference in single quotes.
+	assert.Regexp(t, `'\{\{\s*\.`+varName+`\s*\}\}'`, spec,
+		"credentials reference must be single-quoted, got:\n%s", spec)
 
 	varFile := filepath.Join(importedDir, importer.SecretsVarFileName)
 	scaffoldedVars, err := os.ReadFile(varFile)

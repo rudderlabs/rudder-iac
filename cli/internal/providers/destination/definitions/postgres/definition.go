@@ -424,10 +424,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "postgres",
-		APIType:    "POSTGRES",
-		Version:    1,
-		Properties: properties,
+		Type:        "postgres",
+		DisplayName: "PostgreSQL",
+		APIType:     "POSTGRES",
+		Version:     1,
+		Properties:  properties,
 		SecretKeys: []string{
 			"password",
 			"access_key_id",

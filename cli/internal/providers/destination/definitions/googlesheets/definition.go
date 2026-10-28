@@ -72,11 +72,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "googlesheets",
-		APIType:    "GOOGLESHEETS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"credentials"},
+		Type:        "googlesheets",
+		DisplayName: "Google Sheets",
+		APIType:     "GOOGLESHEETS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"credentials"},
 		NewConfig: func() any {
 			return &googleSheetsConfig{}
 		},

@@ -76,7 +76,7 @@ type delimitedMappingEntry struct {
 
 type eventToTypeEntry struct {
 	From string `mapstructure:"from" validate:"required,pattern=single_line_100"`
-	To   string `mapstructure:"to" validate:"omitempty,oneof=initHeartbeat heartbeatPlaybackStarted heartbeatPlaybackPaused heartbeatPlaybackResumed heartbeatPlaybackCompleted heartbeatPlaybackInterrupted heartbeatContentStarted heartbeatContentComplete heartbeatAdBreakStarted heartbeatAdBreakCompleted heartbeatAdStarted heartbeatAdCompleted heartbeatAdSkipped heartbeatSeekStarted heartbeatSeekCompleted heartbeatBufferStarted heartbeatBufferCompleted heartbeatQualityUpdated heartbeatUpdatePlayhead"`
+	To   string `mapstructure:"to" validate:"omitempty,oneof='' initHeartbeat heartbeatPlaybackStarted heartbeatPlaybackPaused heartbeatPlaybackResumed heartbeatPlaybackCompleted heartbeatPlaybackInterrupted heartbeatContentStarted heartbeatContentComplete heartbeatAdBreakStarted heartbeatAdBreakCompleted heartbeatAdStarted heartbeatAdCompleted heartbeatAdSkipped heartbeatSeekStarted heartbeatSeekCompleted heartbeatBufferStarted heartbeatBufferCompleted heartbeatQualityUpdated heartbeatUpdatePlayhead"`
 }
 
 type eventFiltering struct {
@@ -200,10 +200,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "adobe_analytics",
-		APIType:    "ADOBE_ANALYTICS",
-		Version:    1,
-		Properties: properties,
+		Type:        "adobe_analytics",
+		DisplayName: "Adobe Analytics",
+		APIType:     "ADOBE_ANALYTICS",
+		Version:     1,
+		Properties:  properties,
 		NewConfig: func() any {
 			return &adobeAnalyticsConfig{}
 		},

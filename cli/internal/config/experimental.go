@@ -9,6 +9,10 @@ import (
 	"github.com/spf13/viper"
 )
 
+// ExperimentalEnvVar turns experimental mode on. Without it every experimental
+// flag reads as false, whatever its own variable says.
+const ExperimentalEnvVar = "RUDDERSTACK_CLI_EXPERIMENTAL"
+
 // ExperimentalConfig defines all available experimental flags
 // All flags default to false for safety - explicit opt-in required
 type ExperimentalConfig struct {
@@ -35,6 +39,10 @@ type ExperimentalConfig struct {
 	// RETLTableSupport registers the retl-source-table spec kind with the RETL
 	// provider.
 	RETLTableSupport bool `mapstructure:"retlTableSupport"`
+
+	// SourcesListen shows and enables the `sources` command group: a local listener that
+	// captures the events an app sends, and the commands that read them.
+	SourcesListen bool `mapstructure:"sourcesListen"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

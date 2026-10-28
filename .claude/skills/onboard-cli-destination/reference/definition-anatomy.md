@@ -75,8 +75,9 @@ func NewDefinition() *definitions.DestinationDefinition {
     properties = append(properties, common.Properties(sourceTypes)...)
 
     return &definitions.DestinationDefinition{
-        Type:       "s3",       // lowercase(APIType), deterministic; equals the input localType
-        APIType:    "S3",       // upstream API type, derived from db-config.json "name" (Step 1)
+        Type:        "s3",        // lowercase(APIType), deterministic; equals the input localType
+        DisplayName: "Amazon S3", // db-config.json "displayName"; registration rejects an empty one
+        APIType:     "S3",        // upstream API type, derived from db-config.json "name" (Step 1)
         Version:    1,          // = terraform ConfigMeta.Version
         Properties: properties,
         SecretKeys: []string{"access_key_id", "access_key"}, // snake_case LOCAL keys
@@ -120,6 +121,7 @@ Register(); `RegisteredDefinition.GatedKeyPaths()` returns
 
 Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 
+- `DisplayName` must not be empty.
 - `NewConfig` must return a pointer to struct.
 - Every `SourceTypes` entry must exist in the local→API source-type mapping.
 - `ConnectionModes` keys ⊆ `SourceTypes`, and every source type must have modes.
@@ -139,6 +141,45 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
 - Gated properties: source types ⊆ `SourceTypes`, local key must exist on the
   config struct, no duplicates, and the property must carry a local key
   (`Gated(Discriminator(...))` is rejected).
+- Every `SecretKeys` path must resolve to a string field, through nested
+  objects and lists of objects, and be snake_case, since each segment goes
+  upper-cased into the secret's variable name.
+- Every `validate` rule on the config struct must be one that
+  `(*RegisteredDefinition).Describe` reads (`required`, `required_if`,
+  `required_unless`, `required_with`, `excluded_with`, `excluded_if`, `oneof`,
+  `dynamic_or_oneof`, `pattern`, `dynamic_or_pattern`, `min`, `max`, `dive`,
+  `omitempty`) or a tag in the definition's `ConfigValidateFuncs`. Named
+  patterns must be registered. This keeps `rudder-cli docs destination` able to
+  describe every definition.
+- Registration also rejects rule shapes the docs would misstate:
+  - after `dive`, any rule but `oneof`, `dynamic_or_oneof`, `pattern`,
+    `dynamic_or_pattern` or a custom tag;
+  - `omitempty` after `dive` next to `oneof` or `dynamic_or_oneof`: a list
+    item is never omitted, so it would only let `""` skip the enum. List `''`
+    as a member to allow an empty item;
+  - `required` on a key inside a nested block that is not a pointer, since
+    go-playground checks it even when the spec leaves the block out;
+  - a `required*` rule on a `bool` or number that is not a pointer, since it
+    rejects `false` or `0`;
+  - a `required*` rule on a nested block that is not a pointer, since
+    go-playground skips a bare `required` there and reads the other rules as
+    "not empty";
+  - a `required*` rule after `omitempty`, since go-playground skips every rule
+    after `omitempty` on an empty value;
+  - a second `required_if`, `required_unless` or `excluded_if` on one key,
+    since go-playground checks each on its own;
+  - in a condition, a bool value other than `true` or `false` (go-playground
+    compares it with the text `true`);
+  - in a condition, a `oneof` or a `min`/`max` limit, an integer not written in
+    plain base 10 (go-playground reads `010` as octal), or a negative value for
+    an unsigned integer;
+  - a condition on a key that is not a string, bool or number;
+  - `oneof` on anything but a string or an integer, and `min` or `max` on a
+    bool or a block, since go-playground panics on them;
+  - `pattern`, `dynamic_or_pattern` or `dynamic_or_oneof` on anything but a
+    string, since they read only strings;
+  - `|`, a quoted value outside a `oneof` or `dynamic_or_oneof` list, or a
+    `0x2C` or `0x7C` escape in a tag.
 
 ## Validation semantics to remember
 
@@ -154,6 +195,10 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
   source-extraction.md "Enforcing regex patterns".
 - Error paths are JSON pointers over local keys (`/bucket_name`,
   `/consent_management/web/0/provider`) — assert them in tests.
+- An explicitly configured empty string is rejected for enum fields before
+  defaults are applied. Omitted enum keys may still receive defaults; only a
+  schema enum that contains `""` should list it, as the quoted member `''`
+  (`oneof='' a b`).
 
 ## Test template
 
@@ -170,18 +215,17 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
    `LocalJSON`/`APIJSON`; include a consent case with boundary-mapped source
    types (`android_kotlin` ↔ `androidKotlin`, `react_native` ↔ `reactnative`).
 
-## Registration in dependencies.go
+## Registration in the builtin table
+
+`newDestinationRegistry` registers the entries of the table in
+`cli/internal/providers/destination/definitions/builtin/builtin.go`: the
+verified ones always, the rest only under `UnverifiedDestinations`.
 
 ```go
-func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
-    registry := definitions.NewRegistry()
-    if err := registry.Register(s3.NewDefinition()); err != nil {
-        return nil, fmt.Errorf("registering s3 destination definition: %w", err)
-    }
-    if cfg.ExperimentalFlags.UnverifiedDestinations {
-        // Append the new definition here, same pattern.
-    }
-    return registry, nil
+var entries = []entry{
+    {NewDefinition: s3.NewDefinition, Verified: true},
+    // ...
+    {NewDefinition: <pkg>.NewDefinition}, // the new definition, unverified
 }
 ```
 

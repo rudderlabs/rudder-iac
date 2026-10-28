@@ -39,7 +39,7 @@ var connectionModes = map[string][]string{
 
 type eventToStandard struct {
 	From string `mapstructure:"from" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_oneof=AddPaymentInfo AddToCart AddToWishlist ClickButton CompletePayment CompleteRegistration Contact Download InitiateCheckout PlaceAnOrder Search SubmitForm Subscribe ViewContent CustomizeProduct FindLocation Schedule Purchase Lead ApplicationApproval SubmitApplication StartTrial"`
+	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_oneof='' AddPaymentInfo AddToCart AddToWishlist ClickButton CompletePayment CompleteRegistration Contact Download InitiateCheckout PlaceAnOrder Search SubmitForm Subscribe ViewContent CustomizeProduct FindLocation Schedule Purchase Lead ApplicationApproval SubmitApplication StartTrial"`
 }
 
 // Nested event_filtering block, matching the fleet convention (braze,
@@ -86,11 +86,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "tiktok_ads",
-		APIType:    "TIKTOK_ADS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"access_token", "pixel_code"},
+		Type:        "tiktok_ads",
+		DisplayName: "TikTok Ads",
+		APIType:     "TIKTOK_ADS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"access_token", "pixel_code"},
 		NewConfig: func() any {
 			return &tiktokAdsConfig{}
 		},

@@ -68,14 +68,14 @@ var connectionModes = map[string][]string{
 // integrations-config destinations/kafka defaultConfig; validations mirror
 // schema.json, including Kafka's SSL/SASL, Avro, multi-topic, and SSH settings.
 type kafkaConfig struct {
-	HostName            string                   `mapstructure:"host_name" validate:"required,dynamic_or_pattern=kafka_host_name"`
-	Port                string                   `mapstructure:"port" validate:"required,dynamic_or_pattern=kafka_port"`
-	Topic               string                   `mapstructure:"topic" validate:"required,dynamic_or_pattern=kafka_topic"`
+	HostName            string                   `mapstructure:"host_name" validate:"required,pattern=kafka_host_name"`
+	Port                string                   `mapstructure:"port" validate:"required,pattern=kafka_port"`
+	Topic               string                   `mapstructure:"topic" validate:"required,pattern=kafka_topic"`
 	SSLEnabled          *bool                    `mapstructure:"ssl_enabled"`
 	CACertificate       string                   `mapstructure:"ca_certificate"`
 	UseSASL             *bool                    `mapstructure:"use_sasl"`
-	SASLType            string                   `mapstructure:"sasl_type" validate:"required_if=SSLEnabled true UseSASL true,omitempty,dynamic_or_oneof=plain sha256 sha512" default:"plain"`
-	Username            string                   `mapstructure:"username" validate:"required_if=SSLEnabled true UseSASL true,omitempty,dynamic_or_pattern=kafka_user_name"`
+	SASLType            string                   `mapstructure:"sasl_type" validate:"required_if=SSLEnabled true UseSASL true,omitempty,oneof=plain sha256 sha512" default:"plain"`
+	Username            string                   `mapstructure:"username" validate:"required_if=SSLEnabled true UseSASL true,omitempty,pattern=kafka_user_name"`
 	Password            string                   `mapstructure:"password" validate:"omitempty,dynamic_or_pattern=single_line_100"`
 	ConvertToAvro       *bool                    `mapstructure:"convert_to_avro"`
 	AvroSchemas         []avroSchema             `mapstructure:"avro_schemas" validate:"required_if=ConvertToAvro true,omitempty,dive"`
@@ -90,10 +90,10 @@ type kafkaConfig struct {
 }
 
 type sshConfig struct {
-	Host      string `mapstructure:"host" validate:"kafka_ssh_required,omitempty,dynamic_or_pattern=kafka_ssh_host"`
-	Port      string `mapstructure:"port" validate:"kafka_ssh_required,omitempty,dynamic_or_pattern=kafka_port"`
-	User      string `mapstructure:"user" validate:"kafka_ssh_required,omitempty,dynamic_or_pattern=kafka_user_name"`
-	PublicKey string `mapstructure:"public_key" validate:"kafka_ssh_required,omitempty,dynamic_or_pattern=kafka_ssh_public_key"`
+	Host      string `mapstructure:"host" validate:"kafka_ssh_required,omitempty,pattern=kafka_ssh_host"`
+	Port      string `mapstructure:"port" validate:"kafka_ssh_required,omitempty,pattern=kafka_port"`
+	User      string `mapstructure:"user" validate:"kafka_ssh_required,omitempty,pattern=kafka_user_name"`
+	PublicKey string `mapstructure:"public_key" validate:"kafka_ssh_required,omitempty,pattern=kafka_ssh_public_key"`
 }
 
 // kafkaSSHRequired reads the selector from the top-level config because the SSH
@@ -133,7 +133,7 @@ type avroSchema struct {
 }
 
 type eventTypeTopicMapping struct {
-	From string `mapstructure:"from" validate:"omitempty,dynamic_or_oneof=identify page screen group alias"`
+	From string `mapstructure:"from" validate:"omitempty,oneof=identify page screen group alias"`
 	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_pattern=kafka_mapping_value"`
 }
 
@@ -179,11 +179,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "kafka",
-		APIType:    "KAFKA",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"password"},
+		Type:        "kafka",
+		DisplayName: "Apache Kafka",
+		APIType:     "KAFKA",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"password"},
 		NewConfig: func() any {
 			return &kafkaConfig{}
 		},

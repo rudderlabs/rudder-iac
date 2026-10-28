@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -662,7 +663,7 @@ func TestCustomerioAPIKeyIsWrappedAsSecret(t *testing.T) {
 		DisplayName:       "Customer.io Production",
 		Type:              "customerio",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Config: map[string]any{
 			"site_id":    "site-id-1",
 			"api_key":    "customerio-api-key",

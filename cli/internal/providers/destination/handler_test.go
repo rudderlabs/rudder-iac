@@ -21,6 +21,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -50,8 +51,9 @@ func testRegistry(t *testing.T) *definitions.Registry {
 
 func eventFilteringTestDefinition() *definitions.DestinationDefinition {
 	return &definitions.DestinationDefinition{
-		Type:    "FILTERED",
-		Version: 1,
+		Type:        "FILTERED",
+		DisplayName: "Test",
+		Version:     1,
 		Properties: []converter.ConfigProperty{
 			converter.Simple("trackingID", "tracking_id"),
 			converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
@@ -79,8 +81,9 @@ func eventFilteringTestDefinition() *definitions.DestinationDefinition {
 
 func webhookTestDefinition() *definitions.DestinationDefinition {
 	return &definitions.DestinationDefinition{
-		Type:    "WEBHOOK",
-		Version: 1,
+		Type:        "WEBHOOK",
+		DisplayName: "Test",
+		Version:     1,
 		Properties: []converter.ConfigProperty{
 			converter.Simple("webhookUrl", "webhook_url"),
 		},
@@ -100,8 +103,9 @@ func webhookTestDefinition() *definitions.DestinationDefinition {
 // local specs can be asserted independently of any real destination.
 func defaultsTestDefinition() *definitions.DestinationDefinition {
 	return &definitions.DestinationDefinition{
-		Type:    "DEFAULTED",
-		Version: 1,
+		Type:        "DEFAULTED",
+		DisplayName: "Test",
+		Version:     1,
 		Properties: []converter.ConfigProperty{
 			converter.Simple("apiSecret", "api_secret"),
 			converter.Simple("mode", "mode"),
@@ -124,8 +128,9 @@ func defaultsTestDefinition() *definitions.DestinationDefinition {
 
 func ga4TestDefinition() *definitions.DestinationDefinition {
 	return &definitions.DestinationDefinition{
-		Type:    "GA4",
-		Version: 1,
+		Type:        "GA4",
+		DisplayName: "Test",
+		Version:     1,
 		Properties: []converter.ConfigProperty{
 			converter.Simple("apiSecret", "api_secret"),
 			converter.Simple("measurementId", "measurement_id"),
@@ -199,7 +204,7 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 			DisplayName:       "Production GA4",
 			Type:              "GA4",
 			Enabled:           true,
-			DefinitionVersion: 1,
+			DefinitionVersion: lo.ToPtr[int64](1),
 			Transformation:    "#transformation:my-transform",
 			Config: map[string]any{
 				"api_secret":     "secret",
@@ -236,7 +241,7 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 			ID:                "ga4-no-secret",
 			DisplayName:       "GA4",
 			Type:              "GA4",
-			DefinitionVersion: 1,
+			DefinitionVersion: lo.ToPtr[int64](1),
 			Config:            map[string]any{"measurement_id": "G-1"},
 		})
 		require.NoError(t, err)
@@ -259,7 +264,7 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 		extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/defaulted.yaml", &destination.DestinationSpec{
 			ID:                "defaulted",
 			Type:              "DEFAULTED",
-			DefinitionVersion: 1,
+			DefinitionVersion: lo.ToPtr[int64](1),
 			Config: map[string]any{
 				"api_secret": "secret",
 				"debug_mode": true, // explicit value must survive
@@ -287,7 +292,7 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 			ID:                "bad",
 			DisplayName:       "Bad",
 			Type:              "GA4",
-			DefinitionVersion: 1,
+			DefinitionVersion: lo.ToPtr[int64](1),
 			Transformation:    "#source:my-source", // wrong kind
 			Config:            map[string]any{},
 		})
@@ -304,7 +309,7 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 			ID:                "ga4",
 			DisplayName:       "GA4",
 			Type:              "GA4",
-			DefinitionVersion: 1,
+			DefinitionVersion: lo.ToPtr[int64](1),
 			Config:            map[string]any{},
 		})
 		require.Error(t, err)
@@ -1867,7 +1872,7 @@ func TestHandlerImpl_SecretOnlyDiff(t *testing.T) {
 		DisplayName:       "GA4",
 		Type:              "GA4",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Config: map[string]any{
 			"api_secret":     "local-secret",
 			"measurement_id": "G-123",
@@ -1944,7 +1949,7 @@ func TestHandlerImpl_Create_RevealsWrappedSecrets(t *testing.T) {
 		DisplayName:       "Production GA4",
 		Type:              "GA4",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Config: map[string]any{
 			"api_secret":     "secret-value",
 			"measurement_id": "G-123",

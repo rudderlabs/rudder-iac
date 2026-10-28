@@ -250,6 +250,17 @@ func TestGoogleAdsConfigValidation(t *testing.T) {
 		assert.Equal(t, "/sdk_base_url", errors[0].Path)
 	})
 
+	t.Run("event_mapping_from_config accepts an empty target event", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"conversion_id": "AW-123456789",
+			"event_mapping_from_config": []any{
+				map[string]any{"from": "Order Completed", "to": ""},
+			},
+		})
+		assert.Empty(t, errors)
+	})
+
 	t.Run("event_mapping_from_config rejects an unknown target event", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{

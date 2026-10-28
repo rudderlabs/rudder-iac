@@ -137,6 +137,12 @@
 - Kafka SASL validation follows the nested schema condition: require `sasl_type` and `username` only when both `ssl_enabled` and `use_sasl` are true; `password` remains optional, and `use_sasl: true` with `ssl_enabled: false` is accepted.
 - Kafka models shared `consent_management` only; do not add legacy include-key consent blocks `one_trust_cookie_categories` or `ketch_consent_purposes` unless a future task explicitly changes the destination-definition policy.
 
+## DEX-1088 — Kafka Static Versus Dynamic Pattern Validation
+<!-- ticket:DEX-1088 -->
+- Kafka `host_name`, `port`, `topic`, `username`, and `ssh.{host,port,user,public_key}` use plain `pattern=kafka_*` validation because their upstream schema properties expose only static regexes; accepting templates locally would make validation pass values that the backend rejects during apply.
+- Kafka topic-mapping fields remain dynamic where their own upstream properties explicitly include a template alternative: `event_type_to_topic_map[].to` and `event_to_topic_map[].{from,to}` use `dynamic_or_pattern`.
+- Decide template support per upstream property, not per destination or shared named regex; Kafka intentionally mixes static and template-capable fields.
+
 ## DEX-487 — ActiveCampaign Config Surface
 <!-- ticket:DEX-487 -->
 - ActiveCampaign models shared `consent_management` only; reject legacy include-key consent blocks `one_trust_cookie_categories` and `ketch_consent_purposes` as unknown config keys for this onboarding.
@@ -293,3 +299,14 @@
 - Customer.io device-mode-v2 requiredness counts only an explicit `sdk_version.web: v2`. The nested `v2` default fills only an `sdk_version` block the spec carries, so an omitted block is sent absent, and upstream's `allOf` conditionals and the web SDK both read an absent version as v1. Treating it as `v2` during validation rejects existing web device-mode destinations that upstream accepts.
 - Attach the conditional `write_key` requirement to the top-level `WriteKey` pointer and register it with `CallEvenIfNull`; validating only nested `write_key.web` cannot catch a completely omitted `write_key` block.
 - Customer.io `write_key.web` uses plain `pattern=single_line_100`: upstream's pattern has no template branch, so a template is judged as a literal and gets no length exemption.
+
+## DEX-1079 — Destination Envelope Required Numbers Are Pointers
+<!-- ticket:DEX-1079 -->
+- `DestinationSpec.DefinitionVersion` (`cli/internal/providers/destination/model.go`) is `*int64` with `validate:"required"`. go-playground's `required` rejects a plain number's zero value, so as an `int64` an explicit `definition_version: 0` reported `'definition_version' is required` and never reached the `version not valid for destination type '<type>'; valid versions: <n>` check in `specSyntaxValidRule.Validate`. As a pointer, `required` fails only on an absent or `null` key.
+- Registration's rejection of a required non-pointer number covers definition config structs only; nothing checks the `DestinationSpec` envelope, so a new required number or bool there must be made a pointer by hand.
+- Rejected alternative: keep `int64`, drop the tag, and check the raw key in `specSyntaxValidRule.Validate`. It duplicates the shared `'<field>' is required` message by hand, and re-adding the tag later would report the error twice.
+
+## DEX-1081 — Decode Error Messages Read The Type Off The Model
+<!-- ticket:DEX-1081 -->
+- mapstructure v2.5.0 types only scalar and map mismatches (`*mapstructure.UnconvertibleTypeError`, whose `Expected` holds the target). Slice and struct mismatches are plain text (`source data must be an array or slice, got string`, `expected a map or struct, got "string"`). So `decodeErrorMessage` (`cli/internal/providers/destination/definitions/validator.go`) finds the expected type by walking the root struct along the decode path (`typeAt`: struct fields by mapstructure tag, then map values and list items), and never parses error text.
+- Rejected alternatives: rETL's `'<field>' is not valid: <reason>` (`cli/internal/providers/retl/rules/connection/connection_spec_valid.go`) still prints Go types such as `map[string]interface {}` and `common.ConsentManagement`. Matching mapstructure's message text has no precedent in the repo and breaks silently on a library upgrade. A decode hook that raises typed errors would re-implement mapstructure's conversion rules.
