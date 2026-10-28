@@ -28,7 +28,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
-		"cloud", "react_native", "flutter", "cordova",
+		"cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -37,6 +37,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"cloud"}, modes)
 	}
+
+	// db-config.json declares neither rETL field, so the backend fallback applies.
+	assert.Nil(t, googlesheets.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	byAPI, err := registry.GetByAPIType("GOOGLESHEETS", 1)
 	require.NoError(t, err)
@@ -354,6 +359,7 @@ func TestGoogleSheetsConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 
