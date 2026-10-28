@@ -17,7 +17,8 @@
     },
     "mobileApiKeyIOS": {
       "ios": "rudderCliE2eDeviceIosKeyUpdated"
-    }
+    },
+    "eventFilteringOption": "disable"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"
