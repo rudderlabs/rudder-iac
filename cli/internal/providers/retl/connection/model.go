@@ -116,9 +116,10 @@ type ConnectionSpec struct {
 // and ClassifyFlow mirrors that. No raw map absorbs unknown keys, so a misspelt
 // field is an error rather than a silently dropped setting. Object is a pointer
 // so validation can tell an omitted object (a JSON mapper connection) from an
-// explicitly empty one, which is a spec error.
+// explicitly empty one, which is a spec error. SyncBehaviour leaves out mirror,
+// which the backend accepts but this CLI does not support.
 type ConfigSpec struct {
-	SyncBehaviour string            `json:"sync_behaviour"          mapstructure:"sync_behaviour" validate:"required,oneof=upsert mirror full"`
+	SyncBehaviour string            `json:"sync_behaviour"          mapstructure:"sync_behaviour" validate:"required,oneof=upsert full"`
 	Schedule      ScheduleSpec      `json:"schedule"                mapstructure:"schedule"`
 	Identifiers   []MappingSpec     `json:"identifiers"             mapstructure:"identifiers"    validate:"required,min=1,dive"`
 	Mappings      []MappingSpec     `json:"mappings,omitempty"      mapstructure:"mappings"       validate:"dive"`
