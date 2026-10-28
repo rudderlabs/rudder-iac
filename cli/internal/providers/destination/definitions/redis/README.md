@@ -198,5 +198,5 @@ config:
 
 Note that:
 
-- `ca_certificate` spans several lines. Pass it with its line breaks written as `\n`, which the double-quoted reference turns back into line breaks: `export RUDDER_REDIS_CA_CERTIFICATE="$(awk '{printf "%s\\n", $0}' ca.pem)"`.
+- `ca_certificate` spans several lines. In a var file, write it as a YAML literal block; a reference that is the whole quoted value, such as `'{{ .REDIS_CA_CERTIFICATE }}'`, keeps the line breaks in either quote style, including the single-quoted references `import workspace` generates. An environment variable can carry the file's contents directly, for example `export RUDDER_REDIS_CA_CERTIFICATE="$(cat ca.pem)"`.
 - The dashboard doesn't mask `ca_certificate`, but Rudder CLI treats it as a secret.

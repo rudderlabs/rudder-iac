@@ -61,7 +61,7 @@ The above example connects over SSL with SCRAM-SHA-512 authentication — see [S
 `config` accepts only the keys listed below. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
 
 > [!NOTE]
-> A `{{ path || fallback }}` template resolves per event, so only the topic mappings can use one: `to` in `event_type_to_topic_map`, and both fields of `event_to_topic_map`. Rudder CLI accepts a template in most other string keys too, but the API rejects one in `host_name`, `port`, `topic`, `sasl_type`, `username`, `from` in `event_type_to_topic_map`, and the `ssh` fields — such a spec passes `validate` and fails at `apply`.
+> A `{{ path || fallback }}` template resolves per event, so only the topic mappings can use one: `to` in `event_type_to_topic_map`, and both fields of `event_to_topic_map`. A template in `host_name`, `port`, `topic`, `sasl_type`, `username`, `from` in `event_type_to_topic_map`, or the `ssh` fields fails validation.
 
 ### Connection
 

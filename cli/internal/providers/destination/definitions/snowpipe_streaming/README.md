@@ -115,11 +115,22 @@ PEM-encoded private key whose public half is assigned to `user` in Snowflake.
 - Must include the delimiters: `-----BEGIN PRIVATE KEY-----` … `-----END PRIVATE KEY-----`, or the `ENCRYPTED PRIVATE KEY` equivalents. A bare base64 key body is rejected, and so is a PKCS#1 `RSA PRIVATE KEY`.
 - Templates aren't accepted. `{{ .VAR }}` references are resolved before validation, so the resolved value is what must be PEM-shaped.
 
-Load the key from a file with its line breaks written as `\n`, which the double-quoted reference turns back into line breaks:
+Environment variables can carry the key directly:
 
 ```bash
-export RUDDER_SNOWFLAKE_PRIVATE_KEY="$(awk '{printf "%s\\n", $0}' rsa_key.p8)"
+export RUDDER_SNOWFLAKE_PRIVATE_KEY="$(cat rsa_key.p8)"
 ```
+
+In a var file, use a YAML literal block:
+
+```yaml
+SNOWFLAKE_PRIVATE_KEY: |
+  -----BEGIN PRIVATE KEY-----
+  ...
+  -----END PRIVATE KEY-----
+```
+
+A reference that is the whole quoted value, such as `'{{ .SNOWFLAKE_PRIVATE_KEY }}'`, keeps the line breaks in either quote style, including the single-quoted form `import workspace` generates.
 
 Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
@@ -259,5 +270,5 @@ config:
 
 Note that:
 
-- `private_key` spans several lines, so pass it with its line breaks written as `\n` — see [`private_key`](#private_key--string-required-secret).
+- `private_key` spans several lines. Use a YAML literal block in a var file or a multiline environment variable — see [`private_key`](#private_key--string-required-secret).
 - Unlike [Snowflake](../snowflake/README.md#secrets), `user` isn't a secret here, so `import` writes it in plain text.
