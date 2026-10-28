@@ -27,6 +27,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -40,6 +41,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type eventFiltering struct {
@@ -199,7 +201,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 		NewConfig: func() any {
 			return &googleAnalyticsConfig{}
 		},
-		SourceTypes:     append([]string(nil), sourceTypes...),
-		ConnectionModes: connectionModes,
+		SourceTypes:          append([]string(nil), sourceTypes...),
+		ConnectionModes:      connectionModes,
+		SupportsVisualMapper: true,
 	}
 }

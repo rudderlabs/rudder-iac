@@ -18,6 +18,7 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -30,6 +31,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud", "device"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // schema.json guards both sides with ^(.{0,100})$ — a pattern forbidding line
