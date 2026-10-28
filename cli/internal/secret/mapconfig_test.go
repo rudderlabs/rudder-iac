@@ -3,6 +3,7 @@ package secret
 import (
 	"encoding/json"
 	"maps"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -369,4 +370,65 @@ func TestVariableName(t *testing.T) {
 	config := map[string]any{"headers": []any{map[string]any{"to": "t"}}}
 	require.NoError(t, MaskSecrets(config, "my-dest", []string{"headers.to"}))
 	assert.Equal(t, Reference(VariableName("my-dest", "headers", "0", "to")), config["headers"].([]any)[0].(map[string]any)["to"])
+}
+
+// WalkSecrets reaches the values MaskSecrets rewrites, with the segments
+// VariableName turns into the names MaskSecrets writes.
+func TestWalkSecrets(t *testing.T) {
+	config := map[string]any{
+		"api_key": "key",
+		"headers": []any{
+			map[string]any{"to": "first", "from": "X-First"},
+			"not-a-header",
+			map[string]any{"to": "second"},
+		},
+		"typed": []map[string]any{{"to": "typed"}},
+		"auth":  map[string]any{"token": "nested"},
+		"other": "not a secret",
+	}
+	secretKeys := []string{"api_key", "headers.to", "typed.to", "auth.token", "missing"}
+
+	type visited struct {
+		segments []string
+		value    any
+	}
+	var got []visited
+	WalkSecrets(config, secretKeys, func(segments []string, value any) {
+		got = append(got, visited{segments: segments, value: value})
+	})
+
+	assert.Equal(t, []visited{
+		{segments: []string{"api_key"}, value: "key"},
+		{segments: []string{"headers", "0", "to"}, value: "first"},
+		{segments: []string{"headers", "2", "to"}, value: "second"},
+		{segments: []string{"typed", "0", "to"}, value: "typed"},
+		{segments: []string{"auth", "token"}, value: "nested"},
+	}, got)
+
+	masked := maps.Clone(config)
+	masked["headers"] = cloneSecretValue(config["headers"])
+	masked["typed"] = cloneSecretValue(config["typed"])
+	masked["auth"] = cloneSecretValue(config["auth"])
+	require.NoError(t, MaskSecrets(masked, "my-dest", secretKeys))
+	for _, v := range got {
+		var value any = masked
+		for _, segment := range v.segments {
+			switch container := value.(type) {
+			case map[string]any:
+				value = container[segment]
+			case []any:
+				value = container[mustAtoi(t, segment)]
+			case []map[string]any:
+				value = container[mustAtoi(t, segment)]
+			}
+		}
+		assert.Equal(t, Reference(VariableName("my-dest", v.segments...)), value)
+	}
+}
+
+func mustAtoi(t *testing.T, s string) int {
+	t.Helper()
+	i, err := strconv.Atoi(s)
+	require.NoError(t, err)
+	return i
 }
