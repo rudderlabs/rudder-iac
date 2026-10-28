@@ -130,6 +130,7 @@ var exampleVariables = variables{
 	"MY_PIXEL_DESTINATION_PIXEL_ID":          "123456789012345",
 	"MY_CUSTOMERIO_AUDIENCE_API_KEY":         "example-api-key",
 	"MY_CUSTOMERIO_AUDIENCE_APP_API_KEY":     "example-app-api-key",
+	"MY_CUSTOMERIO_AUDIENCE_SITE_ID":         "example-site-id",
 }
 
 type variables map[string]string
