@@ -1124,7 +1124,7 @@ func TestSQLModelHandler(t *testing.T) {
 					sqlmodel.IDKey: "src123",
 				},
 				expectedError: true,
-				errorMessage:  "RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=true",
+				errorMessage:  "Delete them in the workspace first",
 				mockSetup: func() *mockRETLClient {
 					return &mockRETLClient{sourceID: "src123", deleteErr: &client.APIError{
 						HTTPStatusCode: http.StatusBadRequest,

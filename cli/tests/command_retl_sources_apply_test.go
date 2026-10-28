@@ -39,10 +39,8 @@ func TestRETLSourcesApply(t *testing.T) {
 		t.Skip("set RUN_RETL_E2E=1; this suite applies to a live workspace")
 	}
 	allowManagedResidue(t)
-	// Accounts are behind the experimental umbrella and the table kind behind
-	// its own flag; the SQL model kind is behind neither.
+	// Accounts are behind the experimental umbrella.
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
-	t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", "true")
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)

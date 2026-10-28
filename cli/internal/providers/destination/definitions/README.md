@@ -101,7 +101,7 @@ A source's own definition resolves to exactly one token. Note that `cloud` and `
 
 Rudder CLI doesn't manage connections from AMP, Shopify, or cloud app sources, so `amp`, `shopify`, and `cloud_source` aren't valid for any type here, even where the dashboard offers the destination to them.
 
-A Reverse ETL connection reaches its destination as a `warehouse` source, and is checked against the same destination config rules as an event stream connection. Reverse ETL connections sit behind the `retlConnectionSupport` experimental flag. A destination can't receive from both event stream and Reverse ETL sources in the same project.
+A Reverse ETL connection reaches its destination as a `warehouse` source, and is checked against the same destination config rules as an event stream connection. A destination can't receive from both event stream and Reverse ETL sources in the same project.
 
 ## Connection modes
 

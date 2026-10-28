@@ -59,89 +59,33 @@ func TestProviderOrderSatisfiesProviderEdges(t *testing.T) {
 }
 
 // The recording server stands in for the backend so the remote load is
-// observable without credentials. The flags travel through the environment
-// rather than viper.Set so InitConfig resolves them the way the CLI does, and
-// t.Setenv unwinds them afterwards. Only the environment unwinds: InitConfig
-// mutates process-global viper, so the package is left holding whatever the
-// last subtest resolved. Later tests that read config must re-init.
-func TestRETLConnectionSupportFlagMatrix(t *testing.T) {
-	cases := []struct {
-		name      string
-		umbrella  string
-		flag      string
-		supported bool
-	}{
-		{name: "flag off keeps connections out of the provider", umbrella: "true", flag: "false"},
-		{name: "flag on registers the connection kind", umbrella: "true", flag: "true", supported: true},
-		{name: "umbrella off ignores the flag", umbrella: "false", flag: "true"},
-	}
+// observable without credentials. Experimental mode is off: the table and
+// connection kinds must register without any flag. InitConfig mutates
+// process-global viper, so later tests that read config must re-init.
+func TestComposeProvidersRegistersRETLTableAndConnection(t *testing.T) {
+	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "false")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", tc.umbrella)
-			t.Setenv("RUDDERSTACK_X_RETL_CONNECTION_SUPPORT", tc.flag)
-			config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+	var hitConnections atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/v2/retl-connections") {
+			hitConnections.Store(true)
+		}
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
 
-			var hitConnections atomic.Bool
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if strings.HasPrefix(r.URL.Path, "/v2/retl-connections") {
-					hitConnections.Store(true)
-				}
-				_, _ = w.Write([]byte(`{}`))
-			}))
-			t.Cleanup(server.Close)
+	c, err := client.New("test-token", client.WithBaseURL(server.URL))
+	require.NoError(t, err)
 
-			c, err := client.New("test-token", client.WithBaseURL(server.URL))
-			require.NoError(t, err)
+	_, providers, err := composeProviders(c)
+	require.NoError(t, err)
+	assert.Contains(t, providers.RETL.SupportedKinds(), connection.ResourceKind)
+	assert.Contains(t, providers.RETL.SupportedKinds(), table.ResourceKind)
 
-			_, providers, err := composeProviders(c)
-			require.NoError(t, err)
-			assert.Equal(t, tc.supported, slices.Contains(providers.RETL.SupportedKinds(), connection.ResourceKind))
-
-			_, err = providers.RETL.LoadResourcesFromRemote(t.Context())
-			require.NoError(t, err)
-			assert.Equal(t, tc.supported, hitConnections.Load())
-		})
-	}
-}
-
-// The composed RETL provider picks the flag up from the environment, and only
-// while experimental mode is on — the same umbrella every experimental flag
-// sits under.
-func TestComposeProvidersGatesRETLTableSupport(t *testing.T) {
-	cases := []struct {
-		name         string
-		experimental string
-		tableFlag    string
-		wantTable    bool
-	}{
-		{name: "experimental mode on", experimental: "true", tableFlag: "true", wantTable: true},
-		{name: "experimental mode off", experimental: "false", tableFlag: "true", wantTable: false},
-		// Experimental mode is on for an unrelated flag: the kind must still be
-		// absent, which is what distinguishes the per-flag check from a bare
-		// experimental-mode check.
-		{name: "experimental mode on, table flag unset", experimental: "true", tableFlag: "", wantTable: false},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", tc.experimental)
-			t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", tc.tableFlag)
-			config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
-
-			c, err := client.New("test-token")
-			require.NoError(t, err)
-
-			_, providers, err := composeProviders(c)
-			require.NoError(t, err)
-
-			if tc.wantTable {
-				assert.Contains(t, providers.RETL.SupportedKinds(), table.ResourceKind)
-				return
-			}
-			assert.NotContains(t, providers.RETL.SupportedKinds(), table.ResourceKind)
-		})
-	}
+	_, err = providers.RETL.LoadResourcesFromRemote(t.Context())
+	require.NoError(t, err)
+	assert.True(t, hitConnections.Load())
 }
 
 func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
