@@ -98,7 +98,6 @@ var entries = []entry{
 	{NewDefinition: adj.NewDefinition, Verified: true},
 	{NewDefinition: adobeanalytics.NewDefinition, Verified: true},
 	{NewDefinition: confluentcloud.NewDefinition, Verified: true},
-	{NewDefinition: customerioaudience.NewDefinition, Verified: true},
 	{NewDefinition: firebase.NewDefinition, Verified: true},
 	{NewDefinition: ga.NewDefinition, Verified: true},
 	{NewDefinition: googlepubsub.NewDefinition, Verified: true},
@@ -119,6 +118,7 @@ var entries = []entry{
 	{NewDefinition: vwo.NewDefinition, Verified: true},
 	{NewDefinition: zendesk.NewDefinition, Verified: true},
 	{NewDefinition: bingadsofflineconversions.NewDefinition},
+	{NewDefinition: customerioaudience.NewDefinition},
 	{NewDefinition: googleadwordsofflineconversions.NewDefinition},
 	{NewDefinition: linkedinads.NewDefinition},
 }
