@@ -61,7 +61,7 @@ The above example connects to a single Redis server over TLS. `cluster_mode` def
 
 Address of your Redis server, as `host:port`. With `cluster_mode` on, list several cluster nodes separated by commas.
 
-- At most 100 characters, and must not contain `.ngrok.io`.
+- At most 100 characters, and must not contain line breaks or `.ngrok.io`.
 
 #### `password` — string, secret
 
@@ -199,4 +199,5 @@ config:
 Note that:
 
 - `ca_certificate` spans several lines. In a var file, write it as a YAML literal block; a reference that is the whole quoted value, such as `'{{ .REDIS_CA_CERTIFICATE }}'`, keeps the line breaks in either quote style, including the single-quoted references `import workspace` generates. An environment variable can carry the file's contents directly, for example `export RUDDER_REDIS_CA_CERTIFICATE="$(cat ca.pem)"`.
+- A certificate with its line breaks written as `\n` also works, but only inside a double-quoted reference. A single-quoted reference, like the ones `import workspace` generates, keeps the `\n` as literal text.
 - The dashboard doesn't mask `ca_certificate`, but Rudder CLI treats it as a secret.

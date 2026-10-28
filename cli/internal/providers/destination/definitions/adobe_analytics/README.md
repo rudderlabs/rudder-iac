@@ -261,7 +261,7 @@ Maps event properties to Adobe props, on the same terms as `list_mapping` — `t
 
 #### `mobile_event_mapping` — array of objects
 
-The dashboard labels it **Map RudderStack field to Adobe mobile events**, but no connection mode reads it. Android and iOS device mode take event names from `rudder_events_to_adobe_events`, and context data from `context_data_mapping`.
+The dashboard labels it **Map RudderStack event field to Adobe mobile events**, but no connection mode reads it. Android and iOS device mode take event names from `rudder_events_to_adobe_events`, and context data from `context_data_mapping`.
 
 Rudder CLI accepts it so that a destination already carrying a value keeps it. Leave it out of a new destination.
 
