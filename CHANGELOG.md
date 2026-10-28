@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.29.0](https://github.com/rudderlabs/rudder-iac/compare/v0.28.0...v0.29.0) (2026-10-28)
+
+
+### Features
+
+* **cli:** add docs destination and docs source commands ([#989](https://github.com/rudderlabs/rudder-iac/issues/989)) ([fc40d92](https://github.com/rudderlabs/rudder-iac/commit/fc40d92387f31a9127ed907e9fe581f4b7418c28))
+* **cli:** add install.sh for one-line installs from GitHub releases ([#978](https://github.com/rudderlabs/rudder-iac/issues/978)) ([bad985c](https://github.com/rudderlabs/rudder-iac/commit/bad985c4086007caa0c24efdc161a8bc4dcf38a0))
+* **cli:** add rudder-cli dev listen, a local event capture server ([#936](https://github.com/rudderlabs/rudder-iac/issues/936)) ([1b927c2](https://github.com/rudderlabs/rudder-iac/commit/1b927c232d0a9aaace338a83aa560d22e254e7c1))
+* **cli:** warn when a destination secret key holds a value, and mask secrets in validate output ([#990](https://github.com/rudderlabs/rudder-iac/issues/990)) ([59ea6c5](https://github.com/rudderlabs/rudder-iac/commit/59ea6c501e22e4bf64c3438e758f27a63340a6e3))
+* **destination:** mark 22 destinations as verified ([#1003](https://github.com/rudderlabs/rudder-iac/issues/1003)) ([2e29584](https://github.com/rudderlabs/rudder-iac/commit/2e29584c4d67d66d1048662d4d4d32d3f1695a86))
+* **devlisten:** rename to sources listen, print events on stdout, store behind --store ([#981](https://github.com/rudderlabs/rudder-iac/issues/981)) ([d8abd91](https://github.com/rudderlabs/rudder-iac/commit/d8abd910047a5cc82cd55c74fe91c43fe2394717))
+* **retl:** make retl-source-table and retl-connections generally available ([#1008](https://github.com/rudderlabs/rudder-iac/issues/1008)) ([5816715](https://github.com/rudderlabs/rudder-iac/commit/58167156ad6349e6a8e81ba83225050871f9c78e))
+* **validate:** render diagnostics as JSON ([#877](https://github.com/rudderlabs/rudder-iac/issues/877)) ([b55d6f5](https://github.com/rudderlabs/rudder-iac/commit/b55d6f5573341c35a4e8758c8dbacd7db0da89e8))
+
+
+### Bug Fixes
+
+* **accounts:** refuse BigQuery credentials that are not a service account key ([#951](https://github.com/rudderlabs/rudder-iac/issues/951)) ([26a5cb5](https://github.com/rudderlabs/rudder-iac/commit/26a5cb590986c97c21539b64698ab32edf0a3e09))
+* **ci:** skip the test jobs, not the workflow, on docs-only pull requests ([#958](https://github.com/rudderlabs/rudder-iac/issues/958)) ([dc8a4f0](https://github.com/rudderlabs/rudder-iac/commit/dc8a4f030e95adcfc2ee874e68d51db38444cc7f))
+* **cli:** preserve multiline PEM values during substitution ([#998](https://github.com/rudderlabs/rudder-iac/issues/998)) ([6dff079](https://github.com/rudderlabs/rudder-iac/commit/6dff07907d9e4e59a6529555dcd60ed05c4b123a))
+* **cli:** run validate offline without credentials ([#905](https://github.com/rudderlabs/rudder-iac/issues/905)) ([b8abcd8](https://github.com/rudderlabs/rudder-iac/commit/b8abcd8607f9ec737aa0cdbe942cbb0074c15ac3))
+* **destination:** apply revision-2 secret keys to the 26 unverified destinations ([#1006](https://github.com/rudderlabs/rudder-iac/issues/1006)) ([846539e](https://github.com/rudderlabs/rudder-iac/commit/846539e360876c9b39fd2b5add6ad00784272188))
+* **destination:** reject empty enum values and kafka enum templates ([#995](https://github.com/rudderlabs/rudder-iac/issues/995)) ([6cf87a1](https://github.com/rudderlabs/rudder-iac/commit/6cf87a102a047934b23b50b3d8d942c4a6b7bab2))
+* **destination:** reject null config values at validate ([#997](https://github.com/rudderlabs/rudder-iac/issues/997)) ([d0327cd](https://github.com/rudderlabs/rudder-iac/commit/d0327cd9c3c341ca47e385573188f29902d34c66))
+* **destination:** report wrong value types as readable per-field errors ([#1001](https://github.com/rudderlabs/rudder-iac/issues/1001)) ([fe706b0](https://github.com/rudderlabs/rudder-iac/commit/fe706b035534326cb565798931da192ae14c5d8e))
+* **destination:** treat definition_version 0 as invalid, not missing ([#1000](https://github.com/rudderlabs/rudder-iac/issues/1000)) ([77a52b9](https://github.com/rudderlabs/rudder-iac/commit/77a52b96163883ea69a2d5fb85bdde56d84776eb))
+* **import:** run import --merge matchers in a fixed provider dependency order ([#950](https://github.com/rudderlabs/rudder-iac/issues/950)) ([173ae9f](https://github.com/rudderlabs/rudder-iac/commit/173ae9fcf879f8a24c9f63fcdc4d885b429016fe))
+* **import:** single-quote generated secret template slots ([#955](https://github.com/rudderlabs/rudder-iac/issues/955)) ([7d274ce](https://github.com/rudderlabs/rudder-iac/commit/7d274cefff5c508892dc28ca322b56b6d56aec87))
+* **kafka:** reject templates for static pattern fields ([#993](https://github.com/rudderlabs/rudder-iac/issues/993)) ([5a68c99](https://github.com/rudderlabs/rudder-iac/commit/5a68c9921423d0fe58c29486afc0a39aa8e49f39))
+* **retl:** close validation gaps found in QA (DEX-960, 994, 995, 1020, 959) ([#937](https://github.com/rudderlabs/rudder-iac/issues/937)) ([dabdf75](https://github.com/rudderlabs/rudder-iac/commit/dabdf752ca73ca5a415d8e581277f35c11549472))
+* **retl:** reject mirror sync_behaviour on rETL connections ([#1009](https://github.com/rudderlabs/rudder-iac/issues/1009)) ([c727bf2](https://github.com/rudderlabs/rudder-iac/commit/c727bf225a846f2841687391a5fec86b36c760d9))
+* **telemetry:** report command failures accurately and track pre-run errors ([#858](https://github.com/rudderlabs/rudder-iac/issues/858)) ([fa072c9](https://github.com/rudderlabs/rudder-iac/commit/fa072c9689aceed4f58acbf980696ac1f7191ccc))
+
+
+### Miscellaneous
+
+* **destination:** add backend update-time defaults to e2e update snapshots ([#1005](https://github.com/rudderlabs/rudder-iac/issues/1005)) ([63b13ed](https://github.com/rudderlabs/rudder-iac/commit/63b13ed4ffcd9b392ed23e0f7accc557fbeadd60))
+* **destination:** backfill warehouse rETL metadata on 17 destinations ([#1007](https://github.com/rudderlabs/rudder-iac/issues/1007)) ([e468ac8](https://github.com/rudderlabs/rudder-iac/commit/e468ac836c5459f7669c2d43873830e04cdf94e7))
+* **devlisten:** e2e hardening tests, hostile-event page test and nightly job ([#941](https://github.com/rudderlabs/rudder-iac/issues/941)) ([ee407cd](https://github.com/rudderlabs/rudder-iac/commit/ee407cdf4fa542a3f0f197a5d5f62015c82c5684))
+
 ## [0.28.0](https://github.com/rudderlabs/rudder-iac/compare/v0.27.0...v0.28.0) (2026-10-08)
 
 
