@@ -34,6 +34,14 @@ var validateConnectionsSpec = func(
 		results = append(results, validateEndpointRef(
 			i, "destination", c.Destination, destination.DestinationSpecKind, "a destination",
 		)...)
+		// Unlike rETL connections, event stream connections have no disabled
+		// state, so only true (or omitted) is accepted.
+		if c.Enabled != nil && !*c.Enabled {
+			results = append(results, rules.ValidationResult{
+				Reference: fmt.Sprintf("/connections/%d/enabled", i),
+				Message:   "'enabled' cannot be false: event stream connections cannot be disabled",
+			})
+		}
 	}
 
 	return results

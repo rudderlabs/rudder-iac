@@ -2,7 +2,8 @@ rule_id: "event-stream/connection/spec-syntax-valid"
 match_behavior:
   # event-stream-connections is a v1-only kind: connection entries need id,
   # source, and destination; the source ref must point at an event stream
-  # source and the destination ref at a destination. Connection id uniqueness
+  # source and the destination ref at a destination. enabled may be omitted or
+  # true — event stream connections cannot be disabled. Connection id uniqueness
   # across the project is the project/duplicate-urn rule's concern.
   - applies_to:
       - kind: "event-stream-connections"
@@ -22,7 +23,7 @@ match_behavior:
                   source: "#event-stream-source:my-android-source"
                   destination: "#destination:my-s3-destination"
       - example_id: "es-connection-valid-multiple-with-enabled"
-        title: "Valid connection list with an explicitly disabled entry"
+        title: "Valid connection list with an explicitly enabled entry"
         files:
           spec.yaml: |
             version: rudder/v1
@@ -37,7 +38,7 @@ match_behavior:
                 - id: js-to-s3
                   source: "#event-stream-source:my-js-source"
                   destination: "#destination:my-s3-destination"
-                  enabled: false
+                  enabled: true
     invalid:
       - example_id: "es-connection-missing-required-fields"
         title: "Connection entry missing required source and destination"
@@ -113,3 +114,22 @@ match_behavior:
             reference: "/spec/connections/0/destination"
             severity: "error"
             message_contains: "'destination' must reference a destination (#destination:<id>), got a 'event-stream-source' reference"
+      - example_id: "es-connection-disabled"
+        title: "Connection explicitly disabled"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: event-stream-connections
+            metadata:
+              name: my-connections
+            spec:
+              connections:
+                - id: android-to-s3
+                  source: "#event-stream-source:my-android-source"
+                  destination: "#destination:my-s3-destination"
+                  enabled: false
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/spec/connections/0/enabled"
+            severity: "error"
+            message_contains: "'enabled' cannot be false: event stream connections cannot be disabled"
