@@ -1,7 +1,9 @@
 package destination
 
 import (
+	"context"
 	"fmt"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -9,6 +11,9 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	destdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/docs"
+	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	vdocs "github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
@@ -24,6 +29,10 @@ type Provider struct {
 	registry *definitions.Registry
 }
 
+// The composite finds plan checkers by type assertion, so a drifted CheckPlan
+// signature would silently stop the check from running.
+var _ provider.PlanChecker = &Provider{}
+
 // NewProvider constructs the destination provider with the given API client and
 // definition registry. The registry is expected to be populated by the caller;
 // this constructor registers no definitions itself.
@@ -34,6 +43,35 @@ func NewProvider(c *client.Client, registry *definitions.Registry) *Provider {
 		}),
 		registry: registry,
 	}
+}
+
+// CheckPlan refuses a destination linked to a transformation the same plan
+// creates. A new transformation is published only once the apply finishes, and
+// the API links a destination only to a published one, so the link would fail
+// partway through every apply. See provider.PlanChecker.
+func (p *Provider) CheckPlan(_ context.Context, plan *planner.Plan, _ *state.State) error {
+	created := make(map[string]bool)
+	for _, op := range plan.Operations {
+		if op.Type == planner.Create && op.Resource.Type() == ttypes.TransformationResourceType {
+			created[op.Resource.URN()] = true
+		}
+	}
+
+	var refused []string
+	for _, op := range plan.Operations {
+		dest, ok := op.Resource.RawData().(*DestinationResource)
+		if !ok || dest.Transformation == nil || !created[dest.Transformation.URN] {
+			continue
+		}
+		refused = append(refused, fmt.Sprintf("%s links #%s", op.Resource.URN(), dest.Transformation.URN))
+	}
+	if len(refused) == 0 {
+		return nil
+	}
+	return fmt.Errorf("cannot link a destination to a transformation created in the same apply: "+
+		"a new transformation is published only once the apply finishes, and only a published "+
+		"transformation can be linked. Apply the new transformation first, leaving the destination's "+
+		"transformation as it is, then link it in a second apply:\n  %s", strings.Join(refused, "\n  "))
 }
 
 // LoadLegacySpec rejects legacy spec versions — destinations are v1-only.
