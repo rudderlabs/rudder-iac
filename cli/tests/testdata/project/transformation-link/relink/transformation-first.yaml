@@ -1,0 +1,10 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: link_first_transformation
+spec:
+  id: link-first
+  name: E2E Link First
+  language: javascript
+  code: |
+    export function transformEvent(event, metadata) { return event; }
