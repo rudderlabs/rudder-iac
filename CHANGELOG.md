@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.29.1](https://github.com/rudderlabs/rudder-iac/compare/v0.29.0...v0.29.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* **destination:** refuse linking a transformation created in the same apply ([#1013](https://github.com/rudderlabs/rudder-iac/issues/1013)) ([a41fc94](https://github.com/rudderlabs/rudder-iac/commit/a41fc9498672553c664d8e040fdfe0a110b06028))
+* reject enabled: false on event-stream connections ([#1010](https://github.com/rudderlabs/rudder-iac/issues/1010)) ([de7fce9](https://github.com/rudderlabs/rudder-iac/commit/de7fce9d72d9c528116db27c57c2eff13818b896))
+
 ## [0.29.0](https://github.com/rudderlabs/rudder-iac/compare/v0.28.0...v0.29.0) (2026-10-28)
 
 
