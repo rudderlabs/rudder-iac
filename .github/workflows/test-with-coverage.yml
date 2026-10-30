@@ -118,7 +118,7 @@ jobs:
           RUDDERSTACK_ACCESS_TOKEN: ${{ secrets.RUDDERSTACK_ACCESS_TOKEN }}
 
       - name: upload unit coverage to Codecov
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: rudderlabs/rudder-iac
@@ -227,7 +227,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: upload e2e coverage to Codecov
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: rudderlabs/rudder-iac
