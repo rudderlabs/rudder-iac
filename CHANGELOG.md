@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0](https://github.com/rudderlabs/rudder-iac/compare/v0.29.1...v1.0.0) (2026-10-30)
+
+
+### Features
+
+* release 1.0.0 ([#1014](https://github.com/rudderlabs/rudder-iac/issues/1014)) ([0d5c3b2](https://github.com/rudderlabs/rudder-iac/commit/0d5c3b218e0d88f2a7f7ad3092f846ccbf1fed52))
+
+
+### Miscellaneous
+
+* release 1.0.0 and document semantic versioning ([#1015](https://github.com/rudderlabs/rudder-iac/issues/1015)) ([c0f2d3f](https://github.com/rudderlabs/rudder-iac/commit/c0f2d3f4fe0aa24fc6eee0042f5113d431bbe91a))
+
 ## [0.29.1](https://github.com/rudderlabs/rudder-iac/compare/v0.29.0...v0.29.1) (2026-10-30)
 
 
