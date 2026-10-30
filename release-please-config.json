@@ -4,6 +4,7 @@
   "packages": {
     ".": {
       "release-type": "go",
+      "release-as": "1.0.0",
       "include-v-in-tag": true,
       "changelog-path": "CHANGELOG.md",
       "changelog-sections": [
