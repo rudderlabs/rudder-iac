@@ -1,0 +1,17 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: link-webhook
+spec:
+  id: link-webhook
+  display_name: E2E Linked Webhook
+  type: webhook
+  enabled: true
+  definition_version: 1
+  transformation: "#transformation:link-second"
+  config:
+    webhook_url: https://webhooks.example.com/rudder
+    webhook_method: POST
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

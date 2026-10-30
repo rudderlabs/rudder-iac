@@ -1,0 +1,10 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: link_second_transformation
+spec:
+  id: link-second
+  name: E2E Link Second
+  language: javascript
+  code: |
+    export function transformEvent(event, metadata) { return event; }

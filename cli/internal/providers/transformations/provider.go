@@ -2,11 +2,16 @@ package transformations
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 	"sync"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
@@ -22,8 +27,10 @@ import (
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	vdocs "github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
 	"github.com/samber/lo"
 
 	tfdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/docs"
@@ -42,11 +49,46 @@ type pendingDeletes struct {
 	libraries       []string // remote IDs
 }
 
+// plannedPublish stages and publishes, as one batch, every transformation and
+// library change in the plan the provider last checked. The backend links a
+// destination only to a published transformation, and the destination's
+// operation waits only on the operation of the transformation it links. So
+// whichever planned change the syncer applies first does the whole batch, and
+// the others return its outcome.
+type plannedPublish struct {
+	once    sync.Once
+	ops     []*planner.Operation
+	prior   *state.State // transformation and library state the plan was made from
+	outputs map[string]any
+	err     error
+}
+
+func (b *plannedPublish) includes(urn string) bool {
+	return b != nil && slices.ContainsFunc(b.ops, func(op *planner.Operation) bool {
+		return op.Resource.URN() == urn
+	})
+}
+
+// stageTask stages one planned change.
+type stageTask struct {
+	op *planner.Operation
+}
+
+func (t *stageTask) Id() string {
+	return t.op.Resource.URN()
+}
+
+func (t *stageTask) Dependencies() []string {
+	return nil
+}
+
 // Provider wraps BaseProvider and adds transformations-specific functionality
 type Provider struct {
 	*provider.BaseProvider
-	store          transformations.TransformationStore
-	pendingDeletes pendingDeletes
+	store            transformations.TransformationStore
+	pendingDeletes   pendingDeletes
+	planned          *plannedPublish
+	stageConcurrency int
 }
 
 // NewProvider creates a new transformations provider with all resource handlers
@@ -68,6 +110,9 @@ func NewProviderWithStore(store transformations.TransformationStore) *Provider {
 	return &Provider{
 		BaseProvider: provider.NewBaseProvider(handlers),
 		store:        store,
+		// The planned batch stages changes the syncer would otherwise have
+		// applied concurrently.
+		stageConcurrency: config.GetConfig().Concurrency.Syncer,
 	}
 }
 
@@ -228,6 +273,157 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 	return graph, nil
 }
 
+// CheckPlan never refuses a plan. It keeps the plan's transformation and
+// library changes for plannedPublish.
+func (p *Provider) CheckPlan(_ context.Context, plan *planner.Plan, st *state.State) error {
+	planned := &plannedPublish{prior: state.EmptyState()}
+	for _, op := range plan.Operations {
+		if _, ok := p.GetHandler(op.Resource.Type()); !ok || op.Type == planner.Delete {
+			continue
+		}
+		planned.ops = append(planned.ops, op)
+	}
+	// Copied now because the syncer writes to st while operations run.
+	for urn, rs := range st.Resources {
+		if _, ok := p.GetHandler(rs.Type); ok {
+			planned.prior.Resources[urn] = rs
+		}
+	}
+	p.planned = planned
+	return nil
+}
+
+// CreateRaw, UpdateRaw and ImportRaw return the planned batch's outcome for the
+// changes CheckPlan kept. Anything else is only staged, for ConsolidateSync to
+// publish.
+func (p *Provider) CreateRaw(ctx context.Context, r *resources.Resource) (any, error) {
+	if !p.planned.includes(r.URN()) {
+		return p.BaseProvider.CreateRaw(ctx, r)
+	}
+	return p.applyPlanned(ctx, r.URN())
+}
+
+func (p *Provider) UpdateRaw(ctx context.Context, r *resources.Resource, oldData any, oldState any) (any, error) {
+	if !p.planned.includes(r.URN()) {
+		return p.BaseProvider.UpdateRaw(ctx, r, oldData, oldState)
+	}
+	return p.applyPlanned(ctx, r.URN())
+}
+
+func (p *Provider) ImportRaw(ctx context.Context, r *resources.Resource, remoteID string) (any, error) {
+	if !p.planned.includes(r.URN()) {
+		return p.BaseProvider.ImportRaw(ctx, r, remoteID)
+	}
+	return p.applyPlanned(ctx, r.URN())
+}
+
+func (p *Provider) applyPlanned(ctx context.Context, urn string) (any, error) {
+	planned := p.planned
+	planned.once.Do(func() {
+		planned.outputs, planned.err = p.stageAndPublish(ctx, planned)
+	})
+	if planned.err != nil {
+		return nil, planned.err
+	}
+	return planned.outputs[urn], nil
+}
+
+// stageAndPublish stages every planned change, then publishes them together
+// with what must go live alongside them. It returns their states marked
+// unmodified, so ConsolidateSync does not publish them again.
+func (p *Provider) stageAndPublish(ctx context.Context, planned *plannedPublish) (map[string]any, error) {
+	tasks := lo.Map(planned.ops, func(op *planner.Operation, _ int) tasker.Task {
+		return &stageTask{op: op}
+	})
+	staged := tasker.NewResults[any]()
+	errs := tasker.RunTasks(ctx, tasks, p.stageConcurrency, false, func(task tasker.Task) error {
+		t, ok := task.(*stageTask)
+		if !ok {
+			return fmt.Errorf("task is not a stage task")
+		}
+		out, err := p.stage(ctx, t.op, planned.prior)
+		if err != nil {
+			return err
+		}
+		staged.Store(t.Id(), out)
+		return nil
+	})
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("staging transformations and libraries: %w", errors.Join(errs...))
+	}
+
+	st := state.EmptyState()
+	maps.Copy(st.Resources, planned.prior.Resources)
+	for _, op := range planned.ops {
+		out, _ := staged.Get(op.Resource.URN())
+		st.AddResource(&state.ResourceState{ID: op.Resource.ID(), Type: op.Resource.Type(), OutputRaw: out})
+	}
+
+	graph, err := p.ResourceGraph()
+	if err != nil {
+		return nil, fmt.Errorf("building resource graph: %w", err)
+	}
+	req, err := p.buildBatchPublishRequest(graph, st)
+	if err != nil {
+		return nil, fmt.Errorf("building batch publish request: %w", err)
+	}
+	resp, err := p.store.BatchPublish(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("batch publishing %d transformations and %d libraries: %w",
+			len(req.Transformations), len(req.Libraries), err)
+	}
+	if !resp.Published {
+		return nil, rejectedPublishError(resp.ValidationOutput)
+	}
+	log.Info("Published transformations and libraries ahead of their dependents",
+		"transformations", len(req.Transformations), "libraries", len(req.Libraries))
+
+	outputs := make(map[string]any, len(planned.ops))
+	for _, op := range planned.ops {
+		out := st.GetResource(op.Resource.URN()).OutputRaw
+		switch s := out.(type) {
+		case *model.TransformationState:
+			s.Modified = false
+		case *model.LibraryState:
+			s.Modified = false
+		}
+		outputs[op.Resource.URN()] = out
+	}
+	return outputs, nil
+}
+
+// stage applies one planned change as an unpublished draft, as the syncer
+// would have.
+func (p *Provider) stage(ctx context.Context, op *planner.Operation, prior *state.State) (any, error) {
+	r := op.Resource
+	switch op.Type {
+	case planner.Update:
+		old := prior.GetResource(r.URN())
+		if old == nil {
+			return nil, fmt.Errorf("resource not found in state: %s", r.URN())
+		}
+		return p.BaseProvider.UpdateRaw(ctx, r, old.InputRaw, old.OutputRaw)
+	case planner.Import:
+		return p.BaseProvider.ImportRaw(ctx, r, r.ImportMetadata().RemoteId)
+	default:
+		return p.BaseProvider.CreateRaw(ctx, r)
+	}
+}
+
+// rejectedPublishError names what failed the backend's publish tests. The full
+// results are left to `transformations test`: while operations run, the
+// apply's progress display owns the terminal.
+func rejectedPublishError(out transformations.ValidationOutput) error {
+	failed := lo.FilterMap(out.Libraries, func(lib transformations.LibraryTestResult, _ int) (string, bool) {
+		return fmt.Sprintf("library %q", lib.Name), !lib.Pass
+	})
+	failed = append(failed, lo.FilterMap(out.Transformations, func(tr transformations.TransformationTestResult, _ int) (string, bool) {
+		return fmt.Sprintf("transformation %q", tr.Name), !tr.Pass
+	})...)
+	return fmt.Errorf("batch publish validation failed for %s: run `rudder-cli transformations test --modified` for the results",
+		strings.Join(failed, ", "))
+}
+
 // DeleteRaw overrides BaseProvider.DeleteRaw to defer deletion until ConsolidateSync.
 // Instead of immediately deleting resources, it records the delete intent so that
 // batch publish can update the published dependency graph first.
@@ -257,8 +453,9 @@ func (p *Provider) DeleteRaw(_ context.Context, _ string, resourceType string, _
 	return nil
 }
 
-// ConsolidateSync implements batch publishing of all transformations and libraries
-// This is called after all Create/Update operations to publish changes in a single batch
+// ConsolidateSync publishes any change still waiting to go live, then runs the
+// deferred deletes. In an apply nothing is normally left waiting: plannedPublish
+// has already published the plan's changes before their dependents ran.
 func (p *Provider) ConsolidateSync(ctx context.Context, graph *resources.Graph, st *state.State) error {
 	req, err := p.buildBatchPublishRequest(graph, st)
 	if err != nil {
