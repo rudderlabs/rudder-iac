@@ -25,16 +25,9 @@ func destinationOp(opType planner.OperationType, id, transformationID string) *p
 }
 
 func transformationOp(opType planner.OperationType, id string) *planner.Operation {
-	return &planner.Operation{
-		Type:     opType,
-		Resource: resources.NewResource(id, ttypes.TransformationResourceType, resources.ResourceData{}, nil),
-	}
+	return &planner.Operation{Type: opType, Resource: transformationGraphResource(id)}
 }
 
-// A new transformation is published only at the end of the apply that creates
-// it, and the API links a destination only to a published transformation, so
-// linking one in the same apply would fail on every apply. The plan is refused
-// before anything is applied instead.
 func TestCheckPlanRefusesLinkToTransformationCreatedInSameApply(t *testing.T) {
 	t.Parallel()
 
@@ -42,6 +35,7 @@ func TestCheckPlanRefusesLinkToTransformationCreatedInSameApply(t *testing.T) {
 		name        string
 		ops         []*planner.Operation
 		wantRefused []string
+		wantAllowed []string
 	}{
 		{
 			name: "new destination linked to a new transformation",
@@ -81,9 +75,27 @@ func TestCheckPlanRefusesLinkToTransformationCreatedInSameApply(t *testing.T) {
 			},
 		},
 		{
+			name: "only the destination linked to the new transformation is named",
+			ops: []*planner.Operation{
+				transformationOp(planner.Create, "tx-1"),
+				transformationOp(planner.Update, "tx-2"),
+				destinationOp(planner.Create, "dest-1", "tx-1"),
+				destinationOp(planner.Create, "dest-2", "tx-2"),
+			},
+			wantRefused: []string{"destination:dest-1 links #transformation:tx-1"},
+			wantAllowed: []string{"destination:dest-2"},
+		},
+		{
 			name: "destination linked to a transformation updated in the same apply",
 			ops: []*planner.Operation{
 				transformationOp(planner.Update, "tx-1"),
+				destinationOp(planner.Create, "dest-1", "tx-1"),
+			},
+		},
+		{
+			name: "destination linked to a transformation imported in the same apply",
+			ops: []*planner.Operation{
+				transformationOp(planner.Import, "tx-1"),
 				destinationOp(planner.Create, "dest-1", "tx-1"),
 			},
 		},
@@ -116,7 +128,10 @@ func TestCheckPlanRefusesLinkToTransformationCreatedInSameApply(t *testing.T) {
 			for _, refused := range tt.wantRefused {
 				assert.ErrorContains(t, err, refused)
 			}
-			assert.ErrorContains(t, err, "leaving the destination's transformation as it is, then link it in a second apply")
+			for _, allowed := range tt.wantAllowed {
+				assert.NotContains(t, err.Error(), allowed)
+			}
+			assert.ErrorContains(t, err, "leave a new destination's transformation unset, and keep an existing destination's current one")
 		})
 	}
 }
