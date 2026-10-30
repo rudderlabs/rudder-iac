@@ -23,6 +23,19 @@ You can also contribute to any open-source RudderStack project. View our [**GitH
 
 We prefer squash or rebase commits so that all changes from a branch are committed to master as a single commit. All pull requests are squashed when merged, but rebasing prior to merge gives you better control over the commit message.
 
+### Versioning
+
+Releases follow [semantic versioning](https://semver.org). release-please picks the next version from the squashed commit titles on `main`, which are the PR titles:
+
+| PR title | Bump | Example |
+| --- | --- | --- |
+| `fix: ...` | patch | 1.2.3 to 1.2.4 |
+| `feat: ...` | minor | 1.2.3 to 1.3.0 |
+| `feat!: ...` or a `BREAKING CHANGE:` footer in the PR body | major | 1.2.3 to 2.0.0 |
+| `chore`, `docs`, `refactor`, `test` | none on their own | |
+
+A change is breaking if existing users must edit their specs, flags or workflows. Mark it with `!` in the title and add an entry to [BREAKING_CHANGES.md](BREAKING_CHANGES.md).
+
 ## Getting help
 
 For any questions, concerns, or queries, you can start by asking a question in our [**Slack**](https://rudderstack.com/join-rudderstack-slack-community/) community.
