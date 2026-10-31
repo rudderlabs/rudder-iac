@@ -29,22 +29,25 @@ const (
 // readOptions are the flags both read commands share. Each filter is the
 // query parameter of the same name.
 type readOptions struct {
-	url         string
-	serverID    string
-	timeout     time.Duration
-	json        bool
-	since       string
-	events      []string
-	types       []string
-	userID      string
-	anonymousID string
-	writeKeys   []string
+	url          string
+	allowPartial bool
+	serverID     string
+	timeout      time.Duration
+	json         bool
+	since        string
+	events       []string
+	types        []string
+	userID       string
+	anonymousID  string
+	writeKeys    []string
 }
 
 func addReadFlags(f *pflag.FlagSet, o *readOptions) {
 	f.StringVar(&o.url, "url", "", "URL of the listener, from its ready line (default $"+urlEnv+")")
 	f.StringVar(&o.serverID, "server-id", "", "Answer 409 server_changed unless the listener has this serverId")
 	f.BoolVarP(&o.json, "json", "j", false, "Print the listener's JSON instead of a table")
+	f.BoolVar(&o.allowPartial, "allow-partial", false,
+		"Exit 0 when the listener evicted requests of this window; the output is then incomplete")
 	f.StringVar(&o.since, "since", "0", "Read after this cursor, or since a duration such as 5m or an RFC 3339 time")
 	f.StringArrayVar(&o.events, "event", nil, "Only events with this name, or a prefix ending in *; repeat for more")
 	f.StringArrayVar(&o.types, "type", nil, "Only events of this type, such as track or page; repeat for more")
@@ -127,6 +130,10 @@ func newCmdEvents() *cobra.Command {
 			The stream carries no cursor. Take it from the ready line. At most --limit events per page;
 			when more are left, stderr names the --since to continue from. Events of rejected requests
 			are not in the stream: read them on URL/_dev/v1/requests or the review page.
+
+			The listener keeps the last 10,000 requests or 64 MiB. When the window lost requests to
+			that limit, the command prints the events that are left and exits 1 with events_evicted on
+			stderr, or exits 0 with --allow-partial.
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli sources events --url http://127.0.0.1:4321 --since 5m

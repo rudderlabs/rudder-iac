@@ -150,9 +150,9 @@ func (h *Handler) requests(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	win := h.window(q.since)
+	rd := h.read(q.since)
 	var matched []*store.Record
-	for _, rec := range h.records(win) {
+	for _, rec := range rd.records {
 		if q.matches(rec) {
 			matched = append(matched, rec)
 		}
@@ -160,9 +160,9 @@ func (h *Handler) requests(w http.ResponseWriter, r *http.Request) {
 	env := requestsEnvelope{
 		APIVersion:     h.cfg.Identity.APIVersion,
 		ServerID:       h.cfg.Identity.ServerID,
-		Since:          win.since,
-		Cursor:         win.cursor,
-		EvictedThrough: h.store.Stats().EvictedThrough,
+		Since:          rd.since,
+		Cursor:         rd.cursor,
+		EvictedThrough: rd.stats.EvictedThrough,
 		Total:          len(matched),
 		View:           q.view,
 		Requests:       []json.RawMessage{},

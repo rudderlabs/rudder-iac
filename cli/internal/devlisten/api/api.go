@@ -62,8 +62,17 @@ type Config struct {
 	UI http.Handler
 }
 
+// captures is what the handlers read of the store.
+type captures interface {
+	Snapshot(seq uint64) store.Snapshot
+	Get(seq uint64) *store.Record
+	Cursor() uint64
+	Stats() store.Stats
+	Wait(ctx context.Context, since uint64, atLeast int, count func(*store.Record) int) (int, error)
+}
+
 type Handler struct {
-	store  *store.Store
+	store  captures
 	cfg    Config
 	hosts  map[string]bool
 	routes map[string]http.HandlerFunc

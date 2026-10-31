@@ -55,15 +55,15 @@ func (h *Handler) serverChanged(w http.ResponseWriter) {
 // stream writes the accepted events after the cursor, one per line. A page
 // holds whole requests only, so the next cursor never splits one.
 func (h *Handler) stream(w http.ResponseWriter, r *http.Request, q *eventsQuery) {
-	win := h.window(q.since)
+	rd := h.read(q.since)
 	var (
 		body    bytes.Buffer
 		n       int
-		cursor  = win.cursor
+		cursor  = rd.cursor
 		scanned uint64
 		hasMore bool
 	)
-	for _, rec := range h.records(win) {
+	for _, rec := range rd.records {
 		var page []int
 		if accepted(rec) {
 			page = q.matches(rec)
@@ -84,6 +84,11 @@ func (h *Handler) stream(w http.ResponseWriter, r *http.Request, q *eventsQuery)
 	header.Set("Content-Type", "application/x-ndjson")
 	header.Set("X-Dev-Cursor", strconv.FormatUint(cursor, 10))
 	header.Set("X-Dev-Has-More", strconv.FormatBool(hasMore))
+	// The loss goes in headers, so the body stays one event per line.
+	header.Set("X-Dev-Evicted-Through", strconv.FormatUint(rd.stats.EvictedThrough, 10))
+	if rd.lost {
+		header.Set("X-Dev-Diagnosis", CodeEvicted)
+	}
 	if hasMore {
 		header.Set("Link", "<"+base+"events?"+nextQuery(q.raw, cursor)+`>; rel="next"`)
 	}

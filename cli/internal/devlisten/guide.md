@@ -234,6 +234,13 @@ listener without `--store` (`store_disabled`), or another listener at the URL
 `next` command that fixes it: one JSON object with `--json`, else an `Error:` line
 and a `Next:` line.
 
+With `--store`, a window that lost requests to the memory limit makes `sources
+events` print the events that are left and then exit 1 with `events_evicted`.
+`--allow-partial` accepts the loss, prints a `note:` line on stderr and exits 0.
+The default window starts at cursor 0, so after the first eviction a read without
+`--since` always fails: pass the cursor from the ready line. In bash or zsh, set
+`pipefail` when you pipe a read into `jq`, or the pipeline drops that exit 1.
+
 Several services can send to one listener, each with its own write key: filter
 with `--write-key`. For full isolation, start one listener per service or per test
 worker with `--port 0`. Listeners share nothing: no state file and no lock file.
@@ -277,6 +284,9 @@ The review page shows a diagnosis when events are missing. It is also at
 `GET URL/_dev/v1/events?view=counts&since=N` with `--store`. The diagnosis reads the whole window after `since` and ignores the filters.
 Several codes can hold at once. Each has a `next`: the command to run.
 
+- `events_evicted`: the listener dropped requests of this window to stay within
+  its limit, so the counts and the events are incomplete. `all_accepted` never
+  shows with it. `next` reads the window after the dropped requests.
 - `nothing_received`: no event request ever reached the listener. The app is not
   pointed at it. `next` is a curl self-test.
 - `nothing_new`: the listener holds requests, but none after your cursor. The app
@@ -309,6 +319,9 @@ on a laptop:
   10s to arrive is refused.
 - With `--store` the listener keeps the last 10,000 requests or 64 MiB, and drops
   the oldest whole requests first. `evictedThrough` is the highest `seq` it dropped.
+  A read of a window that lost requests has the `events_evicted` diagnosis, and the
+  stream answers with `X-Dev-Diagnosis: events_evicted`. `X-Dev-Evicted-Through`
+  is on every stream answer.
 - It does not check the 32 KB per-event limit or the JSON depth limit.
 
 With `--store`, each request gets the next `seq`, in the order its capture completed. Gaps in what
