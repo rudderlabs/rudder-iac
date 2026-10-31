@@ -15,6 +15,7 @@ import (
 	d "github.com/rudderlabs/rudder-iac/cli/internal/cmd/debug"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
+	fmtcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/format"
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/destroy"
@@ -92,6 +93,7 @@ func init() {
 
 	rootCmd.AddCommand(apply.NewCmdApply())
 	rootCmd.AddCommand(validate.NewCmdValidate())
+	rootCmd.AddCommand(fmtcmd.NewCmdFmt())
 	rootCmd.AddCommand(destroy.NewCmdDestroy())
 	rootCmd.AddCommand(migrate.NewCmdMigrate())
 
