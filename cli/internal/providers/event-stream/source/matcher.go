@@ -7,8 +7,8 @@ import (
 )
 
 // Matcher returns the import --merge matcher for event stream sources. Sources
-// are unique by name within a workspace (mirroring the source uniqueness
-// rule), so a remote source links to a local source of the same name.
+// are unique by name within a workspace, case-insensitively, so a remote source
+// links to a local source whose name folds to the same value.
 func Matcher() importmatcher.Matcher {
 	return importmatcher.Matcher{
 		ResourceType: ResourceType,
@@ -24,7 +24,8 @@ func matchSource(scope importmatcher.Scope, r *resources.RemoteResource) *resour
 	}
 
 	local, _ := importmatcher.ByData(scope.LocalGraph, ResourceType, func(data resources.ResourceData) bool {
-		return data[NameKey].(string) == remote.Name
+		name, _ := data[NameKey].(string)
+		return importmatcher.SameName(name, remote.Name)
 	})
 	return local
 }
