@@ -23,6 +23,37 @@ type KV struct {
 	V interface{}
 }
 
+// ciPlatforms names the CI service behind each variable that service sets on
+// every job. The CLI reports the name as ci_platform when
+// RUDDERSTACK_CLI_CI_PLATFORM is not set, so runs in a user's own pipeline are
+// not counted as runs by a person. The official workflow sets both
+// RUDDERSTACK_CLI_* variables, so cli_workflow_version still tells its runs
+// apart. The bare CI variable is left out: some tools and coding agents set it
+// to turn off prompts on a developer's machine.
+var ciPlatforms = []struct{ envVar, platform string }{
+	{"GITHUB_ACTIONS", "github-actions"},
+	{"GITLAB_CI", "gitlab-ci"},
+	{"CIRCLECI", "circleci"},
+	{"BUILDKITE", "buildkite"},
+	{"JENKINS_URL", "jenkins"},
+	{"TF_BUILD", "azure-pipelines"},
+	{"BITBUCKET_BUILD_NUMBER", "bitbucket-pipelines"},
+	{"CODEBUILD_BUILD_ID", "aws-codebuild"},
+	{"TEAMCITY_VERSION", "teamcity"},
+	{"TRAVIS", "travis-ci"},
+	{"DRONE", "drone"},
+}
+
+// detectCIPlatform returns the CI service the CLI runs in, or "" outside CI.
+func detectCIPlatform() string {
+	for _, ci := range ciPlatforms {
+		if os.Getenv(ci.envVar) != "" {
+			return ci.platform
+		}
+	}
+	return ""
+}
+
 // getCIExecutionContext returns the execution context of the CLI if running in CI.
 func getCIExecutionContext() map[string]interface{} {
 	executionContext := make(map[string]interface{})
@@ -35,6 +66,12 @@ func getCIExecutionContext() map[string]interface{} {
 		envValue := os.Getenv(envVar)
 		if envValue != "" {
 			executionContext[key] = envValue
+		}
+	}
+
+	if _, set := executionContext["ci_platform"]; !set {
+		if platform := detectCIPlatform(); platform != "" {
+			executionContext["ci_platform"] = platform
 		}
 	}
 
