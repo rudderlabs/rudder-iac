@@ -16,6 +16,14 @@ before:
     - go mod tidy
     # you may remove this if you don't need go generate
     - go generate ./...
+    # Regenerate the validation rule catalog against the tag being released, so
+    # the published artifact's cli_version matches the binaries shipped beside
+    # it — that is what lets a consumer fetch the catalog for the version they
+    # actually run. Deliberately generated with experimental flags off: the
+    # release artifact should describe what a default install enforces. The
+    # gen-rule-docs CI gate runs with them on, because its job is the opposite —
+    # proving every rule has authored docs.
+    - go run -ldflags "-X main.version={{ .Version }}" ./cli/cmd/gen-rule-docs --output-dir ./docs/generated/
 
 builds:
   - env:
@@ -45,6 +53,15 @@ archives:
     format_overrides:
       - goos: windows
         formats: [ 'zip' ]
+
+release:
+  # Ship the rule catalog alongside the binaries. It is the authoritative
+  # reference for the rule IDs `rudder-cli validate` reports, and the densest
+  # artifact we have for teaching a tool — or an agent — our spec dialect.
+  # Attaching it here means consumers pin a version instead of scraping the
+  # artifact off a CI run.
+  extra_files:
+    - glob: ./docs/generated/rules.yaml
 
 changelog:
   sort: asc
