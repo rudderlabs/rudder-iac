@@ -30,6 +30,9 @@ type ExperimentalConfig struct {
 	// SourcesListen shows and enables the `sources` command group: a local listener that
 	// captures the events an app sends, and the commands that read them.
 	SourcesListen bool `mapstructure:"sourcesListen"`
+
+	// ApplyOptions enables --no-delete and --provider flags for apply command
+	ApplyOptions bool `mapstructure:"applyOptions"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags

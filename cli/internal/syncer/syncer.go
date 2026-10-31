@@ -23,6 +23,7 @@ type ProjectSyncer struct {
 	concurrency     int
 	dryRun          bool
 	askConfirmation bool
+	plannerOptions  []planner.PlanOption
 }
 
 type SyncProvider interface {
@@ -97,6 +98,25 @@ func WithAskConfirmation(askConfirmation bool) Option {
 	}
 }
 
+// WithSkipDeletes configures the syncer to skip delete operations.
+// A later call replaces an earlier one.
+func WithSkipDeletes(skip bool) Option {
+	return func(s *ProjectSyncer) error {
+		s.plannerOptions = append(s.plannerOptions, planner.WithSkipDeletes(skip))
+		return nil
+	}
+}
+
+// WithResourceTypes configures the syncer to only apply operations for
+// the specified resource types. Empty types means all types. A later call
+// replaces an earlier one.
+func WithResourceTypes(types []string) Option {
+	return func(s *ProjectSyncer) error {
+		s.plannerOptions = append(s.plannerOptions, planner.WithResourceTypes(types))
+		return nil
+	}
+}
+
 type SyncReporter interface {
 	ReportPlan(plan *planner.Plan)
 	AskConfirmation() (bool, error)
@@ -134,7 +154,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 	}
 	source := StateToGraph(state)
 
-	p := planner.New(s.workspace.ID)
+	p := planner.New(s.workspace.ID, s.plannerOptions...)
 	plan := p.Plan(source, target)
 
 	ui.StopSpinner()

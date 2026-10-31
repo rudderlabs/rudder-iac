@@ -26,6 +26,25 @@ func TestApplyTracksRunFailureAsErrored(t *testing.T) {
 			{K: "location", V: location},
 			{K: "dryRun", V: false},
 			{K: "confirm", V: false},
+			{K: "noDelete", V: false},
+			{K: "providers", V: ""},
 		},
 	}}, *calls)
+}
+
+// An unknown --provider fails inside RunE before the syncer runs. Telemetry
+// must still record the run as errored.
+func TestApplyTracksUnknownProviderAsErrored(t *testing.T) {
+	testutils.UseFakeAPI(t)
+	testutils.SetConfig(t, "experimental", true)
+	testutils.SetConfig(t, "flags.applyOptions", true)
+	calls := telemetrytest.Record(t)
+	location := t.TempDir()
+
+	err := telemetrytest.Execute(NewCmdApply(), nil, []string{"--location", location, "--confirm=false", "--provider", "nope"})
+
+	require.ErrorContains(t, err, "unknown provider: nope")
+	require.Len(t, *calls, 1)
+	assert.True(t, (*calls)[0].Errored)
+	assert.Contains(t, (*calls)[0].Extras, telemetry.KV{K: "providers", V: "nope"})
 }

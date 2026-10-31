@@ -232,3 +232,59 @@ func TestSyncerDelete(t *testing.T) {
 		}, "TaskCompleted should contain deletion task for "+urn)
 	}
 }
+
+// A later planner option replaces an earlier one, the same way WithDryRun does,
+// so WithSkipDeletes(false) and WithResourceTypes(nil) clear a previous setting.
+func TestSyncerLaterPlannerOptionWins(t *testing.T) {
+	event := internalTestutils.NewMockEvent("event1", resources.ResourceData{"name": "Test Event"})
+
+	tests := []struct {
+		name        string
+		options     []syncer.Option
+		wantDeletes int
+	}{
+		{
+			name:        "skip deletes",
+			options:     []syncer.Option{syncer.WithSkipDeletes(true)},
+			wantDeletes: 0,
+		},
+		{
+			name:        "skip deletes cleared",
+			options:     []syncer.Option{syncer.WithSkipDeletes(true), syncer.WithSkipDeletes(false)},
+			wantDeletes: 1,
+		},
+		{
+			name:        "resource types",
+			options:     []syncer.Option{syncer.WithResourceTypes([]string{"other-type"})},
+			wantDeletes: 0,
+		},
+		{
+			name:        "resource types cleared",
+			options:     []syncer.Option{syncer.WithResourceTypes([]string{"other-type"}), syncer.WithResourceTypes(nil)},
+			wantDeletes: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			initialState := state.EmptyState()
+			initialState.AddResource(&state.ResourceState{
+				ID:     event.ID(),
+				Type:   event.Type(),
+				Input:  event.Data(),
+				Output: resources.ResourceData{"id": "generated-event-event1"},
+			})
+			provider := &internalTestutils.DataCatalogProvider{
+				InitialState:       initialState,
+				ReconstructedState: initialState,
+			}
+
+			options := append([]syncer.Option{syncer.WithReporter(testutils.NewMockReporter())}, tt.options...)
+			s, err := syncer.New(provider, mockWorkspace(), options...)
+			require.NoError(t, err)
+
+			require.NoError(t, s.Sync(context.Background(), resources.NewGraph()))
+			assert.Len(t, provider.OperationLog, tt.wantDeletes)
+		})
+	}
+}
