@@ -46,6 +46,68 @@ archives:
       - goos: windows
         formats: [ 'zip' ]
 
+nfpms:
+  - id: linux-packages
+    package_name: rudder-cli
+    # The archive names without the version, so that
+    # releases/latest/download/rudder-cli_Linux_x86_64.deb always gets the newest package.
+    file_name_template: >-
+      {{ .PackageName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    vendor: RudderStack
+    homepage: https://github.com/rudderlabs/rudder-iac
+    maintainer: RudderStack <contact@rudderstack.com>
+    description: Command-line tool for managing RudderStack platform resources
+    license: MIT
+    section: utils
+    formats:
+      - deb
+      - rpm
+    # rudder-cli verifies HTTPS against the system's CA certificates, which slim
+    # Debian and Ubuntu images do not install.
+    dependencies:
+      - ca-certificates
+    bindir: /usr/bin
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/rudder-cli/copyright
+        packager: deb
+      - src: LICENSE
+        dst: /usr/share/licenses/rudder-cli/LICENSE
+        packager: rpm
+        type: license
+
+homebrew_casks:
+  - name: rudder-cli
+    binaries:
+      - rudder-cli
+    homepage: https://github.com/rudderlabs/rudder-iac
+    description: Command-line tool for managing RudderStack platform resources
+    repository:
+      owner: rudderlabs
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+      # The tap's main branch requires a pull request with one approval.
+      pull_request:
+        enabled: true
+    # Nothing is pushed to the tap unless the release job sets both a non-empty
+    # HOMEBREW_TAP_TOKEN and HOMEBREW_TAP_PUBLISH=true. release.yml sets neither.
+    # The cask is still written to dist/homebrew/Casks/rudder-cli.rb.
+    skip_upload: '{{ if and (isEnvSet "HOMEBREW_TAP_TOKEN") (eq (envOrDefault "HOMEBREW_TAP_PUBLISH" "") "true") }}auto{{ else }}true{{ end }}'
+    # The binary is not notarized, so remove the quarantine attribute that
+    # Homebrew sets on cask downloads. Drop this once the binary is notarized.
+    # install_steps needs GoReleaser v2.19 or later, and the cask's run step needs
+    # Homebrew 6.0.13 or later on the user's Mac.
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/rudder-cli"]
+          end
+
 changelog:
   sort: asc
   filters:

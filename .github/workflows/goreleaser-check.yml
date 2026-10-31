@@ -1,0 +1,86 @@
+# .github/workflows/goreleaser-check.yml
+# Runs the release config in snapshot mode on pull requests that change it, and weekly on
+# main because the release job downloads the newest GoReleaser v2 each time. A broken
+# config, or a GoReleaser release that breaks it, should fail here before it fails in the
+# release job. Nothing is published.
+name: goreleaser-check
+
+on:
+  pull_request:
+    paths:
+      - cli/.goreleaser.yaml
+      - LICENSE
+      - .github/workflows/release.yml
+      - .github/workflows/goreleaser-check.yml
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # actions/checkout
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      # The pins and the Go version follow release.yml, so this runs what the release runs.
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: 1.25.0
+          cache: false
+
+      - name: Check the config
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check -f ./cli/.goreleaser.yaml
+
+      - name: Build a snapshot without publishing
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --snapshot --clean --skip=publish,announce,validate -f ./cli/.goreleaser.yaml
+        env:
+          TELEMETRY_WRITE_KEY: snapshot
+          TELEMETRY_DATAPLANE_URL: http://localhost
+
+      # install.sh and the README link to the archives by exact name.
+      - name: Check the archive names
+        run: |
+          for f in Darwin_arm64.tar.gz Darwin_x86_64.tar.gz Linux_arm64.tar.gz Linux_i386.tar.gz \
+              Linux_x86_64.tar.gz Windows_arm64.zip Windows_i386.zip Windows_x86_64.zip; do
+            if [ ! -s "dist/rudder-cli_$f" ]; then
+              echo "::error::dist/rudder-cli_$f is missing"
+              exit 1
+            fi
+          done
+
+      - name: Install the .deb and run the binary
+        env:
+          RUDDERSTACK_CLI_TELEMETRY_DISABLED: "true"
+        run: |
+          # Slim images have no CA certificates, and rudder-cli needs them for HTTPS.
+          dpkg-deb --field dist/rudder-cli_Linux_x86_64.deb Depends | grep -qw ca-certificates
+          sudo apt-get install -y ./dist/rudder-cli_Linux_x86_64.deb
+          test "$(command -v rudder-cli)" = /usr/bin/rudder-cli
+          rudder-cli --version
+          test -s dist/homebrew/Casks/rudder-cli.rb
