@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0](https://github.com/rudderlabs/rudder-iac/compare/v1.0.0...v1.0.0) (2026-10-31)
+
+
+### Miscellaneous
+
+* **ci:** move codecov-action to v7.1.1 ([#985](https://github.com/rudderlabs/rudder-iac/issues/985)) ([a5ff4ae](https://github.com/rudderlabs/rudder-iac/commit/a5ff4aee56b567b4ec2f28f1d33122f7c61ae1f1))
+* **ci:** move the PR title check to check-pr-title v2.0.3 ([#1020](https://github.com/rudderlabs/rudder-iac/issues/1020)) ([de5f96c](https://github.com/rudderlabs/rudder-iac/commit/de5f96cd3466efa41e9f7c78a975d9b3903065d8))
+
 ## [1.0.0](https://github.com/rudderlabs/rudder-iac/compare/v0.29.1...v1.0.0) (2026-10-30)
 
 
