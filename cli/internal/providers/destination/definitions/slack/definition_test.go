@@ -428,6 +428,19 @@ func TestSlackConversionRoundTrip(t *testing.T) {
 			}`,
 		},
 		{
+			Name: "empty lists round trip",
+			LocalJSON: `{
+				"webhook_url": "https://hooks.slack.com/services/T000/B000/example",
+				"whitelisted_trait_settings": [],
+				"deny_list_of_events": []
+			}`,
+			APIJSON: `{
+				"webhookUrl": "https://hooks.slack.com/services/T000/B000/example",
+				"whitelistedTraitsSettings": [],
+				"denyListOfEvents": []
+			}`,
+		},
+		{
 			// Covers the three keys schema.json declares but terraform omits:
 			// incomingWebhooksType, eventChannelWebhook, and denyListOfEvents.
 			Name: "keys absent from terraform round trip",

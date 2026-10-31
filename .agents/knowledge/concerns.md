@@ -52,7 +52,7 @@
 <!-- ticket:DEX-846 -->
 - Destination definition defaults intentionally support scalar default tags only; `cli/internal/providers/destination/definitions/defaults.go` rejects slice defaults, and that refusal is asserted in `defaults_test.go`.
 - Slack is currently the only registered destination whose schema declares non-scalar top-level defaults, so its empty-array defaults need fixture/snapshot pinning until DEX-704 teaches the defaults/converter layer to preserve empty arrays.
-- `converter.ArrayWithStrings` can drop explicitly empty lists because of its non-empty-content guard, so fixing array defaults requires both defaults-engine support and empty-list preservation in converters rather than only adding `default:"[]"` tags.
+- `converter.ArrayWithStrings` sends an explicitly empty list as `[]` since DEX-1089, as `ArrayWithObjects` already did, so fixing array defaults now needs only defaults-engine support for `default:"[]"` tags.
 
 ## DEX-1079 — Raw Decoder Text For Wrong-Typed Destination Envelope Fields
 <!-- ticket:DEX-1079 -->
