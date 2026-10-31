@@ -2,8 +2,8 @@ package planner
 
 import (
 	"fmt"
+	"maps"
 	"slices"
-	"sort"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
@@ -63,33 +63,32 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 		Diff: diff,
 	}
 
-	// Handle importable resources (will be imported from remote)
-	sortedImportable := sortByDependencies(diff.ImportableResources, target)
-	for _, urn := range sortedImportable {
-		resource, _ := target.GetResource(urn)
-		plan.Operations = append(plan.Operations, &Operation{Type: Import, Resource: resource})
+	// Non-delete operations are ordered across types: an import or create can
+	// reference a resource created or updated in the same apply, and the
+	// sequential executor runs operations in plan order. Grouping by type
+	// remains the tie-break where dependencies allow.
+	opTypes := make(map[string]OperationType)
+	var ordered []string
+	for _, group := range []struct {
+		opType OperationType
+		urns   []string
+	}{
+		{Import, diff.ImportableResources},
+		{Create, diff.NewResources},
+		{Update, slices.Collect(maps.Keys(diff.UpdatedResources))},
+	} {
+		for _, urn := range slices.Sorted(slices.Values(group.urns)) {
+			opTypes[urn] = group.opType
+			ordered = append(ordered, urn)
+		}
 	}
-
-	// Handle new resources (will be created)
-	sortedNew := sortByDependencies(diff.NewResources, target)
-	for _, urn := range sortedNew {
+	for _, urn := range sortByDependencies(ordered, target) {
 		resource, _ := target.GetResource(urn)
-		plan.Operations = append(plan.Operations, &Operation{Type: Create, Resource: resource})
-	}
-
-	// Handle updated resources
-	updatedURNs := make([]string, 0, len(diff.UpdatedResources))
-	for r := range diff.UpdatedResources {
-		updatedURNs = append(updatedURNs, r)
-	}
-	sortedUpdated := sortByDependencies(updatedURNs, target)
-	for _, urn := range sortedUpdated {
-		resource, _ := target.GetResource(urn)
-		plan.Operations = append(plan.Operations, &Operation{Type: Update, Resource: resource})
+		plan.Operations = append(plan.Operations, &Operation{Type: opTypes[urn], Resource: resource})
 	}
 
 	// Handle deleted resources
-	sortedDeleted := sortByDependencies(diff.RemovedResources, source)
+	sortedDeleted := sortByDependencies(slices.Sorted(slices.Values(diff.RemovedResources)), source)
 	slices.Reverse(sortedDeleted)
 	for _, urn := range sortedDeleted {
 		resource, _ := source.GetResource(urn)
@@ -99,12 +98,13 @@ func (p *Planner) Plan(source, target *resources.Graph) *Plan {
 	return plan
 }
 
-// sortByDependencies returns resources ordered by their dependencies,
-// so that resources that depend on others are visited after their dependencies.
-// Resources with the same dependencies are sorted alphabetically for consistent ordering.
+// sortByDependencies returns urns ordered so that each resource comes after
+// its dependencies within the set, otherwise keeping the input order.
 func sortByDependencies(urns []string, g *resources.Graph) []string {
-	// Sort URNs alphabetically first
-	sort.Strings(urns)
+	inSet := make(map[string]bool, len(urns))
+	for _, urn := range urns {
+		inSet[urn] = true
+	}
 
 	visited := make(map[string]bool)
 	sorted := make([]string, 0, len(urns))
@@ -117,12 +117,8 @@ func sortByDependencies(urns []string, g *resources.Graph) []string {
 		visited[urn] = true
 
 		for _, dep := range g.GetDependencies(urn) {
-			// Only visit dependencies that are in our target URN set
-			for _, targetURN := range urns {
-				if dep == targetURN {
-					visit(dep)
-					break
-				}
+			if inSet[dep] {
+				visit(dep)
 			}
 		}
 		sorted = append(sorted, urn)
