@@ -47,8 +47,9 @@ func (keychain) Delete(account string) error {
 	return err
 }
 
-// KeychainAccount keys the token by API host, so a login against a local stack
-// does not replace the production token.
+// KeychainAccount keys the token by API host, so a token is only read back for
+// the host it was issued for. The config keeps one login at a time: a login to
+// another host replaces the previous one.
 func KeychainAccount(apiURL string) string {
 	u, err := url.Parse(apiURL)
 	if err != nil || u.Host == "" {
