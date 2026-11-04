@@ -36,27 +36,23 @@ func TestInitConfig_TightensExistingFile(t *testing.T) {
 	assert.Equal(t, os.FileMode(0o600), info.Mode().Perm())
 }
 
-func TestSetKeychainLogin_RemovesFileToken(t *testing.T) {
+func TestSetKeychainLogin_KeepsFileTokenForOtherHosts(t *testing.T) {
 	t.Setenv(AccessTokenEnvVar, "")
 	path := filepath.Join(t.TempDir(), "config.json")
-	require.NoError(t, os.WriteFile(path, []byte(`{"auth":{"accessToken":"old"},"debug":true}`), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte(`{"auth":{"accessToken":"prod-token"},"debug":true}`), 0o600))
 	InitConfig(path)
 
 	SetKeychainLogin("ws-1", "Prod")
 
 	cfg := GetConfig()
-	assert.Equal(t, "", cfg.Auth.AccessToken)
+	assert.Equal(t, "prod-token", cfg.Auth.AccessToken, "a login against another host must not delete the file token")
 	assert.Equal(t, TokenStoreKeychain, cfg.Auth.TokenStore)
 	assert.Equal(t, "ws-1", cfg.Auth.WorkspaceID)
 	assert.Equal(t, "Prod", cfg.Auth.WorkspaceName)
 	assert.True(t, cfg.Debug)
-
-	data, err := os.ReadFile(path)
-	require.NoError(t, err)
-	assert.NotContains(t, string(data), "old")
 }
 
-func TestSetFileToken_DropsKeychainMarker(t *testing.T) {
+func TestSetFileToken_KeepsKeychainMarker(t *testing.T) {
 	t.Setenv(AccessTokenEnvVar, "")
 	path := filepath.Join(t.TempDir(), "config.json")
 	require.NoError(t, os.WriteFile(path, []byte(`{"auth":{"tokenStore":"keychain","workspaceID":"ws-1"}}`), 0o600))
@@ -66,8 +62,8 @@ func TestSetFileToken_DropsKeychainMarker(t *testing.T) {
 
 	cfg := GetConfig()
 	assert.Equal(t, "new", cfg.Auth.AccessToken)
-	assert.Equal(t, "", cfg.Auth.TokenStore)
-	assert.Equal(t, "", cfg.Auth.WorkspaceID)
+	assert.Equal(t, TokenStoreKeychain, cfg.Auth.TokenStore, "keychain logins for other hosts still need the marker")
+	assert.Equal(t, "ws-1", cfg.Auth.WorkspaceID)
 }
 
 func TestClearAuth(t *testing.T) {

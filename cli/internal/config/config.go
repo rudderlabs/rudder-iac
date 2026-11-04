@@ -149,27 +149,30 @@ func createConfigFileIfNotExists(cfgFile string) error {
 	return nil
 }
 
-// SetKeychainLogin records a browser login. The token itself goes to the
-// keychain, so any token an earlier login left in the file is removed.
+// SetKeychainLogin records a browser login; the token itself is in the keychain. It sets only the
+// login keys. A file token stays, because it may belong to another API host: the keychain entry
+// is per host, and lookup falls back to the file token.
 func SetKeychainLogin(workspaceID, workspaceName string) {
 	updateConfig(func(data []byte) ([]byte, error) {
-		data, err := sjson.DeleteBytes(data, "auth.accessToken")
-		if err != nil {
-			return nil, err
+		for key, value := range map[string]string{
+			"auth.tokenStore":    TokenStoreKeychain,
+			"auth.workspaceID":   workspaceID,
+			"auth.workspaceName": workspaceName,
+		} {
+			var err error
+			if data, err = sjson.SetBytes(data, key, value); err != nil {
+				return nil, err
+			}
 		}
-		return sjson.SetBytes(data, "auth", map[string]string{
-			"tokenStore":    TokenStoreKeychain,
-			"workspaceID":   workspaceID,
-			"workspaceName": workspaceName,
-		})
+		return data, nil
 	})
 }
 
-// SetFileToken records a token login (`auth login --with-token`). It drops the
-// keychain marker so the new token is the one in use.
+// SetFileToken records a token login (`auth login --with-token`). It keeps the keychain marker,
+// because keychain logins for other API hosts still depend on it.
 func SetFileToken(accessToken string) {
 	updateConfig(func(data []byte) ([]byte, error) {
-		return sjson.SetBytes(data, "auth", map[string]string{"accessToken": accessToken})
+		return sjson.SetBytes(data, "auth.accessToken", accessToken)
 	})
 }
 
