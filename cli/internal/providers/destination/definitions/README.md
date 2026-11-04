@@ -89,6 +89,7 @@ Or persist it in `~/.rudder/config.json`:
 | :-----| :-----|
 | [BingAds Offline Conversions](bingads_offline_conversions/README.md) | `bingads_offline_conversions` |
 | [Braze Audiences](braze_audience/README.md) | `braze_audience` |
+| [Custom Activation](custom_audience/README.md) | `custom_audience` |
 | [Customer.io Audience](customerio_audience/README.md) | `customerio_audience` |
 | [Facebook Custom Audience](fb_custom_audience/README.md) | `fb_custom_audience` |
 | [Google Ads Offline Conversions](google_adwords_offline_conversions/README.md) | `google_adwords_offline_conversions` |
