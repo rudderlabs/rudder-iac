@@ -17,6 +17,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bq"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bqstream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/braze"
+	brazeaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/braze_audience"
 	confluentcloud "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/confluent_cloud"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio"
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
@@ -36,17 +37,20 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/hs"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/intercom"
+	intercomv2 "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/intercom_v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/iterable"
 	iterableaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/iterable_audience"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kafka"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kinesis"
 	linkedinads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_ads"
+	linkedinaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_audience"
 	linkedininsighttag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_insight_tag"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/marketo"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/mp"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/postgres"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/posthog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/qualtrics"
+	redditaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/reddit_audience"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/redis"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/rs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
@@ -58,9 +62,11 @@ import (
 	snowpipestreaming "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/snowpipe_streaming"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/statsig"
 	tiktokads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/tiktok_ads"
+	tiktokaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/tiktok_audience"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/vwo"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/webhook"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/zendesk"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/zoho"
 )
 
 // entry is one compiled destination definition.
@@ -127,6 +133,12 @@ var entries = []entry{
 	{NewDefinition: fbcustomaudience.NewDefinition},
 	{NewDefinition: googleadwordsremarketinglists.NewDefinition},
 	{NewDefinition: iterableaudience.NewDefinition},
+	{NewDefinition: brazeaudience.NewDefinition},
+	{NewDefinition: intercomv2.NewDefinition},
+	{NewDefinition: linkedinaudience.NewDefinition},
+	{NewDefinition: redditaudience.NewDefinition},
+	{NewDefinition: tiktokaudience.NewDefinition},
+	{NewDefinition: zoho.NewDefinition},
 }
 
 // NewRegistry registers the verified definitions and, with includeUnverified,
