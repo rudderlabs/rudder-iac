@@ -45,6 +45,10 @@ type endpointOnlyTestConfig struct {
 //     mapper flow leaves the two endpoints with no behaviour in common (V-R2).
 //   - "hyphen-mapper" is an object-mapping destination whose names carry a
 //     hyphen (V-R10 backend parity).
+//   - "vdmv2audience" stands in for the vdm-next audience destinations
+//     (fb_custom_audience and the rest): supportsVisualMapperV2 and mirror
+//     alone, the one combination on which mirror is accepted. None of them has
+//     a CLI definition yet, so no shipped one can produce this flow.
 func newTestRegistry(t *testing.T) *definitions.Registry {
 	t.Helper()
 
@@ -72,6 +76,17 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 		SourceTypes:     []string{common.SourceTypeWarehouse},
 		ConnectionModes: map[string][]string{common.SourceTypeWarehouse: {"cloud"}},
 		SyncBehaviours:  []string{"mirror"},
+	}))
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:                   "vdmv2audience",
+		DisplayName:            "Test",
+		APIType:                "VDMV2_AUDIENCE",
+		Version:                1,
+		NewConfig:              func() any { return &endpointOnlyTestConfig{} },
+		SourceTypes:            []string{common.SourceTypeWarehouse},
+		ConnectionModes:        map[string][]string{common.SourceTypeWarehouse: {"cloud"}},
+		SyncBehaviours:         []string{"mirror"},
+		SupportsVisualMapperV2: true,
 	}))
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:                 "hyphen-mapper",
@@ -127,6 +142,12 @@ func amplitudeDestination() destinationFixture {
 		enabled: true,
 		config:  map[string]any{"connection_mode": map[string]any{"warehouse": "cloud"}},
 	}
+}
+
+// audienceDestination is a vdm-next audience destination: the visual mapper v2
+// flow, where mirror is the only behaviour it accepts.
+func audienceDestination() destinationFixture {
+	return destinationFixture{id: "my-audience-destination", typ: "vdmv2audience", enabled: true, config: map[string]any{}}
 }
 
 func bingDestination() destinationFixture {
@@ -601,6 +622,46 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/config/sync_behaviour",
 				Message:   "source definition 'postgres' and destination 'my-bing-destination' share no sync behaviour for the object_mapping flow; the connection cannot sync",
+			}},
+		},
+		{
+			name:        "a visual mapper v2 destination on mirror",
+			destination: audienceDestination(),
+			mutate:      func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "mirror" },
+		},
+		{
+			name:        "a visual mapper v2 destination on upsert, which it does not accept",
+			destination: audienceDestination(),
+			expected: []rules.ValidationResult{{
+				Reference: "/connections/0/config/sync_behaviour",
+				Message:   "'sync_behaviour' must be one of [mirror] for source definition 'postgres' and destination 'my-audience-destination' on the visual_mapper_v2 flow",
+			}},
+		},
+		{
+			name:        "an object on a visual mapper v2 destination",
+			destination: audienceDestination(),
+			mutate: func(c *retlConnection.ConnectionSpec) {
+				objectMappingEntry(c)
+				c.Config.SyncBehaviour = "mirror"
+			},
+			expected: []rules.ValidationResult{{
+				Reference: "/connections/0/config/object",
+				Message:   `'object' is not allowed: destination api type "VDMV2_AUDIENCE" maps fields through its own destination config, not an object`,
+			}},
+		},
+		{
+			// The flow takes its mapping checks from the object-mapping side:
+			// its field set is declared up front, so constants and a CDP event
+			// have nowhere to go.
+			name:        "constants on a visual mapper v2 connection",
+			destination: audienceDestination(),
+			mutate: func(c *retlConnection.ConnectionSpec) {
+				c.Config.SyncBehaviour = "mirror"
+				c.Config.Constants = []retlConnection.ConstantSpec{{Key: "plan", Value: "free"}}
+			},
+			expected: []rules.ValidationResult{{
+				Reference: "/connections/0/config/constants",
+				Message:   "'constants' is not allowed with object mapping",
 			}},
 		},
 	}

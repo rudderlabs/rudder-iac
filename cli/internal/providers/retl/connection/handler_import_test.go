@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -131,6 +132,37 @@ func connectionCollection(remotes ...*resources.RemoteResource) *resources.Remot
 	}
 	collection.Set(ResourceType, resourceMap)
 	return collection
+}
+
+// TestFormatForExportMirrorRoundTrips is the import foot-gun regression from
+// #1009: a remote mirror connection still imported cleanly, but the spec it
+// generated failed `validate` on 'sync_behaviour' — and sync_behaviour is
+// immutable, so the only way out was deleting the connection and recreating it.
+// What import writes has to load and validate again.
+func TestFormatForExportMirrorRoundTrips(t *testing.T) {
+	t.Parallel()
+
+	row := remoteRow("conn-mirror", "", "src-1", "dst-1")
+	row.SyncBehaviour = retlClient.SyncBehaviourMirror
+
+	config, err := configFromRemote(&row)
+	require.NoError(t, err)
+	require.Equal(t, "mirror", config.SyncBehaviour)
+
+	exported, err := configToMap(config)
+	require.NoError(t, err)
+
+	spec, err := decode(t, map[string]any{ConnectionsKey: []any{map[string]any{
+		"id":          "users-to-webhook",
+		"source":      "#retl-source-sql-model:users",
+		"destination": "#destination:webhook",
+		"config":      exported,
+	}}})
+	require.NoError(t, err)
+
+	results, err := rules.ValidateStruct(spec, "")
+	require.NoError(t, err)
+	assert.Empty(t, results)
 }
 
 func TestFormatForExport(t *testing.T) {

@@ -57,6 +57,16 @@ type DestinationDefinition struct {
 	// With it, a rETL connection that names an object runs the object-mapping
 	// flow; without it every connection is a JSON-mapper one.
 	SupportsVisualMapper bool
+	// SupportsVisualMapperV2 mirrors db-config.json
+	// config.supportsVisualMapperV2, the flag the vdm-next destinations carry
+	// (the audience destinations: fb_custom_audience,
+	// google_adwords_remarketing_lists, iterable_audience and the rest). It
+	// replaces supportsVisualMapper rather than adding to it: none of those
+	// destinations declares both, and the field set comes from the
+	// destination's own config instead of a named object. A connection to such
+	// a destination runs the visual-mapper-v2 flow, the only flow on which the
+	// backend lets a sync mirror.
+	SupportsVisualMapperV2 bool
 	// ConsentValidationOverrides replaces canonical consent validation for selected local source types.
 	ConsentValidationOverrides map[string]common.ConsentValidator
 	// ConfigValidateFuncs registers extra go-playground custom validate tags,
@@ -172,12 +182,11 @@ var defaultSyncBehaviours = []string{"upsert", "mirror", "full"}
 // backend default only when the definition declares none at all.
 //
 // This is the destination-level list, not the set a connection may actually
-// use: the backend intersects it with the source's own list and rejects
-// "mirror" outright for the JSON-mapper flow (FLOWS_DISALLOWING_MIRROR in
-// config-backend retl/api-gateway/connection-config/assembler.ts). So HTTP
-// reads back [upsert mirror full] yet can never use "mirror", and a
-// mirror-only destination like bingads_offline_conversions has no valid
-// behaviour at all unless the connection carries an object.
+// use: the rETL connection rules intersect it with the source's own list and
+// keep "mirror" on the visual-mapper-v2 flow alone. So HTTP reads back
+// [upsert mirror full] yet can never use "mirror", and a mirror-only
+// destination without supportsVisualMapperV2, such as
+// bingads_offline_conversions, has no valid behaviour at all.
 func (d *RegisteredDefinition) SyncBehaviours() []string {
 	behaviours := d.DestinationDefinition.SyncBehaviours
 	if behaviours == nil {
@@ -192,6 +201,10 @@ func (d *RegisteredDefinition) SyncBehaviours() []string {
 
 func (d *RegisteredDefinition) SupportsVisualMapper() bool {
 	return d.DestinationDefinition.SupportsVisualMapper
+}
+
+func (d *RegisteredDefinition) SupportsVisualMapperV2() bool {
+	return d.DestinationDefinition.SupportsVisualMapperV2
 }
 
 // LocalSourceTypeKeys returns keys allowed under source-type-scoped config blocks.

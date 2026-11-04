@@ -213,6 +213,7 @@ func TestRegistryRejectsRETLMetadataWithoutWarehouse(t *testing.T) {
 	for name, mutate := range map[string]func(*definitions.DestinationDefinition){
 		"empty sync behaviours": func(def *definitions.DestinationDefinition) { def.SyncBehaviours = []string{} },
 		"visual mapper":         func(def *definitions.DestinationDefinition) { def.SupportsVisualMapper = true },
+		"visual mapper v2":      func(def *definitions.DestinationDefinition) { def.SupportsVisualMapperV2 = true },
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

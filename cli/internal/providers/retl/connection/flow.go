@@ -15,12 +15,13 @@ import (
 type Flow string
 
 const (
-	FlowJSONMapper    Flow = "json_mapper"
-	FlowObjectMapping Flow = "object_mapping"
+	FlowJSONMapper     Flow = "json_mapper"
+	FlowObjectMapping  Flow = "object_mapping"
+	FlowVisualMapperV2 Flow = "visual_mapper_v2"
 )
 
 // UsesDestinationSpecificFlow reports whether a destination drives rETL
-// through its own flow rather than the two generic ones. The list mirrors the
+// through its own flow rather than the generic ones. The list mirrors the
 // config-backend DESTINATION_SPECIFIC_REGISTRY in
 // src/modules/retl/api-gateway/connection-config/constants.ts.
 func UsesDestinationSpecificFlow(apiType string) bool {
@@ -32,9 +33,22 @@ func UsesDestinationSpecificFlow(apiType string) bool {
 // object. It errors instead of guessing whenever the combination has no flow:
 // destination-specific flows are not supported at all, and an object only
 // means object mapping on a destination that supports the visual mapper.
-func ClassifyFlow(apiType string, supportsVisualMapper bool, object *string) (Flow, error) {
+//
+// The visual-mapper-v2 flow is read off the destination's own
+// supportsVisualMapperV2 metadata rather than a list of destination names, so
+// a destination that gains the flag upstream needs no change here. It takes
+// precedence because the two flags are exclusive upstream, and it carries no
+// object: a vdm-next destination declares its field set through its own
+// config, which is why it is the one flow a sync can mirror on.
+func ClassifyFlow(apiType string, supportsVisualMapper, supportsVisualMapperV2 bool, object *string) (Flow, error) {
 	if UsesDestinationSpecificFlow(apiType) {
 		return "", fmt.Errorf("destination api type %q uses a destination-specific rETL flow, which is not supported", apiType)
+	}
+	if supportsVisualMapperV2 {
+		if object != nil {
+			return "", fmt.Errorf("'object' is not allowed: destination api type %q maps fields through its own destination config, not an object", apiType)
+		}
+		return FlowVisualMapperV2, nil
 	}
 	if object == nil {
 		return FlowJSONMapper, nil

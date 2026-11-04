@@ -501,7 +501,7 @@ func (h *Handler) destinationUsable(dst apiClient.Destination, object string) er
 	if !slices.Contains(registered.SupportedSourceTypes(), common.SourceTypeWarehouse) {
 		return fmt.Errorf("destination type %q does not accept warehouse sources", dst.Type)
 	}
-	if _, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), lo.EmptyableToPtr(object)); err != nil {
+	if _, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), registered.SupportsVisualMapperV2(), lo.EmptyableToPtr(object)); err != nil {
 		return err
 	}
 	return nil

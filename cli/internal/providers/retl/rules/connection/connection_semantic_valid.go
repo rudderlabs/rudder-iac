@@ -283,7 +283,7 @@ func validateDestinationCompatibility(registry *definitions.Registry, entry conn
 	// rather than hiding it.
 	var (
 		supported        = registered.SupportedSourceTypes()
-		flow, flowErr    = retlConnection.ClassifyFlow(registered.APIType, registered.SupportsVisualMapper(), entry.config.Object)
+		flow, flowErr    = retlConnection.ClassifyFlow(registered.APIType, registered.SupportsVisualMapper(), registered.SupportsVisualMapperV2(), entry.config.Object)
 		acceptsWarehouse = slices.Contains(supported, common.SourceTypeWarehouse)
 	)
 
@@ -312,10 +312,13 @@ func validateDestinationCompatibility(registry *definitions.Registry, entry conn
 	entry.registered, entry.flow = registered, flow
 
 	results := validateDestinationConfig(entry, destinationData.Config)
-	if flow == retlConnection.FlowObjectMapping {
-		results = append(results, validateObjectMappings(entry.index, entry.config)...)
-	} else {
+	// Both mapper flows declare the destination's field set up front, so the
+	// same mapping checks hold: only the JSON mapper takes constants, an event
+	// and the two reserved user identities.
+	if flow == retlConnection.FlowJSONMapper {
 		results = append(results, validateJSONMappings(entry.index, entry.config)...)
+	} else {
+		results = append(results, validateObjectMappings(entry.index, entry.config)...)
 	}
 	return append(results, validateSyncBehaviour(entry)...)
 }
@@ -459,11 +462,11 @@ func validateSourceCapability(entry connectionEntry) []rules.ValidationResult {
 }
 
 // validateSyncBehaviour (V-R2): the behaviour has to be one both endpoints
-// accept, minus mirror, which this CLI does not support on any flow. An empty
-// intersection is reported as such rather than falling back to a
-// permissive set — that would let a connection the backend refuses pass here.
-// A source whose capabilities are unknown is validateSourceCapability's to
-// report, so there is nothing to intersect.
+// accept, and only the visual-mapper-v2 flow keeps mirror from what the two
+// agree on. An empty intersection is reported as such rather than falling back
+// to a permissive set — that would let a connection the backend refuses pass
+// here. A source whose capabilities are unknown is validateSourceCapability's
+// to report, so there is nothing to intersect.
 func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
 	sourceDefinition := entry.endpoints.sourceDefinition()
 	warehouse, known := retlConnection.SourceWarehouseMetadata(sourceDefinition)
@@ -477,10 +480,19 @@ func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
 	)
 
 	// SourceWarehouseMetadata hands back a clone, so filtering in place is safe.
-	// The spec rule already rejects mirror; dropping it here keeps a mirror-only
-	// destination from being offered a behaviour the spec rule would refuse.
+	// Mirroring needs the destination's field set declared up front, which is
+	// what the vdm-next destinations do through their own config; the other
+	// flows drop mirror however the two endpoints feel about it. The backend
+	// refuses it on the JSON mapper alone (FLOWS_DISALLOWING_MIRROR in
+	// config-backend retl/api-gateway/connection-config/assembler.ts), but
+	// DEX-1021 showed that mirror on an object-mapping connection is accepted
+	// and then silently stored as an upsert, so this rule stays stricter than
+	// the backend there rather than passing a connection that cannot mirror.
 	accepted := slices.DeleteFunc(warehouse.SyncBehaviours, func(behaviour string) bool {
-		return behaviour == "mirror" || !slices.Contains(destinationAccepted, behaviour)
+		if behaviour == "mirror" && entry.flow != retlConnection.FlowVisualMapperV2 {
+			return true
+		}
+		return !slices.Contains(destinationAccepted, behaviour)
 	})
 
 	if len(accepted) == 0 {
