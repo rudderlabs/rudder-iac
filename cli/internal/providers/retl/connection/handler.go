@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -499,14 +500,14 @@ func (h *Handler) destinationUsable(dst apiClient.Destination, object string) (*
 		// Usually a definition registered only behind a flag this run has off —
 		// bingads_offline_conversions and customerio_audience sit behind
 		// unverifiedDestinations — so say so rather than surface the lookup.
-		return nil, "", fmt.Errorf("destination type %q version %d is not registered in this CLI; if it is an unverified destination, set RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true: %w", dst.Type, dst.Version, err)
+		return nil, "", skipf("its destination type is not registered in this CLI", "destination type %q version %d is not registered in this CLI; if it is an unverified destination, set RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true: %w", dst.Type, dst.Version, err)
 	}
 	if !slices.Contains(registered.SupportedSourceTypes(), common.SourceTypeWarehouse) {
-		return nil, "", fmt.Errorf("destination type %q does not accept warehouse sources", dst.Type)
+		return nil, "", skipf("its destination does not accept rETL sources", "destination type %q does not accept warehouse sources", dst.Type)
 	}
 	flow, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), lo.EmptyableToPtr(object))
 	if err != nil {
-		return nil, "", err
+		return nil, "", skipf("its destination runs a flow this CLI does not support", "%w", err)
 	}
 	return registered, flow, nil
 }
@@ -522,27 +523,27 @@ func (h *Handler) remoteConnection(
 ) (*RemoteConnection, error) {
 	source, ok := sources[conn.SourceID]
 	if !ok {
-		return nil, fmt.Errorf("connection %q: source %q is not a rETL source in this workspace", conn.ID, conn.SourceID)
+		return nil, skipf("its source is not a rETL source in this workspace", "connection %q: source %q is not a rETL source in this workspace", conn.ID, conn.SourceID)
 	}
 	sourceKind, ok := SourceKindBySourceType(source.SourceType)
 	if !ok {
-		return nil, fmt.Errorf("connection %q: rETL source type %q is not supported", conn.ID, source.SourceType)
+		return nil, skipf("its rETL source type is not supported", "connection %q: rETL source type %q is not supported", conn.ID, source.SourceType)
 	}
 	if !h.sourceKindEnabled(sourceKind) {
-		return nil, fmt.Errorf("connection %q: its source is a %s, which this provider does not register", conn.ID, sourceKind.Kind)
+		return nil, skipf("its source kind is not registered in this run", "connection %q: its source is a %s, which this provider does not register", conn.ID, sourceKind.Kind)
 	}
 	// The workspace is what an import entry is filed under; without one there
 	// is no valid import metadata to write for the row.
 	if source.WorkspaceID == "" {
-		return nil, fmt.Errorf("connection %q: rETL source %q reports no workspace", conn.ID, conn.SourceID)
+		return nil, skipf("its source reports no workspace", "connection %q: rETL source %q reports no workspace", conn.ID, conn.SourceID)
 	}
 	dst, ok := destinations[conn.DestinationID]
 	if !ok {
-		return nil, fmt.Errorf("connection %q: destination %q was not found in this workspace", conn.ID, conn.DestinationID)
+		return nil, skipf("its destination was not found in this workspace", "connection %q: destination %q was not found in this workspace", conn.ID, conn.DestinationID)
 	}
 	registered, flow, err := h.destinationUsable(dst, conn.Object)
 	if err != nil {
-		return nil, fmt.Errorf("connection %q: %w", conn.ID, err)
+		return nil, relabel(err, "connection %q: %w", conn.ID, err)
 	}
 	if err := syncBehaviourRepresentable(conn, source.SourceDefinitionName, registered.SyncBehaviours(), flow); err != nil {
 		return nil, err
@@ -581,6 +582,8 @@ func (h *Handler) remoteConnection(
 // definition to intersect with. It is also read-path only by design: a create
 // has already passed the spec rules, so re-deriving the set on write would
 // duplicate V-R2 rather than guard anything.
+const unrepresentableSyncBehaviour = "its sync behaviour has no spec equivalent"
+
 func syncBehaviourRepresentable(conn retlClient.RETLConnection, sourceDefinition string, destinationAccepted []string, flow Flow) error {
 	behaviour := string(conn.SyncBehaviour)
 	// An unknown source definition has nothing to intersect; remoteConnection
@@ -591,11 +594,65 @@ func syncBehaviourRepresentable(conn retlClient.RETLConnection, sourceDefinition
 	}
 
 	if len(accepted) == 0 {
-		return fmt.Errorf("connection %q: sync behaviour %q cannot be expressed as a spec, and source definition %q and this destination share no behaviour that can on the %s flow; the connection stays in the workspace unchanged: %w",
+		return skipf(unrepresentableSyncBehaviour, "connection %q: sync behaviour %q cannot be expressed as a spec, and source definition %q and this destination share no behaviour that can on the %s flow; the connection stays in the workspace unchanged: %w",
 			conn.ID, behaviour, sourceDefinition, flow, ErrUnrepresentableConfig)
 	}
-	return fmt.Errorf("connection %q: sync behaviour %q cannot be expressed as a spec on the %s flow, where only [%s] can; the connection stays in the workspace unchanged: %w",
+	return skipf(unrepresentableSyncBehaviour, "connection %q: sync behaviour %q cannot be expressed as a spec on the %s flow, where only [%s] can; the connection stays in the workspace unchanged: %w",
 		conn.ID, behaviour, flow, strings.Join(accepted, " "), ErrUnrepresentableConfig)
+}
+
+// skipError labels a dropped row with a row-independent reason, which is what
+// the closing summary groups by. The per-row warning still carries the whole
+// error, ids and all.
+type skipError struct {
+	reason string
+	err    error
+}
+
+func (e *skipError) Error() string { return e.err.Error() }
+func (e *skipError) Unwrap() error { return e.err }
+
+// skipf builds a labelled skip error. reason must name the kind of problem
+// only — a connection id or a type in it would make the summary one line per
+// row again, which is what the summary exists to avoid.
+func skipf(reason, format string, args ...any) error {
+	return &skipError{reason: reason, err: fmt.Errorf(format, args...)}
+}
+
+// relabel reformats a labelled error, keeping its reason. remoteConnection adds
+// the connection id to what destinationUsable reports, and that prefix must not
+// cost the label.
+func relabel(err error, format string, args ...any) error {
+	var labelled *skipError
+	if !errors.As(err, &labelled) {
+		return fmt.Errorf(format, args...)
+	}
+	return &skipError{reason: labelled.reason, err: fmt.Errorf(format, args...)}
+}
+
+// skipReason is the summary's grouping key. An unlabelled error falls back to
+// the sentinel its origin wraps, and then to a generic line: a missing label
+// costs detail in the summary, never a dropped count.
+func skipReason(err error) string {
+	var labelled *skipError
+	switch {
+	case errors.As(err, &labelled):
+		return labelled.reason
+	case errors.Is(err, ErrUnrepresentableConfig):
+		return "its configuration has no spec equivalent"
+	default:
+		return "it cannot be expressed as a spec"
+	}
+}
+
+// logSkipSummary closes a bulk read with one line per reason. A workspace
+// holding dozens of connections the CLI cannot manage otherwise ends in a wall
+// of per-row warnings, which reads as noise rather than as the answer.
+func logSkipSummary(reasons map[string]int) {
+	for _, reason := range slices.Sorted(maps.Keys(reasons)) {
+		log.Warn("rETL connections skipped; they stay in the workspace unchanged",
+			"count", reasons[reason], "reason", reason)
+	}
 }
 
 // logSkip reports a remote row the CLI cannot express. Nothing is changed
@@ -624,15 +681,20 @@ func (h *Handler) eligible(ctx context.Context, hasExternalID *bool) ([]*RemoteC
 	if err != nil {
 		return nil, err
 	}
-	remotes := make([]*RemoteConnection, 0, len(conns))
+	var (
+		remotes = make([]*RemoteConnection, 0, len(conns))
+		skipped = map[string]int{}
+	)
 	for _, conn := range conns {
 		remote, err := h.remoteConnection(conn, sources, destinations)
 		if err != nil {
 			logSkip(conn, err)
+			skipped[skipReason(err)]++
 			continue
 		}
 		remotes = append(remotes, remote)
 	}
+	logSkipSummary(skipped)
 	return remotes, nil
 }
 
