@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -267,7 +268,8 @@ func (h *Handler) assertCreatable(ctx context.Context, request *retlClient.Creat
 	if err != nil {
 		return err
 	}
-	return h.destinationUsable(dst, request.Object)
+	_, _, err = h.destinationUsable(dst, request.Object)
+	return err
 }
 
 // Update changes the mutable fields in one PUT; toUpdateRequest rejects a change
@@ -487,24 +489,26 @@ func (h *Handler) destination(ctx context.Context, id string) (apiClient.Destina
 }
 
 // destinationUsable reports why a destination cannot carry a rETL connection,
-// or nil when it can. Read and write both consult it, so a create cannot write
-// a row the read path would skip. It covers the destination rules only; the
-// source-side reasons remoteConnection skips for stay read-path only.
-func (h *Handler) destinationUsable(dst apiClient.Destination, object string) error {
+// or nil when it can, and hands back the definition and flow it had to resolve
+// to answer. Read and write both consult it, so a create cannot write a row the
+// read path would skip. It covers the destination rules only; the source-side
+// reasons remoteConnection skips for stay read-path only.
+func (h *Handler) destinationUsable(dst apiClient.Destination, object string) (*definitions.RegisteredDefinition, Flow, error) {
 	registered, err := h.registry.GetByAPIType(dst.Type, dst.Version)
 	if err != nil {
 		// Usually a definition registered only behind a flag this run has off —
 		// bingads_offline_conversions and customerio_audience sit behind
 		// unverifiedDestinations — so say so rather than surface the lookup.
-		return fmt.Errorf("destination type %q version %d is not registered in this CLI; if it is an unverified destination, set RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true: %w", dst.Type, dst.Version, err)
+		return nil, "", fmt.Errorf("destination type %q version %d is not registered in this CLI; if it is an unverified destination, set RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true: %w", dst.Type, dst.Version, err)
 	}
 	if !slices.Contains(registered.SupportedSourceTypes(), common.SourceTypeWarehouse) {
-		return fmt.Errorf("destination type %q does not accept warehouse sources", dst.Type)
+		return nil, "", fmt.Errorf("destination type %q does not accept warehouse sources", dst.Type)
 	}
-	if _, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), lo.EmptyableToPtr(object)); err != nil {
-		return err
+	flow, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), lo.EmptyableToPtr(object))
+	if err != nil {
+		return nil, "", err
 	}
-	return nil
+	return registered, flow, nil
 }
 
 // remoteConnection checks one remote row against everything the spec contract
@@ -536,8 +540,12 @@ func (h *Handler) remoteConnection(
 	if !ok {
 		return nil, fmt.Errorf("connection %q: destination %q was not found in this workspace", conn.ID, conn.DestinationID)
 	}
-	if err := h.destinationUsable(dst, conn.Object); err != nil {
+	registered, flow, err := h.destinationUsable(dst, conn.Object)
+	if err != nil {
 		return nil, fmt.Errorf("connection %q: %w", conn.ID, err)
+	}
+	if err := syncBehaviourRepresentable(conn, source.SourceDefinitionName, registered.SyncBehaviours(), flow); err != nil {
+		return nil, err
 	}
 	// configFromRemote names the connection in its own errors, so wrapping here
 	// would only repeat the prefix the other arms add.
@@ -556,6 +564,38 @@ func (h *Handler) remoteConnection(
 		DestinationName:       dst.Name,
 		DestinationExternalID: dst.ExternalID,
 	}, nil
+}
+
+// syncBehaviourRepresentable refuses a remote connection whose sync behaviour
+// the spec rules would reject, so the row is skipped at import rather than
+// written into a spec that then fails validate. sync_behaviour is immutable, so
+// a user who imports such a spec cannot edit their way out — the connection has
+// to be deleted and recreated — which is why import has to agree with V-R2
+// exactly. It therefore asks AcceptedSyncBehaviours, the same function the rule
+// asks, and narrows by itself as the spec contract widens.
+//
+// This lives here rather than in configFromRemote or destinationUsable because
+// it is the only place that holds both halves of the question: configFromRemote
+// sees the connection but no endpoint metadata, and destinationUsable sees the
+// destination definition but neither the connection's behaviour nor the source
+// definition to intersect with. It is also read-path only by design: a create
+// has already passed the spec rules, so re-deriving the set on write would
+// duplicate V-R2 rather than guard anything.
+func syncBehaviourRepresentable(conn retlClient.RETLConnection, sourceDefinition string, destinationAccepted []string, flow Flow) error {
+	behaviour := string(conn.SyncBehaviour)
+	// An unknown source definition has nothing to intersect; remoteConnection
+	// accepts the row and the source's own rules report the definition.
+	accepted, known := AcceptedSyncBehaviours(sourceDefinition, destinationAccepted, flow)
+	if !known || slices.Contains(accepted, behaviour) {
+		return nil
+	}
+
+	if len(accepted) == 0 {
+		return fmt.Errorf("connection %q: sync behaviour %q cannot be expressed as a spec, and source definition %q and this destination share no behaviour that can on the %s flow; the connection stays in the workspace unchanged: %w",
+			conn.ID, behaviour, sourceDefinition, flow, ErrUnrepresentableConfig)
+	}
+	return fmt.Errorf("connection %q: sync behaviour %q cannot be expressed as a spec on the %s flow, where only [%s] can; the connection stays in the workspace unchanged: %w",
+		conn.ID, behaviour, flow, strings.Join(accepted, " "), ErrUnrepresentableConfig)
 }
 
 // logSkip reports a remote row the CLI cannot express. Nothing is changed

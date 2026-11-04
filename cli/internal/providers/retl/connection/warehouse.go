@@ -1,6 +1,10 @@
 package connection
 
-import "slices"
+import (
+	"slices"
+
+	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+)
 
 // WarehouseMetadata is what the CLI knows about one rETL source warehouse: the
 // sync behaviours it accepts, and whether it can back a SQL model source or
@@ -51,4 +55,35 @@ func SourceWarehouseMetadata(sourceDefinition string) (WarehouseMetadata, bool) 
 	// every warehouse at once.
 	metadata.SyncBehaviours = slices.Clone(metadata.SyncBehaviours)
 	return metadata, ok
+}
+
+// AcceptedSyncBehaviours is the set of sync behaviours a connection between a
+// source definition and a destination may declare: what both endpoints accept,
+// intersected with what a spec can express on the given flow. It is the one
+// derivation of that set — the V-R2 validation rule and the import eligibility
+// check both read it, so a row import writes can never fail validate on this
+// field, and widening the spec contract narrows the import skip by itself.
+//
+// An empty result means the two endpoints share no expressible behaviour, which
+// callers report as such rather than falling back to a permissive set: that
+// would let a connection the backend refuses pass. ok is false when the source
+// definition's capabilities are unknown, in which case there is nothing to
+// intersect and the caller has to skip the check rather than guess.
+func AcceptedSyncBehaviours(sourceDefinition string, destinationAccepted []string, flow Flow) ([]string, bool) {
+	warehouse, known := SourceWarehouseMetadata(sourceDefinition)
+	if !known {
+		return nil, false
+	}
+	// SourceWarehouseMetadata hands back a clone, so filtering in place is safe.
+	return slices.DeleteFunc(warehouse.SyncBehaviours, func(behaviour string) bool {
+		return !specSupportsSyncBehaviour(behaviour, flow) || !slices.Contains(destinationAccepted, behaviour)
+	}), true
+}
+
+// specSupportsSyncBehaviour reports whether ConfigSpec.SyncBehaviour can carry
+// the behaviour on the given flow. It is the Go side of that field's `oneof`
+// tag, flow by flow: the tag is the union over the flows, so widening one has
+// to widen the other. mirror has no representation on either generic flow yet.
+func specSupportsSyncBehaviour(behaviour string, _ Flow) bool {
+	return behaviour != string(retlClient.SyncBehaviourMirror)
 }
