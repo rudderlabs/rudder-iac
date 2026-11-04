@@ -50,7 +50,7 @@ spec:
 The RudderStack account holding the Meta access token. Create the account in the dashboard and name it here; Rudder CLI does not manage accounts, and a value naming no account in the workspace fails at apply with `Account not found with given id in the workspace`.
 
 - At most 100 characters, and must not contain line breaks.
-- Upstream declares the bare constraint, so a `{{ .VAR }}` reference is measured as text rather than resolved against it.
+- Rudder CLI resolves a `{{ .VAR }}` reference from a variable file before it validates, so the limit applies to the resolved value. Upstream declares the bare constraint with no template alternative, so a destination-side template that survives substitution is judged as an ordinary literal.
 
 #### `ad_account_id` — string
 
@@ -72,7 +72,7 @@ Identifiers Meta matches members on. Accepted members: `EMAIL`, `PHONE`, `GEN`, 
 
 Meta ORs across identifiers, so more mappings raise the match rate. `FN`, `LN`, `CT`, `ST`, `ZIP` and `COUNTRY` only contribute when sent together.
 
-- The dashboard defaults this to `[EMAIL]`. Rudder CLI does not apply that default, because it only applies defaults to single values, so set the key explicitly or the destination stores an empty list.
+- Defaults to `[EMAIL]`. Rudder CLI applies that default when the spec omits the key, matching what the backend stores, so an omitted key does not diff on later applies. Set it explicitly to match on more than email.
 
 #### `is_hash_required` — boolean, default `true`
 
@@ -137,7 +137,19 @@ spec:
             to: user_id
 ```
 
-Facebook Custom Audience declares `supportsVisualMapperV2`, so the connection runs the visual mapper v2 flow: the destination names its own field set through `user_schema`, the connection carries no `object` and no `mappings`, and `mirror` is the only sync behaviour either side accepts. Naming an `object` fails with `'object' is not allowed`, and `upsert` or `full` fails with `'sync_behaviour' must be one of [mirror] \u2026 on the visual_mapper_v2 flow`.
+Facebook Custom Audience declares `supportsVisualMapperV2`, so the connection runs the visual mapper v2 flow: the destination names its own field set through `user_schema`, an `object` is not allowed, because the destination config carries that field set instead, and `mirror` is the only sync behaviour either side accepts. `mappings` are optional on this flow, not forbidden: add them to fill the declared fields from source columns beyond the identifier, and omit them for the smallest valid connection. Naming an `object` fails with `'object' is not allowed`, and `upsert` or `full` fails with `'sync_behaviour' must be one of [mirror] \u2026 on the visual_mapper_v2 flow`.
+
+To send more than the identifier, add `mappings` naming a source column for each field `user_schema` declares. Meta ORs across identifiers, so each mapping raises the match rate:
+
+```yaml
+        mappings:
+          - from: phone
+            to: PHONE
+          - from: first_name
+            to: FN
+          - from: last_name
+            to: LN
+```
 
 The connection also needs `ad_account_id` on the destination, the key the `warehouse` source type requires to connect:
 

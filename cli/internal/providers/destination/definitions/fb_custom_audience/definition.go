@@ -37,9 +37,10 @@ type fbCustomAudienceConfig struct {
 	// modelled because destination update replaces the whole config object.
 	AccessToken string `mapstructure:"access_token"`
 	AppSecret   string `mapstructure:"app_secret"`
-	// Identifiers Facebook matches on. Upstream defaults this to ["EMAIL"],
-	// which ApplyDefaults cannot carry: it handles top-level scalars only.
-	UserSchema     []string `mapstructure:"user_schema" validate:"omitempty,dive,oneof=EMAIL PHONE GEN MADID EXTERN_ID DOBY DOBM DOBD LN FN FI CT ST ZIP COUNTRY"`
+	// Identifiers Facebook matches on. The declared default mirrors upstream's
+	// ["EMAIL"]: the backend fills it in when a spec omits the key, so without
+	// it here every later apply would diff against the stored value.
+	UserSchema     []string `mapstructure:"user_schema" validate:"omitempty,dive,oneof=EMAIL PHONE GEN MADID EXTERN_ID DOBY DOBM DOBD LN FN FI CT ST ZIP COUNTRY" default:"EMAIL"`
 	IsHashRequired *bool    `mapstructure:"is_hash_required" default:"true"`
 	IsRaw          *bool    `mapstructure:"is_raw" default:"false"`
 	DisableFormat  *bool    `mapstructure:"disable_format" default:"false"`

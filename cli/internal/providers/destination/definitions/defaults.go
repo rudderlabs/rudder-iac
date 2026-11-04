@@ -67,9 +67,9 @@ func isRequiredField(field reflect.StructField) bool {
 
 // parseDefaultValue converts the tag's string form to the field's type.
 //
-// String, bool and integer are the only JSON types upstream schemas default
-// today. Any other kind is rejected at registration rather than guessed at, so
-// widening this switch stays a deliberate act.
+// String, bool, integer and string list are the JSON types upstream schemas
+// default today. Any other kind is rejected at registration rather than
+// guessed at, so widening this switch stays a deliberate act.
 func parseDefaultValue(field reflect.StructField, raw string) (any, error) {
 	switch kind := derefType(field.Type).Kind(); kind {
 	case reflect.String:
@@ -90,6 +90,26 @@ func parseDefaultValue(field reflect.StructField, raw string) (any, error) {
 			return nil, fmt.Errorf("invalid integer default %q", raw)
 		}
 		return float64(value), nil
+
+	case reflect.Slice:
+		// Upstream defaults a few identifier lists (fb_custom_audience and
+		// google_adwords_remarketing_lists userSchema). Only a list of strings
+		// is supported, written comma-separated, and the elements are stored in
+		// a []any so the value compares equal to the same JSON array decoded
+		// from an API response — the same reason integers are kept as float64.
+		if element := derefType(field.Type).Elem().Kind(); element != reflect.String {
+			return nil, fmt.Errorf("unsupported list element kind %s for a default tag", element)
+		}
+		parts := strings.Split(raw, ",")
+		values := make([]any, 0, len(parts))
+		for _, part := range parts {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				return nil, fmt.Errorf("invalid list default %q: empty element", raw)
+			}
+			values = append(values, part)
+		}
+		return values, nil
 
 	default:
 		return nil, fmt.Errorf("unsupported kind %s for a default tag", kind)

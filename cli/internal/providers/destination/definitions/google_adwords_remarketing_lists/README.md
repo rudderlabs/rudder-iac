@@ -79,7 +79,7 @@ Required to connect a cloud-mode event stream source; a Reverse ETL connection d
 
 Identifiers Google matches members on: `email`, `phone`, `addressInfo`. Note the lowercase spelling — Google Ads differs from Facebook Custom Audience here.
 
-- The dashboard defaults this to `[email]`. Rudder CLI does not apply that default, because it only applies defaults to single values, so set the key explicitly or the destination stores an empty list.
+- Defaults to `[email]`. Rudder CLI applies that default when the spec omits the key, matching what the backend stores, so an omitted key does not diff on later applies. Set it explicitly to match on more than email.
 
 #### `is_hash_required` — boolean, default `true`
 
@@ -147,7 +147,7 @@ spec:
             to: user_id
 ```
 
-Google Ads Remarketing Lists declares `supportsVisualMapperV2`, so the connection runs the visual mapper v2 flow: the destination names its own field set through `user_schema`, the connection carries no `object` and no `mappings`, and `mirror` is the only sync behaviour either side accepts.
+Google Ads Remarketing Lists declares `supportsVisualMapperV2`, so the connection runs the visual mapper v2 flow: the destination names its own field set through `user_schema`, an `object` is not allowed, because the destination config carries that field set instead, and `mirror` is the only sync behaviour either side accepts. `mappings` are optional on this flow, not forbidden: add them to fill the declared fields from source columns beyond the identifier, and omit them for the smallest valid connection.
 
 ## Secrets
 

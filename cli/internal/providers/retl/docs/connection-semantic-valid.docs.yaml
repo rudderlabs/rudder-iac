@@ -127,7 +127,7 @@ match_behavior:
                         to: email
       - example_id: "retl-connection-semantic-valid-visual-mapper-v2"
         title: "Mirror sync to a Facebook Custom Audience"
-        description: "Facebook Custom Audience declares supportsVisualMapperV2, so the connection runs the visual mapper v2 flow: the destination names its own field set through user_schema, the connection carries no object and no mappings, and mirror is the only sync behaviour either side accepts."
+        description: "Facebook Custom Audience declares supportsVisualMapperV2, so the connection runs the visual mapper v2 flow: the destination names its own field set through user_schema, an object is not allowed because the destination config carries that field set instead, and mirror is the only sync behaviour either side accepts. Mappings are optional on this flow, and this example omits them to show the smallest valid connection."
         files:
           model.yaml: &audience-model |
             version: rudder/v1
@@ -143,8 +143,10 @@ match_behavior:
               sql: SELECT user_id, email, phone FROM audience_members
           destination.yaml: &fb-custom-audience-destination |
             # fb_custom_audience is unverified: validate this project with
-            # RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is
-            # unknown.
+            # RUDDERSTACK_CLI_EXPERIMENTAL=true and
+            # RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true, or its type is
+            # unknown. The umbrella switch is required too: without it
+            # config.GetConfig clears every experimental flag.
             version: rudder/v1
             kind: destination
             metadata:

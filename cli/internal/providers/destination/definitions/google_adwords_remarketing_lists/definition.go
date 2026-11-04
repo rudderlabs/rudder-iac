@@ -50,9 +50,11 @@ type googleAdwordsRemarketingListsConfig struct {
 	ListID string `mapstructure:"list_id"`
 	// Required at connect time for a cloud source (schema.json allOf).
 	AudienceID string `mapstructure:"audience_id" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	// Identifiers Google matches on. Upstream defaults this to ["email"],
-	// which ApplyDefaults cannot carry: it handles top-level scalars only.
-	UserSchema             []string                 `mapstructure:"user_schema" validate:"omitempty,dive,oneof=email phone addressInfo"`
+	// Identifiers Google matches on. The declared default mirrors upstream's
+	// ["email"]: the backend fills it in when a spec omits the key, so without
+	// it here every later apply would diff against the stored value. Note the
+	// lowercase spelling, which differs from fb_custom_audience.
+	UserSchema             []string                 `mapstructure:"user_schema" validate:"omitempty,dive,oneof=email phone addressInfo" default:"email"`
 	IsHashRequired         *bool                    `mapstructure:"is_hash_required" default:"true"`
 	TypeOfList             string                   `mapstructure:"type_of_list" validate:"omitempty,oneof=General userID mobileDeviceID" default:"General"`
 	UserDataConsent        string                   `mapstructure:"user_data_consent" validate:"omitempty,oneof=UNSPECIFIED UNKNOWN GRANTED DENIED" default:"UNSPECIFIED"`

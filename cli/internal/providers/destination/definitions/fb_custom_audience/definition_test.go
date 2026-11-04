@@ -256,6 +256,7 @@ func TestFbCustomAudienceDefaults(t *testing.T) {
 	// or every apply reports a phantom diff.
 	assert.Equal(t, map[string]any{
 		"rudder_account_id": "acct-1",
+		"user_schema":       []any{"EMAIL"},
 		"is_hash_required":  true,
 		"is_raw":            false,
 		"disable_format":    false,
@@ -267,8 +268,15 @@ func TestFbCustomAudienceDefaults(t *testing.T) {
 	applied := registered.ApplyDefaults(map[string]any{
 		"rudder_account_id": "acct-1",
 		"is_hash_required":  false,
+		"user_schema":       []any{"PHONE"},
 	})
 	assert.Equal(t, false, applied["is_hash_required"])
+	assert.Equal(t, []any{"PHONE"}, applied["user_schema"])
+
+	// The list default is stored as []any so it compares equal to the same
+	// JSON array decoded from an API response, which is what makes a spec that
+	// omits the key converge instead of diffing on every apply.
+	assert.Equal(t, []any{"EMAIL"}, registered.ApplyDefaults(map[string]any{})["user_schema"])
 }
 
 func TestFbCustomAudienceConversionRoundTrip(t *testing.T) {

@@ -257,11 +257,22 @@ func TestGoogleAdwordsRemarketingListsDefaults(t *testing.T) {
 		"rudder_account_id":       "gads-account",
 		"customer_id":             "1234567890",
 		"sub_account":             false,
+		"user_schema":             []any{"email"},
 		"is_hash_required":        true,
 		"type_of_list":            "General",
 		"user_data_consent":       "UNSPECIFIED",
 		"personalization_consent": "UNSPECIFIED",
 	}, registered.ApplyDefaults(validConfig()))
+
+	// An explicitly supplied list wins over the default, so a spec that names
+	// its own identifiers converges rather than being overwritten.
+	applied := registered.ApplyDefaults(map[string]any{
+		"rudder_account_id": "gads-account",
+		"customer_id":       "1234567890",
+		"sub_account":       false,
+		"user_schema":       []any{"phone", "addressInfo"},
+	})
+	assert.Equal(t, []any{"phone", "addressInfo"}, applied["user_schema"])
 }
 
 func TestGoogleAdwordsRemarketingListsConversionRoundTrip(t *testing.T) {
