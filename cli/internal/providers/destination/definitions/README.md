@@ -88,12 +88,18 @@ Or persist it in `~/.rudder/config.json`:
 | Destination | Type |
 | :-----| :-----|
 | [BingAds Offline Conversions](bingads_offline_conversions/README.md) | `bingads_offline_conversions` |
+| [Braze Audiences](braze_audience/README.md) | `braze_audience` |
 | [Customer.io Audience](customerio_audience/README.md) | `customerio_audience` |
 | [Facebook Custom Audience](fb_custom_audience/README.md) | `fb_custom_audience` |
 | [Google Ads Offline Conversions](google_adwords_offline_conversions/README.md) | `google_adwords_offline_conversions` |
 | [Google Ads Remarketing Lists](google_adwords_remarketing_lists/README.md) | `google_adwords_remarketing_lists` |
+| [Intercom V2](intercom_v2/README.md) | `intercom_v2` |
 | [Iterable Audience](iterable_audience/README.md) | `iterable_audience` |
 | [LinkedIn Ads](linkedin_ads/README.md) | `linkedin_ads` |
+| [Linkedin Audience](linkedin_audience/README.md) | `linkedin_audience` |
+| [Reddit Audience](reddit_audience/README.md) | `reddit_audience` |
+| [Tiktok Audience](tiktok_audience/README.md) | `tiktok_audience` |
+| [ZOHO](zoho/README.md) | `zoho` |
 
 Every unverified type takes `definition_version: 1`, and the [config key rules](#config-key-rules) apply to them as they do to verified types.
 
