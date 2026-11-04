@@ -41,7 +41,7 @@ spec:
 The RudderStack account holding the Braze REST API key. Create the account in the dashboard and name it here; Rudder CLI does not manage accounts, and a value naming no account in the workspace fails at apply with `Account not found with given id in the workspace`.
 
 - At most 100 characters, and must not contain line breaks.
-- Upstream declares the bare constraint, so a `{{ .VAR }}` reference is measured as text rather than resolved against it.
+- Rudder CLI resolves a `{{ .VAR }}` reference from a variable file before it validates, so the limit applies to the resolved value. Upstream declares the bare constraint with no template alternative, so a destination-side template that survives substitution is judged as an ordinary literal.
 
 #### `rest_api_key` — string, secret
 
@@ -90,7 +90,7 @@ spec:
             to: user_id
 ```
 
-Braze Audiences declares `supportsVisualMapperV2`, so the connection runs the visual mapper v2 flow: the destination names its own field set through its config, the connection carries no `object` and no `mappings`, and `mirror` is the only sync behaviour either side accepts. Naming an `object` fails, and so does `upsert` or `full`.
+Braze Audiences declares `supportsVisualMapperV2`, so the connection runs the visual mapper v2 flow: the destination names its own field set through its config, an `object` is not allowed, because the destination config carries that field set instead, and `mirror` is the only sync behaviour either side accepts. `mappings` are optional on this flow, not forbidden: add them to fill the declared fields from source columns beyond the identifier, and omit them for the smallest valid connection. Naming an `object` fails, and so does `upsert` or `full`.
 
 Event stream sources are refused by type, since `warehouse` is the only source type this destination accepts. Note this is a different destination from `braze`, which takes event stream sources and is verified.
 

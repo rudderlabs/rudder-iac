@@ -49,7 +49,7 @@ Unlike `intercom`, this destination takes no API key or app ID in `config` — t
 Intercom regional API host your workspace lives in: `US`, `Europe` or `Australia`.
 
 - The dashboard defaults this to `US`, but Rudder CLI requires it explicitly, because a default cannot sit on a required key.
-- A plain enum, so a `{{ .VAR }}` reference is rejected rather than resolved.
+- A plain enum. A `{{ .VAR }}` reference from a variable file is resolved before validation, so it is accepted as long as it resolves to one of the three values. What upstream does not allow here is a destination-side `{{ path || fallback }}` template, which this field has no alternative for, so such a literal is rejected.
 
 ### Behaviour
 
@@ -111,7 +111,7 @@ spec:
             to: user_id
 ```
 
-Intercom V2 declares `supportsVisualMapperV2`, so the connection runs the visual mapper v2 flow: the destination names its own field set through its config, the connection carries no `object` and no `mappings`, and `mirror` is the only sync behaviour either side accepts. Naming an `object` fails, and so does `upsert` or `full`.
+Intercom V2 declares `supportsVisualMapperV2`, so the connection runs the visual mapper v2 flow: the destination names its own field set through its config, an `object` is not allowed, because the destination config carries that field set instead, and `mirror` is the only sync behaviour either side accepts. `mappings` are optional on this flow, not forbidden: add them to fill the declared fields from source columns beyond the identifier, and omit them for the smallest valid connection. Naming an `object` fails, and so does `upsert` or `full`.
 
 `mirror` being the only accepted behaviour applies to Reverse ETL connections alone. Event stream connections never negotiate a sync behaviour.
 

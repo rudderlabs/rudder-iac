@@ -92,6 +92,25 @@ func TestRedditAudienceConfigValidation(t *testing.T) {
 		assert.Equal(t, "/ad_account_id", errors[0].Path)
 	})
 
+	// The two account fields carry the same named pattern but different tags,
+	// which only shows on a value the pattern itself would reject: a template
+	// is exempt under dynamic_or_pattern and judged as a literal under pattern.
+	t.Run("only ad_account_id exempts an upstream template from the pattern", func(t *testing.T) {
+		t.Parallel()
+
+		template := "{{ config." + strings.Repeat("x", 140) + " || fallback }}"
+		require.Greater(t, len(template), 100)
+
+		assert.Empty(t, registered.ValidateConfig(map[string]any{
+			"rudder_account_id": "reddit-account",
+			"ad_account_id":     template,
+		}))
+
+		errors := registered.ValidateConfig(map[string]any{"rudder_account_id": template})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/rudder_account_id", errors[0].Path)
+	})
+
 	t.Run("connection_mode rejects an unsupported mode", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{

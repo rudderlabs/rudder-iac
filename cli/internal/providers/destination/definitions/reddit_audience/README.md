@@ -42,13 +42,13 @@ spec:
 The RudderStack account holding the Reddit Ads OAuth grant. Create the account in the dashboard and name it here; Rudder CLI does not manage accounts, and a value naming no account in the workspace fails at apply with `Account not found with given id in the workspace`.
 
 - At most 100 characters, and must not contain line breaks.
-- Upstream declares the bare constraint, so a `{{ .VAR }}` reference is measured as text rather than resolved against it.
+- Rudder CLI resolves a `{{ .VAR }}` reference from a variable file before it validates, so the limit applies to the resolved value. Upstream declares the bare constraint with no template alternative, so a destination-side template that survives substitution is judged as an ordinary literal.
 
 #### `ad_account_id` — string
 
 Reddit ad account the audience belongs to, such as `t2_abc123`.
 
-- At most 100 characters, and must not contain line breaks. Unlike `rudder_account_id`, a `{{ .VAR }}` reference is accepted in place of a literal here, because upstream wraps this key's constraint in a template alternative.
+- At most 100 characters, and must not contain line breaks, applied to the resolved value as for `rudder_account_id`. What differs is that upstream wraps this key's constraint in a template alternative, so a destination-side `{{ path || fallback }}` literal is accepted here and bypasses the pattern, which is not true of `rudder_account_id`.
 
 ### Per-source keys
 
@@ -91,7 +91,7 @@ spec:
             to: user_id
 ```
 
-Reddit Audience declares `supportsVisualMapperV2`, so the connection runs the visual mapper v2 flow: the destination names its own field set through its config, the connection carries no `object` and no `mappings`, and `mirror` is the only sync behaviour either side accepts. Naming an `object` fails, and so does `upsert` or `full`.
+Reddit Audience declares `supportsVisualMapperV2`, so the connection runs the visual mapper v2 flow: the destination names its own field set through its config, an `object` is not allowed, because the destination config carries that field set instead, and `mirror` is the only sync behaviour either side accepts. `mappings` are optional on this flow, not forbidden: add them to fill the declared fields from source columns beyond the identifier, and omit them for the smallest valid connection. Naming an `object` fails, and so does `upsert` or `full`.
 
 Event stream sources are refused by type, since `warehouse` is the only source type this destination accepts.
 
