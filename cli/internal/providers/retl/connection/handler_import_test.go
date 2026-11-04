@@ -134,35 +134,58 @@ func connectionCollection(remotes ...*resources.RemoteResource) *resources.Remot
 	return collection
 }
 
-// TestFormatForExportMirrorRoundTrips is the import foot-gun regression from
-// #1009: a remote mirror connection still imported cleanly, but the spec it
-// generated failed `validate` on 'sync_behaviour' — and sync_behaviour is
-// immutable, so the only way out was deleting the connection and recreating it.
-// What import writes has to load and validate again.
-func TestFormatForExportMirrorRoundTrips(t *testing.T) {
+// TestFormatForExportMirrorClearsSpecSyntax covers the import hazard #1009
+// left behind, and is deliberately narrower than it looks.
+//
+// An audience connection on a vdm-next destination carries a destinationConfig,
+// which the spec has no field for, so configFromRemote refuses the row and the
+// import skips it (TestConfigFromRemoteRefusesUnrepresentableShapes). It never
+// reaches a spec. What does reach one is a mirror row without a destination
+// config, in either generic shape, and #1009 made the spec it generated fail at
+// the syntax step on a field the backend will not let anyone change.
+//
+// Mirror clears the syntax step again, which is all this test claims. It is not
+// a clean round trip: V-R2 still refuses mirror on both of these flows, so such
+// a connection keeps failing `validate`, with the flow named rather than the
+// enum (TestConnectionSemanticValid_SourceCapability pins both messages). The
+// dead end closes only once a destination declaring supportsVisualMapperV2 is
+// registered and the spec can carry its destination config (DEX-875).
+func TestFormatForExportMirrorClearsSpecSyntax(t *testing.T) {
 	t.Parallel()
 
-	row := remoteRow("conn-mirror", "", "src-1", "dst-1")
-	row.SyncBehaviour = retlClient.SyncBehaviourMirror
+	tests := map[string]func(*retlClient.RETLConnection){
+		"json mapper":    func(*retlClient.RETLConnection) {},
+		"object mapping": func(conn *retlClient.RETLConnection) { conn.Object = "Audience" },
+	}
 
-	config, err := configFromRemote(&row)
-	require.NoError(t, err)
-	require.Equal(t, "mirror", config.SyncBehaviour)
+	for name, shape := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	exported, err := configToMap(config)
-	require.NoError(t, err)
+			row := remoteRow("conn-mirror", "", "src-1", "dst-1")
+			row.SyncBehaviour = retlClient.SyncBehaviourMirror
+			shape(&row)
 
-	spec, err := decode(t, map[string]any{ConnectionsKey: []any{map[string]any{
-		"id":          "users-to-webhook",
-		"source":      "#retl-source-sql-model:users",
-		"destination": "#destination:webhook",
-		"config":      exported,
-	}}})
-	require.NoError(t, err)
+			config, err := configFromRemote(&row)
+			require.NoError(t, err, "a mirror row without a destination config is representable")
+			require.Equal(t, "mirror", config.SyncBehaviour)
 
-	results, err := rules.ValidateStruct(spec, "")
-	require.NoError(t, err)
-	assert.Empty(t, results)
+			exported, err := configToMap(config)
+			require.NoError(t, err)
+
+			spec, err := decode(t, map[string]any{ConnectionsKey: []any{map[string]any{
+				"id":          "users-to-webhook",
+				"source":      "#retl-source-sql-model:users",
+				"destination": "#destination:webhook",
+				"config":      exported,
+			}}})
+			require.NoError(t, err)
+
+			results, err := rules.ValidateStruct(spec, "")
+			require.NoError(t, err)
+			assert.Empty(t, results)
+		})
+	}
 }
 
 func TestFormatForExport(t *testing.T) {
