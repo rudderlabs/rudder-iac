@@ -8,6 +8,7 @@ import (
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	esClient "github.com/rudderlabs/rudder-iac/api/client/event-stream"
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
+	"github.com/rudderlabs/rudder-iac/cli/internal/auth"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
@@ -87,8 +88,7 @@ func Initialise(version string) {
 }
 
 func validateDependencies() error {
-	cfg := config.GetConfig()
-	if cfg.Auth.AccessToken == "" {
+	if auth.AccessToken() == "" {
 		return fmt.Errorf("access token is required, please run `rudder-cli auth login`, or set the access token via the RUDDERSTACK_ACCESS_TOKEN environment variable")
 	}
 
@@ -100,7 +100,7 @@ func NewDeps() (Deps, error) {
 		return nil, err
 	}
 
-	return newDeps(config.GetConfig().Auth.AccessToken)
+	return newDeps(auth.AccessToken())
 }
 
 // NewOfflineDeps builds the same providers as NewDeps (so it observes the same

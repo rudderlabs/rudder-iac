@@ -23,14 +23,17 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/pretty v1.2.1
 	github.com/tidwall/sjson v1.2.5
+	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8
 	golang.org/x/term v0.38.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
+	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.12 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
+	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	golang.org/x/crypto v0.46.0 // indirect

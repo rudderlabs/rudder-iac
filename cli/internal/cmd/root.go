@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"runtime/debug"
 
 	"github.com/kyokomi/emoji/v2"
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/auth"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
@@ -158,6 +160,7 @@ func SetVersion(v string) {
 var trackedCommands = []string{
 	"apply",
 	"auth login",
+	"auth logout",
 	"data-graphs validate",
 	"destroy",
 	"docs destination",
@@ -202,8 +205,17 @@ func Execute() {
 
 		var silent *cmderrors.SilentError
 		if !errors.As(err, &silent) {
-			ui.PrintError(err)
+			ui.PrintError(withLoginHint(err))
 		}
 		os.Exit(1)
 	}
+}
+
+// withLoginHint points a user whose token was rejected at the fix.
+func withLoginHint(err error) error {
+	var apiErr *client.APIError
+	if errors.As(err, &apiErr) && apiErr.HTTPStatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("%w\nThe access token was rejected. Run `rudder-cli auth login` to sign in again.", err)
+	}
+	return err
 }

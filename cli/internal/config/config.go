@@ -22,12 +22,25 @@ var (
 	TelemetryDataplaneURL = ""
 )
 
+const (
+	AccessTokenEnvVar = "RUDDERSTACK_ACCESS_TOKEN"
+	DefaultAppURL     = "https://app.rudderstack.com"
+
+	// TokenStoreKeychain marks a browser login: the token lives in the OS
+	// keychain and the config file holds none.
+	TokenStoreKeychain = "keychain"
+)
+
 type Config = struct {
 	Debug   bool   `mapstructure:"debug"`
 	Verbose bool   `mapstructure:"verbose"`
 	APIURL  string `mapstructure:"apiURL"`
+	AppURL  string `mapstructure:"appURL"`
 	Auth    struct {
-		AccessToken string `mapstructure:"accessToken"`
+		AccessToken   string `mapstructure:"accessToken"`
+		TokenStore    string `mapstructure:"tokenStore"`
+		WorkspaceID   string `mapstructure:"workspaceID"`
+		WorkspaceName string `mapstructure:"workspaceName"`
 	} `mapstructure:"auth"`
 	Telemetry struct {
 		Disabled     bool   `mapstructure:"disabled"`
@@ -74,6 +87,7 @@ func InitConfig(cfgFile string) {
 	viper.SetDefault("debug", false)
 	viper.SetDefault("verbose", false)
 	viper.SetDefault("apiURL", client.BASE_URL)
+	viper.SetDefault("appURL", DefaultAppURL)
 	viper.SetDefault("telemetry.disabled", false)
 	viper.SetDefault("telemetry.writeKey", TelemetryWriteKey)
 	viper.SetDefault("telemetry.dataplaneURL", TelemetryDataplaneURL)
@@ -83,8 +97,9 @@ func InitConfig(cfgFile string) {
 	viper.SetDefault("concurrency.catalogProvider", 4)
 	viper.SetDefault("concurrency.dataGraph", 4)
 
-	viper.BindEnv("auth.accessToken", "RUDDERSTACK_ACCESS_TOKEN")
+	viper.BindEnv("auth.accessToken", AccessTokenEnvVar)
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
+	viper.BindEnv("appURL", "RUDDERSTACK_APP_URL")
 	viper.BindEnv("telemetry.writeKey", "RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY")
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")
@@ -105,14 +120,26 @@ func InitConfig(cfgFile string) {
 func createConfigFileIfNotExists(cfgFile string) error {
 	configPath := filepath.Dir(cfgFile)
 
-	if _, err := os.Stat(cfgFile); os.IsNotExist(err) {
+	info, err := os.Stat(cfgFile)
+	if err == nil {
+		// Older releases created the file 0644 while it held the access token,
+		// and WriteFile keeps the mode of an existing file.
+		if info.Mode().Perm()&0o077 != 0 {
+			if err := os.Chmod(cfgFile, 0o600); err != nil {
+				return fmt.Errorf("tightening config file mode: %w", err)
+			}
+		}
+		return nil
+	}
+
+	if os.IsNotExist(err) {
 		log.Info("Config file not found, creating default configuration", "location", cfgFile)
 
-		if err := os.MkdirAll(configPath, 0755); err != nil {
+		if err := os.MkdirAll(configPath, 0o700); err != nil {
 			return fmt.Errorf("error creating config directory: %v", err)
 		}
 
-		file, err := os.Create(cfgFile)
+		file, err := os.OpenFile(cfgFile, os.O_CREATE|os.O_WRONLY, 0o600)
 		if err != nil {
 			return fmt.Errorf("error creating config file: %v", err)
 		}
@@ -122,9 +149,33 @@ func createConfigFileIfNotExists(cfgFile string) error {
 	return nil
 }
 
-func SetAccessToken(accessToken string) {
+// SetKeychainLogin records a browser login. The token itself goes to the
+// keychain, so any token an earlier login left in the file is removed.
+func SetKeychainLogin(workspaceID, workspaceName string) {
 	updateConfig(func(data []byte) ([]byte, error) {
-		return sjson.SetBytes(data, "auth.accessToken", accessToken)
+		data, err := sjson.DeleteBytes(data, "auth.accessToken")
+		if err != nil {
+			return nil, err
+		}
+		return sjson.SetBytes(data, "auth", map[string]string{
+			"tokenStore":    TokenStoreKeychain,
+			"workspaceID":   workspaceID,
+			"workspaceName": workspaceName,
+		})
+	})
+}
+
+// SetFileToken records a token login (`auth login --with-token`). It drops the
+// keychain marker so the new token is the one in use.
+func SetFileToken(accessToken string) {
+	updateConfig(func(data []byte) ([]byte, error) {
+		return sjson.SetBytes(data, "auth", map[string]string{"accessToken": accessToken})
+	})
+}
+
+func ClearAuth() {
+	updateConfig(func(data []byte) ([]byte, error) {
+		return sjson.DeleteBytes(data, "auth")
 	})
 }
 
@@ -167,7 +218,7 @@ func updateConfig(f func(data []byte) ([]byte, error)) {
 
 	formattedData := pretty.Pretty(newData)
 
-	err = os.WriteFile(configFile, formattedData, 0644)
+	err = os.WriteFile(configFile, formattedData, 0o600)
 	cobra.CheckErr(err)
 
 	_ = viper.ReadInConfig()
