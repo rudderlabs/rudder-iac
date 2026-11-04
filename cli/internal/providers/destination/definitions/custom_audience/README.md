@@ -132,15 +132,26 @@ update:
 
 Set to `false`, or left out, `update` must carry `method`, `endpoint`, `request_body` and `batch_size` of its own. Leaving the key out is not an exemption — the four are required whenever it is not `true`.
 
-> [!WARNING]
-> Rudder CLI substitutes `{{ .VAR }}` in every quoted value before it validates the spec, and it has no escape for a literal one. So a `request_body` that needs `{{ .something }}` of its own cannot be written in a spec today — `validate` reports the token as an undefined variable:
+> [!IMPORTANT]
+> Rudder CLI substitutes `{{ .VAR }}` in every quoted value before it validates the spec, and it has no escape for a literal one. A `request_body` written inline with a `{{ .something }}` token of its own is therefore read as a variable reference and fails:
 >
 > ```text
 > variable substitution failed: make sure undefined variables are defined in a
 > variable file and passed with --var-file
 > ```
 >
-> A body with no `{{ .x }}` token, like the sample above, is unaffected. A `{{ x }}` token without the leading dot is also left alone, since the substitution only claims the dotted form.
+> Put the body in a variable file instead. Substitution collects its matches before injecting resolved values, so a resolved value is never rescanned and the token survives intact:
+>
+> ```yaml
+> # bodies.vars.yaml
+> INSERT_BODY: '{"email": "{{ .email }}", "schema": ["EMAIL_SHA256"]}'
+> ```
+>
+> ```yaml
+> request_body: '{{ .INSERT_BODY }}'
+> ```
+>
+> Two other forms need no workaround: a body with no `{{ .x }}` token, like the sample above, and a `{{ x }}` token without the leading dot, which the substitution never claims.
 
 #### `actions.<call>.fields` — list of objects
 
@@ -202,7 +213,7 @@ spec:
             to: user_id
 ```
 
-Custom Activation declares `supportsVisualMapperV2`, so the connection runs the visual mapper v2 flow: the destination names its own field set through `actions.<call>.fields`, the connection carries no `object` and no `mappings`, and `mirror` is the only sync behaviour either side accepts. Naming an `object` fails, and so does `upsert` or `full`.
+Custom Activation declares `supportsVisualMapperV2`, so the connection runs the visual mapper v2 flow: the destination names its own field set through `actions.<call>.fields`, an `object` is not allowed, because the destination config carries that field set instead, and `mirror` is the only sync behaviour either side accepts. `mappings` are optional on this flow, not forbidden: add them to fill the fields `actions.<call>.fields` declares from source columns beyond the identifier, and omit them for the smallest valid connection. Naming an `object` fails, and so does `upsert` or `full`.
 
 Event stream sources are refused by type, since `warehouse` is the only source type this destination accepts.
 
