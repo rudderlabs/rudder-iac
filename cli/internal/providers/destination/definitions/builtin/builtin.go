@@ -19,6 +19,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/braze"
 	brazeaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/braze_audience"
 	confluentcloud "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/confluent_cloud"
+	customaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/custom_audience"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio"
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
 	facebookconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_conversions"
@@ -139,6 +140,7 @@ var entries = []entry{
 	{NewDefinition: redditaudience.NewDefinition},
 	{NewDefinition: tiktokaudience.NewDefinition},
 	{NewDefinition: zoho.NewDefinition},
+	{NewDefinition: customaudience.NewDefinition},
 }
 
 // NewRegistry registers the verified definitions and, with includeUnverified,
