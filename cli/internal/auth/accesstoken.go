@@ -75,7 +75,12 @@ func Login(ctx context.Context, opts LoginOptions) error {
 	return err
 }
 
+// clientName names the token after this machine. RUDDERSTACK_CLI_DEVICE_NAME
+// overrides the hostname, for shared or generically named machines.
 func clientName() string {
+	if name := strings.TrimSpace(os.Getenv("RUDDERSTACK_CLI_DEVICE_NAME")); name != "" {
+		return "rudder-cli on " + name
+	}
 	host, err := os.Hostname()
 	if err != nil || host == "" {
 		return "rudder-cli"
