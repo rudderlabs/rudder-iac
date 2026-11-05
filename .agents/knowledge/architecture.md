@@ -352,3 +352,8 @@
 ## DEX-1079 — Destination Spec Dereference Relies On The Syntax Gate
 <!-- ticket:DEX-1079 -->
 - `HandlerImpl.ExtractResourcesFromSpec` (`cli/internal/providers/destination/handler.go`) dereferences `*spec.DefinitionVersion` without a nil check. That is safe only because `project.handleValidation` runs `ValidateSyntax`, where `destination/spec-syntax-valid` enforces `required`, before any `loadSpec`, and destination `Provider.LoadLegacySpec` rejects legacy specs, so `BaseProvider.LoadLegacySpec`'s fallback to `LoadSpec` cannot deliver a spec the V1-only rule never saw. A new path that calls `LoadSpec` without the syntax phase must validate first or nil-check.
+
+## INT-7520 — HTTP Definition Version Isolation
+
+- The built-in destination table (`cli/internal/providers/destination/definitions/builtin/builtin.go`) registers HTTP version 1 as verified but HTTP version 2 as unverified under the existing `unverifiedDestinations` opt-in until the v2 stack has been QA verified; introducing v2 does not require another flag.
+- HTTP v2 uses a separate config model and converter under `cli/internal/providers/destination/definitions/http/v2.go`, leaving the verified v1 definition unchanged while reusing its secret, source-type and request-field conversion policies.

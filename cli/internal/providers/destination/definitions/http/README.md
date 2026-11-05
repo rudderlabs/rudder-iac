@@ -5,9 +5,38 @@ HTTP Webhook sends each event to an HTTP endpoint you own. You choose the method
 In an HTTP Webhook destination spec:
 
 - `type: http`
-- `definition_version: 1`
+- `definition_version: 1` for JSONPath-based v1 mapping, or `definition_version: 2` for JSONata request-body templates.
 
-## Sample configuration
+## Version 2: request-body templates
+
+HTTP v2 keeps `type: http` and API type `HTTP`, but uses a JSONata `request_body_template` in place of v1's `properties_mapping`, `is_default_mapping`, `is_batching_enabled`, and `event_filtering`. v1 specs and their settings remain supported unchanged. Enable the existing `unverifiedDestinations` experimental flag to use v2 until the v2 integration is verified.
+
+```yaml
+version: rudder/v1
+kind: destination
+metadata:
+  name: orders-xml
+spec:
+  id: orders-xml
+  display_name: Orders XML
+  type: http
+  definition_version: 2
+  enabled: true
+  config:
+    api_url: https://api.example.com/events
+    auth: noAuth
+    method: POST
+    format: XML
+    xml_root_key: Envelope
+    request_body_template: '{"event": $$.events.{"id": messageId}}'
+    max_batch_size: "50"
+    connection_mode:
+      web: cloud
+```
+
+`format` defaults to `JSON` if omitted. For XML and FORM the template must evaluate to a non-null object, not an array; XML wraps it in `xml_root_key` (or `root` if empty/absent), and FORM sends its top-level keys as form fields. `request_body_template` is required in all formats. `max_batch_size` is required for JSON and XML, from `"1"` through `"5000"`, with **no default**. FORM allows it to be absent or present, but always sends one event per request regardless of its value. Preserve a single-event payload with `request_body_template: '[$$.events][0]'` and `max_batch_size: "1"` (omit the batch-size key for FORM). v2 request-field mappings (`headers`, `query_params`, `path_params`) and authentication use the same local key names as v1. See `rudder-cli docs destination http --definition-version 2` for version-specific fields and validations.
+
+## Sample configuration (version 1)
 
 ```yaml
 version: rudder/v1
@@ -59,9 +88,9 @@ spec:
 
 The above example uses API key authentication and custom request mapping. `xml_root_key` is omitted because it applies only when `format` is `XML`. Several keys apply only in certain combinations — see [Key dependencies](#key-dependencies).
 
-## Config keys
+## Version 1 config keys
 
-`config` accepts only the keys listed below. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
+The keys below describe version 1 only; see [Version 2: request-body templates](#version-2-request-body-templates) or `rudder-cli docs destination http --definition-version 2` for version 2. The [shared config key rules](../README.md#config-key-rules) cover unknown keys, defaults, and immutability.
 
 ### Key dependencies
 

@@ -42,6 +42,27 @@ func describe(t *testing.T, docs *specdocs.Destinations, opts specdocs.DescribeO
 	return doc
 }
 
+func TestHTTPVersionsAreDocumentedSeparately(t *testing.T) {
+	t.Parallel()
+	docs, _ := newDestinations(t)
+	list, err := docs.List(specdocs.ListOptions{})
+	require.NoError(t, err)
+	for _, summary := range list.Destinations {
+		if summary.Type == "http" {
+			assert.Equal(t, []int64{1, 2}, summary.DefinitionVersions)
+			assert.Equal(t, []int64{1}, summary.VerifiedVersions)
+			assert.False(t, summary.Verified) // The legacy field describes the latest version.
+			break
+		}
+	}
+	v1 := describe(t, docs, specdocs.DescribeOptions{Type: "http", Version: ptr[int64](1)})
+	v2 := describe(t, docs, specdocs.DescribeOptions{Type: "http", Version: ptr[int64](2)})
+	assert.True(t, v1.Verified)
+	assert.False(t, v2.Verified)
+	assert.Contains(t, v1.Fields, specdocs.Field{Key: "is_default_mapping", Type: "boolean", Default: true})
+	assert.NotContains(t, v2.Fields, specdocs.Field{Key: "is_default_mapping", Type: "boolean", Default: true})
+}
+
 // The docs output names each secret's variable before any config exists, and
 // import names it from a real config later. Both must agree, or a spec the
 // agent writes and one import writes would reference different variables.
@@ -364,6 +385,7 @@ func (f filler) followConditions(t *testing.T, config map[string]any) []string {
 // fakeStrings are tried in order for a string key; the first its pattern and
 // limits accept is used.
 var fakeStrings = []string{
+	"1", // Batch sizes are string-encoded positive integers.
 	"fake-value",
 	"https://hooks.example.com/rudder",
 	"arn:aws:iam::123456789012:role/fake",

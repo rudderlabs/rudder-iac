@@ -117,6 +117,7 @@ var entries = []entry{
 	{NewDefinition: statsig.NewDefinition, Verified: true},
 	{NewDefinition: vwo.NewDefinition, Verified: true},
 	{NewDefinition: zendesk.NewDefinition, Verified: true},
+	{NewDefinition: httpdest.NewV2Definition},
 	{NewDefinition: bingadsofflineconversions.NewDefinition},
 	{NewDefinition: customerioaudience.NewDefinition},
 	{NewDefinition: googleadwordsofflineconversions.NewDefinition},

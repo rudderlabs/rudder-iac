@@ -309,3 +309,8 @@
 <!-- ticket:DEX-1081 -->
 - mapstructure v2.5.0 types only scalar and map mismatches (`*mapstructure.UnconvertibleTypeError`, whose `Expected` holds the target). Slice and struct mismatches are plain text (`source data must be an array or slice, got string`, `expected a map or struct, got "string"`). So `decodeErrorMessage` (`cli/internal/providers/destination/definitions/validator.go`) finds the expected type by walking the root struct along the decode path (`typeAt`: struct fields by mapstructure tag, then map values and list items), and never parses error text.
 - Rejected alternatives: rETL's `'<field>' is not valid: <reason>` (`cli/internal/providers/retl/rules/connection/connection_spec_valid.go`) still prints Go types such as `map[string]interface {}` and `common.ConsentManagement`. Matching mapstructure's message text has no precedent in the repo and breaks silently on a library upgrade. A decode hook that raises typed errors would re-implement mapstructure's conversion rules.
+
+## INT-7520 — HTTP v2 Format and Batch Config
+
+- HTTP v2 defaults `format` to `JSON`, requires `max_batch_size` for JSON and XML but not FORM, and exposes `xml_root_key` for XML; keep v1-only mappings, event-filter fields, and batching toggles out of the v2 definition.
+- The HTTP v2 config model can declare the JSON format default while requiring a batch size conditionally: destination validation applies defaults before evaluating conditional requirements, so an omitted format is treated as JSON and still requires `max_batch_size`.
