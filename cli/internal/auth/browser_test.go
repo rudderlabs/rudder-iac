@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -162,18 +163,31 @@ func TestExchangeCode(t *testing.T) {
 	}, grant)
 }
 
-func TestExchangeCode_InvalidGrant(t *testing.T) {
+func TestExchangeCode_ErrorBody(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write([]byte(`{"error":"invalid_grant"}`))
-	}))
-	t.Cleanup(srv.Close)
+	for _, tc := range []struct {
+		name, status, body, want string
+	}{
+		{"cli-auth error", "400", `{"error":"invalid_grant"}`, "exchanging code: HTTP 400: invalid_grant"},
+		{"with description", "400", `{"error":"invalid_grant","error_description":"code expired"}`, "exchanging code: HTTP 400: invalid_grant: code expired"},
+		{"backend message only", "409", `{"message":"Access token limit reached"}`, "exchanging code: HTTP 409: Access token limit reached"},
+		{"no JSON", "502", `bad gateway`, "exchanging code: HTTP 502"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				code, _ := strconv.Atoi(tc.status)
+				w.WriteHeader(code)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			t.Cleanup(srv.Close)
 
-	_, err := exchangeCode(context.Background(), srv.Client(), srv.URL, "code", "verifier", "http://127.0.0.1:1/callback")
+			_, err := exchangeCode(context.Background(), srv.Client(), srv.URL, "code", "verifier", "http://127.0.0.1:1/callback")
 
-	assert.EqualError(t, err, "exchanging code: HTTP 400 invalid_grant")
+			assert.EqualError(t, err, tc.want)
+		})
+	}
 }
 
 func TestExchangeCode_EmptyToken(t *testing.T) {

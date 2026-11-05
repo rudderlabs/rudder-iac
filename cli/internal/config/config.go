@@ -169,6 +169,13 @@ func SetKeychainLogin(workspaceID, workspaceName string) {
 // SetFileToken records a token login (`auth login --with-token`). It drops the
 // keychain marker so the new token is the one in use.
 func SetFileToken(accessToken string) {
+	// createConfigFileIfNotExists only warns when it cannot tighten the mode,
+	// so refuse here rather than write a token other users can read.
+	info, err := os.Stat(viper.ConfigFileUsed())
+	cobra.CheckErr(err)
+	if info.Mode().Perm()&0o077 != 0 {
+		cobra.CheckErr(fmt.Errorf("config file %s is readable by other users (mode %o): run chmod 600 on it, then log in again", viper.ConfigFileUsed(), info.Mode().Perm()))
+	}
 	updateConfig(func(data []byte) ([]byte, error) {
 		return sjson.SetBytes(data, "auth", map[string]string{"accessToken": accessToken})
 	})

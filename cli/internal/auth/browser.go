@@ -201,8 +201,16 @@ func exchangeCode(ctx context.Context, httpClient *http.Client, apiURL, code, ve
 			Message     string `json:"message"`
 		}
 		_ = json.Unmarshal(data, &e)
-		detail := strings.TrimSpace(strings.Join([]string{e.Error, e.Description, e.Message}, " "))
-		return nil, fmt.Errorf("exchanging code: HTTP %d %s", res.StatusCode, detail)
+		var parts []string
+		for _, p := range []string{e.Error, e.Description, e.Message} {
+			if p = strings.TrimSpace(p); p != "" {
+				parts = append(parts, p)
+			}
+		}
+		if len(parts) == 0 {
+			return nil, fmt.Errorf("exchanging code: HTTP %d", res.StatusCode)
+		}
+		return nil, fmt.Errorf("exchanging code: HTTP %d: %s", res.StatusCode, strings.Join(parts, ": "))
 	}
 
 	grant := &TokenGrant{}
