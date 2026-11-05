@@ -52,8 +52,6 @@ type ImportResourceInfo struct {
 	RemoteId    string
 }
 
-var importMetadata = map[string]*ImportResourceInfo{}
-
 // isValidSourceDefinition checks if the given source definition is valid
 func isValidSourceDefinition(sd SourceDefinition) bool {
 	v, ok := validSourceDefinitions[sd]
