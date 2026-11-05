@@ -1,6 +1,7 @@
 package definitions
 
 import (
+	"encoding/json"
 	"fmt"
 	"maps"
 	"reflect"
@@ -67,9 +68,9 @@ func isRequiredField(field reflect.StructField) bool {
 
 // parseDefaultValue converts the tag's string form to the field's type.
 //
-// String, bool and integer are the only JSON types upstream schemas default
-// today. Any other kind is rejected at registration rather than guessed at, so
-// widening this switch stays a deliberate act.
+// Strings, bools, integers and arrays are the JSON types upstream schemas
+// default today. Any other kind is rejected at registration rather than guessed
+// at, so widening this switch stays a deliberate act.
 func parseDefaultValue(field reflect.StructField, raw string) (any, error) {
 	switch kind := derefType(field.Type).Kind(); kind {
 	case reflect.String:
@@ -90,6 +91,16 @@ func parseDefaultValue(field reflect.StructField, raw string) (any, error) {
 			return nil, fmt.Errorf("invalid integer default %q", raw)
 		}
 		return float64(value), nil
+
+	case reflect.Slice:
+		// Carried as JSON so it decodes to the same shape an API response
+		// converts to (`[]` -> []any{}). Maps stay unsupported: applyDefaults
+		// reads a map value as nested per-field defaults, not a literal.
+		var value []any
+		if err := json.Unmarshal([]byte(raw), &value); err != nil {
+			return nil, fmt.Errorf("invalid slice default %q", raw)
+		}
+		return value, nil
 
 	default:
 		return nil, fmt.Errorf("unsupported kind %s for a default tag", kind)
@@ -143,6 +154,10 @@ func cloneDefaults(defaults map[string]any) map[string]any {
 	for key, value := range defaults {
 		if nested, ok := value.(map[string]any); ok {
 			out[key] = cloneDefaults(nested)
+			continue
+		}
+		if list, ok := value.([]any); ok {
+			out[key] = slices.Clone(list)
 			continue
 		}
 		out[key] = value
