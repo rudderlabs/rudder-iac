@@ -214,8 +214,12 @@ func Execute() {
 // withLoginHint points a user whose token was rejected at the fix.
 func withLoginHint(err error) error {
 	var apiErr *client.APIError
-	if errors.As(err, &apiErr) && apiErr.HTTPStatusCode == http.StatusUnauthorized {
-		return fmt.Errorf("%w\nThe access token was rejected. Run `rudder-cli auth login` to sign in again.", err)
+	if !errors.As(err, &apiErr) || apiErr.HTTPStatusCode != http.StatusUnauthorized {
+		return err
 	}
-	return err
+	// The env var outranks a browser login, so a new login alone would not help.
+	if os.Getenv(config.AccessTokenEnvVar) != "" {
+		return fmt.Errorf("%w\nThe access token in %s was rejected. Unset it or replace it.", err, config.AccessTokenEnvVar)
+	}
+	return fmt.Errorf("%w\nThe access token was rejected. Run `rudder-cli auth login` to sign in again.", err)
 }

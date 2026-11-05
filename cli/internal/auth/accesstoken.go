@@ -109,7 +109,7 @@ func LoginWithToken(stdin *os.File) error {
 	}
 
 	// A keychain token outranks the file, so drop it to make this one current.
-	removeKeychainToken(config.GetConfig().APIURL)
+	removeKeychainToken(config.GetConfig())
 	config.SetFileToken(accessToken)
 	return nil
 }
@@ -125,7 +125,7 @@ func readTokenLine(r io.Reader) (string, error) {
 // Logout removes the keychain token and every auth key from the config file.
 // A RUDDERSTACK_ACCESS_TOKEN in the environment stays in effect.
 func Logout(stderr io.Writer) error {
-	removeKeychainToken(config.GetConfig().APIURL)
+	removeKeychainToken(config.GetConfig())
 	config.ClearAuth()
 
 	fmt.Fprintln(stderr, "Signed out. The token stays valid until you revoke it in the RudderStack app.")
@@ -135,8 +135,13 @@ func Logout(stderr io.Writer) error {
 	return nil
 }
 
-func removeKeychainToken(apiURL string) {
-	err := NewKeychain().Delete(KeychainAccount(apiURL))
+// removeKeychainToken skips the keychain unless a browser login put a token
+// there, so CI runners with no Secret Service never touch it.
+func removeKeychainToken(cfg config.Config) {
+	if cfg.Auth.TokenStore != config.TokenStoreKeychain {
+		return
+	}
+	err := NewKeychain().Delete(KeychainAccount(cfg.APIURL))
 	if err != nil && !errors.Is(err, ErrTokenNotFound) {
 		log.Warn("removing token from keychain", "error", err)
 	}

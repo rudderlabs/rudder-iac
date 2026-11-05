@@ -123,10 +123,11 @@ func createConfigFileIfNotExists(cfgFile string) error {
 	info, err := os.Stat(cfgFile)
 	if err == nil {
 		// Older releases created the file 0644 while it held the access token,
-		// and WriteFile keeps the mode of an existing file.
+		// and WriteFile keeps the mode of an existing file. A file the user
+		// cannot chmod (read-only mount, ConfigMap) still works, so only warn.
 		if info.Mode().Perm()&0o077 != 0 {
 			if err := os.Chmod(cfgFile, 0o600); err != nil {
-				return fmt.Errorf("tightening config file mode: %w", err)
+				log.Warn("could not restrict the config file to its owner", "location", cfgFile, "error", err)
 			}
 		}
 		return nil

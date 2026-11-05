@@ -68,9 +68,17 @@ func BrowserLogin(ctx context.Context, opts BrowserLoginOptions) (*TokenGrant, e
 	srv := &http.Server{
 		Handler:           newCallbackHandler(state, done),
 		ReadHeaderTimeout: 5 * time.Second,
+		// A local client that withholds a request body must not keep the login waiting.
+		ReadTimeout: 10 * time.Second,
 	}
 	go func() { _ = srv.Serve(ln) }()
-	defer func() { _ = srv.Shutdown(context.Background()) }()
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			_ = srv.Close()
+		}
+	}()
 
 	loginURL := authorizeURL(opts.AppURL, redirectURI, codeChallengeS256(verifier), state, opts.ClientName)
 	fmt.Fprintf(opts.Progress, "Open this URL to sign in and pick a workspace:\n\n  %s\n\n", loginURL)
@@ -185,11 +193,16 @@ func exchangeCode(ctx context.Context, httpClient *http.Client, apiURL, code, ve
 	}
 
 	if res.StatusCode != http.StatusOK {
+		// cli-auth errors carry error and error_description; other backend errors
+		// (quota, duplicate name, role) carry only message.
 		var e struct {
-			Error string `json:"error"`
+			Error       string `json:"error"`
+			Description string `json:"error_description"`
+			Message     string `json:"message"`
 		}
 		_ = json.Unmarshal(data, &e)
-		return nil, fmt.Errorf("exchanging code: HTTP %d %s", res.StatusCode, e.Error)
+		detail := strings.TrimSpace(strings.Join([]string{e.Error, e.Description, e.Message}, " "))
+		return nil, fmt.Errorf("exchanging code: HTTP %d %s", res.StatusCode, detail)
 	}
 
 	grant := &TokenGrant{}
