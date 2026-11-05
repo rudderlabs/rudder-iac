@@ -567,24 +567,37 @@ func (h *Handler) remoteConnection(
 	}, nil
 }
 
-// syncBehaviourRepresentable refuses a remote connection whose sync behaviour
-// the spec rules would reject, so the row is skipped at import rather than
-// written into a spec that then fails validate. sync_behaviour is immutable, so
-// a user who imports such a spec cannot edit their way out — the connection has
-// to be deleted and recreated — which is why import has to agree with V-R2
-// exactly. It therefore asks AcceptedSyncBehaviours, the same function the rule
-// asks, and narrows by itself as the spec contract widens.
+// syncBehaviourRepresentable refuses an unmanaged remote connection whose sync
+// behaviour the spec rules would reject, so the row is skipped at import rather
+// than written into a spec that then fails validate. sync_behaviour is
+// immutable, so a user who imports such a spec cannot edit their way out — the
+// connection has to be deleted and recreated — which is why import has to agree
+// with V-R2 exactly. It therefore asks AcceptedSyncBehaviours, the same
+// function the rule asks, and narrows by itself as the spec contract widens.
 //
-// This lives here rather than in configFromRemote or destinationUsable because
-// it is the only place that holds both halves of the question: configFromRemote
-// sees the connection but no endpoint metadata, and destinationUsable sees the
-// destination definition but neither the connection's behaviour nor the source
-// definition to intersect with. It is also read-path only by design: a create
-// has already passed the spec rules, so re-deriving the set on write would
-// duplicate V-R2 rather than guard anything.
+// It applies to unmanaged rows only, and the row says which it is: an
+// externalId means the CLI already owns the connection, so it is state, not an
+// import candidate. Dropping a managed row would take it out of the state graph
+// and the planner would read the spec beside it as a new resource — planning a
+// Create against a source–destination pair that already holds a connection, and
+// planning no Delete when the spec is removed. A spec that still cannot express
+// the behaviour is V-R2's to refuse at validate, where the user can read it. A
+// perpetual diff is the status quo here; a silent Create would be a regression.
+//
+// This lives in remoteConnection rather than configFromRemote or
+// destinationUsable because it is the only place that holds both halves of the
+// question: configFromRemote sees the connection but no endpoint metadata, and
+// destinationUsable sees the destination definition but neither the connection's
+// behaviour nor the source definition to intersect with. It is also read-path
+// only by design: a create has already passed the spec rules, so re-deriving the
+// set on write would duplicate V-R2 rather than guard anything.
 const unrepresentableSyncBehaviour = "its sync behaviour has no spec equivalent"
 
 func syncBehaviourRepresentable(conn retlClient.RETLConnection, sourceDefinition string, destinationAccepted []string, flow Flow) error {
+	if conn.ExternalID != "" {
+		return nil
+	}
+
 	behaviour := string(conn.SyncBehaviour)
 	// An unknown source definition has nothing to intersect; remoteConnection
 	// accepts the row and the source's own rules report the definition.

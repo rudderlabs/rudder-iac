@@ -179,6 +179,39 @@ func TestEligibleSkipsUnrepresentableSyncBehaviour(t *testing.T) {
 	}
 }
 
+// The gate must never touch a managed row. LoadResourcesFromRemote builds the
+// state graph, and a row dropped from it is a row the planner cannot see: the
+// spec beside it reads as a new resource, so apply plans a Create against a
+// source-destination pair that already holds a connection, and removing the
+// spec plans no Delete at all. The spec still cannot express mirror and V-R2
+// still refuses it at validate, which is where the user can read it.
+func TestManagedMirrorConnectionStaysInState(t *testing.T) {
+	t.Parallel()
+
+	managed := syncBehaviourRow("conn-mirror-managed", "dst-object", retlClient.SyncBehaviourMirror, "Contact")
+	managed.ExternalID = "users-to-bing-ads"
+
+	mock := &MockConnectionClient{
+		Sources:      syncBehaviourSources(),
+		Destinations: remoteDestinations(),
+		ListFunc:     pagedList([]retlClient.RETLConnection{managed}),
+	}
+
+	collection, err := remoteHandler(mock, t).LoadResourcesFromRemote(t.Context())
+	require.NoError(t, err)
+
+	rows := collection.GetAll(ResourceType)
+	require.Len(t, rows, 1, "a managed row must stay in state whatever its sync behaviour")
+	require.Contains(t, rows, managed.ID)
+	assert.Equal(t, "users-to-bing-ads", rows[managed.ID].ExternalID)
+
+	// The same row, unmanaged, is still refused: this is the import candidate.
+	unmanaged := managed
+	unmanaged.ExternalID = ""
+	require.Error(t, syncBehaviourRepresentable(unmanaged, "snowflake", []string{"mirror"}, FlowObjectMapping))
+	require.NoError(t, syncBehaviourRepresentable(managed, "snowflake", []string{"mirror"}, FlowObjectMapping))
+}
+
 // A source definition the CLI has no metadata for leaves the gate inert: the
 // source's own rules report the definition, and guessing a set here would skip
 // rows that are fine.
