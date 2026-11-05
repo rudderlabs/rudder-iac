@@ -182,6 +182,39 @@ func TestMark_ClaimedFirstWinsBySortedRemoteID(t *testing.T) {
 	}, claimed[0])
 }
 
+func TestMark_MatchOnAManagedLocalIsReportedNotLinked(t *testing.T) {
+	t.Parallel()
+
+	// "checkout" is already managed (it is in the managed remote graph), so a
+	// second remote matching it — say after a local rename — must not link:
+	// apply would update the managed resource and silently drop this one.
+	local := localResource("checkout", "category", resources.ResourceData{"name": "Checkout"})
+	remote := &resources.RemoteResource{
+		ID:         "cat_unmanaged",
+		ExternalID: "checkout-1",
+		Reference:  "#category:checkout-1",
+		Data:       "Checkout",
+	}
+
+	scope := importmatcher.Scope{
+		LocalGraph:  graphWith(local),
+		RemoteGraph: graphWith(localResource("checkout", "category", resources.ResourceData{"name": "Old Checkout"})),
+		Importable:  importableWith("category", remote),
+	}
+
+	claimed := importmatcher.Mark(scope, []importmatcher.Matcher{matchByName("category")})
+
+	assert.Nil(t, remote.MatchedWith)
+	assert.Equal(t, "checkout-1", remote.ExternalID)
+	assert.Equal(t, "#category:checkout-1", remote.Reference)
+	assert.Equal(t, []importmatcher.MultipleClaimed{{
+		ResourceType: "category",
+		LocalURN:     "category:checkout",
+		RemoteID:     "cat_unmanaged",
+		Managed:      true,
+	}}, claimed)
+}
+
 func TestMultipleClaimed_String(t *testing.T) {
 	t.Parallel()
 
@@ -194,6 +227,21 @@ func TestMultipleClaimed_String(t *testing.T) {
 
 	assert.Equal(t,
 		`local resource "category:checkout" is matched by multiple remotes "cat_a" and "cat_b"`,
+		claimed.String())
+}
+
+func TestMultipleClaimed_StringForManagedLocal(t *testing.T) {
+	t.Parallel()
+
+	claimed := importmatcher.MultipleClaimed{
+		ResourceType: "category",
+		LocalURN:     "category:checkout",
+		RemoteID:     "cat_unmanaged",
+		Managed:      true,
+	}
+
+	assert.Equal(t,
+		`local resource "category:checkout" is already managed, but remote "cat_unmanaged" matches it too`,
 		claimed.String())
 }
 

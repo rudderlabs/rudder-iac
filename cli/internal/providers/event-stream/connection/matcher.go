@@ -23,13 +23,11 @@ func matchConnection(scope importmatcher.Scope, r *resources.RemoteResource) *re
 	// Dispatched by resource type, so a wrong payload is a wiring bug — panic.
 	remote := r.Data.(*RemoteConnection)
 
-	// Destination rows carry no marks today (the destination provider has no
-	// matcher), so resolving them does not depend on cross-provider matcher
-	// order.
 	sourceURN, ok := importmatcher.EndpointURN(scope, source.ResourceType, remote.SourceID, remote.SourceExternalID)
 	if !ok {
 		return nil
 	}
+	// Destination matches are recorded before this runs (see app.providerOrder).
 	destinationURN, ok := importmatcher.EndpointURN(scope, destination.DestinationResourceType, remote.DestinationID, remote.DestinationExternalID)
 	if !ok {
 		return nil
