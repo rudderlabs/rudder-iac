@@ -9,6 +9,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestHTTPV2Registration(t *testing.T) {
+	t.Parallel()
+
+	registry, err := NewRegistry(true)
+	require.NoError(t, err)
+	v1, err := registry.Get("http", 1)
+	require.NoError(t, err)
+	v2, err := registry.Get("http", 2)
+	require.NoError(t, err)
+	assert.Equal(t, "HTTP", v2.APIType)
+	assert.Equal(t, "http", v2.Type)
+	assert.Equal(t, int64(1), v1.Version)
+	assert.Equal(t, int64(2), v2.Version)
+	assert.True(t, IsVerified("http", 1))
+	assert.False(t, IsVerified("http", 2))
+	withoutUnverified, err := NewRegistry(false)
+	require.NoError(t, err)
+	_, err = withoutUnverified.Get("http", 2)
+	require.Error(t, err)
+}
+
 func TestNewRegistryRegistersTheTable(t *testing.T) {
 	t.Parallel()
 
@@ -23,6 +44,7 @@ func TestNewRegistryRegistersTheTable(t *testing.T) {
 	}
 	slices.Sort(verified)
 	slices.Sort(all)
+	all = slices.Compact(all) // Multiple definition versions share one supported type.
 
 	off, err := NewRegistry(false)
 	require.NoError(t, err)

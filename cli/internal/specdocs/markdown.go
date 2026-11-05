@@ -102,26 +102,27 @@ func RenderDestinationListMarkdown(w io.Writer, list DestinationList) error {
 	p.line("")
 	p.line("Run `rudder-cli docs destination <type>` for the keys a type accepts.")
 	p.line("")
-	p.line("| type | display name | API type | definition versions | verified | source tokens |")
-	p.line("| --- | --- | --- | --- | --- | --- |")
+	p.line("| type | display name | API type | definition versions (status) | source tokens |")
+	p.line("| --- | --- | --- | --- | --- |")
 
 	var enable map[string]string
 	for _, d := range list.Destinations {
 		versions := make([]string, 0, len(d.DefinitionVersions))
 		for _, v := range d.DefinitionVersions {
-			versions = append(versions, fmt.Sprint(v))
+			status := "unverified"
+			if slices.Contains(d.VerifiedVersions, v) {
+				status = "verified"
+			} else {
+				enable = d.Enable
+			}
+			versions = append(versions, fmt.Sprintf("%d (%s)", v, status))
 		}
-		verified := "yes"
-		if !d.Verified {
-			verified = "no"
-			enable = d.Enable
-		}
-		p.row(code(d.Type), d.DisplayName, d.APIType, strings.Join(versions, ", "), verified, strings.Join(d.SourceTypes, ", "))
+		p.row(code(d.Type), d.DisplayName, d.APIType, strings.Join(versions, ", "), strings.Join(d.SourceTypes, ", "))
 	}
 
 	if enable != nil {
 		p.line("")
-		p.line("An unverified type registers only with " + envAssignments(enable) + ".")
+		p.line("An unverified definition version registers only with " + envAssignments(enable) + ".")
 	}
 	return p.err
 }

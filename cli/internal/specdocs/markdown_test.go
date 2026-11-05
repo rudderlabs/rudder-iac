@@ -8,6 +8,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestDestinationListShowsVerificationPerVersion(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	err := RenderDestinationListMarkdown(&buf, DestinationList{Destinations: []DestinationSummary{{
+		Type: "http", DisplayName: "HTTP Webhook", APIType: "HTTP",
+		DefinitionVersions: []int64{1, 2}, VerifiedVersions: []int64{1},
+		SourceTypes: []string{"web"}, Enable: map[string]string{"RUDDERSTACK_X_UNVERIFIED_DESTINATIONS": "true"},
+	}}})
+	require.NoError(t, err)
+	assert.Contains(t, buf.String(), "| `http` | HTTP Webhook | HTTP | 1 (verified), 2 (unverified) |")
+	assert.Contains(t, buf.String(), "An unverified definition version registers only with")
+}
+
 func TestCodeSpanFencesBackticks(t *testing.T) {
 	t.Parallel()
 

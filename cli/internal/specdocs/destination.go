@@ -122,13 +122,15 @@ type DestinationList struct {
 // tokens, the keys of connectionModes, not the source spec types --source
 // takes; `docs source` maps one to the other.
 type DestinationSummary struct {
-	Type               string            `json:"type"`
-	DisplayName        string            `json:"displayName"`
-	APIType            string            `json:"apiType"`
-	DefinitionVersions []int64           `json:"definitionVersions"`
-	Verified           bool              `json:"verified"`
-	SourceTypes        []string          `json:"sourceTypes"`
-	Enable             map[string]string `json:"enable,omitempty"`
+	Type               string  `json:"type"`
+	DisplayName        string  `json:"displayName"`
+	APIType            string  `json:"apiType"`
+	DefinitionVersions []int64 `json:"definitionVersions"`
+	// VerifiedVersions distinguishes always-available versions from gated ones.
+	VerifiedVersions []int64           `json:"verifiedVersions"`
+	Verified         bool              `json:"verified"` // Status of the latest version.
+	SourceTypes      []string          `json:"sourceTypes"`
+	Enable           map[string]string `json:"enable,omitempty"`
 }
 
 // Destinations documents the definitions of a registry. The registry should
@@ -184,11 +186,18 @@ func (d *Destinations) List(opts ListOptions) (DestinationList, error) {
 		}
 		slices.Sort(sourceTypes)
 
+		verifiedVersions := []int64{}
+		for _, version := range versions {
+			if builtin.IsVerified(destType, version) {
+				verifiedVersions = append(verifiedVersions, version)
+			}
+		}
 		summary := DestinationSummary{
 			Type:               latest.Type,
 			DisplayName:        latest.DisplayName,
 			APIType:            latest.APIType,
 			DefinitionVersions: versions,
+			VerifiedVersions:   verifiedVersions,
 			Verified:           builtin.IsVerified(latest.Type, latest.Version),
 			SourceTypes:        sourceTypes,
 		}

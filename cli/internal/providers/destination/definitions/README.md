@@ -6,7 +6,7 @@ The rules in this file apply to every type. The per-type READMEs cover only what
 
 ## Supported destination types
 
-Use the `type` value in YAML. Every type below takes `definition_version: 1`.
+Use the `type` value in YAML. Types below take `definition_version: 1` unless their README documents other versions. HTTP also supports an unverified `definition_version: 2` behind the existing `unverifiedDestinations` flag; v1 remains verified.
 
 | Destination | Type |
 | :-----| :-----|
@@ -57,7 +57,7 @@ Use the `type` value in YAML. Every type below takes `definition_version: 1`.
 | [Webhook](webhook/README.md) | `webhook` |
 | [Zendesk](zendesk/README.md) | `zendesk` |
 
-These are the verified definitions, which Rudder CLI always registers. The [unverified destination types](#unverified-destination-types) register only behind an experimental flag. Any other `type` fails validation.
+Each listed type has a verified definition that Rudder CLI always registers; a newer version of that type may still be gated (as with HTTP v2). The [unverified destination types](#unverified-destination-types) register only behind an experimental flag. Any other `type` fails validation.
 
 To start from a destination already configured in the dashboard, run `rudder-cli import workspace` — the imported YAML uses the same keys the READMEs document.
 
