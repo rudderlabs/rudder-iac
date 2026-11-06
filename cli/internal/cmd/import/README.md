@@ -238,11 +238,48 @@ rudder-cli import workspace [flags]
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--location`, `-l` | Path to the project directory (default `.`).                                                                                                                                      |
 | `--merge`          | Link workspace resources that match existing local resources instead of writing duplicates, and allow import on a diverged project. Requires the `importMerge` experimental flag. |
+| `--managed`        | Write the resources the CLI already manages (those with an externalId) under `managed/` instead of importing unmanaged ones. Requires the `importManaged` experimental flag. See [Exporting managed resources](#exporting-managed-resources). |
+| `--skip-existing`  | With `--managed`, allow a project that already has specs and write only the managed resources it does not have yet. |
 | `--var-file`       | Variable file (`.vars.yaml`/`.vars.yml`) resolving `{{ .VAR }}` references while the project is read. Repeatable; later files win. Pass the same files you pass to `apply`, or a templated field reads as divergence. |
 
 Import writes into an `imported/` subdirectory of the project and **fails if that
 directory already exists** — move or remove a previous `imported/` before
 re-running.
+
+---
+
+## Exporting managed resources
+
+> **Status: experimental.** `--managed` needs experimental mode and the
+> `importManaged` flag, set the same ways as `importMerge` (for example
+> `RUDDERSTACK_X_IMPORT_MANAGED=true`). Without it, `--managed` is rejected.
+
+A plain import writes only resources that have no externalId, and it refuses to
+run when the workspace has managed resources your project lacks. So it cannot
+recover a project that something else manages, such as a teammate's repository.
+
+`import workspace --managed` writes the managed resources under `managed/`, each
+spec keyed by the resource's externalId, so `apply --dry-run` on the result
+reports no changes. It recovers what the specs say, not how they were written:
+file layout, comments, `{{ .VAR }}` substitutions and secrets are lost.
+
+```bash
+rudder-cli import workspace --managed --location ./acme   # managed resources, into managed/
+rudder-cli import workspace --location ./acme             # then the unmanaged ones, into imported/
+```
+
+Without `--skip-existing`, the project must have no specs, because they would
+collide with the externalIds the export writes. With `--skip-existing`, the
+project may already hold some of the managed resources: the export leaves those
+out and writes only the rest. References to a resource the project already has
+point at its existing spec.
+
+```bash
+rudder-cli import workspace --managed --skip-existing --location ./my-project
+```
+
+`--managed` fails if `managed/` already exists, and it cannot be combined with
+`--merge`.
 
 ---
 

@@ -230,6 +230,24 @@ func (p *BaseProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) 
 	return collection, nil
 }
 
+func (p *BaseProvider) LoadManaged(ctx context.Context) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
+	for resourceType, handler := range p.handlers {
+		m, ok := handler.(ManagedExportLoader)
+		if !ok {
+			return nil, fmt.Errorf("handler %s cannot export managed resources", resourceType)
+		}
+		c, err := m.LoadManaged(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("loading managed %s: %w", resourceType, err)
+		}
+		if collection, err = collection.Merge(c); err != nil {
+			return nil, fmt.Errorf("merging managed %s: %w", resourceType, err)
+		}
+	}
+	return collection, nil
+}
+
 func (p *BaseProvider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,

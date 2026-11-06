@@ -222,7 +222,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			make([]string, 0),
 			getResourceImportMetadata(prop.LocalID, types.PropertyResourceType),
 			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s",
-				localcatalog.KindProperties,
+				types.PropertyResourceType,
 				prop.LocalID,
 			)),
 		)
@@ -244,7 +244,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			make([]string, 0),
 			getResourceImportMetadata(event.LocalID, types.EventResourceType),
 			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s",
-				localcatalog.KindEvents,
+				types.EventResourceType,
 				event.LocalID,
 			)),
 		)
@@ -269,7 +269,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			make([]string, 0),
 			getResourceImportMetadata(customType.LocalID, types.CustomTypeResourceType),
 			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s",
-				localcatalog.KindCustomTypes,
+				types.CustomTypeResourceType,
 				customType.LocalID,
 			)),
 		)
@@ -289,7 +289,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			make([]string, 0),
 			getResourceImportMetadata(category.LocalID, types.CategoryResourceType),
 			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s",
-				localcatalog.KindCategories,
+				types.CategoryResourceType,
 				category.LocalID,
 			)),
 		)
@@ -312,7 +312,7 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 			make([]string, 0),
 			getResourceImportMetadata(tp.LocalID, types.TrackingPlanResourceType),
 			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s",
-				localcatalog.KindTrackingPlans,
+				types.TrackingPlanResourceType,
 				tp.LocalID,
 			)),
 			resources.WithAdditionalMetadata(map[string]any{

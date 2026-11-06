@@ -18,12 +18,14 @@ import (
 
 func NewCmdWorkspaceImport() *cobra.Command {
 	var (
-		deps     app.Deps
-		p        project.Project
-		err      error
-		location string
-		merge    bool
-		varFiles []string
+		deps         app.Deps
+		p            project.Project
+		err          error
+		location     string
+		merge        bool
+		managed      bool
+		skipExisting bool
+		varFiles     []string
 	)
 
 	cmd := &cobra.Command{
@@ -33,10 +35,21 @@ func NewCmdWorkspaceImport() *cobra.Command {
 		Example: heredoc.Doc(`
 			$ rudder-cli import workspace --location </path/to/project_dir>
 			$ rudder-cli import workspace --location </path/to/project_dir> --var-file prod.vars.yaml
+			$ rudder-cli import workspace --managed --location </path/to/empty_dir>
+			$ rudder-cli import workspace --managed --skip-existing --location </path/to/project_dir>
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if merge && !config.GetConfig().ExperimentalFlags.ImportMerge {
 				return fmt.Errorf("--merge requires the %q experimental flag to be enabled", "importMerge")
+			}
+			if managed && !config.GetConfig().ExperimentalFlags.ImportManaged {
+				return fmt.Errorf("--managed requires the %q experimental flag to be enabled", "importManaged")
+			}
+			if merge && managed {
+				return errors.New("--merge and --managed cannot be used together")
+			}
+			if skipExisting && !managed {
+				return errors.New("--skip-existing only applies to --managed")
 			}
 
 			deps, err = app.NewDeps()
@@ -70,9 +83,13 @@ func NewCmdWorkspaceImport() *cobra.Command {
 				ui.PrintDeprecationWarning(project.ImportLegacySpecWarning)
 			}
 
-			_, err = os.Stat(filepath.Join(location, importer.ImportedDir))
+			outDir := filepath.Join(location, importer.ImportedDir)
+			if managed {
+				outDir = filepath.Join(location, importer.ManagedDir)
+			}
+			_, err = os.Stat(outDir)
 			if err == nil {
-				return fmt.Errorf("directory for import: %s already exists", filepath.Join(location, importer.ImportedDir))
+				return fmt.Errorf("directory for import: %s already exists", outDir)
 			}
 
 			if errors.Is(err, os.ErrNotExist) {
@@ -87,7 +104,15 @@ func NewCmdWorkspaceImport() *cobra.Command {
 			}()
 
 			ui.StartSpinner("Importing ...")
-			err = importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider(), importer.ImportOptions{Merge: merge})
+			if managed {
+				if mp, ok := deps.CompositeProvider().(importer.ManagedExportProvider); ok {
+					err = importer.ManagedExport(cmd.Context(), p, mp, importer.ManagedExportOptions{SkipExisting: skipExisting})
+				} else {
+					err = errors.New("the configured providers cannot export managed resources")
+				}
+			} else {
+				err = importer.WorkspaceImport(cmd.Context(), p, deps.CompositeProvider(), importer.ImportOptions{Merge: merge})
+			}
 			ui.StopSpinner()
 			if err == nil {
 				// Continuation lines are indented to align under the text after "Warning: ".
@@ -107,6 +132,8 @@ func NewCmdWorkspaceImport() *cobra.Command {
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files")
 	cmd.Flags().BoolVar(&merge, "merge", false, "Allow import on a diverged project, linking remote resources that match existing local resources (experimental)")
+	cmd.Flags().BoolVar(&managed, "managed", false, "Export the resources the CLI already manages (those with an externalId) into "+importer.ManagedDir+"/, keyed by their externalId. Needs a project with no specs unless --skip-existing is set (experimental)")
+	cmd.Flags().BoolVar(&skipExisting, "skip-existing", false, "With --managed, allow a project that already has specs and write only the managed resources it does not have yet")
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 	return cmd
 }

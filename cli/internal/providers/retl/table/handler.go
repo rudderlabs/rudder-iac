@@ -409,7 +409,18 @@ func (h *Handler) FetchImportData(_ context.Context, _ specs.ImportIds) (writer.
 }
 
 func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
-	hasExternalID := false
+	return h.loadExportable(ctx, false, idNamer)
+}
+
+// LoadManaged loads the managed table sources keyed by their real externalId.
+func (h *Handler) LoadManaged(ctx context.Context) (*resources.RemoteResources, error) {
+	return h.loadExportable(ctx, true, nil)
+}
+
+// loadExportable lists table sources with or without an externalId. Unmanaged ones
+// take an id from idNamer; managed ones keep their externalId.
+func (h *Handler) loadExportable(ctx context.Context, managed bool, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	hasExternalID := managed
 	sources, err := h.client.ListRetlSources(ctx, retlClient.WithSourceType(tableSourceTypeFilter), retlClient.WithHasExternalId(&hasExternalID))
 	if err != nil {
 		return nil, fmt.Errorf("listing RETL sources: %w", err)
@@ -417,12 +428,15 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 
 	resourceMap := make(map[string]*resources.RemoteResource, len(sources.Data))
 	for _, source := range sources.Data {
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  source.Name,
-			Scope: ResourceType,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("generating external ID for source %s: %w", source.Name, err)
+		externalID := source.ExternalID
+		if !managed {
+			externalID, err = idNamer.Name(namer.ScopeName{
+				Name:  source.Name,
+				Scope: ResourceType,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("generating external ID for source %s: %w", source.Name, err)
+			}
 		}
 		resourceMap[source.ID] = &resources.RemoteResource{
 			ID:         source.ID,

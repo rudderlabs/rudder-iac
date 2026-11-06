@@ -95,6 +95,15 @@ type UnmanagedRemoteResourceLoader interface {
 	LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error)
 }
 
+// ManagedExportLoader loads the resources the CLI already manages (those with an
+// externalId) shaped like LoadImportable output: ExternalID is the resource's real
+// externalId and Reference is set, so FormatForExport can write them as specs that
+// a later plan sees as unchanged. Optional: providers without it are skipped by
+// import workspace --managed.
+type ManagedExportLoader interface {
+	LoadManaged(ctx context.Context) (*resources.RemoteResources, error)
+}
+
 // RemoteResourceLoader combines the ability to load both managed and unmanaged resources
 // from a remote system. This is the complete interface for remote resource discovery.
 //

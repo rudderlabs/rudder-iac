@@ -449,3 +449,18 @@ func TestRemoteResources_GetURNByID(t *testing.T) {
 		assert.Equal(t, URN(externalID, resourceType), urn)
 	})
 }
+
+func TestRemoteResources_Without(t *testing.T) {
+	rc := NewRemoteResources()
+	rc.Set("source", map[string]*RemoteResource{
+		"r1": {ID: "r1", ExternalID: "managed"},
+		"r2": {ID: "r2"},
+	})
+
+	kept := rc.Without(func(_ string, r *RemoteResource) bool { return r.ExternalID == "" })
+
+	assert.Equal(t, 1, kept.Len())
+	_, ok := kept.GetByID("source", "r1")
+	assert.True(t, ok)
+	assert.Equal(t, 2, rc.Len(), "the receiver is left unchanged")
+}
