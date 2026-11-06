@@ -849,6 +849,26 @@ func TestHTTPConversionRoundTrip(t *testing.T) {
 			}`,
 		},
 		{
+			// An empty whitelist still selects whitelisting, which drops every
+			// event, so the empty list has to reach the API as well.
+			Name: "event filtering empty whitelist",
+			LocalJSON: `{
+				"api_url": "https://example.com/webhook",
+				"auth": "noAuth",
+				"method": "POST",
+				"format": "JSON",
+				"event_filtering": {"whitelist": []}
+			}`,
+			APIJSON: `{
+				"apiUrl": "https://example.com/webhook",
+				"auth": "noAuth",
+				"method": "POST",
+				"format": "JSON",
+				"whitelistedEvents": [],
+				"eventFilteringOption": "whitelistedEvents"
+			}`,
+		},
+		{
 			Name: "event filtering blacklist",
 			LocalJSON: `{
 				"api_url": "https://example.com/webhook",
