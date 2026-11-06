@@ -20,6 +20,23 @@ const (
 	FlowVisualMapperV2 Flow = "visual_mapper_v2"
 )
 
+// Label is how a flow is named in a diagnostic. The spec never names a flow,
+// so an error that mentions one has to mention the one this connection was
+// classified as: a visual-mapper-v2 connection told to fix something "with
+// object mapping" is pointed at a flow its destination cannot run.
+func (f Flow) Label() string {
+	switch f {
+	case FlowJSONMapper:
+		return "JSON mapping"
+	case FlowObjectMapping:
+		return "object mapping"
+	case FlowVisualMapperV2:
+		return "the visual mapper v2 flow"
+	default:
+		return string(f)
+	}
+}
+
 // UsesDestinationSpecificFlow reports whether a destination drives rETL
 // through its own flow rather than the generic ones. The list mirrors the
 // config-backend DESTINATION_SPECIFIC_REGISTRY in

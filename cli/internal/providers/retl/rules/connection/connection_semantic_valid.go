@@ -312,13 +312,14 @@ func validateDestinationCompatibility(registry *definitions.Registry, entry conn
 	entry.registered, entry.flow = registered, flow
 
 	results := validateDestinationConfig(entry, destinationData.Config)
-	// Both mapper flows declare the destination's field set up front, so the
-	// same mapping checks hold: only the JSON mapper takes constants, an event
-	// and the two reserved user identities.
+	// The two non-JSON flows declare the destination's field set up front, so
+	// constants and an event belong to the JSON mapper alone whichever of them
+	// a connection runs. What they do with identifiers differs, so the rest is
+	// per flow rather than shared.
 	if flow == retlConnection.FlowJSONMapper {
 		results = append(results, validateJSONMappings(entry.index, entry.config)...)
 	} else {
-		results = append(results, validateObjectMappings(entry.index, entry.config)...)
+		results = append(results, validateMappedMappings(entry.index, entry.config, flow)...)
 	}
 	return append(results, validateSyncBehaviour(entry)...)
 }
@@ -345,19 +346,40 @@ func validateDestinationConfig(entry connectionEntry, config map[string]any) []r
 	return results
 }
 
-// validateObjectMappings covers the object mapping flow: constants and events
-// belong to the JSON mapper alone (V-R5), the flow stores exactly one
-// identifier (V-R4), its mappings may be absent (V-R9b), and a mapping aimed at
-// an identifier target would not survive a round trip.
-func validateObjectMappings(index int, config retlConnection.ConfigSpec) []rules.ValidationResult {
+// validateMappedMappings covers the two flows whose destination declares its
+// field set up front. Constants and events belong to the JSON mapper alone
+// (V-R5) on both, and mappings may be absent on both (V-R9b). Each message
+// names the flow the connection was classified as, because the spec never
+// names one and the reader has no other way to tell which rules they are
+// being held to.
+//
+// Everything after that is object mapping's alone. It stores exactly one
+// identifier (V-R4) and synthesises `user_id` and `context.externalId[0].id`
+// from it, so a user mapping aimed at either would be folded into the
+// identifiers and never come back where it was written. The visual mapper v2
+// flow does neither: every identifier is carried through to
+// `identifierMappings` and mappings stay separate as `fieldMappings`, so it
+// takes as many identifiers as the destination has fields to match on and
+// reserves no mapping target. Capping it at one would refuse the shape these
+// destinations are actually used in: the Google Ads payload behind DEX-1108
+// matches on six.
+func validateMappedMappings(index int, config retlConnection.ConfigSpec, flow retlConnection.Flow) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
 	if len(config.Constants) > 0 {
-		results = append(results, result(configRef(index)+"/constants", "'constants' is not allowed with object mapping"))
+		results = append(results, result(configRef(index)+"/constants", fmt.Sprintf(
+			"'constants' is not allowed with %s", flow.Label(),
+		)))
 	}
 	if config.Event != nil {
-		results = append(results, result(configRef(index)+"/event", "'event' is not allowed with object mapping"))
+		results = append(results, result(configRef(index)+"/event", fmt.Sprintf(
+			"'event' is not allowed with %s", flow.Label(),
+		)))
 	}
+	if flow != retlConnection.FlowObjectMapping {
+		return results
+	}
+
 	if len(config.Identifiers) != 1 {
 		results = append(results, result(configRef(index)+"/identifiers", fmt.Sprintf(
 			"object mapping supports a single identifier, found %d", len(config.Identifiers),
