@@ -7,13 +7,16 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
+	"github.com/rudderlabs/rudder-iac/cli/internal/devlisten"
 )
 
 // get sends the one request of a read command and returns the answer of a
@@ -92,17 +95,52 @@ func trimNewline(b []byte) []byte {
 	return b
 }
 
-// readStream prints the stream as the server wrote it, or as a table. The
-// cursor to continue from goes to stderr, so stdout stays one event per line.
+// again is the command line the caller ran, with --url filled in and --since
+// replaced, so a next command asks the same question of the same listener.
+func again(cmd *cobra.Command, base, since string) string {
+	words := []string{cmd.CommandPath(), "--url", shellWord(base), "--since", shellWord(since)}
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		slice, isSlice := f.Value.(pflag.SliceValue)
+		switch {
+		case f.Name == "url" || f.Name == "since":
+		case isSlice:
+			for _, v := range slice.GetSlice() {
+				words = append(words, "--"+f.Name, shellWord(v))
+			}
+		case f.Value.Type() == "bool":
+			// A bool takes no separate word: --json, or --json=false.
+			words = append(words, strings.TrimSuffix("--"+f.Name+"="+f.Value.String(), "=true"))
+		default:
+			words = append(words, "--"+f.Name, shellWord(f.Value.String()))
+		}
+	})
+	return strings.Join(words, " ")
+}
+
+// readStream prints the stream, then fails a window that lost requests.
 func readStream(cmd *cobra.Command, opts *readOptions, base string, q url.Values, timeout time.Duration, view string, fields []string) error {
 	resp, body, err := get(cmd, base, q, timeout)
 	if err != nil {
 		return err
 	}
-	hasMore := resp.Header.Get("X-Dev-Has-More") == "true"
-	cursor := resp.Header.Get("X-Dev-Cursor")
+	if err := writeStream(cmd, opts, base, resp.Header, body, view, fields); err != nil {
+		return err
+	}
+	return verdict(cmd, opts, base, readResult{
+		lost:           resp.Header.Get("X-Dev-Diagnosis") == devlisten.CodeEvicted,
+		evictedThrough: resp.Header.Get("X-Dev-Evicted-Through"),
+	})
+}
+
+// writeStream prints the stream as the server wrote it, or as a table. The
+// cursor to continue from goes to stderr, so stdout stays one event per line.
+func writeStream(cmd *cobra.Command, opts *readOptions, base string, header http.Header, body []byte, view string, fields []string) error {
+	hasMore := header.Get("X-Dev-Has-More") == "true"
+	cursor := header.Get("X-Dev-Cursor")
 	if opts.json {
-		if hasMore {
+		// A read that fails on loss writes one JSON error to stderr and nothing else.
+		lost := header.Get("X-Dev-Diagnosis") == devlisten.CodeEvicted
+		if hasMore && (!lost || opts.allowPartial) {
 			fmt.Fprintf(cmd.ErrOrStderr(), "more events: continue with --since %s\n", cursor)
 		}
 		_, err := cmd.OutOrStdout().Write(body)
@@ -113,4 +151,29 @@ func readStream(cmd *cobra.Command, opts *readOptions, base string, q url.Values
 		more = cursor
 	}
 	return renderStream(cmd.OutOrStdout(), body, streamTable{since: opts.since, base: base, more: more, view: view, fields: fields})
+}
+// readResult is what a read says about its own output. The listener
+// decides which windows lost requests; the CLI only reads its answer.
+type readResult struct {
+	lost           bool
+	evictedThrough string
+}
+
+// verdict runs after the output is written. It fails a read whose window
+// lost requests, unless the caller accepted the loss.
+func verdict(cmd *cobra.Command, opts *readOptions, base string, r readResult) error {
+	if !r.lost {
+		return nil
+	}
+	message := "requests up to seq " + r.evictedThrough + " were evicted, so this window is incomplete"
+	if !opts.allowPartial {
+		return fail(cmd, &usageError{
+			code:    devlisten.CodeEvicted,
+			message: message + "; pass --allow-partial to accept it",
+			// The window after the newest evicted request is complete.
+			next: again(cmd, base, r.evictedThrough),
+		})
+	}
+	fmt.Fprintln(cmd.ErrOrStderr(), "note: "+message)
+	return nil
 }

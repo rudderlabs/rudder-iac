@@ -77,12 +77,14 @@ type diagnosisItem struct {
 }
 
 func (h *Handler) summary(w http.ResponseWriter, r *http.Request, q *eventsQuery) {
-	win := h.window(q.since)
+	rd := h.read(q.since)
 	var waited time.Duration
 	if q.wait > 0 {
-		ctx, cancel := context.WithTimeout(r.Context(), q.wait)
+		// Start the clock before the deadline, so a wait that ran out never
+		// reports less than it was given.
 		began := time.Now()
-		_, err := h.wait(ctx, win.since, q.min, q.acceptedMatches(win))
+		ctx, cancel := context.WithTimeout(r.Context(), q.wait)
+		_, err := h.wait(ctx, rd.since, q.min, q.acceptedMatches(rd.window))
 		cancel()
 		waited = time.Since(began)
 		switch {
@@ -93,25 +95,21 @@ func (h *Handler) summary(w http.ResponseWriter, r *http.Request, q *eventsQuery
 		case r.Context().Err() != nil:
 			return
 		}
+		rd = h.reread(rd.window)
 	}
-	// The cursor is taken before the records, so a request stored between
-	// the two reads waits for the next read instead of being skipped.
-	win.cursor = h.store.Cursor()
-	records := h.records(win)
-	stats := h.store.Stats()
 
-	filtered := tally(records, q)
-	filtered.Diagnosis = h.diagnose(win, tally(records, &eventsQuery{}), filtered, q, stats)
+	filtered := tally(rd.records, q)
+	filtered.Diagnosis = h.diagnose(rd, tally(rd.records, &eventsQuery{}), filtered, q)
 	writeJSON(w, http.StatusOK, summaryObject{
 		APIVersion:     h.cfg.Identity.APIVersion,
 		ServerID:       h.cfg.Identity.ServerID,
-		Since:          win.since,
-		Cursor:         win.cursor,
-		EvictedThrough: stats.EvictedThrough,
+		Since:          rd.since,
+		Cursor:         rd.cursor,
+		EvictedThrough: rd.stats.EvictedThrough,
 		TimedOut:       q.wait > 0 && filtered.Events.Total < q.min,
 		WaitedMs:       waited.Milliseconds(),
 		Summary:        filtered,
-		Next:           "rudder-cli sources events --since " + strconv.FormatUint(win.cursor, 10) + q.args() + " --json",
+		Next:           "rudder-cli sources events --since " + strconv.FormatUint(rd.cursor, 10) + q.args() + " --json",
 	})
 }
 
@@ -262,10 +260,13 @@ var bodyStages = []string{"decode", "body", "parse", "batch", "identity", "size"
 
 // diagnose reads the whole window, not the filters: a typo in a filter must
 // not read as a listener that received nothing. Every rule that holds is
-// listed, in the order of what it rules out first.
-func (h *Handler) diagnose(win window, all, filtered counts, q *eventsQuery, stats store.Stats) []diagnosisItem {
+// listed, in the order of what it rules out first. When the window lost
+// requests to the store budget, no rule can vouch for what arrived.
+func (h *Handler) diagnose(rd reading, all, filtered counts, q *eventsQuery) []diagnosisItem {
 	var (
 		out   = []diagnosisItem{}
+		win   = rd.window
+		stats = rd.stats
 		since = strconv.FormatUint(win.since, 10)
 		add   = func(code string, count int, message, next string) {
 			out = append(out, diagnosisItem{code, count, message, next})
@@ -274,6 +275,9 @@ func (h *Handler) diagnose(win window, all, filtered counts, q *eventsQuery, sta
 		control = all.Control
 	)
 	requests := func(query string) string { return h.curl("requests?since=" + since + query) }
+	if rd.lost {
+		out = append(out, evicted(rd, q))
+	}
 
 	// The store counts ingestion requests only, so control requests alone
 	// still read as nothing received. Eviction needs requests to evict.
@@ -288,13 +292,15 @@ func (h *Handler) diagnose(win window, all, filtered counts, q *eventsQuery, sta
 			"curl -fsS -u '"+key+":' -H 'Content-Type: application/json' -d '{\"event\":\"dev check\",\"userId\":\"dev\"}' '"+
 				h.cfg.Identity.URL+"/v1/track'")
 	}
-	if received && reqs == 0 {
+	// An empty window that lost requests is not empty because nothing came,
+	// so the rules below that read an empty window skip it.
+	if received && reqs == 0 && !rd.lost {
 		add("nothing_new", 0,
 			fmt.Sprintf("No request after cursor %d; the listener holds %d. The app sent before the cursor, or has not sent yet.",
 				win.since, stats.Requests),
 			"rudder-cli sources events --since 0 --json")
 	}
-	if control.Preflight > 0 && control.SourceConfig == 0 && reqs == 0 {
+	if control.Preflight > 0 && control.SourceConfig == 0 && reqs == 0 && !rd.lost {
 		add("preflight_only", control.Preflight,
 			"The browser sent CORS preflights only, so it never sent the requests that carry events.",
 			requests("&kind=control"))
@@ -304,7 +310,7 @@ func (h *Handler) diagnose(win window, all, filtered counts, q *eventsQuery, sta
 			"The SDK asked for its config and got 401 or 400: its write key is not on the --write-key allowlist.",
 			requests("&kind=control&failed=true"))
 	}
-	if control.SourceConfig > 0 && control.SourceConfigFailed == 0 && reqs == 0 {
+	if control.SourceConfig > 0 && control.SourceConfigFailed == 0 && reqs == 0 && !rd.lost {
 		add("sdk_loaded_no_events", control.SourceConfig,
 			"The SDK loaded its config but sent no event: check the SDK plugins, or the action never ran.",
 			requests("&kind=control"))
@@ -336,7 +342,7 @@ func (h *Handler) diagnose(win window, all, filtered counts, q *eventsQuery, sta
 			requestsVerb(missing.Requests, "arrived", "arrived")+" with no write key. The listener accepts them; RudderStack answers 401.",
 			requests("&writeKey="))
 	}
-	if reqs > 0 && all.Requests.Failed == 0 {
+	if reqs > 0 && all.Requests.Failed == 0 && !rd.lost {
 		add("all_accepted", reqs,
 			"Every request that arrived was accepted. This says nothing about events that never came: read byEvent.",
 			"rudder-cli sources events --since "+since+q.args()+" --json")
@@ -347,6 +353,28 @@ func (h *Handler) diagnose(win window, all, filtered counts, q *eventsQuery, sta
 			"rudder-cli sources events --since "+since+" --json")
 	}
 	return out
+}
+
+// CodeEvicted marks a window that lost requests to the store budget, in the
+// diagnosis and in the stream headers.
+const CodeEvicted = "events_evicted"
+
+// evicted describes the loss. A cursor window counts the lost requests,
+// because each request takes the next seq; a time window cannot.
+func evicted(rd reading, q *eventsQuery) diagnosisItem {
+	count, subject := 0, "Requests were"
+	if rd.floor.IsZero() {
+		count = int(rd.stats.EvictedThrough - rd.since)
+		subject = requestsVerb(count, "was", "were")
+	}
+	return diagnosisItem{
+		Code:  CodeEvicted,
+		Count: count,
+		Message: fmt.Sprintf("%s evicted from this window: the listener keeps the last %d requests or %d MiB. "+
+			"The counts and the events are incomplete.", subject, rd.stats.MaxRequests, rd.stats.MaxBytes>>20),
+		// The window after the newest evicted request is complete.
+		Next: "rudder-cli sources events --since " + strconv.FormatUint(rd.stats.EvictedThrough, 10) + q.args() + " --json",
+	}
 }
 
 func requestsVerb(n int, one, many string) string {
