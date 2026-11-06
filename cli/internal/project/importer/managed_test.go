@@ -35,6 +35,15 @@ func TestManagedExport(t *testing.T) {
 		assert.True(t, os.IsNotExist(err))
 	})
 
+	t.Run("drops resources without an externalId", func(t *testing.T) {
+		managed := importableCollection()
+		managed.Set("destination", map[string]*resources.RemoteResource{"rid-2": {ID: "rid-2"}})
+		p := &stubManagedProvider{stubImportProvider{importable: managed}}
+
+		require.NoError(t, ManagedExport(context.Background(), &stubProject{location: t.TempDir(), graph: resources.NewGraph()}, p))
+		assert.Equal(t, 1, managed.Len())
+	})
+
 	t.Run("refuses a project that has specs", func(t *testing.T) {
 		graph := resources.NewGraph()
 		graph.AddResource(resources.NewResource("my-src", "source", resources.ResourceData{}, nil))

@@ -43,6 +43,7 @@ func ManagedExport(ctx context.Context, project Project, p ManagedExportProvider
 	if err != nil {
 		return fmt.Errorf("loading managed resources: %w", err)
 	}
+	managed.DropUnmanaged()
 	if len(skipped) > 0 {
 		ui.PrintWarning("Managed resources of these providers are not exported: " + strings.Join(skipped, ", "))
 	}

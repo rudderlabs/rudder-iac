@@ -799,6 +799,10 @@ func toTrackingPlanConfigImportSpec(config *sourceClient.TrackingPlanConfig) map
 
 func toEventConfigImportSpec(config *sourceClient.EventTypeConfig) map[string]any {
 	result := make(map[string]any)
+	// A track config that only sets drop_unplanned_events has no embedded EventTypeConfig.
+	if config == nil {
+		return result
+	}
 	if config.PropagateViolations != nil {
 		result[PropagateViolationsYAMLKey] = *config.PropagateViolations
 	}
