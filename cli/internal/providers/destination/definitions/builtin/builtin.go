@@ -22,11 +22,13 @@ import (
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
 	facebookconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_conversions"
 	facebookpixel "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_pixel"
+	fbcustomaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/fb_custom_audience"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/firebase"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
 	googleadwordsofflineconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_adwords_offline_conversions"
+	googleadwordsremarketinglists "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_adwords_remarketing_lists"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googleads"
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	googlesheets "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlesheets"
@@ -35,6 +37,7 @@ import (
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/intercom"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/iterable"
+	iterableaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/iterable_audience"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kafka"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kinesis"
 	linkedinads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_ads"
@@ -121,6 +124,9 @@ var entries = []entry{
 	{NewDefinition: customerioaudience.NewDefinition},
 	{NewDefinition: googleadwordsofflineconversions.NewDefinition},
 	{NewDefinition: linkedinads.NewDefinition},
+	{NewDefinition: fbcustomaudience.NewDefinition},
+	{NewDefinition: googleadwordsremarketinglists.NewDefinition},
+	{NewDefinition: iterableaudience.NewDefinition},
 }
 
 // NewRegistry registers the verified definitions and, with includeUnverified,
