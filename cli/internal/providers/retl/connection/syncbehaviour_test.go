@@ -131,15 +131,23 @@ func TestEligibleSkipsUnrepresentableSyncBehaviour(t *testing.T) {
 		{
 			name: "mirror on an object mapping destination is skipped",
 			conn: syncBehaviourRow("conn-mirror-object", "dst-object", retlClient.SyncBehaviourMirror, "Contact"),
-			message: `connection "conn-mirror-object": sync behaviour "mirror" cannot be expressed as a spec, ` +
-				`and source definition "snowflake" and this destination share no behaviour that can on the object_mapping flow; ` +
-				"the connection stays in the workspace unchanged: connection config cannot be represented as a spec",
+			message: `connection "conn-mirror-object": sync behaviour "mirror" cannot be expressed as a spec on the object_mapping flow; ` +
+				"recreate the connection with a behaviour a spec can express to bring it under the CLI: connection config cannot be represented as a spec",
 		},
 		{
-			name: "mirror on a destination with expressible behaviours names them",
+			name: "mirror on a json mapper destination is skipped",
 			conn: syncBehaviourRow("conn-mirror-json", "dst-1", retlClient.SyncBehaviourMirror, ""),
-			message: `connection "conn-mirror-json": sync behaviour "mirror" cannot be expressed as a spec on the json_mapper flow, ` +
-				"where only [upsert full] can; the connection stays in the workspace unchanged: connection config cannot be represented as a spec",
+			message: `connection "conn-mirror-json": sync behaviour "mirror" cannot be expressed as a spec on the json_mapper flow; ` +
+				"recreate the connection with a behaviour a spec can express to bring it under the CLI: connection config cannot be represented as a spec",
+		},
+		{
+			// Bing Ads accepts mirror alone, so the endpoints leave nothing a
+			// spec can carry. The behaviour itself is expressible, which is
+			// what tells this refusal apart from the two above.
+			name: "a behaviour the endpoints do not share is skipped",
+			conn: syncBehaviourRow("conn-upsert-object", "dst-object", retlClient.SyncBehaviourUpsert, "Contact"),
+			message: `connection "conn-upsert-object": source definition "snowflake" and this destination share no sync behaviour ` +
+				"a spec can express on the object_mapping flow; the connection stays in the workspace unchanged: connection config cannot be represented as a spec",
 		},
 		{
 			name: "an expressible behaviour is kept",
@@ -212,24 +220,72 @@ func TestManagedMirrorConnectionStaysInState(t *testing.T) {
 	require.NoError(t, syncBehaviourRepresentable(managed, "snowflake", []string{"mirror"}, FlowObjectMapping))
 }
 
-// A source definition the CLI has no metadata for leaves the gate inert: the
-// source's own rules report the definition, and guessing a set here would skip
-// rows that are fine.
-func TestEligibleKeepsRowsWithUnknownSourceDefinition(t *testing.T) {
+// A source definition the CLI has no metadata for leaves the endpoint
+// intersection inert — guessing a set there would skip rows that are fine — but
+// not the spec check: a behaviour no spec can carry is a dead end on any
+// source, and importing it would write a spec that fails validate on an
+// immutable field.
+func TestUnknownSourceDefinitionGatesOnTheSpecContractOnly(t *testing.T) {
 	t.Parallel()
 
-	conn := syncBehaviourRow("conn-unknown-def", "dst-1", retlClient.SyncBehaviourMirror, "")
-	sources := []retlClient.RETLSource{
-		{ID: "src-sf", Name: "Users", SourceType: retlClient.ModelSourceType, SourceDefinitionName: "duckdb", WorkspaceID: "ws-1"},
-	}
-	mock := &MockConnectionClient{
-		Sources:      sources,
-		Destinations: remoteDestinations(),
-		ListFunc:     pagedList([]retlClient.RETLConnection{conn}),
-	}
+	for _, tc := range []struct {
+		name      string
+		behaviour retlClient.SyncBehaviour
+		kept      bool
+	}{
+		{name: "an expressible behaviour is kept", behaviour: retlClient.SyncBehaviourUpsert, kept: true},
+		{name: "mirror is still refused", behaviour: retlClient.SyncBehaviourMirror},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	remotes, err := remoteHandler(mock, t).eligible(t.Context(), lo.ToPtr(false))
-	require.NoError(t, err)
-	require.Len(t, remotes, 1)
-	assert.Equal(t, "mirror", remotes[0].Config.SyncBehaviour)
+			conn := syncBehaviourRow("conn-unknown-def", "dst-1", tc.behaviour, "")
+			sources := []retlClient.RETLSource{
+				{ID: "src-sf", Name: "Users", SourceType: retlClient.ModelSourceType, SourceDefinitionName: "duckdb", WorkspaceID: "ws-1"},
+			}
+			mock := &MockConnectionClient{
+				Sources:      sources,
+				Destinations: remoteDestinations(),
+				ListFunc:     pagedList([]retlClient.RETLConnection{conn}),
+			}
+
+			remotes, err := remoteHandler(mock, t).eligible(t.Context(), lo.ToPtr(false))
+			require.NoError(t, err)
+
+			if !tc.kept {
+				assert.Empty(t, remotes, "a behaviour no spec can carry is a dead end whatever the source definition")
+				return
+			}
+			require.Len(t, remotes, 1)
+			assert.Equal(t, string(tc.behaviour), remotes[0].Config.SyncBehaviour)
+		})
+	}
+}
+
+// An empty source definition name takes the unknown path too, so the same
+// split applies: the endpoint intersection is skipped, the spec check is not.
+func TestEmptySourceDefinitionGatesOnTheSpecContractOnly(t *testing.T) {
+	t.Parallel()
+
+	row := func(behaviour retlClient.SyncBehaviour) retlClient.RETLConnection {
+		return syncBehaviourRow("conn-empty-def", "dst-1", behaviour, "")
+	}
+	require.NoError(t, syncBehaviourRepresentable(row(retlClient.SyncBehaviourUpsert), "", []string{"upsert", "full"}, FlowJSONMapper))
+	require.Error(t, syncBehaviourRepresentable(row(retlClient.SyncBehaviourMirror), "", []string{"mirror"}, FlowJSONMapper))
+}
+
+// The endpoints can also share some expressible behaviour without sharing the
+// one this row carries, which reads differently from sharing none: the message
+// names what is left. No fixture destination produces the pair, so drive the
+// gate directly.
+func TestSyncBehaviourNotSharedNamesWhatIsLeft(t *testing.T) {
+	t.Parallel()
+
+	conn := syncBehaviourRow("conn-full", "dst-1", retlClient.SyncBehaviourFull, "")
+	err := syncBehaviourRepresentable(conn, "snowflake", []string{"upsert"}, FlowJSONMapper)
+	require.Error(t, err)
+	assert.EqualError(t, err, `connection "conn-full": sync behaviour "full" is not accepted by source definition "snowflake" `+
+		"and this destination together, which share only [upsert] on the json_mapper flow; "+
+		"the connection stays in the workspace unchanged: connection config cannot be represented as a spec")
+	assert.ErrorIs(t, err, ErrUnrepresentableConfig)
 }

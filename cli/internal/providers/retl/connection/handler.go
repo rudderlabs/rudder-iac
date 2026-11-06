@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -500,14 +499,14 @@ func (h *Handler) destinationUsable(dst apiClient.Destination, object string) (*
 		// Usually a definition registered only behind a flag this run has off —
 		// bingads_offline_conversions and customerio_audience sit behind
 		// unverifiedDestinations — so say so rather than surface the lookup.
-		return nil, "", skipf("its destination type is not registered in this CLI", "destination type %q version %d is not registered in this CLI; if it is an unverified destination, set RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true: %w", dst.Type, dst.Version, err)
+		return nil, "", fmt.Errorf("destination type %q version %d is not registered in this CLI; if it is an unverified destination, set RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true: %w", dst.Type, dst.Version, err)
 	}
 	if !slices.Contains(registered.SupportedSourceTypes(), common.SourceTypeWarehouse) {
-		return nil, "", skipf("its destination does not accept rETL sources", "destination type %q does not accept warehouse sources", dst.Type)
+		return nil, "", fmt.Errorf("destination type %q does not accept warehouse sources", dst.Type)
 	}
 	flow, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), lo.EmptyableToPtr(object))
 	if err != nil {
-		return nil, "", skipf("its destination runs a flow this CLI does not support", "%w", err)
+		return nil, "", fmt.Errorf("%w", err)
 	}
 	return registered, flow, nil
 }
@@ -523,27 +522,27 @@ func (h *Handler) remoteConnection(
 ) (*RemoteConnection, error) {
 	source, ok := sources[conn.SourceID]
 	if !ok {
-		return nil, skipf("its source is not a rETL source in this workspace", "connection %q: source %q is not a rETL source in this workspace", conn.ID, conn.SourceID)
+		return nil, fmt.Errorf("connection %q: source %q is not a rETL source in this workspace", conn.ID, conn.SourceID)
 	}
 	sourceKind, ok := SourceKindBySourceType(source.SourceType)
 	if !ok {
-		return nil, skipf("its rETL source type is not supported", "connection %q: rETL source type %q is not supported", conn.ID, source.SourceType)
+		return nil, fmt.Errorf("connection %q: rETL source type %q is not supported", conn.ID, source.SourceType)
 	}
 	if !h.sourceKindEnabled(sourceKind) {
-		return nil, skipf("its source kind is not registered in this run", "connection %q: its source is a %s, which this provider does not register", conn.ID, sourceKind.Kind)
+		return nil, fmt.Errorf("connection %q: its source is a %s, which this provider does not register", conn.ID, sourceKind.Kind)
 	}
 	// The workspace is what an import entry is filed under; without one there
 	// is no valid import metadata to write for the row.
 	if source.WorkspaceID == "" {
-		return nil, skipf("its source reports no workspace", "connection %q: rETL source %q reports no workspace", conn.ID, conn.SourceID)
+		return nil, fmt.Errorf("connection %q: rETL source %q reports no workspace", conn.ID, conn.SourceID)
 	}
 	dst, ok := destinations[conn.DestinationID]
 	if !ok {
-		return nil, skipf("its destination was not found in this workspace", "connection %q: destination %q was not found in this workspace", conn.ID, conn.DestinationID)
+		return nil, fmt.Errorf("connection %q: destination %q was not found in this workspace", conn.ID, conn.DestinationID)
 	}
 	registered, flow, err := h.destinationUsable(dst, conn.Object)
 	if err != nil {
-		return nil, relabel(err, "connection %q: %w", conn.ID, err)
+		return nil, fmt.Errorf("connection %q: %w", conn.ID, err)
 	}
 	if err := syncBehaviourRepresentable(conn, source.SourceDefinitionName, registered.SyncBehaviours(), flow); err != nil {
 		return nil, err
@@ -572,8 +571,10 @@ func (h *Handler) remoteConnection(
 // than written into a spec that then fails validate. sync_behaviour is
 // immutable, so a user who imports such a spec cannot edit their way out — the
 // connection has to be deleted and recreated — which is why import has to agree
-// with V-R2 exactly. It therefore asks AcceptedSyncBehaviours, the same
-// function the rule asks, and narrows by itself as the spec contract widens.
+// with V-R2 exactly. It asks the same two functions the rule asks —
+// specSupportsSyncBehaviour for what a spec can carry, AcceptedSyncBehaviours
+// for what the two endpoints also accept — and narrows by itself as the spec
+// contract widens.
 //
 // It applies to unmanaged rows only, and the row says which it is: an
 // externalId means the CLI already owns the connection, so it is state, not an
@@ -591,88 +592,41 @@ func (h *Handler) remoteConnection(
 // behaviour nor the source definition to intersect with. It is also read-path
 // only by design: a create has already passed the spec rules, so re-deriving the
 // set on write would duplicate V-R2 rather than guard anything.
-const unrepresentableSyncBehaviour = "its sync behaviour has no spec equivalent"
-
 func syncBehaviourRepresentable(conn retlClient.RETLConnection, sourceDefinition string, destinationAccepted []string, flow Flow) error {
 	if conn.ExternalID != "" {
 		return nil
 	}
 
 	behaviour := string(conn.SyncBehaviour)
-	// An unknown source definition has nothing to intersect; remoteConnection
-	// accepts the row and the source's own rules report the definition.
+	// Check the spec contract before the intersection, because it needs nothing
+	// from the source: a behaviour no spec can carry is a dead end on any
+	// source, known to this CLI version or not, so an unknown source definition
+	// must not make this arm inert.
+	if !specSupportsSyncBehaviour(behaviour, flow) {
+		return fmt.Errorf("connection %q: sync behaviour %q cannot be expressed as a spec on the %s flow; recreate the connection with a behaviour a spec can express to bring it under the CLI: %w",
+			conn.ID, behaviour, flow, ErrUnrepresentableConfig)
+	}
+	// Past that only the endpoints can refuse the behaviour, and an unknown
+	// source definition has no capabilities to intersect: keep the row and let
+	// the source's own rules report the definition.
 	accepted, known := AcceptedSyncBehaviours(sourceDefinition, destinationAccepted, flow)
 	if !known || slices.Contains(accepted, behaviour) {
 		return nil
 	}
 
 	if len(accepted) == 0 {
-		return skipf(unrepresentableSyncBehaviour, "connection %q: sync behaviour %q cannot be expressed as a spec, and source definition %q and this destination share no behaviour that can on the %s flow; the connection stays in the workspace unchanged: %w",
-			conn.ID, behaviour, sourceDefinition, flow, ErrUnrepresentableConfig)
+		return fmt.Errorf("connection %q: source definition %q and this destination share no sync behaviour a spec can express on the %s flow; the connection stays in the workspace unchanged: %w",
+			conn.ID, sourceDefinition, flow, ErrUnrepresentableConfig)
 	}
-	return skipf(unrepresentableSyncBehaviour, "connection %q: sync behaviour %q cannot be expressed as a spec on the %s flow, where only [%s] can; the connection stays in the workspace unchanged: %w",
-		conn.ID, behaviour, flow, strings.Join(accepted, " "), ErrUnrepresentableConfig)
-}
-
-// skipError labels a dropped row with a row-independent reason, which is what
-// the closing summary groups by. The per-row warning still carries the whole
-// error, ids and all.
-type skipError struct {
-	reason string
-	err    error
-}
-
-func (e *skipError) Error() string { return e.err.Error() }
-func (e *skipError) Unwrap() error { return e.err }
-
-// skipf builds a labelled skip error. reason must name the kind of problem
-// only — a connection id or a type in it would make the summary one line per
-// row again, which is what the summary exists to avoid.
-func skipf(reason, format string, args ...any) error {
-	return &skipError{reason: reason, err: fmt.Errorf(format, args...)}
-}
-
-// relabel reformats a labelled error, keeping its reason. remoteConnection adds
-// the connection id to what destinationUsable reports, and that prefix must not
-// cost the label.
-func relabel(err error, format string, args ...any) error {
-	var labelled *skipError
-	if !errors.As(err, &labelled) {
-		return fmt.Errorf(format, args...)
-	}
-	return &skipError{reason: labelled.reason, err: fmt.Errorf(format, args...)}
-}
-
-// skipReason is the summary's grouping key. An unlabelled error falls back to
-// the sentinel its origin wraps, and then to a generic line: a missing label
-// costs detail in the summary, never a dropped count.
-func skipReason(err error) string {
-	var labelled *skipError
-	switch {
-	case errors.As(err, &labelled):
-		return labelled.reason
-	case errors.Is(err, ErrUnrepresentableConfig):
-		return "its configuration has no spec equivalent"
-	default:
-		return "it cannot be expressed as a spec"
-	}
-}
-
-// logSkipSummary closes a bulk read with one line per reason. A workspace
-// holding dozens of connections the CLI cannot manage otherwise ends in a wall
-// of per-row warnings, which reads as noise rather than as the answer.
-func logSkipSummary(reasons map[string]int) {
-	for _, reason := range slices.Sorted(maps.Keys(reasons)) {
-		log.Warn("rETL connections skipped; they stay in the workspace unchanged",
-			"count", reasons[reason], "reason", reason)
-	}
+	return fmt.Errorf("connection %q: sync behaviour %q is not accepted by source definition %q and this destination together, which share only [%s] on the %s flow; the connection stays in the workspace unchanged: %w",
+		conn.ID, behaviour, sourceDefinition, strings.Join(accepted, " "), flow, ErrUnrepresentableConfig)
 }
 
 // logSkip reports a remote row the CLI cannot express. Nothing is changed
-// remotely, so the message has to say both that the row survives untouched and
-// what would bring it under management.
+// remotely, so the message says the row survives untouched; the remedy differs
+// by reason and travels in the error each refusal builds.
 func logSkip(conn retlClient.RETLConnection, err error) {
-	log.Warn("skipping rETL connection the CLI cannot manage: it stays in the workspace unchanged; importing its source and destination, or a CLI version that supports it, may be needed",
+	log.Warn("skipping rETL connection the CLI cannot manage: it stays in the workspace unchanged",
 		"connection", conn.ID, "externalId", conn.ExternalID, "sourceId", conn.SourceID,
 		"destinationId", conn.DestinationID, "reason", err.Error())
 }
@@ -694,20 +648,15 @@ func (h *Handler) eligible(ctx context.Context, hasExternalID *bool) ([]*RemoteC
 	if err != nil {
 		return nil, err
 	}
-	var (
-		remotes = make([]*RemoteConnection, 0, len(conns))
-		skipped = map[string]int{}
-	)
+	remotes := make([]*RemoteConnection, 0, len(conns))
 	for _, conn := range conns {
 		remote, err := h.remoteConnection(conn, sources, destinations)
 		if err != nil {
 			logSkip(conn, err)
-			skipped[skipReason(err)]++
 			continue
 		}
 		remotes = append(remotes, remote)
 	}
-	logSkipSummary(skipped)
 	return remotes, nil
 }
 
