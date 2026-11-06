@@ -24,6 +24,17 @@ func GetTerminalWidth() int {
 	return width
 }
 
+// GetTerminalHeight returns the current height of the terminal, or zero when
+// stdout is not a terminal. Callers use zero to mean "do not constrain", since
+// there is no sensible guess for output that is being piped or redirected.
+func GetTerminalHeight() int {
+	_, height, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		return 0
+	}
+	return height
+}
+
 // Ruler returns a string representing a horizontal line across the terminal.
 func Ruler() string {
 	return RulerWithWidth(GetTerminalWidth())
