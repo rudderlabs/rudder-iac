@@ -484,42 +484,25 @@ func validateSourceCapability(entry connectionEntry) []rules.ValidationResult {
 }
 
 // validateSyncBehaviour (V-R2): the behaviour has to be one both endpoints
-// accept, and only the visual-mapper-v2 flow keeps mirror from what the two
-// agree on. An empty intersection is reported as such rather than falling back
-// to a permissive set — that would let a connection the backend refuses pass
-// here. A source whose capabilities are unknown is validateSourceCapability's
-// to report, so there is nothing to intersect.
+// accept and the spec can express on this flow, which for mirror means the
+// visual-mapper-v2 flow alone. AcceptedSyncBehaviours derives that set, and the
+// import eligibility check reads the same function so the two cannot disagree
+// about which remote rows are representable; specSupportsSyncBehaviour carries
+// the per-flow part, including why object mapping is stricter here than the
+// backend. An empty intersection is reported as such rather than falling back
+// to a permissive set, which would let a connection the backend refuses pass. A
+// source whose capabilities are unknown is validateSourceCapability's to
+// report, so there is nothing to intersect.
 func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
 	sourceDefinition := entry.endpoints.sourceDefinition()
-	warehouse, known := retlConnection.SourceWarehouseMetadata(sourceDefinition)
+	accepted, known := retlConnection.AcceptedSyncBehaviours(
+		sourceDefinition, entry.registered.SyncBehaviours(), entry.flow,
+	)
 	if !known {
 		return nil
 	}
 
-	var (
-		reference           = configRef(entry.index) + "/sync_behaviour"
-		destinationAccepted = entry.registered.SyncBehaviours()
-	)
-
-	// SourceWarehouseMetadata hands back a clone, so filtering in place is safe.
-	// Mirroring needs the destination's field set declared up front, which is
-	// what the vdm-next destinations do through their own config; the other
-	// flows drop mirror however the two endpoints feel about it.
-	//
-	// This is stricter than the backend on object mapping, deliberately. The
-	// backend refuses mirror on the JSON mapper alone (FLOWS_DISALLOWING_MIRROR
-	// in config-backend retl/api-gateway/connection-config/assembler.ts), so an
-	// object-mapping connection is accepted and stored as mirror. DEX-1046
-	// found that what looked like a silent downgrade to upsert was the webapp
-	// displaying it as Upsert, not the backend rewriting it. The sync still has
-	// no declared field set to mirror onto, so refusing it here is better than
-	// passing a connection that cannot do what its spec says.
-	accepted := slices.DeleteFunc(warehouse.SyncBehaviours, func(behaviour string) bool {
-		if behaviour == "mirror" && entry.flow != retlConnection.FlowVisualMapperV2 {
-			return true
-		}
-		return !slices.Contains(destinationAccepted, behaviour)
-	})
+	reference := configRef(entry.index) + "/sync_behaviour"
 
 	if len(accepted) == 0 {
 		return []rules.ValidationResult{result(reference, fmt.Sprintf(
