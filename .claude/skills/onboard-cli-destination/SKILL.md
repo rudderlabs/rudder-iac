@@ -151,9 +151,11 @@ Mechanical rules:
   (`amp`, `shopify`, `cloud_source`), which the CLI maps but cannot reach.
   `warehouse` **is** declared whenever db-config lists it: rETL connections
   reach destinations through it.
-- `db-config.json` `config.syncBehaviours` / `config.supportsVisualMapper` →
-  `SyncBehaviours` / `SupportsVisualMapper` — see source-type-mapping.md
-  "rETL metadata".
+- `db-config.json` `config.syncBehaviours` / `config.supportsVisualMapper` /
+  `config.supportsVisualMapperV2` → `SyncBehaviours` /
+  `SupportsVisualMapper` / `SupportsVisualMapperV2` — see
+  source-type-mapping.md "rETL metadata". The two mapper flags are exclusive:
+  copy whichever db-config declares, never both.
 - `schema.json` `configSchema.allOf` branches conditioned on `connectionMode` →
   `ConnectionRequiredKeys`, a
   `map[localSourceType]map[connectionMode][]localConfigKey`: only keys the

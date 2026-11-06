@@ -136,14 +136,14 @@ func TestEligibleSkipsUnrepresentableSyncBehaviour(t *testing.T) {
 			name: "mirror on an object mapping destination is skipped",
 			conn: syncBehaviourRow("conn-mirror-object", "dst-object", retlClient.SyncBehaviourMirror, "Contact"),
 			message: `connection "conn-mirror-object": source definition "snowflake" and this destination share no sync behaviour ` +
-				"a spec can express on the object_mapping flow; the connection stays in the workspace unchanged: connection config cannot be represented as a spec",
+				"a spec can express on object mapping; the connection stays in the workspace unchanged: connection config cannot be represented as a spec",
 		},
 		{
 			// A webhook accepts all three, so recreating is a real remedy here
 			// and the message names the behaviours that would work.
 			name: "mirror on a json mapper destination is skipped",
 			conn: syncBehaviourRow("conn-mirror-json", "dst-1", retlClient.SyncBehaviourMirror, ""),
-			message: `connection "conn-mirror-json": sync behaviour "mirror" cannot be expressed as a spec on the json_mapper flow; ` +
+			message: `connection "conn-mirror-json": sync behaviour "mirror" cannot be expressed as a spec on JSON mapping; ` +
 				"recreate the connection with one of [upsert full] to bring it under the CLI: connection config cannot be represented as a spec",
 		},
 		{
@@ -153,7 +153,7 @@ func TestEligibleSkipsUnrepresentableSyncBehaviour(t *testing.T) {
 			name: "a behaviour the endpoints do not share is skipped",
 			conn: syncBehaviourRow("conn-upsert-object", "dst-object", retlClient.SyncBehaviourUpsert, "Contact"),
 			message: `connection "conn-upsert-object": source definition "snowflake" and this destination share no sync behaviour ` +
-				"a spec can express on the object_mapping flow; the connection stays in the workspace unchanged: connection config cannot be represented as a spec",
+				"a spec can express on object mapping; the connection stays in the workspace unchanged: connection config cannot be represented as a spec",
 		},
 		{
 			name: "an expressible behaviour is kept",
@@ -291,7 +291,7 @@ func TestSyncBehaviourNotSharedNamesWhatIsLeft(t *testing.T) {
 	err := syncBehaviourRepresentable(conn, "snowflake", []string{"upsert"}, FlowJSONMapper)
 	require.Error(t, err)
 	assert.EqualError(t, err, `connection "conn-full": sync behaviour "full" is not accepted by source definition "snowflake" `+
-		"and this destination together, which share only [upsert] on the json_mapper flow; "+
+		"and this destination together, which share only [upsert] on JSON mapping; "+
 		"the connection stays in the workspace unchanged: connection config cannot be represented as a spec")
 	assert.ErrorIs(t, err, ErrUnrepresentableConfig)
 }

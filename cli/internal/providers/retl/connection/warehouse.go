@@ -83,7 +83,24 @@ func AcceptedSyncBehaviours(sourceDefinition string, destinationAccepted []strin
 // specSupportsSyncBehaviour reports whether ConfigSpec.SyncBehaviour can carry
 // the behaviour on the given flow. It is the Go side of that field's `oneof`
 // tag, flow by flow: the tag is the union over the flows, so widening one has
-// to widen the other. mirror has no representation on either generic flow yet.
-func specSupportsSyncBehaviour(behaviour string, _ Flow) bool {
-	return behaviour != string(retlClient.SyncBehaviourMirror)
+// to widen the other.
+//
+// Mirroring needs the destination's field set declared up front, which is what
+// the vdm-next destinations do through their own config. The JSON mapper and
+// object mapping declare no such set, so a spec cannot carry mirror there
+// however the two endpoints feel about it.
+//
+// On object mapping that is stricter than the backend, deliberately. The
+// backend refuses mirror on the JSON mapper alone (FLOWS_DISALLOWING_MIRROR in
+// config-backend retl/api-gateway/connection-config/assembler.ts), so an
+// object-mapping connection is accepted and stored as mirror. DEX-1046 found
+// that what looked like a silent downgrade to upsert was the webapp displaying
+// it as Upsert, not the backend rewriting it. The sync still has no declared
+// field set to mirror onto, so refusing it here is better than passing a
+// connection that cannot do what its spec says.
+func specSupportsSyncBehaviour(behaviour string, flow Flow) bool {
+	if behaviour == string(retlClient.SyncBehaviourMirror) {
+		return flow == FlowVisualMapperV2
+	}
+	return true
 }

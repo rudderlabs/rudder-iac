@@ -504,7 +504,7 @@ func (h *Handler) destinationUsable(dst apiClient.Destination, object string) (*
 	if !slices.Contains(registered.SupportedSourceTypes(), common.SourceTypeWarehouse) {
 		return nil, "", fmt.Errorf("destination type %q does not accept warehouse sources", dst.Type)
 	}
-	flow, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), lo.EmptyableToPtr(object))
+	flow, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), registered.SupportsVisualMapperV2(), lo.EmptyableToPtr(object))
 	if err != nil {
 		return nil, "", err
 	}
@@ -606,8 +606,8 @@ func syncBehaviourRepresentable(conn retlClient.RETLConnection, sourceDefinition
 	// the user to recreate here would cost them a working connection and give
 	// them nothing back.
 	if known && len(accepted) == 0 {
-		return fmt.Errorf("connection %q: source definition %q and this destination share no sync behaviour a spec can express on the %s flow; the connection stays in the workspace unchanged: %w",
-			conn.ID, sourceDefinition, flow, ErrUnrepresentableConfig)
+		return fmt.Errorf("connection %q: source definition %q and this destination share no sync behaviour a spec can express on %s; the connection stays in the workspace unchanged: %w",
+			conn.ID, sourceDefinition, flow.Label(), ErrUnrepresentableConfig)
 	}
 	// Then the spec contract, which needs nothing from the source: a behaviour
 	// no spec can carry is a dead end on any source, known to this CLI version
@@ -615,11 +615,11 @@ func syncBehaviourRepresentable(conn retlClient.RETLConnection, sourceDefinition
 	// a known source lets the remedy name what to recreate with.
 	if !specSupportsSyncBehaviour(behaviour, flow) {
 		if !known {
-			return fmt.Errorf("connection %q: sync behaviour %q cannot be expressed as a spec on the %s flow; recreate the connection with a behaviour a spec can express to bring it under the CLI: %w",
-				conn.ID, behaviour, flow, ErrUnrepresentableConfig)
+			return fmt.Errorf("connection %q: sync behaviour %q cannot be expressed as a spec on %s; recreate the connection with a behaviour a spec can express to bring it under the CLI: %w",
+				conn.ID, behaviour, flow.Label(), ErrUnrepresentableConfig)
 		}
-		return fmt.Errorf("connection %q: sync behaviour %q cannot be expressed as a spec on the %s flow; recreate the connection with one of [%s] to bring it under the CLI: %w",
-			conn.ID, behaviour, flow, strings.Join(accepted, " "), ErrUnrepresentableConfig)
+		return fmt.Errorf("connection %q: sync behaviour %q cannot be expressed as a spec on %s; recreate the connection with one of [%s] to bring it under the CLI: %w",
+			conn.ID, behaviour, flow.Label(), strings.Join(accepted, " "), ErrUnrepresentableConfig)
 	}
 	// Past that only the endpoints can refuse the behaviour, and an unknown
 	// source definition has no capabilities to intersect: keep the row and let
@@ -627,8 +627,8 @@ func syncBehaviourRepresentable(conn retlClient.RETLConnection, sourceDefinition
 	if !known || slices.Contains(accepted, behaviour) {
 		return nil
 	}
-	return fmt.Errorf("connection %q: sync behaviour %q is not accepted by source definition %q and this destination together, which share only [%s] on the %s flow; the connection stays in the workspace unchanged: %w",
-		conn.ID, behaviour, sourceDefinition, strings.Join(accepted, " "), flow, ErrUnrepresentableConfig)
+	return fmt.Errorf("connection %q: sync behaviour %q is not accepted by source definition %q and this destination together, which share only [%s] on %s; the connection stays in the workspace unchanged: %w",
+		conn.ID, behaviour, sourceDefinition, strings.Join(accepted, " "), flow.Label(), ErrUnrepresentableConfig)
 }
 
 // logSkip reports a remote row the CLI cannot express. Nothing is changed

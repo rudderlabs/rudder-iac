@@ -283,7 +283,7 @@ func validateDestinationCompatibility(registry *definitions.Registry, entry conn
 	// rather than hiding it.
 	var (
 		supported        = registered.SupportedSourceTypes()
-		flow, flowErr    = retlConnection.ClassifyFlow(registered.APIType, registered.SupportsVisualMapper(), entry.config.Object)
+		flow, flowErr    = retlConnection.ClassifyFlow(registered.APIType, registered.SupportsVisualMapper(), registered.SupportsVisualMapperV2(), entry.config.Object)
 		acceptsWarehouse = slices.Contains(supported, common.SourceTypeWarehouse)
 	)
 
@@ -312,10 +312,14 @@ func validateDestinationCompatibility(registry *definitions.Registry, entry conn
 	entry.registered, entry.flow = registered, flow
 
 	results := validateDestinationConfig(entry, destinationData.Config)
-	if flow == retlConnection.FlowObjectMapping {
-		results = append(results, validateObjectMappings(entry.index, entry.config)...)
-	} else {
+	// The two non-JSON flows declare the destination's field set up front, so
+	// constants and an event belong to the JSON mapper alone whichever of them
+	// a connection runs. What they do with identifiers differs, so the rest is
+	// per flow rather than shared.
+	if flow == retlConnection.FlowJSONMapper {
 		results = append(results, validateJSONMappings(entry.index, entry.config)...)
+	} else {
+		results = append(results, validateMappedMappings(entry.index, entry.config, flow)...)
 	}
 	return append(results, validateSyncBehaviour(entry)...)
 }
@@ -342,19 +346,40 @@ func validateDestinationConfig(entry connectionEntry, config map[string]any) []r
 	return results
 }
 
-// validateObjectMappings covers the object mapping flow: constants and events
-// belong to the JSON mapper alone (V-R5), the flow stores exactly one
-// identifier (V-R4), its mappings may be absent (V-R9b), and a mapping aimed at
-// an identifier target would not survive a round trip.
-func validateObjectMappings(index int, config retlConnection.ConfigSpec) []rules.ValidationResult {
+// validateMappedMappings covers the two flows whose destination declares its
+// field set up front. Constants and events belong to the JSON mapper alone
+// (V-R5) on both, and mappings may be absent on both (V-R9b). Each message
+// names the flow the connection was classified as, because the spec never
+// names one and the reader has no other way to tell which rules they are
+// being held to.
+//
+// Everything after that is object mapping's alone. It stores exactly one
+// identifier (V-R4) and synthesises `user_id` and `context.externalId[0].id`
+// from it, so a user mapping aimed at either would be folded into the
+// identifiers and never come back where it was written. The visual mapper v2
+// flow does neither: every identifier is carried through to
+// `identifierMappings` and mappings stay separate as `fieldMappings`, so it
+// takes as many identifiers as the destination has fields to match on and
+// reserves no mapping target. Capping it at one would refuse the shape these
+// destinations are actually used in: the Google Ads payload behind DEX-1108
+// matches on six.
+func validateMappedMappings(index int, config retlConnection.ConfigSpec, flow retlConnection.Flow) []rules.ValidationResult {
 	var results []rules.ValidationResult
 
 	if len(config.Constants) > 0 {
-		results = append(results, result(configRef(index)+"/constants", "'constants' is not allowed with object mapping"))
+		results = append(results, result(configRef(index)+"/constants", fmt.Sprintf(
+			"'constants' is not allowed with %s", flow.Label(),
+		)))
 	}
 	if config.Event != nil {
-		results = append(results, result(configRef(index)+"/event", "'event' is not allowed with object mapping"))
+		results = append(results, result(configRef(index)+"/event", fmt.Sprintf(
+			"'event' is not allowed with %s", flow.Label(),
+		)))
 	}
+	if flow != retlConnection.FlowObjectMapping {
+		return results
+	}
+
 	if len(config.Identifiers) != 1 {
 		results = append(results, result(configRef(index)+"/identifiers", fmt.Sprintf(
 			"object mapping supports a single identifier, found %d", len(config.Identifiers),
@@ -459,11 +484,15 @@ func validateSourceCapability(entry connectionEntry) []rules.ValidationResult {
 }
 
 // validateSyncBehaviour (V-R2): the behaviour has to be one both endpoints
-// accept and the spec can express on this flow. AcceptedSyncBehaviours derives
-// that set, and the import eligibility check reads the same function so the two
-// cannot disagree about which remote rows are representable. A source whose
-// capabilities are unknown is validateSourceCapability's to report, so there is
-// nothing to intersect.
+// accept and the spec can express on this flow, which for mirror means the
+// visual-mapper-v2 flow alone. AcceptedSyncBehaviours derives that set, and the
+// import eligibility check reads the same function so the two cannot disagree
+// about which remote rows are representable; specSupportsSyncBehaviour carries
+// the per-flow part, including why object mapping is stricter here than the
+// backend. An empty intersection is reported as such rather than falling back
+// to a permissive set, which would let a connection the backend refuses pass. A
+// source whose capabilities are unknown is validateSourceCapability's to
+// report, so there is nothing to intersect.
 func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
 	sourceDefinition := entry.endpoints.sourceDefinition()
 	accepted, known := retlConnection.AcceptedSyncBehaviours(
@@ -477,8 +506,8 @@ func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
 
 	if len(accepted) == 0 {
 		return []rules.ValidationResult{result(reference, fmt.Sprintf(
-			"source definition '%s' and destination '%s' share no sync behaviour for the %s flow; the connection cannot sync",
-			sourceDefinition, entry.endpoints.destinationID, entry.flow,
+			"source definition '%s' and destination '%s' share no sync behaviour on %s; the connection cannot sync",
+			sourceDefinition, entry.endpoints.destinationID, entry.flow.Label(),
 		))}
 	}
 	if slices.Contains(accepted, entry.config.SyncBehaviour) {
@@ -486,7 +515,7 @@ func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
 	}
 
 	return []rules.ValidationResult{result(reference, fmt.Sprintf(
-		"'sync_behaviour' must be one of [%s] for source definition '%s' and destination '%s' on the %s flow",
-		strings.Join(accepted, " "), sourceDefinition, entry.endpoints.destinationID, entry.flow,
+		"'sync_behaviour' must be one of [%s] for source definition '%s' and destination '%s' on %s",
+		strings.Join(accepted, " "), sourceDefinition, entry.endpoints.destinationID, entry.flow.Label(),
 	))}
 }
