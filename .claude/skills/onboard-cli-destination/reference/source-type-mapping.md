@@ -102,7 +102,8 @@ raw "$TYPE/db-config.json" | jq -c '{
   warehouse: (.config.supportedSourceTypes | index("warehouse") != null),
   modes: .config.supportedConnectionModes.warehouse,
   syncBehaviours: (.config | if has("syncBehaviours") then .syncBehaviours else "absent" end),
-  supportsVisualMapper: .config.supportsVisualMapper}'
+  supportsVisualMapper: .config.supportsVisualMapper,
+  supportsVisualMapperV2: .config.supportsVisualMapperV2}'
 
 # schema.json: the connectionMode-conditioned branches with required keys.
 raw "$TYPE/schema.json" | jq -c '.configSchema.allOf[]?

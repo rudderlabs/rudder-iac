@@ -744,7 +744,7 @@ match_behavior:
             message_contains: "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-http-destination' on JSON mapping"
       - example_id: "retl-connection-semantic-object-mapping-mirror"
         title: "Mirror sync on the object mapping flow"
-        description: "An object names the destination's object, not its field set, and the backend stores such a connection as an upsert. Mirror is for the destinations that carry their own field config."
+        description: "An object names the destination's object, not its field set, so a sync here has nothing to mirror onto. The backend does store such a connection as mirror; this CLI refuses it rather than accept a connection that cannot do what its spec says. Mirror is for the destinations that carry their own field config."
         files:
           model.yaml: *users-model
           destination.yaml: *amplitude-destination

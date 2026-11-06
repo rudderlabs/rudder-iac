@@ -64,15 +64,21 @@ type DestinationDefinition struct {
 	// replaces supportsVisualMapper rather than adding to it: none of those
 	// destinations declares both, and the field set comes from the
 	// destination's own config instead of a named object. A connection to such
-	// a destination runs the visual-mapper-v2 flow, the only flow on which the
-	// backend lets a sync mirror.
+	// a destination runs the visual-mapper-v2 flow, the only flow this CLI
+	// accepts mirror on. The backend is wider: its FLOWS_DISALLOWING_MIRROR
+	// holds the JSON mapper alone, so it stores mirror on object mapping too.
+	// V-R2 refuses that case anyway, and says why.
 	//
-	// The flag is necessary but not sufficient: the backend also keeps its own
-	// VDM_V2_DESTINATIONS allowlist, which refuses hubspot, pinterest_tag,
-	// marketo_static_lists and gainsight_px today even though they carry the
-	// flag upstream. So set this to match db-config.json and nothing else —
-	// whether a create succeeds is the backend's to answer, and a second
-	// allowlist here would go stale the moment that one moves.
+	// The flag is necessary but not sufficient: admission is the backend's
+	// VDM_V2_DESTINATIONS table, in config-backend
+	// src/modules/retl/api-gateway/connection-config/constants.ts. A
+	// destination absent from it is refused, and four entries that are in it
+	// carry a refusedBecause instead of a required-key list —
+	// GAINSIGHT_PX_AUDIENCE, PINTEREST_AUDIENCE, HS_AUDIENCE and
+	// MARKETO_AUDIENCE — so a create for those fails whatever this flag says.
+	// Set this to match db-config.json and nothing else: whether a create
+	// succeeds is the backend's to answer, and a second allowlist here would go
+	// stale the moment that one moves.
 	SupportsVisualMapperV2 bool
 	// ConsentValidationOverrides replaces canonical consent validation for selected local source types.
 	ConsentValidationOverrides map[string]common.ConsentValidator
