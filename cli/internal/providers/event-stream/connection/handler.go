@@ -409,9 +409,20 @@ func mapRemoteToState(conn *client.Connection, sourceURN, destinationURN string)
 // the CLI (no externalId) and assigns each an identity derived from its
 // endpoints' names, e.g. "android-source-to-s3".
 func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	return h.loadExportable(ctx, false, idNamer)
+}
+
+// LoadManaged loads the managed connections keyed by their real externalId.
+func (h *Handler) LoadManaged(ctx context.Context) (*resources.RemoteResources, error) {
+	return h.loadExportable(ctx, true, nil)
+}
+
+// loadExportable lists connections with or without an externalId. Unmanaged
+// ones take an id from idNamer; managed ones keep their externalId.
+func (h *Handler) loadExportable(ctx context.Context, managed bool, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 
-	conns, sourcesByID, err := h.eventStreamConnections(ctx, client.WithConnectionsHasExternalID(false))
+	conns, sourcesByID, err := h.eventStreamConnections(ctx, client.WithConnectionsHasExternalID(managed))
 	if err != nil {
 		return nil, err
 	}
@@ -442,12 +453,15 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 			// the list falls back to its remote id.
 			destinationName = conn.DestinationID
 		}
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  fmt.Sprintf("%s-to-%s", src.Name, destinationName),
-			Scope: EventStreamConnectionResourceType,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("generating externalID for connection %s: %w", conn.ID, err)
+		externalID := conn.ExternalID
+		if !managed {
+			externalID, err = idNamer.Name(namer.ScopeName{
+				Name:  fmt.Sprintf("%s-to-%s", src.Name, destinationName),
+				Scope: EventStreamConnectionResourceType,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("generating externalID for connection %s: %w", conn.ID, err)
+			}
 		}
 		resourceMap[conn.ID] = &resources.RemoteResource{
 			ID:         conn.ID,

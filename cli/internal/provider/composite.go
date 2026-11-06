@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
@@ -375,6 +376,30 @@ func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resou
 	}
 
 	return collection, nil
+}
+
+// LoadManaged loads managed resources from every provider that implements
+// ManagedExportLoader and returns the names of the providers that do not.
+// ponytail: sequential, unlike LoadImportable; run them as tasks if export time matters.
+func (p *CompositeProvider) LoadManaged(ctx context.Context) (*resources.RemoteResources, []string, error) {
+	collection := resources.NewRemoteResources()
+	var skipped []string
+	for name, provider := range p.Providers {
+		m, ok := provider.(ManagedExportLoader)
+		if !ok {
+			skipped = append(skipped, name)
+			continue
+		}
+		c, err := m.LoadManaged(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("loading managed resources for provider %s: %w", name, err)
+		}
+		if collection, err = collection.Merge(c); err != nil {
+			return nil, nil, fmt.Errorf("merging managed resources for provider %s: %w", name, err)
+		}
+	}
+	sort.Strings(skipped)
+	return collection, skipped, nil
 }
 
 func (p *CompositeProvider) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {

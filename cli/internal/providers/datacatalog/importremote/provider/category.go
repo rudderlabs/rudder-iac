@@ -43,17 +43,28 @@ func NewCategoryImportProvider(client catalog.DataCatalog, log logger.Logger, im
 }
 
 func (p *CategoryImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	return p.load(ctx, false, idNamer)
+}
+
+// LoadManaged loads the managed categories keyed by their real externalId.
+func (p *CategoryImportProvider) LoadManaged(ctx context.Context) (*resources.RemoteResources, error) {
+	return p.load(ctx, true, nil)
+}
+
+// load lists categories with or without an externalId. A nil idNamer keeps
+// each one's externalId instead of naming it.
+func (p *CategoryImportProvider) load(ctx context.Context, managed bool, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable categories from remote catalog")
 	collection := resources.NewRemoteResources()
 
-	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
+	categories, err := p.client.GetCategories(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(managed)})
 	if err != nil {
 		return nil, fmt.Errorf("getting categories from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, category := range categories {
-		if category.ExternalID != "" {
+		if (category.ExternalID != "") != managed {
 			continue
 		}
 
@@ -92,11 +103,15 @@ func (p *CategoryImportProvider) idResources(
 			return fmt.Errorf("unable to cast remote resource to catalog category")
 		}
 
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  data.Name,
-			Scope: types.CategoryResourceType})
-		if err != nil {
-			return fmt.Errorf("generating externalID for category %s: %w", data.Name, err)
+		externalID := data.ExternalID
+		if idNamer != nil {
+			var err error
+			externalID, err = idNamer.Name(namer.ScopeName{
+				Name:  data.Name,
+				Scope: types.CategoryResourceType})
+			if err != nil {
+				return fmt.Errorf("generating externalID for category %s: %w", data.Name, err)
+			}
 		}
 
 		category.ExternalID = externalID
