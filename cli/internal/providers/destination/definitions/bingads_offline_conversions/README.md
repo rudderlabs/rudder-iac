@@ -126,17 +126,13 @@ source type 'web' is not among supported source types: warehouse
 destination 'bing-offline-conversions-prod' config has no 'connection_mode' entry for source type 'warehouse'
 ```
 
-**The connection needs a sync behaviour that both sides offer, and none is left.** BingAds Offline Conversions accepts only `mirror`, which Rudder CLI doesn't support. A connection that sets `sync_behaviour: mirror` fails validation:
+**The connection needs a sync behaviour that both sides offer, and none is left.** BingAds Offline Conversions accepts only `mirror`, and a spec can carry `mirror` on the visual-mapper-v2 flow alone, which this destination does not run. So the two sides share nothing whatever the connection sets, and every `sync_behaviour` is refused with the same message. One that sets `object` runs object mapping and reports:
 
 ```text
-'sync_behaviour' must be one of [upsert full]
+source definition 'postgres' and destination 'bing-offline-conversions-prod' share no sync behaviour on object mapping; the connection cannot sync
 ```
 
-With `upsert` or `full`, the connection is refused instead. One that sets `object` runs object mapping and reports the following; without `object`, the message names the `json_mapper` flow:
-
-```text
-source definition 'postgres' and destination 'bing-offline-conversions-prod' share no sync behaviour for the object_mapping flow; the connection cannot sync
-```
+Without `object` the connection runs the JSON mapper, and the message names that flow instead.
 
 The OAuth account in `rudder_account_id` isn't checked at `validate` time.
 

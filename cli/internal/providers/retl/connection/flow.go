@@ -24,6 +24,11 @@ const (
 // so an error that mentions one has to mention the one this connection was
 // classified as: a visual-mapper-v2 connection told to fix something "with
 // object mapping" is pointed at a flow its destination cannot run.
+//
+// Every diagnostic that names a flow goes through here, so one run never
+// renders the same flow two ways. V-R2 runs on all three flows, which is why
+// all three arms are reachable; the default is there for a flow added to the
+// type without a label, where the raw value still beats an empty string.
 func (f Flow) Label() string {
 	switch f {
 	case FlowJSONMapper:

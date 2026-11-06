@@ -66,6 +66,13 @@ type DestinationDefinition struct {
 	// destination's own config instead of a named object. A connection to such
 	// a destination runs the visual-mapper-v2 flow, the only flow on which the
 	// backend lets a sync mirror.
+	//
+	// The flag is necessary but not sufficient: the backend also keeps its own
+	// VDM_V2_DESTINATIONS allowlist, which refuses hubspot, pinterest_tag,
+	// marketo_static_lists and gainsight_px today even though they carry the
+	// flag upstream. So set this to match db-config.json and nothing else —
+	// whether a create succeeds is the backend's to answer, and a second
+	// allowlist here would go stale the moment that one moves.
 	SupportsVisualMapperV2 bool
 	// ConsentValidationOverrides replaces canonical consent validation for selected local source types.
 	ConsentValidationOverrides map[string]common.ConsentValidator

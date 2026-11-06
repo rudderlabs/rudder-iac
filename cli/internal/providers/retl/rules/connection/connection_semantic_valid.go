@@ -504,12 +504,16 @@ func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
 	// SourceWarehouseMetadata hands back a clone, so filtering in place is safe.
 	// Mirroring needs the destination's field set declared up front, which is
 	// what the vdm-next destinations do through their own config; the other
-	// flows drop mirror however the two endpoints feel about it. The backend
-	// refuses it on the JSON mapper alone (FLOWS_DISALLOWING_MIRROR in
-	// config-backend retl/api-gateway/connection-config/assembler.ts), but
-	// DEX-1021 showed that mirror on an object-mapping connection is accepted
-	// and then silently stored as an upsert, so this rule stays stricter than
-	// the backend there rather than passing a connection that cannot mirror.
+	// flows drop mirror however the two endpoints feel about it.
+	//
+	// This is stricter than the backend on object mapping, deliberately. The
+	// backend refuses mirror on the JSON mapper alone (FLOWS_DISALLOWING_MIRROR
+	// in config-backend retl/api-gateway/connection-config/assembler.ts), so an
+	// object-mapping connection is accepted and stored as mirror. DEX-1046
+	// found that what looked like a silent downgrade to upsert was the webapp
+	// displaying it as Upsert, not the backend rewriting it. The sync still has
+	// no declared field set to mirror onto, so refusing it here is better than
+	// passing a connection that cannot do what its spec says.
 	accepted := slices.DeleteFunc(warehouse.SyncBehaviours, func(behaviour string) bool {
 		if behaviour == "mirror" && entry.flow != retlConnection.FlowVisualMapperV2 {
 			return true
@@ -519,8 +523,8 @@ func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
 
 	if len(accepted) == 0 {
 		return []rules.ValidationResult{result(reference, fmt.Sprintf(
-			"source definition '%s' and destination '%s' share no sync behaviour for the %s flow; the connection cannot sync",
-			sourceDefinition, entry.endpoints.destinationID, entry.flow,
+			"source definition '%s' and destination '%s' share no sync behaviour on %s; the connection cannot sync",
+			sourceDefinition, entry.endpoints.destinationID, entry.flow.Label(),
 		))}
 	}
 	if slices.Contains(accepted, entry.config.SyncBehaviour) {
@@ -528,7 +532,7 @@ func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
 	}
 
 	return []rules.ValidationResult{result(reference, fmt.Sprintf(
-		"'sync_behaviour' must be one of [%s] for source definition '%s' and destination '%s' on the %s flow",
-		strings.Join(accepted, " "), sourceDefinition, entry.endpoints.destinationID, entry.flow,
+		"'sync_behaviour' must be one of [%s] for source definition '%s' and destination '%s' on %s",
+		strings.Join(accepted, " "), sourceDefinition, entry.endpoints.destinationID, entry.flow.Label(),
 	))}
 }

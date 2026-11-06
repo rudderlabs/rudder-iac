@@ -621,7 +621,7 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 			mutate:      objectMappingEntry,
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/config/sync_behaviour",
-				Message:   "source definition 'postgres' and destination 'my-bing-destination' share no sync behaviour for the object_mapping flow; the connection cannot sync",
+				Message:   "source definition 'postgres' and destination 'my-bing-destination' share no sync behaviour on object mapping; the connection cannot sync",
 			}},
 		},
 		{
@@ -634,7 +634,7 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 			destination: audienceDestination(),
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/config/sync_behaviour",
-				Message:   "'sync_behaviour' must be one of [mirror] for source definition 'postgres' and destination 'my-audience-destination' on the visual_mapper_v2 flow",
+				Message:   "'sync_behaviour' must be one of [mirror] for source definition 'postgres' and destination 'my-audience-destination' on the visual mapper v2 flow",
 			}},
 		},
 		{
@@ -745,7 +745,7 @@ func TestConnectionSemanticValid_WarehouseDestinationFlows(t *testing.T) {
 		}}
 		jsonMirrorRefused = []rules.ValidationResult{{
 			Reference: "/connections/0/config/sync_behaviour",
-			Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-destination' on the json_mapper flow",
+			Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-destination' on JSON mapping",
 		}}
 	)
 
@@ -1023,7 +1023,7 @@ func TestConnectionSemanticValid_SourceCapability(t *testing.T) {
 			mutate:      func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "mirror" },
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/config/sync_behaviour",
-				Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-http-destination' on the json_mapper flow",
+				Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-http-destination' on JSON mapping",
 			}},
 		},
 		{
@@ -1036,7 +1036,7 @@ func TestConnectionSemanticValid_SourceCapability(t *testing.T) {
 			},
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/config/sync_behaviour",
-				Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-amplitude-destination' on the object_mapping flow",
+				Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-amplitude-destination' on object mapping",
 			}},
 		},
 		{
@@ -1047,7 +1047,7 @@ func TestConnectionSemanticValid_SourceCapability(t *testing.T) {
 			},
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/config/sync_behaviour",
-				Message:   "source definition 'postgres' and destination 'my-mirror-destination' share no sync behaviour for the json_mapper flow; the connection cannot sync",
+				Message:   "source definition 'postgres' and destination 'my-mirror-destination' share no sync behaviour on JSON mapping; the connection cannot sync",
 			}},
 		},
 		{

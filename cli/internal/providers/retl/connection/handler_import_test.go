@@ -134,8 +134,11 @@ func connectionCollection(remotes ...*resources.RemoteResource) *resources.Remot
 	return collection
 }
 
-// TestFormatForExportMirrorClearsSpecSyntax covers the import hazard #1009
-// left behind, and is deliberately narrower than it looks.
+// TestRemoteMirrorRowClearsSpecSyntax covers the import hazard #1009 left
+// behind, and is deliberately narrower than its subject suggests. It runs the
+// conversions a remote row passes through on its way into a spec —
+// configFromRemote, configToMap, then the struct-tag step rules.ValidateStruct
+// applies — not FormatForExport.
 //
 // An audience connection on a vdm-next destination carries a destinationConfig,
 // which the spec has no field for, so configFromRemote refuses the row and the
@@ -150,7 +153,7 @@ func connectionCollection(remotes ...*resources.RemoteResource) *resources.Remot
 // enum (TestConnectionSemanticValid_SourceCapability pins both messages). The
 // dead end closes only once a destination declaring supportsVisualMapperV2 is
 // registered and the spec can carry its destination config (DEX-875).
-func TestFormatForExportMirrorClearsSpecSyntax(t *testing.T) {
+func TestRemoteMirrorRowClearsSpecSyntax(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]func(*retlClient.RETLConnection){
