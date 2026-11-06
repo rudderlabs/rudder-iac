@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -69,11 +70,20 @@ func startListen(t *testing.T, args ...string) *listenProcess {
 // on stderr.
 func startStream(t *testing.T, args ...string) *listenProcess {
 	t.Helper()
+	return startStreamTo(t, nil, args...)
+}
+
+// startStreamTo is startStream with stdout going to out, unless out is nil.
+func startStreamTo(t *testing.T, out io.Writer, args ...string) *listenProcess {
+	t.Helper()
 	cmd := sourcesListenCommand(t, args...)
 	stderr, err := cmd.StderrPipe()
 	require.NoError(t, err)
 	p := &listenProcess{cmd: cmd, stdout: &lockedBuffer{}, stderr: &lockedBuffer{}, exited: make(chan error, 1)}
 	cmd.Stdout = p.stdout
+	if out != nil {
+		cmd.Stdout = out
+	}
 	require.NoError(t, cmd.Start())
 	t.Cleanup(func() {
 		_ = cmd.Process.Kill()
@@ -253,4 +263,43 @@ func TestSourcesListenChecksTheHostOnAWildcardBind(t *testing.T) {
 		require.NoError(t, resp.Body.Close())
 		require.Equal(t, want, resp.StatusCode, host)
 	}
+}
+
+// A reader that closes the pipe must not leave the SDK getting answers for
+// events that go nowhere: the listener says so and exits 1.
+func TestSourcesListenStopsWhenStdoutCloses(t *testing.T) {
+	t.Parallel()
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	p := startStreamTo(t, w)
+	require.NoError(t, w.Close())
+	require.NoError(t, r.Close())
+
+	resp, err := http.Post(p.url()+"/v1/track", "application/json", strings.NewReader(`{"event":"A","userId":"u1"}`))
+	if err == nil {
+		require.NoError(t, resp.Body.Close())
+	}
+
+	select {
+	case <-p.exited:
+		p.exited <- nil
+	case <-time.After(10 * time.Second):
+		t.Fatal("sources listen did not stop")
+	}
+	require.Equal(t, 1, p.cmd.ProcessState.ExitCode(), p.stderr.String())
+	require.Contains(t, p.stderr.String(), `"code":"output_failed"`)
+	require.Contains(t, p.stderr.String(), "1 accepted event was never written")
+}
+
+func TestSourcesListenOutRefusesAFileThatExists(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "events")
+	require.NoError(t, os.WriteFile(path, nil, 0o600))
+
+	out, err := sourcesListenCommand(t, "--port", "0", "--out", path).CombinedOutput()
+
+	var exit *exec.ExitError
+	require.ErrorAs(t, err, &exit)
+	require.Equal(t, 1, exit.ExitCode())
+	require.Contains(t, string(out), `"code":"out_exists"`)
 }
