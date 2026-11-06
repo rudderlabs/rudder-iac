@@ -506,7 +506,7 @@ func (h *Handler) destinationUsable(dst apiClient.Destination, object string) (*
 	}
 	flow, err := ClassifyFlow(dst.Type, registered.SupportsVisualMapper(), lo.EmptyableToPtr(object))
 	if err != nil {
-		return nil, "", fmt.Errorf("%w", err)
+		return nil, "", err
 	}
 	return registered, flow, nil
 }
@@ -598,25 +598,34 @@ func syncBehaviourRepresentable(conn retlClient.RETLConnection, sourceDefinition
 	}
 
 	behaviour := string(conn.SyncBehaviour)
-	// Check the spec contract before the intersection, because it needs nothing
-	// from the source: a behaviour no spec can carry is a dead end on any
-	// source, known to this CLI version or not, so an unknown source definition
-	// must not make this arm inert.
+	accepted, known := AcceptedSyncBehaviours(sourceDefinition, destinationAccepted, flow)
+
+	// An empty intersection is checked first, whatever the behaviour, because it
+	// is the one refusal with no remedy: the two endpoints share nothing a spec
+	// can express, so no recreated connection could be managed either. Telling
+	// the user to recreate here would cost them a working connection and give
+	// them nothing back.
+	if known && len(accepted) == 0 {
+		return fmt.Errorf("connection %q: source definition %q and this destination share no sync behaviour a spec can express on the %s flow; the connection stays in the workspace unchanged: %w",
+			conn.ID, sourceDefinition, flow, ErrUnrepresentableConfig)
+	}
+	// Then the spec contract, which needs nothing from the source: a behaviour
+	// no spec can carry is a dead end on any source, known to this CLI version
+	// or not, so an unknown source definition must not make this arm inert. Only
+	// a known source lets the remedy name what to recreate with.
 	if !specSupportsSyncBehaviour(behaviour, flow) {
-		return fmt.Errorf("connection %q: sync behaviour %q cannot be expressed as a spec on the %s flow; recreate the connection with a behaviour a spec can express to bring it under the CLI: %w",
-			conn.ID, behaviour, flow, ErrUnrepresentableConfig)
+		if !known {
+			return fmt.Errorf("connection %q: sync behaviour %q cannot be expressed as a spec on the %s flow; recreate the connection with a behaviour a spec can express to bring it under the CLI: %w",
+				conn.ID, behaviour, flow, ErrUnrepresentableConfig)
+		}
+		return fmt.Errorf("connection %q: sync behaviour %q cannot be expressed as a spec on the %s flow; recreate the connection with one of [%s] to bring it under the CLI: %w",
+			conn.ID, behaviour, flow, strings.Join(accepted, " "), ErrUnrepresentableConfig)
 	}
 	// Past that only the endpoints can refuse the behaviour, and an unknown
 	// source definition has no capabilities to intersect: keep the row and let
 	// the source's own rules report the definition.
-	accepted, known := AcceptedSyncBehaviours(sourceDefinition, destinationAccepted, flow)
 	if !known || slices.Contains(accepted, behaviour) {
 		return nil
-	}
-
-	if len(accepted) == 0 {
-		return fmt.Errorf("connection %q: source definition %q and this destination share no sync behaviour a spec can express on the %s flow; the connection stays in the workspace unchanged: %w",
-			conn.ID, sourceDefinition, flow, ErrUnrepresentableConfig)
 	}
 	return fmt.Errorf("connection %q: sync behaviour %q is not accepted by source definition %q and this destination together, which share only [%s] on the %s flow; the connection stays in the workspace unchanged: %w",
 		conn.ID, behaviour, sourceDefinition, strings.Join(accepted, " "), flow, ErrUnrepresentableConfig)

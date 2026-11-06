@@ -129,21 +129,27 @@ func TestEligibleSkipsUnrepresentableSyncBehaviour(t *testing.T) {
 		message string
 	}{
 		{
+			// Bing Ads accepts mirror alone, so on object mapping the endpoints
+			// share nothing a spec can express. Recreating cannot help here, so
+			// the message says the row is left alone instead of naming a remedy
+			// that would cost the user a working connection for nothing.
 			name: "mirror on an object mapping destination is skipped",
 			conn: syncBehaviourRow("conn-mirror-object", "dst-object", retlClient.SyncBehaviourMirror, "Contact"),
-			message: `connection "conn-mirror-object": sync behaviour "mirror" cannot be expressed as a spec on the object_mapping flow; ` +
-				"recreate the connection with a behaviour a spec can express to bring it under the CLI: connection config cannot be represented as a spec",
+			message: `connection "conn-mirror-object": source definition "snowflake" and this destination share no sync behaviour ` +
+				"a spec can express on the object_mapping flow; the connection stays in the workspace unchanged: connection config cannot be represented as a spec",
 		},
 		{
+			// A webhook accepts all three, so recreating is a real remedy here
+			// and the message names the behaviours that would work.
 			name: "mirror on a json mapper destination is skipped",
 			conn: syncBehaviourRow("conn-mirror-json", "dst-1", retlClient.SyncBehaviourMirror, ""),
 			message: `connection "conn-mirror-json": sync behaviour "mirror" cannot be expressed as a spec on the json_mapper flow; ` +
-				"recreate the connection with a behaviour a spec can express to bring it under the CLI: connection config cannot be represented as a spec",
+				"recreate the connection with one of [upsert full] to bring it under the CLI: connection config cannot be represented as a spec",
 		},
 		{
-			// Bing Ads accepts mirror alone, so the endpoints leave nothing a
-			// spec can carry. The behaviour itself is expressible, which is
-			// what tells this refusal apart from the two above.
+			// The same pair as the first case with a behaviour a spec can
+			// carry. It reads identically, and should: what cannot be managed
+			// is the pair, not the behaviour the row happens to hold.
 			name: "a behaviour the endpoints do not share is skipped",
 			conn: syncBehaviourRow("conn-upsert-object", "dst-object", retlClient.SyncBehaviourUpsert, "Contact"),
 			message: `connection "conn-upsert-object": source definition "snowflake" and this destination share no sync behaviour ` +
