@@ -659,3 +659,32 @@ func TestCompositeProvider_CheckPlan(t *testing.T) {
 		assert.Same(t, st, b.gotSt)
 	})
 }
+
+// managedMockProvider adds LoadManaged to MockProvider.
+type managedMockProvider struct {
+	*testutils.MockProvider
+	managed *resources.RemoteResources
+}
+
+func (m *managedMockProvider) LoadManaged(context.Context) (*resources.RemoteResources, error) {
+	return m.managed, nil
+}
+
+func TestCompositeProvider_LoadManaged(t *testing.T) {
+	t.Parallel()
+
+	managed := resources.NewRemoteResources()
+	managed.Set("typeA", map[string]*resources.RemoteResource{"r1": {ID: "r1", ExternalID: "a-1"}})
+	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
+		"a": &managedMockProvider{MockProvider: testutils.NewMockProvider([]string{"kindA"}, nil), managed: managed},
+		"b": testutils.NewMockProvider([]string{"kindB"}, nil),
+	})
+	require.NoError(t, err)
+
+	got, skipped, err := cp.(*provider.CompositeProvider).LoadManaged(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, []string{"b"}, skipped)
+	r, ok := got.GetByID("typeA", "r1")
+	require.True(t, ok)
+	assert.Equal(t, "a-1", r.ExternalID)
+}
