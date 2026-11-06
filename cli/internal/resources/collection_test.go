@@ -450,16 +450,17 @@ func TestRemoteResources_GetURNByID(t *testing.T) {
 	})
 }
 
-func TestRemoteResources_DropUnmanaged(t *testing.T) {
+func TestRemoteResources_Without(t *testing.T) {
 	rc := NewRemoteResources()
 	rc.Set("source", map[string]*RemoteResource{
 		"r1": {ID: "r1", ExternalID: "managed"},
 		"r2": {ID: "r2"},
 	})
 
-	rc.DropUnmanaged()
+	kept := rc.Without(func(_ string, r *RemoteResource) bool { return r.ExternalID == "" })
 
-	assert.Equal(t, 1, rc.Len())
-	_, ok := rc.GetByID("source", "r1")
+	assert.Equal(t, 1, kept.Len())
+	_, ok := kept.GetByID("source", "r1")
 	assert.True(t, ok)
+	assert.Equal(t, 2, rc.Len(), "the receiver is left unchanged")
 }

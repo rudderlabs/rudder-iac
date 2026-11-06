@@ -79,6 +79,11 @@ func TestIsValidExperimentalFlag_EventRuleIncludes(t *testing.T) {
 	assert.True(t, IsValidExperimentalFlag("eventRuleIncludes"))
 }
 
+func TestIsValidExperimentalFlag_ImportManaged(t *testing.T) {
+	assert.True(t, IsValidExperimentalFlag("importManaged"))
+	assert.Equal(t, "RUDDERSTACK_X_IMPORT_MANAGED", GetEnvironmentVariableName("importManaged"))
+}
+
 func TestIsValidExperimentalFlag_ImportMerge(t *testing.T) {
 	t.Parallel()
 

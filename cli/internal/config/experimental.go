@@ -24,6 +24,9 @@ type ExperimentalConfig struct {
 	// remote resources to existing local project resources instead of
 	// generating duplicate specs
 	ImportMerge bool `mapstructure:"importMerge"`
+	// ImportManaged enables `import workspace --managed`, which writes the
+	// resources the CLI already manages in a workspace as specs.
+	ImportManaged bool `mapstructure:"importManaged"`
 	// UnverifiedDestinations enables registration of destination definitions
 	// that still need the unverified gate.
 	UnverifiedDestinations bool `mapstructure:"unverifiedDestinations"`

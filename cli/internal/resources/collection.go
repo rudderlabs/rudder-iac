@@ -48,17 +48,19 @@ func (rc *RemoteResources) Len() int {
 	return count
 }
 
-// DropUnmanaged removes the resources that carry no externalId. Some list
-// endpoints ignore their hasExternalId filter, so a managed listing can hold
-// unmanaged resources.
-func (rc *RemoteResources) DropUnmanaged() {
-	for _, byID := range rc.resources {
+// Without returns a copy that leaves out the resources drop reports true for.
+func (rc *RemoteResources) Without(drop func(resourceType string, r *RemoteResource) bool) *RemoteResources {
+	out := NewRemoteResources()
+	for resourceType, byID := range rc.resources {
+		kept := make(map[string]*RemoteResource, len(byID))
 		for id, r := range byID {
-			if r.ExternalID == "" {
-				delete(byID, id)
+			if !drop(resourceType, r) {
+				kept[id] = r
 			}
 		}
+		out.resources[resourceType] = kept
 	}
+	return out
 }
 
 // Set stores a resource map for the given resource type
