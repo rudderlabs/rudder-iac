@@ -459,29 +459,21 @@ func validateSourceCapability(entry connectionEntry) []rules.ValidationResult {
 }
 
 // validateSyncBehaviour (V-R2): the behaviour has to be one both endpoints
-// accept, minus mirror, which this CLI does not support on any flow. An empty
-// intersection is reported as such rather than falling back to a
-// permissive set — that would let a connection the backend refuses pass here.
-// A source whose capabilities are unknown is validateSourceCapability's to
-// report, so there is nothing to intersect.
+// accept and the spec can express on this flow. AcceptedSyncBehaviours derives
+// that set, and the import eligibility check reads the same function so the two
+// cannot disagree about which remote rows are representable. A source whose
+// capabilities are unknown is validateSourceCapability's to report, so there is
+// nothing to intersect.
 func validateSyncBehaviour(entry connectionEntry) []rules.ValidationResult {
 	sourceDefinition := entry.endpoints.sourceDefinition()
-	warehouse, known := retlConnection.SourceWarehouseMetadata(sourceDefinition)
+	accepted, known := retlConnection.AcceptedSyncBehaviours(
+		sourceDefinition, entry.registered.SyncBehaviours(), entry.flow,
+	)
 	if !known {
 		return nil
 	}
 
-	var (
-		reference           = configRef(entry.index) + "/sync_behaviour"
-		destinationAccepted = entry.registered.SyncBehaviours()
-	)
-
-	// SourceWarehouseMetadata hands back a clone, so filtering in place is safe.
-	// The spec rule already rejects mirror; dropping it here keeps a mirror-only
-	// destination from being offered a behaviour the spec rule would refuse.
-	accepted := slices.DeleteFunc(warehouse.SyncBehaviours, func(behaviour string) bool {
-		return behaviour == "mirror" || !slices.Contains(destinationAccepted, behaviour)
-	})
+	reference := configRef(entry.index) + "/sync_behaviour"
 
 	if len(accepted) == 0 {
 		return []rules.ValidationResult{result(reference, fmt.Sprintf(
