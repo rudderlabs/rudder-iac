@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.0.0](https://github.com/rudderlabs/rudder-iac/compare/v1.0.0...v1.0.0) (2026-11-06)
+
+
+### Bug Fixes
+
+* **retl:** allow mirror sync on the visual mapper v2 flow ([#1022](https://github.com/rudderlabs/rudder-iac/issues/1022)) ([b80e73f](https://github.com/rudderlabs/rudder-iac/commit/b80e73ff936515916dcfd331a17a0fd8f4fa5bac))
+* **retl:** refuse a remote sync_behaviour import cannot express ([#1027](https://github.com/rudderlabs/rudder-iac/issues/1027)) ([f02bb59](https://github.com/rudderlabs/rudder-iac/commit/f02bb59d8d9cfc782ede3dbbe460a24cdb42a4e1))
+
+
+### Miscellaneous
+
+* **ci:** move codecov-action to v7.1.1 ([#985](https://github.com/rudderlabs/rudder-iac/issues/985)) ([a5ff4ae](https://github.com/rudderlabs/rudder-iac/commit/a5ff4aee56b567b4ec2f28f1d33122f7c61ae1f1))
+* **ci:** move the PR title check to check-pr-title v2.0.3 ([#1020](https://github.com/rudderlabs/rudder-iac/issues/1020)) ([de5f96c](https://github.com/rudderlabs/rudder-iac/commit/de5f96cd3466efa41e9f7c78a975d9b3903065d8))
+
 ## [1.0.0](https://github.com/rudderlabs/rudder-iac/compare/v0.29.1...v1.0.0) (2026-10-30)
 
 
