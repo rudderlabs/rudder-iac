@@ -2,10 +2,13 @@ package tests
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"time"
+
+	"github.com/rudderlabs/rudder-iac/cli/tests/demo"
 )
 
 // Executor allows callers to run external commands and capture their combined output.
@@ -68,6 +71,53 @@ func (c *CmdExecutor) Execute(cmd string, args ...string) ([]byte, error) {
 		command.Dir = c.WorkDir
 	}
 
+	start := time.Now().UTC()
 	output, err := command.CombinedOutput()
+
+	journal(start, command, output, err)
+
 	return output, err
+}
+
+// journal records the invocation for demo generation. Every CLI call in this
+// package funnels through Execute, which is what lets a whole suite run be
+// captured without touching a single test.
+//
+// The Enabled() guard below is a cost fast path, not a correctness one: it
+// skips os.Getwd, errors.As and a full os.Environ() scan on every Execute.
+// demo.Append carries the identical guard, so correctness is backstopped
+// there even if this one is ever removed by accident. If Append's guard is
+// ever removed, this one becomes load-bearing and needs its own test.
+func journal(start time.Time, command *exec.Cmd, output []byte, runErr error) {
+	if !demo.Enabled() {
+		return
+	}
+
+	dir := command.Dir
+	if dir == "" {
+		dir, _ = os.Getwd()
+	}
+
+	exitCode := 0
+	var exitErr *exec.ExitError
+	switch {
+	case errors.As(runErr, &exitErr):
+		exitCode = exitErr.ExitCode()
+	case runErr != nil:
+		// The command never produced an exit code — it failed to start, or the
+		// context killed it before exec. -1 is what ExitCode() itself reports
+		// when no code is available, so the journal keeps one vocabulary.
+		exitCode = -1
+	}
+
+	demo.Append(demo.Record{
+		Kind:     demo.KindExec,
+		Start:    start,
+		End:      time.Now().UTC(),
+		Dir:      dir,
+		Argv:     command.Args,
+		Env:      demo.CollectEnv(),
+		ExitCode: exitCode,
+		Output:   string(output),
+	})
 }
