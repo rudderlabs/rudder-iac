@@ -3,6 +3,7 @@ package apply
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -48,17 +49,22 @@ func NewCmdApply() *cobra.Command {
 			$ rudder-cli apply --location </path/to/dir or file> --confirm=false
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) (err error) {
-			deps, err = app.NewDeps()
+			deps, err = app.NewDepsContext(cmd.Context())
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			workspace, err = deps.Client().Workspaces.GetByAuthToken(context.Background())
-			if err != nil {
-				return fmt.Errorf("fetching workspace information: %w", err)
+			workspace = deps.Workspace()
+			if workspace == nil {
+				workspace, err = deps.Client().Workspaces.GetByAuthToken(cmd.Context())
+				if err != nil {
+					return fmt.Errorf("fetching workspace information: %w", err)
+				}
+				if workspace == nil {
+					return fmt.Errorf("fetching workspace information: workspace is missing")
+				}
 			}
-
-			printWorkspaceBanner(workspace)
+			printWorkspaceBanner(workspace, deps.Client().URL(""))
 
 			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
@@ -136,11 +142,22 @@ func NewCmdApply() *cobra.Command {
 
 // printWorkspaceBanner names the workspace the apply is about to touch, so a run
 // against the wrong token is visible before any change is planned.
-func printWorkspaceBanner(workspace *client.Workspace) {
+func printWorkspaceBanner(workspace *client.Workspace, apiURL string) {
 	ui.Printf(
-		"%s %s %s\n",
+		"%s %s %s  %s %s",
 		ui.Color("Workspace:", ui.ColorBlue),
 		ui.Bold(workspace.Name),
 		ui.GreyedOut("("+workspace.ID+")"),
+		ui.Color("Region:", ui.ColorBlue),
+		ui.Bold(workspace.Region),
 	)
+	if apiURL != client.BASE_URL {
+		// A custom URL can carry credentials in userinfo, path, or query.
+		endpoint := "(invalid URL)"
+		if parsed, err := url.Parse(apiURL); err == nil && parsed.Scheme != "" && parsed.Host != "" {
+			endpoint = parsed.Scheme + "://" + parsed.Host
+		}
+		ui.Printf("  %s %s", ui.Color("API:", ui.ColorBlue), ui.GreyedOut(endpoint))
+	}
+	ui.Printf("\n")
 }

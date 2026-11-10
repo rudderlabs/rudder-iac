@@ -352,3 +352,9 @@
 ## DEX-1079 — Destination Spec Dereference Relies On The Syntax Gate
 <!-- ticket:DEX-1079 -->
 - `HandlerImpl.ExtractResourcesFromSpec` (`cli/internal/providers/destination/handler.go`) dereferences `*spec.DefinitionVersion` without a nil check. That is safe only because `project.handleValidation` runs `ValidateSyntax`, where `destination/spec-syntax-valid` enforces `required`, before any `loadSpec`, and destination `Provider.LoadLegacySpec` rejects legacy specs, so `BaseProvider.LoadLegacySpec`'s fallback to `LoadSpec` cannot deliver a spec the V1-only rule never saw. A new path that calls `LoadSpec` without the syntax phase must validate first or nil-check.
+
+## RUD-3474 — Regional Client Bootstrap And Offline Dependency Boundary
+<!-- ticket:RUD-3474 -->
+- Regional API discovery belongs between bootstrap-client creation and provider composition in `cli/internal/app/dependencies.go::newDeps`, because providers retain the client they receive at construction. The shared construction path accepts client options so test-only HTTP transport injection applies to both the bootstrap and rebuilt regional clients without global overrides or real network traffic.
+- Online dependency creation treats a successful `GET /v2/workspace` with a nil workspace as an error before composing providers; only `NewOfflineDeps` may leave the cached workspace nil. Keep workspace discovery disabled for offline dependency construction.
+- `cli/pkg/exp/project/project.go::Load` uses `app.NewOfflineDeps` for read-only graph loading and validation rather than `app.NewDeps`, so callers without credentials do not acquire a remote workspace lookup as a side effect.

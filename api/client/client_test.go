@@ -26,6 +26,27 @@ func TestClientURL(t *testing.T) {
 	assert.Equal(t, "https://api.rudderstack.com/path/more", c.URL("/path/more"))
 }
 
+func TestBaseURLForRegion(t *testing.T) {
+	for _, tc := range []struct {
+		region, url  string
+		switchRegion bool
+	}{
+		{"EU", client.BASE_URL_EU, true},
+		{"eu", client.BASE_URL_EU, true},
+		{" EU ", client.BASE_URL_EU, true},
+		{"US", client.BASE_URL, false},
+		{"", client.BASE_URL, false},
+		{"APAC", client.BASE_URL, false},
+		{"eu-west", client.BASE_URL, false},
+	} {
+		t.Run(tc.region, func(t *testing.T) {
+			url, switchRegion := client.BaseURLForRegion(tc.region)
+			assert.Equal(t, tc.url, url)
+			assert.Equal(t, tc.switchRegion, switchRegion)
+		})
+	}
+}
+
 func TestClientDoRetriesSafeMethodTransportErrors(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t,
 		testutils.Call{

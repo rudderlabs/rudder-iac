@@ -34,7 +34,7 @@ func NewCmdInfo() *cobra.Command {
 				telemetry.TrackCommand(telemetry.CommandName(cmd), err)
 			}()
 
-			d, err := app.NewDeps()
+			d, err := app.NewDepsContext(cmd.Context())
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}

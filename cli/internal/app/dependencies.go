@@ -1,7 +1,9 @@
 package app
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -51,6 +53,7 @@ type Providers struct {
 
 type deps struct {
 	client            *client.Client
+	workspace         *client.Workspace
 	providers         *Providers
 	compositeProvider provider.Provider
 }
@@ -61,6 +64,10 @@ type Deps interface {
 	// Deps from NewOfflineDeps carry a placeholder token, so calls through their
 	// client fail authentication.
 	Client() *client.Client
+
+	// Workspace returns the workspace discovered with the default API URL.
+	// Offline dependencies and explicit URL overrides return nil.
+	Workspace() *client.Workspace
 
 	// Providers returns the initialized Providers struct containing all provider instances
 	// used in the application when individual provider access is needed.
@@ -96,11 +103,16 @@ func validateDependencies() error {
 }
 
 func NewDeps() (Deps, error) {
+	return NewDepsContext(context.Background())
+}
+
+// NewDepsContext bounds workspace discovery by the caller's lifetime.
+func NewDepsContext(ctx context.Context) (Deps, error) {
 	if err := validateDependencies(); err != nil {
 		return nil, err
 	}
 
-	return newDeps(config.GetConfig().Auth.AccessToken)
+	return newDeps(ctx, config.GetConfig().Auth.AccessToken, true)
 }
 
 // NewOfflineDeps builds the same providers as NewDeps (so it observes the same
@@ -110,15 +122,36 @@ func NewDeps() (Deps, error) {
 // rejects an empty one; any API call made through it fails auth, which surfaces
 // an accidental network dependency instead of hiding it.
 func NewOfflineDeps() (Deps, error) {
-	return newDeps("offline")
+	return newDeps(context.Background(), "offline", false)
 }
 
 // newDeps is the single construction path for NewDeps and NewOfflineDeps, so a
 // client option or provider added here reaches both.
-func newDeps(token string) (Deps, error) {
-	c, err := setupClient(token, v)
+func newDeps(ctx context.Context, token string, discoverRegion bool, clientOptions ...client.Option) (Deps, error) {
+	configuredURL := config.GetConfig().APIURL
+	c, err := setupClient(token, v, configuredURL, clientOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("setup client: %w", err)
+	}
+
+	var workspace *client.Workspace
+	if discoverRegion && configuredURL == client.BASE_URL {
+		lookupCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		workspace, err = c.Workspaces.GetByAuthToken(lookupCtx)
+		if err != nil {
+			return nil, fmt.Errorf("fetching workspace information: %w", err)
+		}
+		if workspace == nil {
+			return nil, fmt.Errorf("fetching workspace information: workspace is missing")
+		}
+
+		if regionalURL, switchRegion := client.BaseURLForRegion(workspace.Region); switchRegion {
+			c, err = setupClient(token, v, regionalURL, clientOptions...)
+			if err != nil {
+				return nil, fmt.Errorf("setup regional client: %w", err)
+			}
+		}
 	}
 
 	cp, p, err := composeProviders(c)
@@ -128,6 +161,7 @@ func newDeps(token string) (Deps, error) {
 
 	return &deps{
 		client:            c,
+		workspace:         workspace,
 		providers:         p,
 		compositeProvider: cp,
 	}, nil
@@ -171,13 +205,11 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 	return cp, rawProviders, nil
 }
 
-func setupClient(token, version string) (*client.Client, error) {
-	cfg := config.GetConfig()
-	return client.New(
-		token,
-		client.WithBaseURL(cfg.APIURL),
-		client.WithUserAgent("rudder-cli/"+version),
-	)
+func setupClient(token, version, apiURL string, options ...client.Option) (*client.Client, error) {
+	return client.New(token, append([]client.Option{
+		client.WithBaseURL(apiURL),
+		client.WithUserAgent("rudder-cli/" + version),
+	}, options...)...)
 }
 
 // providerOrder is the order the composite aggregates import --merge matchers
@@ -286,6 +318,10 @@ func SyncReporter() syncer.SyncReporter {
 
 func (d *deps) Client() *client.Client {
 	return d.client
+}
+
+func (d *deps) Workspace() *client.Workspace {
+	return d.workspace
 }
 
 func (d *deps) Providers() *Providers {

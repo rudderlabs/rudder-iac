@@ -31,7 +31,18 @@ type Client struct {
 	Workspaces   *workspaces
 }
 
-const BASE_URL = "https://api.rudderstack.com"
+const (
+	BASE_URL    = "https://api.rudderstack.com"
+	BASE_URL_EU = "https://api.eu.rudderstack.com"
+)
+
+// BaseURLForRegion returns a regional API URL only when the region is known.
+func BaseURLForRegion(region string) (string, bool) {
+	if strings.EqualFold(strings.TrimSpace(region), "EU") {
+		return BASE_URL_EU, true
+	}
+	return BASE_URL, false
+}
 
 var (
 	ErrEmptyAccessToken  = fmt.Errorf("access token cannot be empty")

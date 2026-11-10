@@ -39,7 +39,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
 				return fmt.Errorf("--merge requires the %q experimental flag to be enabled", "importMerge")
 			}
 
-			deps, err = app.NewDeps()
+			deps, err = app.NewDepsContext(cmd.Context())
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}

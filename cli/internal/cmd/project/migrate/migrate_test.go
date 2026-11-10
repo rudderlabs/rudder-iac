@@ -1,12 +1,28 @@
 package migrate
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMigrateWithoutWorkspaceAPI(t *testing.T) {
+	t.Setenv("RUDDERSTACK_ACCESS_TOKEN", "")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+
+	// No token or reachable workspace endpoint is needed to validate local specs.
+	location := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(location, "manifest.yaml"), []byte("version: rudder/v1\nkind: categories\nmetadata:\n  name: test\nspec:\n  categories:\n    - id: page_tracking\n      name: Page Tracking\n"), 0o600))
+	cmd := NewCmdMigrate()
+	require.NoError(t, cmd.Flags().Set("location", location))
+	err := cmd.PreRunE(cmd, nil)
+	require.NoError(t, err)
+}
 
 func TestMigrateTelemetryExtras(t *testing.T) {
 	t.Parallel()

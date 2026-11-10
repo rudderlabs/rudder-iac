@@ -24,10 +24,25 @@ func UseFakeAPI(t *testing.T) {
 // request for each path in responses with that JSON body, whatever the method.
 func UseFakeAPIWith(t *testing.T, responses map[string]string) {
 	t.Helper()
+	useFakeAPIWithRegion(t, responses, "")
+}
+
+// UseFakeAPIWithRegion adds a region to the fake workspace response.
+func UseFakeAPIWithRegion(t *testing.T, region string) {
+	t.Helper()
+	useFakeAPIWithRegion(t, nil, region)
+}
+
+func useFakeAPIWithRegion(t *testing.T, responses map[string]string, region string) {
+	t.Helper()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/v2/workspace" {
-			fmt.Fprintf(w, `{"workspace":{"id":%q}}`, FakeWorkspaceID)
+			if region == "" {
+				fmt.Fprintf(w, `{"workspace":{"id":%q}}`, FakeWorkspaceID)
+			} else {
+				fmt.Fprintf(w, `{"workspace":{"id":%q,"region":%q}}`, FakeWorkspaceID, region)
+			}
 			return
 		}
 		if body, ok := responses[r.URL.Path]; ok {
