@@ -3,10 +3,13 @@ package providers_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -161,6 +164,82 @@ func TestWriteSnapshotThroughASymlinkReplacesTheTarget(t *testing.T) {
 	data, err := os.ReadFile(target)
 	require.NoError(t, err)
 	assert.Contains(t, string(data), `"formatVersion": 1`)
+}
+
+func TestWriteSnapshotThroughADanglingSymlinkCreatesTheTarget(t *testing.T) {
+	var (
+		store  = &mockTrackingPlanStore{trackingPlanWithSchemas: loadGolden(t)}
+		dir    = t.TempDir()
+		target = filepath.Join(dir, "created.json")
+		link   = filepath.Join(dir, "plan.snapshot.json")
+	)
+	if err := os.Symlink("created.json", link); err != nil {
+		t.Skipf("symlinks are not available: %v", err)
+	}
+
+	_, err := providers.WriteSnapshot(context.Background(), store, "tp", 0, link)
+	require.NoError(t, err)
+
+	info, err := os.Lstat(link)
+	require.NoError(t, err)
+	assert.NotZero(t, info.Mode()&os.ModeSymlink, "the link must stay a link")
+
+	data, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), `"formatVersion": 1`)
+}
+
+func TestWriteSnapshotConcurrentWritersToANewPath(t *testing.T) {
+	const (
+		writers = 4
+		rounds  = 30
+	)
+	golden := loadGolden(t)
+
+	for round := range rounds {
+		var (
+			path    = filepath.Join(t.TempDir(), fmt.Sprintf("plan-%d.snapshot.json", round))
+			started sync.WaitGroup
+			done    atomic.Bool
+			empty   atomic.Int32
+			errs    = make(chan error, writers)
+		)
+
+		// A reader must never see the file empty, or fail to create it
+		reader := make(chan struct{})
+		go func() {
+			defer close(reader)
+			for !done.Load() {
+				if data, err := os.ReadFile(path); err == nil && len(data) == 0 {
+					empty.Add(1)
+				}
+			}
+		}()
+
+		started.Add(writers)
+		var finished sync.WaitGroup
+		finished.Add(writers)
+		for range writers {
+			go func() {
+				defer finished.Done()
+				// Each writer has its own store, because the mock is not safe to share
+				store := &mockTrackingPlanStore{trackingPlanWithSchemas: golden}
+				started.Done()
+				started.Wait()
+				_, err := providers.WriteSnapshot(context.Background(), store, "tp", 0, path)
+				errs <- err
+			}()
+		}
+		finished.Wait()
+		done.Store(true)
+		<-reader
+		close(errs)
+
+		for err := range errs {
+			require.NoError(t, err, "round %d", round)
+		}
+		assert.Zero(t, empty.Load(), "round %d: a reader saw an empty file", round)
+	}
 }
 
 func TestWriteSnapshotUpdatesAWritableFileInAReadOnlyDirectory(t *testing.T) {

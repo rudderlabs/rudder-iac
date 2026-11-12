@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"slices"
@@ -67,16 +68,10 @@ func sortEvents(events []catalog.TrackingPlanEventSchema) {
 // then leaves the previous snapshot in place instead of a truncated file.
 //
 // It keeps what an in-place write would: a symlink at path stays a symlink and
-// the file it points to is replaced, an existing file keeps its mode, and a new
-// file gets the mode the umask allows.
+// the file it points to is replaced or created, an existing file keeps its
+// mode, and a new file gets the mode the umask allows.
 func writeFileAtomically(path string, data []byte) error {
-	resolved, err := filepath.EvalSymlinks(path)
-	switch {
-	case err == nil:
-		path = resolved
-	case !errors.Is(err, os.ErrNotExist):
-		return err
-	}
+	path = followSymlinks(path)
 
 	var (
 		mode    os.FileMode
@@ -86,7 +81,7 @@ func writeFileAtomically(path string, data []byte) error {
 		mode, existed = info.Mode().Perm(), true
 	}
 
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".snapshot-*")
+	tmp, err := createTemp(filepath.Dir(path))
 	if err != nil {
 		// A writable file in a directory the user cannot write to cannot be
 		// replaced, but it can still be updated, as before
@@ -105,34 +100,56 @@ func writeFileAtomically(path string, data []byte) error {
 		return err
 	}
 
-	if !existed {
-		if mode, err = newFileMode(path); err != nil {
+	// A new file keeps the mode the temporary file was created with
+	if existed {
+		if err := os.Chmod(tmp.Name(), mode); err != nil {
 			return err
 		}
-	}
-	if err := os.Chmod(tmp.Name(), mode); err != nil {
-		return err
 	}
 	return os.Rename(tmp.Name(), path)
 }
 
-// newFileMode returns the mode a new file at path would get, which depends on
-// the process umask that the standard library does not expose. It creates the
-// file with the default permissions to find out, and the rename that follows
-// replaces it.
-func newFileMode(path string) (os.FileMode, error) {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o666)
-	if err != nil {
-		return 0, err
+// createTemp creates a file next to the target with the default permissions, so
+// the process umask applies, which os.CreateTemp does not do because it always
+// uses 0600. Nothing is created at the target path itself, so another process
+// never sees an empty file there.
+func createTemp(dir string) (*os.File, error) {
+	for range 100 {
+		name := filepath.Join(dir, fmt.Sprintf(".snapshot-%016x", rand.Uint64()))
+		f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
+		if errors.Is(err, os.ErrExist) {
+			continue
+		}
+		return f, err
 	}
-	defer f.Close()
+	return nil, fmt.Errorf("creating a temporary file in %s: too many name collisions", dir)
+}
 
-	info, err := f.Stat()
-	if err != nil {
-		os.Remove(path)
-		return 0, err
+// followSymlinks returns the file a symlink at path points to, even when that
+// file does not exist yet, so that writing through the link creates it as an
+// in-place write would. filepath.EvalSymlinks fails on a dangling link.
+func followSymlinks(path string) string {
+	for range 40 {
+		info, err := os.Lstat(path)
+		if err != nil || info.Mode()&os.ModeSymlink == 0 {
+			break
+		}
+		target, err := os.Readlink(path)
+		if err != nil {
+			break
+		}
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(filepath.Dir(path), target)
+		}
+		path = target
 	}
-	return info.Mode().Perm(), nil
+
+	// Symlinked directories on the way are followed by the filesystem itself,
+	// but resolving them keeps the temporary file in the real directory
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	return path
 }
 
 // SnapshotPlanProvider builds a tracking plan from a snapshot file.
