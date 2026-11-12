@@ -6,7 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"path"
+	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -214,4 +219,119 @@ func extractEventIDs(t *testing.T, req *http.Request) []string {
 		ids[i] = e.ID
 	}
 	return ids
+}
+
+func TestGetTrackingPlanWithSchemasFetchesSchemasConcurrently(t *testing.T) {
+	const (
+		eventCount  = 6
+		concurrency = 3
+	)
+
+	var (
+		inFlight    atomic.Int32
+		maxInFlight atomic.Int32
+	)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch {
+		case req.URL.Query().Get("format") == "schema":
+			current := inFlight.Add(1)
+			defer inFlight.Add(-1)
+			for {
+				seen := maxInFlight.Load()
+				if current <= seen || maxInFlight.CompareAndSwap(seen, current) {
+					break
+				}
+			}
+			// Hold the request open so overlapping fetches are observable
+			time.Sleep(30 * time.Millisecond)
+			fmt.Fprintf(w, `{"id": %q}`, path.Base(req.URL.Path))
+		case strings.HasSuffix(req.URL.Path, "/events"):
+			ids := make([]string, eventCount)
+			for i := range eventCount {
+				ids[i] = fmt.Sprintf(`{"id": %q}`, eventID(i))
+			}
+			fmt.Fprintf(w, `{"data": [%s], "total": %d, "currentPage": 1, "pageSize": 50}`, strings.Join(ids, ","), eventCount)
+		default:
+			fmt.Fprint(w, `{"id": "tp-123", "name": "Test Plan", "version": 4}`)
+		}
+	}))
+	defer server.Close()
+
+	apiClient, err := client.New("test-token", client.WithBaseURL(server.URL))
+	require.NoError(t, err)
+
+	dataCatalog, err := catalog.NewRudderDataCatalog(apiClient, catalog.WithConcurrency(concurrency))
+	require.NoError(t, err)
+
+	tp, err := dataCatalog.GetTrackingPlanWithSchemas(context.Background(), "tp-123")
+	require.NoError(t, err)
+
+	gotIDs := make([]string, len(tp.Events))
+	for i, ev := range tp.Events {
+		gotIDs[i] = ev.ID
+	}
+	assert.Equal(t, []string{"event-0", "event-1", "event-2", "event-3", "event-4", "event-5"}, gotIDs)
+	assert.Greater(t, maxInFlight.Load(), int32(1), "schemas should be fetched concurrently")
+	assert.LessOrEqual(t, maxInFlight.Load(), int32(concurrency), "concurrency limit should hold")
+}
+
+func TestGetTrackingPlanVersionWithSchemas(t *testing.T) {
+	newCatalog := func(t *testing.T, handler http.HandlerFunc) catalog.DataCatalog {
+		t.Helper()
+
+		server := httptest.NewServer(handler)
+		t.Cleanup(server.Close)
+
+		apiClient, err := client.New("test-token", client.WithBaseURL(server.URL))
+		require.NoError(t, err)
+
+		dataCatalog, err := catalog.NewRudderDataCatalog(apiClient)
+		require.NoError(t, err)
+		return dataCatalog
+	}
+
+	t.Run("fetches the pinned version and its schemas in one request", func(t *testing.T) {
+		var requests []string
+		dataCatalog := newCatalog(t, func(w http.ResponseWriter, req *http.Request) {
+			requests = append(requests, req.URL.String())
+			fmt.Fprint(w, `{
+				"id": "tp-123", "name": "Test Plan", "version": 3,
+				"events": [{
+					"id": "ev_1", "name": "Signed Up", "description": "A user signed up",
+					"eventType": "track", "identitySection": "properties",
+					"rules": {"type": "object", "properties": {}}
+				}]
+			}`)
+		})
+
+		tp, err := dataCatalog.GetTrackingPlanVersionWithSchemas(context.Background(), "tp-123", 3)
+		require.NoError(t, err)
+
+		assert.Equal(t, []string{"/v2/catalog/tracking-plans/tp-123?version=3&fetchSchemas=true"}, requests)
+		assert.Equal(t, 3, tp.Version)
+		require.Len(t, tp.Events, 1)
+		assert.Equal(t, "Signed Up", tp.Events[0].Name)
+		assert.Equal(t, "A user signed up", tp.Events[0].Description)
+		assert.Equal(t, "properties", tp.Events[0].IdentitySection)
+	})
+
+	t.Run("accepts a version with no events", func(t *testing.T) {
+		dataCatalog := newCatalog(t, func(w http.ResponseWriter, _ *http.Request) {
+			fmt.Fprint(w, `{"id": "tp-123", "name": "Empty", "version": 1, "events": []}`)
+		})
+
+		tp, err := dataCatalog.GetTrackingPlanVersionWithSchemas(context.Background(), "tp-123", 1)
+		require.NoError(t, err)
+		assert.Empty(t, tp.Events)
+	})
+
+	t.Run("fails when the server ignores fetchSchemas", func(t *testing.T) {
+		dataCatalog := newCatalog(t, func(w http.ResponseWriter, _ *http.Request) {
+			fmt.Fprint(w, `{"id": "tp-123", "name": "Test Plan", "version": 3}`)
+		})
+
+		_, err := dataCatalog.GetTrackingPlanVersionWithSchemas(context.Background(), "tp-123", 3)
+		assert.ErrorIs(t, err, catalog.ErrVersionedSchemasUnsupported)
+	})
 }

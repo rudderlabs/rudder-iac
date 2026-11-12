@@ -18,9 +18,18 @@ type mockTrackingPlanStore struct {
 	*datacatalog.EmptyCatalog
 	trackingPlanWithSchemas *catalog.TrackingPlanWithSchemas
 	err                     error
+	requestedVersion        int
 }
 
 func (m *mockTrackingPlanStore) GetTrackingPlanWithSchemas(ctx context.Context, id string) (*catalog.TrackingPlanWithSchemas, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.trackingPlanWithSchemas, nil
+}
+
+func (m *mockTrackingPlanStore) GetTrackingPlanVersionWithSchemas(ctx context.Context, id string, version int) (*catalog.TrackingPlanWithSchemas, error) {
+	m.requestedVersion = version
 	if m.err != nil {
 		return nil, m.err
 	}

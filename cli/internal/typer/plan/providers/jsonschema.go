@@ -10,6 +10,7 @@ import (
 
 type JSONSchemaPlanProvider struct {
 	trackingPlanID string
+	version        int
 	client         catalog.TrackingPlanStore
 }
 
@@ -20,12 +21,33 @@ func NewJSONSchemaPlanProvider(trackingPlanID string, client catalog.TrackingPla
 	}
 }
 
+// WithVersion pins the provider to a historical tracking plan version.
+// Zero, the default, reads the latest version.
+func (p *JSONSchemaPlanProvider) WithVersion(version int) *JSONSchemaPlanProvider {
+	p.version = version
+	return p
+}
+
+// fetchTrackingPlan reads the latest plan, or the given version when it is not zero.
+func fetchTrackingPlan(ctx context.Context, store catalog.TrackingPlanStore, id string, version int) (*catalog.TrackingPlanWithSchemas, error) {
+	if version == 0 {
+		return store.GetTrackingPlanWithSchemas(ctx, id)
+	}
+	return store.GetTrackingPlanVersionWithSchemas(ctx, id, version)
+}
+
 func (p *JSONSchemaPlanProvider) GetTrackingPlan(ctx context.Context) (*plan.TrackingPlan, error) {
-	apitp, err := p.client.GetTrackingPlanWithSchemas(ctx, p.trackingPlanID)
+	apitp, err := fetchTrackingPlan(ctx, p.client, p.trackingPlanID, p.version)
 	if err != nil {
 		return nil, err
 	}
 
+	return planFromAPI(apitp)
+}
+
+// planFromAPI converts the API's tracking plan into the typer's plan contract.
+// The remote and snapshot providers share it so both read the same wire shape.
+func planFromAPI(apitp *catalog.TrackingPlanWithSchemas) (*plan.TrackingPlan, error) {
 	rules := make([]plan.EventRule, 0, len(apitp.Events))
 	for _, ev := range apitp.Events {
 		rule, err := parseTrackingPlanEventSchema(&ev)
@@ -35,7 +57,7 @@ func (p *JSONSchemaPlanProvider) GetTrackingPlan(ctx context.Context) (*plan.Tra
 		rules = append(rules, *rule)
 	}
 
-	tp := &plan.TrackingPlan{
+	return &plan.TrackingPlan{
 		Name:  apitp.Name,
 		Rules: rules,
 		Metadata: plan.PlanMetadata{
@@ -43,9 +65,7 @@ func (p *JSONSchemaPlanProvider) GetTrackingPlan(ctx context.Context) (*plan.Tra
 			TrackingPlanVersion: apitp.Version,
 			URL:                 fmt.Sprintf("https://app.rudderstack.com/trackingPlans/%s", apitp.ID),
 		},
-	}
-
-	return tp, nil
+	}, nil
 }
 
 func parseEventType(s string) (plan.EventType, error) {

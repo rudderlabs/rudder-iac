@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client/apitask"
@@ -161,6 +162,7 @@ type TrackingPlanStore interface {
 	DeleteTrackingPlan(ctx context.Context, id string) error
 	DeleteTrackingPlanEvent(ctx context.Context, trackingPlanId string, eventId string) error
 	GetTrackingPlanWithSchemas(ctx context.Context, id string) (*TrackingPlanWithSchemas, error)
+	GetTrackingPlanVersionWithSchemas(ctx context.Context, id string, version int) (*TrackingPlanWithSchemas, error)
 	GetTrackingPlan(ctx context.Context, id string) (*TrackingPlan, error)
 	GetTrackingPlans(ctx context.Context, options ListOptions) ([]*TrackingPlan, error)
 	GetTrackingPlanWithIdentifiers(ctx context.Context, id string, rebuildSchemas bool) (*TrackingPlanWithIdentifiers, error)
@@ -362,12 +364,68 @@ func (c *RudderDataCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id s
 	}
 
 	trackingPlan.Events = make([]TrackingPlanEventSchema, len(events))
+
+	// One request per event: fetched serially, a plan with hundreds of events
+	// takes minutes. Each goroutine writes only its own index, which keeps the
+	// event order stable without a lock.
+	// ponytail: no early cancel on the first failure, in-flight fetches finish first.
+	var (
+		wg        sync.WaitGroup
+		semaphore = make(chan struct{}, c.concurrency)
+		errs      = make([]error, len(events))
+	)
 	for i, event := range events {
-		schema, err := c.GetTrackingPlanEventSchema(ctx, id, event.ID)
-		if err != nil {
-			return nil, fmt.Errorf("fetching event schema: %s on tracking plan: %s: %w", event.ID, id, err)
-		}
-		trackingPlan.Events[i] = *schema
+		wg.Add(1)
+		semaphore <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-semaphore }()
+
+			schema, err := c.GetTrackingPlanEventSchema(ctx, id, event.ID)
+			if err != nil {
+				errs[i] = fmt.Errorf("fetching event schema: %s on tracking plan: %s: %w", event.ID, id, err)
+				return
+			}
+			trackingPlan.Events[i] = *schema
+		}()
+	}
+	wg.Wait()
+
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+
+	return &trackingPlan, nil
+}
+
+// ErrVersionedSchemasUnsupported is returned when the server answers a pinned
+// version request with plan metadata only, which is what servers released before
+// the fetchSchemas parameter do. Generating from that response would silently
+// produce code for an empty plan.
+var ErrVersionedSchemasUnsupported = errors.New("the server does not return events for a pinned tracking plan version")
+
+// GetTrackingPlanVersionWithSchemas fetches a historical version of a tracking
+// plan with all its event schemas in one request, unlike the latest plan which
+// needs one request per event.
+func (c *RudderDataCatalog) GetTrackingPlanVersionWithSchemas(ctx context.Context, id string, version int) (*TrackingPlanWithSchemas, error) {
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s?version=%d&fetchSchemas=true", id, version), nil)
+	if err != nil {
+		return nil, fmt.Errorf("executing http request to fetch tracking plan version %d: %w", version, err)
+	}
+
+	var raw struct {
+		Events *json.RawMessage `json:"events"`
+	}
+	if err := json.Unmarshal(resp, &raw); err != nil {
+		return nil, fmt.Errorf("decoding tracking plan response: %w", err)
+	}
+	if raw.Events == nil {
+		return nil, ErrVersionedSchemasUnsupported
+	}
+
+	trackingPlan := TrackingPlanWithSchemas{}
+	if err := json.Unmarshal(resp, &trackingPlan); err != nil {
+		return nil, fmt.Errorf("decoding tracking plan response: %w", err)
 	}
 
 	return &trackingPlan, nil
