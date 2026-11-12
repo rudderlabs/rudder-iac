@@ -3,9 +3,12 @@ package providers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/typer/plan"
@@ -17,7 +20,7 @@ import (
 const SnapshotFormatVersion = 1
 
 // Snapshot is a tracking plan saved so that code generation can run later
-// without credentials or network access. It holds the CLI's own copy of the API
+// without an access token or API calls. It holds the CLI's own copy of the API
 // response, so fields the CLI does not read are not kept. It contains the
 // workspace and user IDs the API returns, and no credentials.
 type Snapshot struct {
@@ -33,6 +36,8 @@ func WriteSnapshot(ctx context.Context, store catalog.TrackingPlanStore, trackin
 		return nil, fmt.Errorf("fetching tracking plan: %w", err)
 	}
 
+	sortEvents(apitp.Events)
+
 	data, err := json.MarshalIndent(Snapshot{FormatVersion: SnapshotFormatVersion, TrackingPlan: *apitp}, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("encoding snapshot: %w", err)
@@ -44,12 +49,50 @@ func WriteSnapshot(ctx context.Context, store catalog.TrackingPlanStore, trackin
 	return apitp, nil
 }
 
+// sortEvents puts the events in a fixed order. The API returns them in the
+// order its pages arrive, which varies between runs, and a build that treats
+// the snapshot as an input would otherwise rerun on a file that only reordered.
+// The ID can be empty for a pinned version, so type and name come first.
+func sortEvents(events []catalog.TrackingPlanEventSchema) {
+	key := func(e catalog.TrackingPlanEventSchema) string {
+		return strings.Join([]string{e.EventType, e.Name, e.ID}, "\x00")
+	}
+	slices.SortStableFunc(events, func(a, b catalog.TrackingPlanEventSchema) int {
+		return strings.Compare(key(a), key(b))
+	})
+}
+
 // writeFileAtomically writes through a temporary file in the same directory and
-// renames it over path. A write that fails halfway, such as on a full disk,
+// renames it over the target. A write that fails halfway, such as on a full disk,
 // then leaves the previous snapshot in place instead of a truncated file.
+//
+// It keeps what an in-place write would: a symlink at path stays a symlink and
+// the file it points to is replaced, an existing file keeps its mode, and a new
+// file gets the mode the umask allows.
 func writeFileAtomically(path string, data []byte) error {
+	resolved, err := filepath.EvalSymlinks(path)
+	switch {
+	case err == nil:
+		path = resolved
+	case !errors.Is(err, os.ErrNotExist):
+		return err
+	}
+
+	var (
+		mode    os.FileMode
+		existed bool
+	)
+	if info, err := os.Stat(path); err == nil {
+		mode, existed = info.Mode().Perm(), true
+	}
+
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".snapshot-*")
 	if err != nil {
+		// A writable file in a directory the user cannot write to cannot be
+		// replaced, but it can still be updated, as before
+		if existed {
+			return os.WriteFile(path, data, mode)
+		}
 		return err
 	}
 	defer os.Remove(tmp.Name())
@@ -61,10 +104,35 @@ func writeFileAtomically(path string, data []byte) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
+
+	if !existed {
+		if mode, err = newFileMode(path); err != nil {
+			return err
+		}
+	}
+	if err := os.Chmod(tmp.Name(), mode); err != nil {
 		return err
 	}
 	return os.Rename(tmp.Name(), path)
+}
+
+// newFileMode returns the mode a new file at path would get, which depends on
+// the process umask that the standard library does not expose. It creates the
+// file with the default permissions to find out, and the rename that follows
+// replaces it.
+func newFileMode(path string) (os.FileMode, error) {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o666)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		os.Remove(path)
+		return 0, err
+	}
+	return info.Mode().Perm(), nil
 }
 
 // SnapshotPlanProvider builds a tracking plan from a snapshot file.

@@ -164,8 +164,8 @@ func newCmdSnapshot() *cobra.Command {
 		Long: heredoc.Doc(`
 			Fetches a tracking plan from the remote workspace and writes it to a file.
 			Run this where credentials are available (for example in CI), then run
-			'typer generate --snapshot' wherever the code is built, with no credentials
-			or network access.
+			'typer generate --snapshot' wherever the code is built, with no access token
+			and no API calls.
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli typer snapshot --tracking-plan-id <id> -o tracking-plan.snapshot.json
