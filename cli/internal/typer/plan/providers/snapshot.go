@@ -2,10 +2,11 @@ package providers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"slices"
@@ -115,7 +116,12 @@ func writeFileAtomically(path string, data []byte) error {
 // never sees an empty file there.
 func createTemp(dir string) (*os.File, error) {
 	for range 100 {
-		name := filepath.Join(dir, fmt.Sprintf(".snapshot-%016x", rand.Uint64()))
+		suffix := make([]byte, 8)
+		if _, err := rand.Read(suffix); err != nil {
+			return nil, fmt.Errorf("generating a temporary file name: %w", err)
+		}
+
+		name := filepath.Join(dir, ".snapshot-"+hex.EncodeToString(suffix))
 		f, err := os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
 		if errors.Is(err, os.ErrExist) {
 			continue
