@@ -399,3 +399,100 @@ func TestGetTrackingPlanWithSchemasStopsAtFirstFailure(t *testing.T) {
 		})
 	}
 }
+
+// newPlanCatalog serves a tracking plan whose event list holds the given IDs,
+// and hands every schema request to schema.
+func newPlanCatalog(t *testing.T, eventIDs []string, concurrency int, schema http.HandlerFunc) catalog.DataCatalog {
+	t.Helper()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch {
+		case req.URL.Query().Get("format") == "schema":
+			schema(w, req)
+		case strings.HasSuffix(req.URL.Path, "/events"):
+			items := make([]string, len(eventIDs))
+			for i, id := range eventIDs {
+				items[i] = fmt.Sprintf(`{"id": %q}`, id)
+			}
+			fmt.Fprintf(w, `{"data": [%s], "total": %d, "currentPage": 1, "pageSize": 50}`, strings.Join(items, ","), len(eventIDs))
+		default:
+			fmt.Fprint(w, `{"id": "tp-123", "name": "Test Plan", "version": 4}`)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	apiClient, err := client.New("test-token", client.WithBaseURL(server.URL))
+	require.NoError(t, err)
+
+	dataCatalog, err := catalog.NewRudderDataCatalog(apiClient, catalog.WithConcurrency(concurrency))
+	require.NoError(t, err)
+	return dataCatalog
+}
+
+func TestGetTrackingPlanWithSchemasEdgeCases(t *testing.T) {
+	t.Run("a null schema body is an error, not a panic", func(t *testing.T) {
+		dataCatalog := newPlanCatalog(t, []string{"event-0"}, 2, func(w http.ResponseWriter, _ *http.Request) {
+			fmt.Fprint(w, `null`)
+		})
+
+		tp, err := dataCatalog.GetTrackingPlanWithSchemas(context.Background(), "tp-123")
+
+		require.Error(t, err)
+		assert.Nil(t, tp)
+		assert.Contains(t, err.Error(), "event-0")
+	})
+
+	t.Run("a failure does not wait for a request that never answers", func(t *testing.T) {
+		release := make(chan struct{})
+
+		dataCatalog := newPlanCatalog(t, []string{"event-0", "event-1"}, 10, func(w http.ResponseWriter, req *http.Request) {
+			if strings.Contains(req.URL.Path, "event-0") {
+				http.Error(w, `{"message": "boom"}`, http.StatusInternalServerError)
+				return
+			}
+			select {
+			case <-req.Context().Done():
+			case <-release:
+			}
+		})
+		// Runs before the server closes, so a handler that is still waiting cannot hang the test
+		t.Cleanup(func() { close(release) })
+
+		type result struct {
+			tp  *catalog.TrackingPlanWithSchemas
+			err error
+		}
+		done := make(chan result, 1)
+		go func() {
+			tp, err := dataCatalog.GetTrackingPlanWithSchemas(context.Background(), "tp-123")
+			done <- result{tp, err}
+		}()
+
+		select {
+		case got := <-done:
+			require.Error(t, got.err)
+			assert.Nil(t, got.tp)
+			assert.Contains(t, got.err.Error(), "500", "the error carries the real cause")
+			assert.NotContains(t, got.err.Error(), "context canceled", "aborting the other request must not add noise")
+		case <-time.After(5 * time.Second):
+			t.Fatal("the call kept waiting for a request that never answers after another one failed")
+		}
+	})
+
+	t.Run("an event listed twice is returned twice and fetched once", func(t *testing.T) {
+		var schemaRequests atomic.Int32
+
+		dataCatalog := newPlanCatalog(t, []string{"event-0", "event-0"}, 2, func(w http.ResponseWriter, _ *http.Request) {
+			schemaRequests.Add(1)
+			fmt.Fprint(w, `{"id": "event-0", "name": "Signed Up"}`)
+		})
+
+		tp, err := dataCatalog.GetTrackingPlanWithSchemas(context.Background(), "tp-123")
+
+		require.NoError(t, err)
+		require.Len(t, tp.Events, 2)
+		assert.Equal(t, "Signed Up", tp.Events[0].Name)
+		assert.Equal(t, "Signed Up", tp.Events[1].Name)
+		assert.Equal(t, int32(1), schemaRequests.Load())
+	})
+}

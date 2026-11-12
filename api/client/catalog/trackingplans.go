@@ -363,18 +363,37 @@ func (c *RudderDataCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id s
 	}
 
 	// One request per event: fetched serially, a plan with hundreds of events
-	// takes minutes. The tasker stops starting requests after the first failure.
+	// takes minutes. The tasker stops starting requests after the first failure,
+	// and cancelling the context also aborts the ones already in flight, so a
+	// request that never answers cannot hold back the error from the one that failed.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	var (
 		paths   = make([]string, len(events))
-		tasks   = make([]tasker.Task, len(events))
+		tasks   = make([]tasker.Task, 0, len(events))
+		seen    = make(map[string]bool, len(events))
 		results = tasker.NewResults[*TrackingPlanEventSchema]()
+		fetch   = apitask.RunAPIFetchTask(ctx, results)
 	)
 	for i, event := range events {
 		paths[i] = fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=schema", id, event.ID)
-		tasks[i] = apitask.NewAPIFetchTask[*TrackingPlanEventSchema](c.client, paths[i])
+
+		// An event listed twice has one schema, and the tasker rejects duplicate tasks
+		if seen[paths[i]] {
+			continue
+		}
+		seen[paths[i]] = true
+		tasks = append(tasks, apitask.NewAPIFetchTask[*TrackingPlanEventSchema](c.client, paths[i]))
 	}
 
-	errs := tasker.RunTasks(ctx, tasks, c.concurrency, false, apitask.RunAPIFetchTask(ctx, results))
+	errs := tasker.RunTasks(ctx, tasks, c.concurrency, false, func(task tasker.Task) error {
+		err := fetch(task)
+		if err != nil {
+			cancel()
+		}
+		return err
+	})
 	if err := joinFailures(errs); err != nil {
 		return nil, fmt.Errorf("fetching event schemas on tracking plan: %s: %w", id, err)
 	}
@@ -383,8 +402,8 @@ func (c *RudderDataCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id s
 	trackingPlan.Events = make([]TrackingPlanEventSchema, len(events))
 	for i, path := range paths {
 		schema, ok := results.Get(path)
-		if !ok {
-			return nil, fmt.Errorf("event schema %s not found in results", events[i].ID)
+		if !ok || schema == nil {
+			return nil, fmt.Errorf("event schema %s is missing or empty in the response", events[i].ID)
 		}
 		trackingPlan.Events[i] = *schema
 	}
@@ -392,22 +411,34 @@ func (c *RudderDataCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id s
 	return &trackingPlan, nil
 }
 
-// joinFailures drops the cancellations the tasker reports for every task it
-// skips after the first failure, so the error shows what failed and not one
-// line per skipped request. Cancellations alone, such as a cancelled context,
-// are kept because they are then the only cause.
+// joinFailures reports what failed. It drops the cancellations the tasker
+// records for every task it skips after the first failure, and the context
+// errors of requests aborted because of that failure, so the error shows the
+// cause and not one line per skipped or aborted request. When nothing else
+// remains, such as after the caller cancelled the context, those are kept
+// because they are then the cause.
 func joinFailures(errs []error) error {
-	var failed []error
+	var failed, causes []error
 	for _, err := range errs {
 		var cancelled *tasker.ErrTaskCancelled
-		if !errors.As(err, &cancelled) {
-			failed = append(failed, err)
+		if errors.As(err, &cancelled) {
+			continue
+		}
+		failed = append(failed, err)
+		if !errors.Is(err, context.Canceled) {
+			causes = append(causes, err)
 		}
 	}
-	if len(failed) == 0 && len(errs) > 0 {
+
+	switch {
+	case len(causes) > 0:
+		return errors.Join(causes...)
+	case len(failed) > 0:
+		return errors.Join(failed...)
+	case len(errs) > 0:
 		return errs[0]
 	}
-	return errors.Join(failed...)
+	return nil
 }
 
 // ErrVersionedSchemasUnsupported is returned when the server answers a pinned
