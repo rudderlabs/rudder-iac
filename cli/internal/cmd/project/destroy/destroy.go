@@ -43,7 +43,7 @@ func NewCmdDestroy() *cobra.Command {
 			$ rudder-cli destroy --confirm=false
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) (err error) {
-			deps, err = app.NewDepsContext(cmd.Context())
+			deps, err = app.NewDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}

@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
-	"time"
+	"sync"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -54,6 +54,8 @@ type Providers struct {
 type deps struct {
 	client            *client.Client
 	workspace         *client.Workspace
+	workspaceMu       sync.Mutex
+	offline           bool
 	providers         *Providers
 	compositeProvider provider.Provider
 }
@@ -65,9 +67,9 @@ type Deps interface {
 	// client fail authentication.
 	Client() *client.Client
 
-	// Workspace returns the workspace discovered with the default API URL.
-	// Offline dependencies and explicit URL overrides return nil.
-	Workspace() *client.Workspace
+	// Workspace fetches and caches the authenticated workspace. Offline deps
+	// cannot fetch it.
+	Workspace(context.Context) (*client.Workspace, error)
 
 	// Providers returns the initialized Providers struct containing all provider instances
 	// used in the application when individual provider access is needed.
@@ -103,16 +105,15 @@ func validateDependencies() error {
 }
 
 func NewDeps() (Deps, error) {
-	return NewDepsContext(context.Background())
+	return newOnlineDeps()
 }
 
-// NewDepsContext bounds workspace discovery by the caller's lifetime.
-func NewDepsContext(ctx context.Context) (Deps, error) {
+func newOnlineDeps(clientOptions ...client.Option) (Deps, error) {
 	if err := validateDependencies(); err != nil {
 		return nil, err
 	}
 
-	return newDeps(ctx, config.GetConfig().Auth.AccessToken, true)
+	return newDeps(config.GetConfig().Auth.AccessToken, true, clientOptions...)
 }
 
 // NewOfflineDeps builds the same providers as NewDeps (so it observes the same
@@ -122,36 +123,23 @@ func NewDepsContext(ctx context.Context) (Deps, error) {
 // rejects an empty one; any API call made through it fails auth, which surfaces
 // an accidental network dependency instead of hiding it.
 func NewOfflineDeps() (Deps, error) {
-	return newDeps(context.Background(), "offline", false)
+	return newOfflineDeps()
+}
+
+func newOfflineDeps(clientOptions ...client.Option) (Deps, error) {
+	return newDeps("offline", false, clientOptions...)
 }
 
 // newDeps is the single construction path for NewDeps and NewOfflineDeps, so a
 // client option or provider added here reaches both.
-func newDeps(ctx context.Context, token string, discoverRegion bool, clientOptions ...client.Option) (Deps, error) {
+func newDeps(token string, discoverRegion bool, clientOptions ...client.Option) (Deps, error) {
 	configuredURL := config.GetConfig().APIURL
+	if discoverRegion {
+		clientOptions = append([]client.Option{client.WithRegionDiscovery()}, clientOptions...)
+	}
 	c, err := setupClient(token, v, configuredURL, clientOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("setup client: %w", err)
-	}
-
-	var workspace *client.Workspace
-	if discoverRegion && configuredURL == client.BASE_URL {
-		lookupCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-		workspace, err = c.Workspaces.GetByAuthToken(lookupCtx)
-		if err != nil {
-			return nil, fmt.Errorf("fetching workspace information: %w", err)
-		}
-		if workspace == nil {
-			return nil, fmt.Errorf("fetching workspace information: workspace is missing")
-		}
-
-		if regionalURL, switchRegion := client.BaseURLForRegion(workspace.Region); switchRegion {
-			c, err = setupClient(token, v, regionalURL, clientOptions...)
-			if err != nil {
-				return nil, fmt.Errorf("setup regional client: %w", err)
-			}
-		}
 	}
 
 	cp, p, err := composeProviders(c)
@@ -161,7 +149,7 @@ func newDeps(ctx context.Context, token string, discoverRegion bool, clientOptio
 
 	return &deps{
 		client:            c,
-		workspace:         workspace,
+		offline:           !discoverRegion,
 		providers:         p,
 		compositeProvider: cp,
 	}, nil
@@ -320,8 +308,27 @@ func (d *deps) Client() *client.Client {
 	return d.client
 }
 
-func (d *deps) Workspace() *client.Workspace {
-	return d.workspace
+func (d *deps) Workspace(ctx context.Context) (*client.Workspace, error) {
+	if d.offline {
+		return nil, fmt.Errorf("workspace is unavailable for offline dependencies")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	d.workspaceMu.Lock()
+	defer d.workspaceMu.Unlock()
+	if d.workspace != nil {
+		return d.workspace, nil
+	}
+	workspace, err := d.client.Workspaces.GetByAuthToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("fetching workspace information: %w", err)
+	}
+	if workspace == nil {
+		return nil, fmt.Errorf("fetching workspace information: workspace is missing")
+	}
+	d.workspace = workspace
+	return workspace, nil
 }
 
 func (d *deps) Providers() *Providers {

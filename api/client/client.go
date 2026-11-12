@@ -8,7 +8,9 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,10 +21,14 @@ type HTTPClient interface {
 }
 
 type Client struct {
-	baseURL     string
-	accessToken string
-	userAgent   string
-	httpClient  HTTPClient
+	baseURL             string
+	urlMu               sync.RWMutex
+	regionMu            sync.Mutex
+	discoverRegion      bool
+	discoveredWorkspace *Workspace
+	accessToken         string
+	userAgent           string
+	httpClient          HTTPClient
 
 	Sources      *sources
 	Destinations *destinations
@@ -69,6 +75,12 @@ func New(accessToken string, options ...Option) (*Client, error) {
 			return nil, err
 		}
 	}
+	if client.discoverRegion {
+		client.discoverRegion = isDefaultBaseURL(client.baseURL)
+		if client.discoverRegion {
+			client.baseURL = BASE_URL
+		}
+	}
 
 	if client.accessToken == "" {
 		return nil, ErrEmptyAccessToken
@@ -78,6 +90,8 @@ func New(accessToken string, options ...Option) (*Client, error) {
 }
 
 func (c *Client) URL(path string) string {
+	c.urlMu.RLock()
+	defer c.urlMu.RUnlock()
 	if len(path) == 0 {
 		return c.baseURL
 	}
@@ -86,6 +100,15 @@ func (c *Client) URL(path string) string {
 }
 
 func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
+	if c.discoverRegion {
+		if err := c.ensureRegion(ctx); err != nil {
+			return nil, fmt.Errorf("fetching workspace information: %w", err)
+		}
+	}
+	return c.do(ctx, method, path, body)
+}
+
+func (c *Client) do(ctx context.Context, method, path string, body io.Reader) ([]byte, error) {
 	res, err := c.doRequest(ctx, method, path, body)
 	if err != nil {
 		return nil, err
@@ -111,6 +134,41 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([
 	}
 
 	return data, nil
+}
+
+// Discovery runs on demand so local-only commands can construct providers
+// without requiring the workspace endpoint.
+func (c *Client) ensureRegion(ctx context.Context) error {
+	c.regionMu.Lock()
+	defer c.regionMu.Unlock()
+	if c.discoveredWorkspace != nil {
+		return nil
+	}
+
+	workspace, err := c.Workspaces.getByAuthToken(ctx)
+	if err != nil {
+		return err
+	}
+	if workspace == nil {
+		return fmt.Errorf("workspace is missing")
+	}
+	if regionalURL, switchRegion := BaseURLForRegion(workspace.Region); switchRegion {
+		c.urlMu.Lock()
+		c.baseURL = regionalURL
+		c.urlMu.Unlock()
+	}
+	c.discoveredWorkspace = workspace
+	return nil
+}
+
+// isDefaultBaseURL accepts harmless spellings of the US endpoint while leaving
+// custom gateways and URL paths under explicit caller control.
+func isDefaultBaseURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || !strings.EqualFold(u.Scheme, "https") || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
+		return false
+	}
+	return strings.EqualFold(u.Hostname(), "api.rudderstack.com") && (u.Port() == "" || u.Port() == "443")
 }
 
 func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {

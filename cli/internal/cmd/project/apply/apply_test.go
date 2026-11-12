@@ -2,20 +2,22 @@ package apply
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/config"
-
 	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry/telemetrytest"
+	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry/telemetrytest"
-	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 )
 
 func TestPrintWorkspaceBannerEU(t *testing.T) {
@@ -58,12 +60,22 @@ func TestPrintWorkspaceBannerRedactsURLSecrets(t *testing.T) {
 
 	printWorkspaceBanner(&client.Workspace{ID: "ws-123", Name: "Acme", Region: "EU"}, "https://user:password@api.custom.test/secret?token=abc#fragment")
 	assert.Contains(t, output.String(), "API: https://api.custom.test")
-	for _, secret := range []string{"user", "password", "secret", "token=abc", "fragment"} {
+	assert.Contains(t, output.String(), "API: https://api.custom.test/secret")
+	for _, secret := range []string{"user", "password", "token=abc", "fragment"} {
 		assert.NotContains(t, output.String(), secret)
 	}
 }
 
+func TestPrintWorkspaceBannerOmitsEmptyRegion(t *testing.T) {
+	var output bytes.Buffer
+	ui.SetWriter(&output)
+	t.Cleanup(ui.RestoreWriter)
+	printWorkspaceBanner(&client.Workspace{ID: "ws-123", Name: "Acme"}, client.BASE_URL)
+	assert.Equal(t, "Workspace: Acme (ws-123)\n", output.String())
+}
+
 func TestApplyPrintsDiscoveredRegion(t *testing.T) {
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
 	testutils.UseFakeAPIWithRegion(t, "EU")
 	var output bytes.Buffer
 	ui.SetWriter(&output)
@@ -87,7 +99,7 @@ func TestApplyWithOverrideFetchesWorkspaceOnce(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":"fake API failure"}`))
 	}))
 	t.Cleanup(server.Close)
-	config.InitConfig("")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
 	testutils.SetConfig(t, "apiURL", server.URL)
 	testutils.SetConfig(t, "auth.accessToken", "fake-token")
 	var output bytes.Buffer
@@ -100,7 +112,46 @@ func TestApplyWithOverrideFetchesWorkspaceOnce(t *testing.T) {
 	assert.Contains(t, output.String(), "Region: EU")
 }
 
+type failingHTTPClient struct{}
+
+func (failingHTTPClient) Do(*http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("unexpected API request")
+}
+
+type cachedWorkspaceDeps struct {
+	app.Deps
+	client         *client.Client
+	workspaceCalls int
+}
+
+func (d *cachedWorkspaceDeps) Workspace(context.Context) (*client.Workspace, error) {
+	d.workspaceCalls++
+	return &client.Workspace{ID: "ws-123", Name: "Acme", Region: "US"}, nil
+}
+
+func (d *cachedWorkspaceDeps) Client() *client.Client { return d.client }
+
+func TestApplyUsesCachedWorkspaceWithoutAnotherRequest(t *testing.T) {
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+	c, err := client.New("test-token", client.WithHTTPClient(failingHTTPClient{}))
+	require.NoError(t, err)
+	d := &cachedWorkspaceDeps{client: c}
+	var output bytes.Buffer
+	ui.SetWriter(&output)
+	t.Cleanup(ui.RestoreWriter)
+	cmd := newCmdApply(func() (app.Deps, error) { return d, nil })
+	cmd.SetArgs([]string{"--var-file", filepath.Join(t.TempDir(), "missing.vars.yaml")})
+
+	err = cmd.Execute()
+	require.Error(t, err) // Stops after the banner while reading the missing variable file.
+	assert.NotContains(t, err.Error(), "unexpected API request")
+	assert.Equal(t, 1, d.workspaceCalls)
+	assert.Contains(t, output.String(), "Region: US")
+	assert.NotContains(t, output.String(), "API:")
+}
+
 func TestApplyTracksRunFailureAsErrored(t *testing.T) {
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
 	testutils.UseFakeAPI(t)
 	calls := telemetrytest.Record(t)
 	location := t.TempDir()

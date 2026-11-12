@@ -39,7 +39,7 @@ func NewCmdWorkspaceImport() *cobra.Command {
 				return fmt.Errorf("--merge requires the %q experimental flag to be enabled", "importMerge")
 			}
 
-			deps, err = app.NewDepsContext(cmd.Context())
+			deps, err = app.NewDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
@@ -54,9 +54,9 @@ func NewCmdWorkspaceImport() *cobra.Command {
 
 			// Scoping to the workspace attaches its import-manifest metadata to
 			// local resources, which merge relies on to skip already-linked ones.
-			workspace, err := deps.Client().Workspaces.GetByAuthToken(cmd.Context())
+			workspace, err := deps.Workspace(cmd.Context())
 			if err != nil {
-				return fmt.Errorf("fetching workspace information: %w", err)
+				return err
 			}
 			projectOpts = append(projectOpts, project.WithWorkspaceID(workspace.ID))
 

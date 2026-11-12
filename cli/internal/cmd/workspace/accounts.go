@@ -38,7 +38,7 @@ func newCmdListAccounts() *cobra.Command {
 				}...)
 			}()
 
-			d, err := app.NewDepsContext(cmd.Context())
+			d, err := app.NewDeps()
 			if err != nil {
 				return err
 			}

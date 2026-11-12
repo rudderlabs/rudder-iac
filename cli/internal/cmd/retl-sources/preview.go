@@ -52,7 +52,7 @@ func newCmdPreview() *cobra.Command {
 				return fmt.Errorf("--limit cannot be negative, got %d", limit)
 			}
 
-			d, err := app.NewDepsContext(cmd.Context())
+			d, err := app.NewDeps()
 			if err != nil {
 				return err
 			}

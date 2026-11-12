@@ -85,7 +85,7 @@ func NewCmdTest() *cobra.Command {
 
 			// Initialize dependencies
 			var err error
-			deps, err = app.NewDepsContext(cmd.Context())
+			deps, err = app.NewDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
@@ -118,9 +118,9 @@ func NewCmdTest() *cobra.Command {
 
 			ctx := context.Background()
 			// Get workspace information
-			workspace, err := deps.Client().Workspaces.GetByAuthToken(ctx)
+			workspace, err := deps.Workspace(ctx)
 			if err != nil {
-				return fmt.Errorf("fetching workspace information: %w", err)
+				return err
 			}
 
 			// Get resource graph

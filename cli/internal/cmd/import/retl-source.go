@@ -65,7 +65,7 @@ func NewCmdRetlSource() *cobra.Command {
 			}()
 
 			// Get dependencies
-			deps, err := app.NewDepsContext(cmd.Context())
+			deps, err := app.NewDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}

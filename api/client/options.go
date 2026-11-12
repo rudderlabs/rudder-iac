@@ -12,6 +12,15 @@ func WithBaseURL(baseURL string) Option {
 	}
 }
 
+// WithRegionDiscovery resolves the workspace before the first API request when
+// the configured URL is the default US control plane.
+func WithRegionDiscovery() Option {
+	return func(c *Client) error {
+		c.discoverRegion = true
+		return nil
+	}
+}
+
 func WithHTTPClient(httpClient HTTPClient) Option {
 	return func(c *Client) error {
 		if httpClient == nil {

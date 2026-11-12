@@ -144,6 +144,7 @@ func newAccountsAPIClient(t testing.TB) *client.Client {
 	apiClient, err := client.New(
 		config.GetConfig().Auth.AccessToken,
 		client.WithBaseURL(config.GetConfig().APIURL),
+		client.WithRegionDiscovery(),
 		client.WithUserAgent("rudder-cli-test"),
 	)
 	require.NoError(t, err)

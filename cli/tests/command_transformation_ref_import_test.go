@@ -135,6 +135,7 @@ func deleteLeftoverUnmanagedWebhooks(ctx context.Context) error {
 	apiClient, err := client.New(
 		config.GetConfig().Auth.AccessToken,
 		client.WithBaseURL(config.GetConfig().APIURL),
+		client.WithRegionDiscovery(),
 		client.WithUserAgent("rudder-cli-test"),
 	)
 	if err != nil {

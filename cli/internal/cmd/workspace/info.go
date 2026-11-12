@@ -34,14 +34,14 @@ func NewCmdInfo() *cobra.Command {
 				telemetry.TrackCommand(telemetry.CommandName(cmd), err)
 			}()
 
-			d, err := app.NewDepsContext(cmd.Context())
+			d, err := app.NewDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			workspace, err := d.Client().Workspaces.GetByAuthToken(cmd.Context())
+			workspace, err := d.Workspace(cmd.Context())
 			if err != nil {
-				return fmt.Errorf("fetching workspace information: %w", err)
+				return err
 			}
 
 			if jsonOutput {

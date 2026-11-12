@@ -22,8 +22,10 @@ import (
 
 // A pre-run failure is reported under the command's path with stage "pre_run".
 func TestPreRunFailuresAreTrackedUnderCommandPath(t *testing.T) {
-	// Every PreRunE below fails: either on flag validation or on the missing token.
+	// Token-required commands fail authentication; offline validate and migrate
+	// fail client setup on the intentionally empty base URL.
 	testutils.SetConfig(t, "auth.accessToken", "")
+	testutils.SetConfig(t, "apiURL", "")
 
 	for _, path := range [][]string{
 		{"apply"},
