@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/rudderlabs/rudder-iac/api/client/apitask"
@@ -363,39 +362,52 @@ func (c *RudderDataCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id s
 		return nil, fmt.Errorf("fetching all events on tracking plan: %s: %w", id, err)
 	}
 
-	trackingPlan.Events = make([]TrackingPlanEventSchema, len(events))
-
 	// One request per event: fetched serially, a plan with hundreds of events
-	// takes minutes. Each goroutine writes only its own index, which keeps the
-	// event order stable without a lock.
-	// ponytail: no early cancel on the first failure, in-flight fetches finish first.
+	// takes minutes. The tasker stops starting requests after the first failure.
 	var (
-		wg        sync.WaitGroup
-		semaphore = make(chan struct{}, c.concurrency)
-		errs      = make([]error, len(events))
+		paths   = make([]string, len(events))
+		tasks   = make([]tasker.Task, len(events))
+		results = tasker.NewResults[*TrackingPlanEventSchema]()
 	)
 	for i, event := range events {
-		wg.Add(1)
-		semaphore <- struct{}{}
-		go func() {
-			defer wg.Done()
-			defer func() { <-semaphore }()
-
-			schema, err := c.GetTrackingPlanEventSchema(ctx, id, event.ID)
-			if err != nil {
-				errs[i] = fmt.Errorf("fetching event schema: %s on tracking plan: %s: %w", event.ID, id, err)
-				return
-			}
-			trackingPlan.Events[i] = *schema
-		}()
+		paths[i] = fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=schema", id, event.ID)
+		tasks[i] = apitask.NewAPIFetchTask[*TrackingPlanEventSchema](c.client, paths[i])
 	}
-	wg.Wait()
 
-	if err := errors.Join(errs...); err != nil {
-		return nil, err
+	errs := tasker.RunTasks(ctx, tasks, c.concurrency, false, apitask.RunAPIFetchTask(ctx, results))
+	if err := joinFailures(errs); err != nil {
+		return nil, fmt.Errorf("fetching event schemas on tracking plan: %s: %w", id, err)
+	}
+
+	// Looked up by path so the event order does not depend on completion order
+	trackingPlan.Events = make([]TrackingPlanEventSchema, len(events))
+	for i, path := range paths {
+		schema, ok := results.Get(path)
+		if !ok {
+			return nil, fmt.Errorf("event schema %s not found in results", events[i].ID)
+		}
+		trackingPlan.Events[i] = *schema
 	}
 
 	return &trackingPlan, nil
+}
+
+// joinFailures drops the cancellations the tasker reports for every task it
+// skips after the first failure, so the error shows what failed and not one
+// line per skipped request. Cancellations alone, such as a cancelled context,
+// are kept because they are then the only cause.
+func joinFailures(errs []error) error {
+	var failed []error
+	for _, err := range errs {
+		var cancelled *tasker.ErrTaskCancelled
+		if !errors.As(err, &cancelled) {
+			failed = append(failed, err)
+		}
+	}
+	if len(failed) == 0 && len(errs) > 0 {
+		return errs[0]
+	}
+	return errors.Join(failed...)
 }
 
 // ErrVersionedSchemasUnsupported is returned when the server answers a pinned
@@ -426,6 +438,9 @@ func (c *RudderDataCatalog) GetTrackingPlanVersionWithSchemas(ctx context.Contex
 	trackingPlan := TrackingPlanWithSchemas{}
 	if err := json.Unmarshal(resp, &trackingPlan); err != nil {
 		return nil, fmt.Errorf("decoding tracking plan response: %w", err)
+	}
+	if trackingPlan.Version != version {
+		return nil, fmt.Errorf("requested tracking plan version %d but the server returned version %d", version, trackingPlan.Version)
 	}
 
 	return &trackingPlan, nil

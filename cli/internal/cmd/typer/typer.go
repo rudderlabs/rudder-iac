@@ -69,6 +69,11 @@ func newCmdGenerate() *cobra.Command {
 			if local && snapshot != "" {
 				return fmt.Errorf("--local and --snapshot cannot be used together")
 			}
+			// A snapshot is one plan, so an ID that names another plan would be
+			// ignored and the wrong bindings generated without any warning
+			if snapshot != "" && trackingPlanID != "" {
+				return fmt.Errorf("--tracking-plan-id does not apply with --snapshot")
+			}
 			if err := validateTrackingPlanVersion(trackingPlanVersion, local || snapshot != ""); err != nil {
 				return err
 			}
@@ -125,7 +130,7 @@ func newCmdGenerate() *cobra.Command {
 	cmd.Flags().BoolVar(&local, "local", false, "Generate from local specs instead of the remote workspace (no workspace, apply, auth or network needed)")
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the project directory or spec file (used with --local)")
 
-	cmd.Flags().StringVar(&snapshot, "snapshot", "", "Generate from a snapshot file written by 'typer snapshot' (no workspace, auth or network needed)")
+	cmd.Flags().StringVar(&snapshot, "snapshot", "", "Generate from a snapshot file written by 'typer snapshot'. Needs no access token and makes no API calls")
 
 	cmd.Flags().StringArrayVar(&options, "option", []string{},
 		"Platform-specific options in key=value format (use 'rudder-cli typer options <platform>' to see available options)")
@@ -138,7 +143,7 @@ func newCmdGenerate() *cobra.Command {
 // worth surfacing instead of ignoring.
 func validateTrackingPlanVersion(version int, fixedInput bool) error {
 	if version < 0 {
-		return fmt.Errorf("--tracking-plan-version must be a positive number")
+		return fmt.Errorf("--tracking-plan-version must not be negative")
 	}
 	if version > 0 && fixedInput {
 		return fmt.Errorf("--tracking-plan-version only applies when generating from the remote workspace")
@@ -189,7 +194,7 @@ func newCmdSnapshot() *cobra.Command {
 				return err
 			}
 
-			ui.Println(fmt.Sprintf("Saved %q (version %d, %d events) to %s", tp.Name, tp.Version, len(tp.Events), outputFile))
+			ui.Printf("Saved %q (version %d, %d events) to %s\n", tp.Name, tp.Version, len(tp.Events), outputFile)
 			return nil
 		},
 	}

@@ -19,9 +19,12 @@ type mockTrackingPlanStore struct {
 	trackingPlanWithSchemas *catalog.TrackingPlanWithSchemas
 	err                     error
 	requestedVersion        int
+	latestCalls             int
+	versionedCalls          int
 }
 
 func (m *mockTrackingPlanStore) GetTrackingPlanWithSchemas(ctx context.Context, id string) (*catalog.TrackingPlanWithSchemas, error) {
+	m.latestCalls++
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -30,6 +33,7 @@ func (m *mockTrackingPlanStore) GetTrackingPlanWithSchemas(ctx context.Context, 
 
 func (m *mockTrackingPlanStore) GetTrackingPlanVersionWithSchemas(ctx context.Context, id string, version int) (*catalog.TrackingPlanWithSchemas, error) {
 	m.requestedVersion = version
+	m.versionedCalls++
 	if m.err != nil {
 		return nil, m.err
 	}

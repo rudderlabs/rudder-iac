@@ -309,11 +309,33 @@ func TestGetTrackingPlanVersionWithSchemas(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, []string{"/v2/catalog/tracking-plans/tp-123?version=3&fetchSchemas=true"}, requests)
-		assert.Equal(t, 3, tp.Version)
-		require.Len(t, tp.Events, 1)
-		assert.Equal(t, "Signed Up", tp.Events[0].Name)
-		assert.Equal(t, "A user signed up", tp.Events[0].Description)
-		assert.Equal(t, "properties", tp.Events[0].IdentitySection)
+
+		event := catalog.TrackingPlanEventSchema{
+			ID:              "ev_1",
+			Name:            "Signed Up",
+			Description:     "A user signed up",
+			EventType:       "track",
+			IdentitySection: "properties",
+		}
+		event.Rules.Type = "object"
+		event.Rules.Properties = map[string]any{}
+
+		assert.Equal(t, &catalog.TrackingPlanWithSchemas{
+			ID:      "tp-123",
+			Name:    "Test Plan",
+			Version: 3,
+			Events:  []catalog.TrackingPlanEventSchema{event},
+		}, tp)
+	})
+
+	t.Run("fails when the server returns another version", func(t *testing.T) {
+		dataCatalog := newCatalog(t, func(w http.ResponseWriter, _ *http.Request) {
+			fmt.Fprint(w, `{"id": "tp-123", "name": "Test Plan", "version": 5, "events": []}`)
+		})
+
+		_, err := dataCatalog.GetTrackingPlanVersionWithSchemas(context.Background(), "tp-123", 3)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "version 5")
 	})
 
 	t.Run("accepts a version with no events", func(t *testing.T) {
@@ -334,4 +356,46 @@ func TestGetTrackingPlanVersionWithSchemas(t *testing.T) {
 		_, err := dataCatalog.GetTrackingPlanVersionWithSchemas(context.Background(), "tp-123", 3)
 		assert.ErrorIs(t, err, catalog.ErrVersionedSchemasUnsupported)
 	})
+}
+
+func TestGetTrackingPlanWithSchemasStopsAtFirstFailure(t *testing.T) {
+	const eventCount = 40
+
+	for _, concurrency := range []int{1, 4} {
+		t.Run(fmt.Sprintf("concurrency %d", concurrency), func(t *testing.T) {
+			var schemaRequests atomic.Int32
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				switch {
+				case req.URL.Query().Get("format") == "schema":
+					schemaRequests.Add(1)
+					http.Error(w, `{"message": "boom"}`, http.StatusInternalServerError)
+				case strings.HasSuffix(req.URL.Path, "/events"):
+					ids := make([]string, eventCount)
+					for i := range eventCount {
+						ids[i] = fmt.Sprintf(`{"id": %q}`, eventID(i))
+					}
+					fmt.Fprintf(w, `{"data": [%s], "total": %d, "currentPage": 1, "pageSize": 50}`, strings.Join(ids, ","), eventCount)
+				default:
+					fmt.Fprint(w, `{"id": "tp-123", "name": "Test Plan", "version": 4}`)
+				}
+			}))
+			defer server.Close()
+
+			apiClient, err := client.New("test-token", client.WithBaseURL(server.URL))
+			require.NoError(t, err)
+
+			dataCatalog, err := catalog.NewRudderDataCatalog(apiClient, catalog.WithConcurrency(concurrency))
+			require.NoError(t, err)
+
+			tp, err := dataCatalog.GetTrackingPlanWithSchemas(context.Background(), "tp-123")
+
+			require.Error(t, err)
+			assert.Nil(t, tp)
+			// Requests already in flight finish, but no new ones start after the failure
+			assert.LessOrEqual(t, int(schemaRequests.Load()), concurrency)
+			assert.Equal(t, 1, strings.Count(err.Error(), "fetching event schemas on tracking plan"), "one failure line, not one per skipped event")
+			assert.NotContains(t, err.Error(), "overall job failed")
+		})
+	}
 }
