@@ -125,6 +125,67 @@ match_behavior:
                     mappings:
                       - from: email
                         to: email
+      - example_id: "retl-connection-semantic-valid-visual-mapper-v2"
+        title: "Mirror sync to a Facebook Custom Audience"
+        description: "Facebook Custom Audience declares supportsVisualMapperV2, so the connection runs the visual mapper v2 flow: the destination names its own field set through user_schema, an object is not allowed because the destination config carries that field set instead, and mirror is the only sync behaviour either side accepts. Mappings are optional on this flow, and this example omits them to show the smallest valid connection."
+        files:
+          model.yaml: &audience-model |
+            version: rudder/v1
+            kind: retl-source-sql-model
+            metadata:
+              name: audience-members
+            spec:
+              id: audience-members
+              display_name: Audience Members
+              account_id: warehouse-account
+              primary_key: user_id
+              source_definition: postgres
+              sql: SELECT user_id, email, phone FROM audience_members
+          destination.yaml: &fb-custom-audience-destination |
+            # fb_custom_audience is unverified: validate this project with
+            # RUDDERSTACK_CLI_EXPERIMENTAL=true and
+            # RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true, or its type is
+            # unknown. The umbrella switch is required too: without it
+            # config.GetConfig clears every experimental flag.
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-fb-custom-audience
+            spec:
+              id: my-fb-custom-audience
+              display_name: Facebook Custom Audience
+              type: fb_custom_audience
+              enabled: true
+              definition_version: 1
+              config:
+                rudder_account_id: fb-audience-account
+                ad_account_id: act_1234567890
+                user_schema:
+                  - EMAIL
+                  - PHONE
+                is_hash_required: true
+                type: FILE_IMPORTED
+                sub_type: MULTI_HASHES
+                connection_mode:
+                  warehouse: cloud
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: audience-to-fb
+                  source: "#retl-source-sql-model:audience-members"
+                  destination: "#destination:my-fb-custom-audience"
+                  config:
+                    sync_behaviour: mirror
+                    schedule:
+                      type: basic
+                      every_minutes: 60
+                    identifiers:
+                      - from: email
+                        to: user_id
     invalid:
       - example_id: "retl-connection-semantic-source-not-found"
         title: "Connection whose rETL source does not exist in the project"
