@@ -1,13 +1,16 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -102,7 +105,46 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([
 	return data, nil
 }
 
+const (
+	maxRateLimitRetries = 5
+	maxRateLimitWait    = 2 * time.Minute
+	// header-less retries then wait about 62s in total, outlasting a minute-long limit window
+	baseRateLimitWait = 2 * time.Second
+)
+
+// doRequest retries rate-limited responses for every method, as the server rejected them before acting on them.
 func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
+	var payload []byte
+	if body != nil {
+		var err error
+		payload, err = io.ReadAll(body)
+		// buffering detaches the body from the request, so the transport no longer closes it
+		if c, ok := body.(io.Closer); ok {
+			_ = c.Close()
+		}
+		if err != nil {
+			return nil, fmt.Errorf("reading request body: %w", err)
+		}
+	}
+
+	for retry := 0; ; retry++ {
+		res, err := c.send(ctx, method, path, payload)
+		if err != nil || res.StatusCode != http.StatusTooManyRequests || retry == maxRateLimitRetries {
+			return res, err
+		}
+
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
+		wait := retryAfterDelay(res.Header.Get("Retry-After"), retry)
+		// up to 10% jitter so concurrent callers told the same wait do not all retry at once; zero stays zero
+		wait += rand.N(wait/10 + 1) //nolint:gosec // timing jitter, not a secret
+		if err := sleep(ctx, wait); err != nil {
+			return nil, err
+		}
+	}
+}
+
+func (c *Client) send(ctx context.Context, method, path string, payload []byte) (*http.Response, error) {
 	attempts := 1
 	if isRetryableMethod(method) {
 		attempts = 3
@@ -110,7 +152,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 
 	var err error
 	for attempt := range attempts {
-		req, reqErr := http.NewRequestWithContext(ctx, method, c.URL(path), body)
+		req, reqErr := http.NewRequestWithContext(ctx, method, c.URL(path), bytes.NewReader(payload))
 		if reqErr != nil {
 			return nil, reqErr
 		}
@@ -128,16 +170,36 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 			return nil, err
 		}
 
-		timer := time.NewTimer(time.Duration(attempt+1) * 100 * time.Millisecond)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return nil, ctx.Err()
-		case <-timer.C:
+		if err := sleep(ctx, time.Duration(attempt+1)*100*time.Millisecond); err != nil {
+			return nil, err
 		}
 	}
 
 	return nil, err
+}
+
+func sleep(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
+// retryAfterDelay reads a Retry-After value (delta-seconds or HTTP-date), capped so a bad value cannot stall a run.
+// Without a usable value it backs off exponentially by retry, so the retries still span a longer limit window.
+func retryAfterDelay(value string, retry int) time.Duration {
+	// an out-of-range value saturates, so a huge positive one still lands on the cap
+	if secs, err := strconv.Atoi(value); (err == nil || errors.Is(err, strconv.ErrRange)) && secs >= 0 {
+		return time.Duration(min(secs, int(maxRateLimitWait/time.Second))) * time.Second
+	}
+	if date, err := http.ParseTime(value); err == nil {
+		return min(max(time.Until(date), 0), maxRateLimitWait)
+	}
+	return min(baseRateLimitWait<<retry, maxRateLimitWait)
 }
 
 func isRetryableMethod(method string) bool {
