@@ -1,0 +1,8 @@
+{"Time":"2026-09-20T12:32:06.375645-04:00","Action":"start","Package":"github.com/rudderlabs/rudder-iac/cli/tests"}
+{"Time":"2026-09-20T12:32:09.823905-04:00","Action":"run","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsImportWorkspace"}
+{"Time":"2026-09-20T12:32:09.82643-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsImportWorkspace","Output":"=== RUN   TestAccountsImportWorkspace\n"}
+{"Time":"2026-09-20T12:32:19.46219-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsImportWorkspace","Output":"--- PASS: TestAccountsImportWorkspace (9.64s)\n"}
+{"Time":"2026-09-20T12:32:19.462931-04:00","Action":"pass","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Test":"TestAccountsImportWorkspace","Elapsed":9.64}
+{"Time":"2026-09-20T12:32:19.463435-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Output":"PASS\n"}
+{"Time":"2026-09-20T12:32:19.468781-04:00","Action":"output","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Output":"ok  \tgithub.com/rudderlabs/rudder-iac/cli/tests\t13.088s\n"}
+{"Time":"2026-09-20T12:32:19.477802-04:00","Action":"pass","Package":"github.com/rudderlabs/rudder-iac/cli/tests","Elapsed":13.102}
