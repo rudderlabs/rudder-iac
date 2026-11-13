@@ -38,8 +38,8 @@ func NewCmdMigrate() *cobra.Command {
 			$ rudder-cli migrate --location </path/to/dir or file> --confirm=false
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			// Initialize dependencies
-			deps, err = app.NewDeps()
+			// Migration validates and rewrites only local files.
+			deps, err = app.NewOfflineDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}

@@ -59,3 +59,9 @@
 - Keep Attentive Tag verified-destination promotion branches scoped to the registry-gating change only; do not bundle unrelated shared live-backend/catalog E2E tolerance work into the same PR.
 - Treat transient live-backend or shared-catalog E2E failures as retry/manual-CI issues for this promotion; durable fixes for stale shared E2E workspace resources belong in their own PR.
 - Before continuing work on a force-pushed Attentive Tag promotion PR, align with the exact remote PR head rather than merging from an old local checkout so reset workaround commits are not resurrected.
+
+## RUD-3474 — Regional Routing Review Boundaries
+
+- Keep `cli/internal/app/dependencies.go` dependency construction free of network requests: discover and cache the authenticated workspace on the shared client's first API request, so commands can complete local validation before API I/O and reuse the workspace result.
+- Do not pass production `RUDDERSTACK_ACCESS_TOKEN` or `RUDDERSTACK_API_URL` to `make test` in `.github/workflows/test-with-coverage.yml`.
+- In the apply workspace banner, retain the path of a custom API base URL to distinguish gateways, but omit URL userinfo, query, and fragment to avoid exposing credentials or other sensitive data.

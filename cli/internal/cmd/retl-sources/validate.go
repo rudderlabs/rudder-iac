@@ -47,7 +47,7 @@ func newCmdValidate() *cobra.Command {
 			}
 			externalID := args[0]
 
-			d, err := app.NewDeps()
+			d, err := app.NewOfflineDeps()
 			if err != nil {
 				return err
 			}

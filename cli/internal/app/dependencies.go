@@ -1,7 +1,9 @@
 package app
 
 import (
+	"context"
 	"fmt"
+	"sync"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
@@ -51,6 +53,9 @@ type Providers struct {
 
 type deps struct {
 	client            *client.Client
+	workspace         *client.Workspace
+	workspaceMu       sync.Mutex
+	offline           bool
 	providers         *Providers
 	compositeProvider provider.Provider
 }
@@ -61,6 +66,10 @@ type Deps interface {
 	// Deps from NewOfflineDeps carry a placeholder token, so calls through their
 	// client fail authentication.
 	Client() *client.Client
+
+	// Workspace fetches and caches the authenticated workspace. Offline deps
+	// cannot fetch it.
+	Workspace(context.Context) (*client.Workspace, error)
 
 	// Providers returns the initialized Providers struct containing all provider instances
 	// used in the application when individual provider access is needed.
@@ -96,11 +105,15 @@ func validateDependencies() error {
 }
 
 func NewDeps() (Deps, error) {
+	return newOnlineDeps()
+}
+
+func newOnlineDeps(clientOptions ...client.Option) (Deps, error) {
 	if err := validateDependencies(); err != nil {
 		return nil, err
 	}
 
-	return newDeps(config.GetConfig().Auth.AccessToken)
+	return newDeps(config.GetConfig().Auth.AccessToken, true, clientOptions...)
 }
 
 // NewOfflineDeps builds the same providers as NewDeps (so it observes the same
@@ -110,13 +123,21 @@ func NewDeps() (Deps, error) {
 // rejects an empty one; any API call made through it fails auth, which surfaces
 // an accidental network dependency instead of hiding it.
 func NewOfflineDeps() (Deps, error) {
-	return newDeps("offline")
+	return newOfflineDeps()
+}
+
+func newOfflineDeps(clientOptions ...client.Option) (Deps, error) {
+	return newDeps("offline", false, clientOptions...)
 }
 
 // newDeps is the single construction path for NewDeps and NewOfflineDeps, so a
 // client option or provider added here reaches both.
-func newDeps(token string) (Deps, error) {
-	c, err := setupClient(token, v)
+func newDeps(token string, discoverRegion bool, clientOptions ...client.Option) (Deps, error) {
+	configuredURL := config.GetConfig().APIURL
+	if discoverRegion {
+		clientOptions = append([]client.Option{client.WithRegionDiscovery()}, clientOptions...)
+	}
+	c, err := setupClient(token, v, configuredURL, clientOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("setup client: %w", err)
 	}
@@ -128,6 +149,7 @@ func newDeps(token string) (Deps, error) {
 
 	return &deps{
 		client:            c,
+		offline:           !discoverRegion,
 		providers:         p,
 		compositeProvider: cp,
 	}, nil
@@ -171,13 +193,11 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 	return cp, rawProviders, nil
 }
 
-func setupClient(token, version string) (*client.Client, error) {
-	cfg := config.GetConfig()
-	return client.New(
-		token,
-		client.WithBaseURL(cfg.APIURL),
-		client.WithUserAgent("rudder-cli/"+version),
-	)
+func setupClient(token, version, apiURL string, options ...client.Option) (*client.Client, error) {
+	return client.New(token, append([]client.Option{
+		client.WithBaseURL(apiURL),
+		client.WithUserAgent("rudder-cli/" + version),
+	}, options...)...)
 }
 
 // providerOrder is the order the composite aggregates import --merge matchers
@@ -286,6 +306,29 @@ func SyncReporter() syncer.SyncReporter {
 
 func (d *deps) Client() *client.Client {
 	return d.client
+}
+
+func (d *deps) Workspace(ctx context.Context) (*client.Workspace, error) {
+	if d.offline {
+		return nil, fmt.Errorf("workspace is unavailable for offline dependencies")
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	d.workspaceMu.Lock()
+	defer d.workspaceMu.Unlock()
+	if d.workspace != nil {
+		return d.workspace, nil
+	}
+	workspace, err := d.client.Workspaces.GetByAuthToken(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("fetching workspace information: %w", err)
+	}
+	if workspace == nil {
+		return nil, fmt.Errorf("fetching workspace information: workspace is missing")
+	}
+	d.workspace = workspace
+	return workspace, nil
 }
 
 func (d *deps) Providers() *Providers {

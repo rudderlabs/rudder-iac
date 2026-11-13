@@ -352,3 +352,9 @@
 ## DEX-1079 — Destination Spec Dereference Relies On The Syntax Gate
 <!-- ticket:DEX-1079 -->
 - `HandlerImpl.ExtractResourcesFromSpec` (`cli/internal/providers/destination/handler.go`) dereferences `*spec.DefinitionVersion` without a nil check. That is safe only because `project.handleValidation` runs `ValidateSyntax`, where `destination/spec-syntax-valid` enforces `required`, before any `loadSpec`, and destination `Provider.LoadLegacySpec` rejects legacy specs, so `BaseProvider.LoadLegacySpec`'s fallback to `LoadSpec` cannot deliver a spec the V1-only rule never saw. A new path that calls `LoadSpec` without the syntax phase must validate first or nil-check.
+
+## RUD-3474 — Regional Client Discovery And Offline Dependency Boundary
+<!-- ticket:RUD-3474 -->
+- Online `cli/internal/app/dependencies.go::newDeps` configures `client.WithRegionDiscovery` but makes no requests while composing providers. The shared `*client.Client` resolves and caches the workspace on its first API request, switches from the default US URL to EU when the workspace region is EU, and then issues provider requests against the final URL. Explicit custom URLs skip discovery.
+- `cli/internal/app/dependencies.go::deps.Workspace(ctx)` fetches and caches the authenticated workspace, rejects a nil workspace, and returns an error for offline dependencies. `NewOfflineDeps` constructs providers without region discovery or network I/O.
+- `cli/pkg/exp/project/project.go::Load` uses `app.NewOfflineDeps` for read-only graph loading and validation rather than `app.NewDeps`, so callers without credentials do not acquire a remote workspace lookup as a side effect.

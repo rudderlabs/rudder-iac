@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+* **cli:** route EU workspace requests to the EU API and show the region in the apply banner (RUD-3474).
+* **cli:** allow `migrate` and `retl-sources validate` without an access token; both read local project files without API requests (DEX-942).
+
 ## [1.0.0](https://github.com/rudderlabs/rudder-iac/compare/v0.29.1...v1.0.0) (2026-10-30)
 
 

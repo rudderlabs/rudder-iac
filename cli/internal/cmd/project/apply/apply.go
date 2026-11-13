@@ -3,6 +3,7 @@ package apply
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -24,6 +25,10 @@ var (
 )
 
 func NewCmdApply() *cobra.Command {
+	return newCmdApply(app.NewDeps)
+}
+
+func newCmdApply(newDeps func() (app.Deps, error)) *cobra.Command {
 	var (
 		deps      app.Deps
 		p         project.Project
@@ -48,17 +53,16 @@ func NewCmdApply() *cobra.Command {
 			$ rudder-cli apply --location </path/to/dir or file> --confirm=false
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) (err error) {
-			deps, err = app.NewDeps()
+			deps, err = newDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			workspace, err = deps.Client().Workspaces.GetByAuthToken(context.Background())
+			workspace, err = deps.Workspace(cmd.Context())
 			if err != nil {
-				return fmt.Errorf("fetching workspace information: %w", err)
+				return err
 			}
-
-			printWorkspaceBanner(workspace)
+			printWorkspaceBanner(workspace, deps.Client().URL(""))
 
 			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
@@ -136,11 +140,23 @@ func NewCmdApply() *cobra.Command {
 
 // printWorkspaceBanner names the workspace the apply is about to touch, so a run
 // against the wrong token is visible before any change is planned.
-func printWorkspaceBanner(workspace *client.Workspace) {
+func printWorkspaceBanner(workspace *client.Workspace, apiURL string) {
 	ui.Printf(
-		"%s %s %s\n",
+		"%s %s %s",
 		ui.Color("Workspace:", ui.ColorBlue),
 		ui.Bold(workspace.Name),
 		ui.GreyedOut("("+workspace.ID+")"),
 	)
+	if workspace.Region != "" {
+		ui.Printf("  %s %s", ui.Color("Region:", ui.ColorBlue), ui.Bold(workspace.Region))
+	}
+	ui.Printf("\n")
+	if apiURL != client.BASE_URL {
+		// A custom URL can carry credentials in userinfo, query, or fragment.
+		endpoint := "(invalid URL)"
+		if parsed, err := url.Parse(apiURL); err == nil && parsed.Scheme != "" && parsed.Host != "" {
+			endpoint = (&url.URL{Scheme: parsed.Scheme, Host: parsed.Host, Path: parsed.Path, RawPath: parsed.RawPath}).String()
+		}
+		ui.Printf("%s %s\n", ui.Color("API:", ui.ColorBlue), ui.GreyedOut(endpoint))
+	}
 }

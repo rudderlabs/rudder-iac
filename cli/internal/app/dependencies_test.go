@@ -1,6 +1,9 @@
 package app
 
 import (
+	"context"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -16,6 +19,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
+	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -184,6 +188,149 @@ func modelsConnectionMode(def *definitions.RegisteredDefinition) bool {
 		}
 	}
 	return true
+}
+
+type workspaceHTTPClientFunc func(*http.Request) (*http.Response, error)
+
+func (f workspaceHTTPClientFunc) Do(r *http.Request) (*http.Response, error) {
+	return f(r)
+}
+
+func TestNewDepsDiscoversEUWorkspaceBeforeProviderRequest(t *testing.T) {
+	t.Setenv("RUDDERSTACK_API_URL", "")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+	testutils.SetConfig(t, "auth.accessToken", "test-token")
+
+	var workspaceRequests atomic.Int32
+	var providerRequests atomic.Int32
+	httpClient := workspaceHTTPClientFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path == "/v2/workspace" {
+			workspaceRequests.Add(1)
+			assert.Equal(t, "api.rudderstack.com", r.URL.Host)
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"workspace":{"id":"ws-eu","region":"EU"}}`))}, nil
+		}
+		providerRequests.Add(1)
+		assert.Equal(t, "api.eu.rudderstack.com", r.URL.Host)
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+	})
+
+	d, err := newOnlineDeps(client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+	assert.EqualValues(t, 0, workspaceRequests.Load()) // Construction stays request-free.
+	_, err = d.Providers().RETL.LoadResourcesFromRemote(t.Context())
+	require.NoError(t, err)
+	assert.Positive(t, providerRequests.Load())
+	assert.Equal(t, client.BASE_URL_EU, d.Client().URL(""))
+	workspace, err := d.Workspace(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, &client.Workspace{ID: "ws-eu", Region: "EU"}, workspace)
+	_, err = d.Workspace(t.Context())
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, workspaceRequests.Load())
+}
+
+func TestNewDepsDiscoveryUsesCallerContext(t *testing.T) {
+	t.Setenv("RUDDERSTACK_API_URL", "")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+	testutils.SetConfig(t, "auth.accessToken", "test-token")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	httpClient := workspaceHTTPClientFunc(func(r *http.Request) (*http.Response, error) {
+		return nil, r.Context().Err()
+	})
+
+	d, err := newOnlineDeps(client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+	_, err = d.Workspace(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestNewDepsDiscoveryHasNoExtraDeadline(t *testing.T) {
+	t.Setenv("RUDDERSTACK_API_URL", "")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+	testutils.SetConfig(t, "auth.accessToken", "test-token")
+	httpClient := workspaceHTTPClientFunc(func(r *http.Request) (*http.Response, error) {
+		_, hasDeadline := r.Context().Deadline()
+		assert.False(t, hasDeadline)
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"workspace":{"id":"ws-eu"}}`))}, nil
+	})
+
+	d, err := newOnlineDeps(client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+	_, err = d.Workspace(nil) // Direct Cobra PreRunE calls may not have a context.
+	require.NoError(t, err)
+}
+
+func TestNewDepsKeepsExplicitAPIURL(t *testing.T) {
+	t.Setenv("RUDDERSTACK_API_URL", "")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+	testutils.SetConfig(t, "auth.accessToken", "test-token")
+	const apiURL = "https://api.custom.test"
+	testutils.SetConfig(t, "apiURL", apiURL)
+
+	var requests atomic.Int32
+	httpClient := workspaceHTTPClientFunc(func(r *http.Request) (*http.Response, error) {
+		requests.Add(1)
+		assert.Equal(t, apiURL+"/v2/workspace", r.URL.String())
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"workspace":{"id":"ws-eu","region":"EU"}}`))}, nil
+	})
+
+	d, err := newOnlineDeps(client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+	assert.EqualValues(t, 0, requests.Load())
+	workspace, err := d.Workspace(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "EU", workspace.Region)
+	_, err = d.Workspace(t.Context())
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, requests.Load())
+	assert.Equal(t, apiURL, d.Client().URL(""))
+}
+
+func TestNewDepsRejectsMissingWorkspace(t *testing.T) {
+	t.Setenv("RUDDERSTACK_API_URL", "")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+	testutils.SetConfig(t, "auth.accessToken", "test-token")
+	httpClient := workspaceHTTPClientFunc(func(r *http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+	})
+	d, err := newOnlineDeps(client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+	_, err = d.Workspace(t.Context())
+	require.ErrorContains(t, err, "workspace is missing")
+}
+
+func TestNewDepsPropagatesWorkspaceLookupFailure(t *testing.T) {
+	t.Setenv("RUDDERSTACK_API_URL", "")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+	testutils.SetConfig(t, "auth.accessToken", "test-token")
+	var requests atomic.Int32
+	httpClient := workspaceHTTPClientFunc(func(r *http.Request) (*http.Response, error) {
+		requests.Add(1)
+		return &http.Response{StatusCode: http.StatusForbidden, Body: io.NopCloser(strings.NewReader(`{"message":"forbidden"}`))}, nil
+	})
+
+	d, err := newOnlineDeps(client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+	_, err = d.Workspace(t.Context())
+	require.ErrorContains(t, err, "http status code: 403")
+	assert.EqualValues(t, 1, requests.Load())
+}
+
+func TestNewOfflineDepsSkipsWorkspaceRequest(t *testing.T) {
+	t.Setenv("RUDDERSTACK_API_URL", "")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+	var requests atomic.Int32
+	httpClient := workspaceHTTPClientFunc(func(r *http.Request) (*http.Response, error) {
+		requests.Add(1)
+		return nil, fmt.Errorf("unexpected workspace request")
+	})
+
+	d, err := newOfflineDeps(client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+	_, err = d.Workspace(t.Context())
+	require.ErrorContains(t, err, "offline dependencies")
+	assert.EqualValues(t, 0, requests.Load())
 }
 
 func TestNewOfflineDepsNeedsNoToken(t *testing.T) {

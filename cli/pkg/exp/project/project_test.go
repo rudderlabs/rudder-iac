@@ -44,8 +44,8 @@ func TestProjectLoad(t *testing.T) {
 // A program that loads a project may write its own output on stdout, so the
 // warnings the load reports go to stderr.
 func TestProjectLoadPrintsDiagnosticsOnStderr(t *testing.T) {
-	// Load builds the API client, which needs a token, but makes no call.
-	t.Setenv("RUDDERSTACK_ACCESS_TOKEN", "fake-token")
+	// Project loading validates locally, without credentials or API requests.
+	t.Setenv("RUDDERSTACK_ACCESS_TOKEN", "")
 
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "destination.yaml"), []byte(`version: rudder/v1

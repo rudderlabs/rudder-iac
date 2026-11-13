@@ -107,9 +107,9 @@ func NewCmdValidate() *cobra.Command {
 			ctx := context.Background()
 
 			var workspace *client.Workspace
-			workspace, err = deps.Client().Workspaces.GetByAuthToken(ctx)
+			workspace, err = deps.Workspace(ctx)
 			if err != nil {
-				return fmt.Errorf("fetching workspace information: %w", err)
+				return err
 			}
 
 			var mode validator.Mode

@@ -39,9 +39,9 @@ func NewCmdInfo() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			workspace, err := d.Client().Workspaces.GetByAuthToken(cmd.Context())
+			workspace, err := d.Workspace(cmd.Context())
 			if err != nil {
-				return fmt.Errorf("fetching workspace information: %w", err)
+				return err
 			}
 
 			if jsonOutput {

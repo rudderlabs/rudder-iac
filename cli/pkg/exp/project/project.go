@@ -33,7 +33,7 @@ type ReadOnlyGraph interface {
 // stays free for the caller's own output.
 func Load(_ context.Context, location string) (ReadOnlyGraph, error) {
 	config.InitConfig("")
-	deps, err := app.NewDeps()
+	deps, err := app.NewOfflineDeps()
 	if err != nil {
 		return nil, err
 	}

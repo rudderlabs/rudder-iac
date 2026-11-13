@@ -23,7 +23,19 @@ type workspaceResponse struct {
 }
 
 func (w *workspaces) GetByAuthToken(ctx context.Context) (*Workspace, error) {
-	res, err := w.client.Do(ctx, "GET", "/v2/workspace", nil)
+	if w.client.discoverRegion {
+		if err := w.client.ensureRegion(ctx); err != nil {
+			return nil, err
+		}
+		w.client.regionMu.Lock()
+		defer w.client.regionMu.Unlock()
+		return w.client.discoveredWorkspace, nil
+	}
+	return w.getByAuthToken(ctx)
+}
+
+func (w *workspaces) getByAuthToken(ctx context.Context) (*Workspace, error) {
+	res, err := w.client.do(ctx, "GET", "/v2/workspace", nil)
 	if err != nil {
 		return nil, err
 	}
