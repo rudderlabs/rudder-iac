@@ -106,10 +106,12 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([
 }
 
 const (
-	// Concurrent writers share one limit window and slots are not handed out fairly, so a call can lose many rounds
-	// in a row. Only this cap (about 100 minutes at a 60s window) and the context bound it: any tighter per-call
-	// bound would cap a whole apply at that bound.
-	maxRateLimitRetries = 100
+	// Concurrent writers share one limit window and slots are not handed out fairly, so a call can lose rounds for
+	// as long as the apply runs; any per-call bound on real waits would cap a whole apply at that bound. Real waits
+	// are therefore bounded only by the context (Ctrl-C, a caller's deadline). This cap only stops a server that
+	// keeps answering with a near-zero wait from spinning a call forever.
+	maxImmediateRetries = 100
+	immediateRetryWait  = time.Second
 	maxRateLimitWait    = 2 * time.Minute
 	baseRateLimitWait   = 2 * time.Second
 )
@@ -129,18 +131,30 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 		}
 	}
 
+	immediate := 0
 	for retry := 0; ; retry++ {
 		res, err := c.send(ctx, method, path, payload)
-		if err != nil || res.StatusCode != http.StatusTooManyRequests || retry == maxRateLimitRetries {
+		if err != nil || res.StatusCode != http.StatusTooManyRequests {
 			return res, err
 		}
 
-		wait := retryAfterDelay(res.Header.Get("Retry-After"), retry)
-		// up to 10% jitter so concurrent callers told the same wait do not all retry at once; zero stays zero
-		wait += rand.N(wait/10 + 1) //nolint:gosec // timing jitter, not a secret
+		base := retryAfterDelay(res.Header.Get("Retry-After"), retry)
+		if base < immediateRetryWait {
+			if immediate == maxImmediateRetries {
+				return res, nil
+			}
+			immediate++
+		}
 		// a wait the context cannot outlast would only end in a deadline error, so surface the 429 instead
-		if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < wait {
+		deadline, hasDeadline := ctx.Deadline()
+		if hasDeadline && time.Until(deadline) < base {
 			return res, nil
+		}
+		// up to 10% jitter so concurrent callers told the same wait do not all retry at once; zero stays zero
+		wait := base + rand.N(base/10+1) //nolint:gosec // timing jitter, not a secret
+		// jitter must not turn a wait that fits before the deadline into one that does not
+		if hasDeadline && time.Until(deadline) < wait {
+			wait = base
 		}
 
 		_, _ = io.Copy(io.Discard, res.Body)
@@ -185,7 +199,8 @@ func (c *Client) send(ctx context.Context, method, path string, payload []byte) 
 	return nil, err
 }
 
-func sleep(ctx context.Context, d time.Duration) error {
+// sleep is a variable so tests can skip real waits.
+var sleep = func(ctx context.Context, d time.Duration) error {
 	timer := time.NewTimer(d)
 	defer timer.Stop()
 	select {

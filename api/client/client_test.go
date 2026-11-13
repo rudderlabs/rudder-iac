@@ -195,7 +195,7 @@ func TestClientDoReturnsRateLimitErrorWhenRetriesRunOut(t *testing.T) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	// the first call plus 100 retries
+	// a near-zero wait is retried at most 100 times: the first call plus 100 retries
 	assert.Equal(t, 101, calls)
 }
 
