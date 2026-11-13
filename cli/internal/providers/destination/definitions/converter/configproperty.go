@@ -165,13 +165,13 @@ func ArrayWithStrings(rootAPIKey, nestedAPIField, localKey string) ConfigPropert
 						contents = append(contents, map[string]any{nestedAPIField: i})
 					}
 
-					if len(contents) > 0 {
-						r, err := sjson.Set(result, rootAPIKey, contents)
-						if err != nil {
-							return result, err
-						}
-						result = r
+					// An empty list is sent too: the plan compares the spec's [] with
+					// what the backend stored, so dropping it never converges.
+					r, err := sjson.Set(result, rootAPIKey, contents)
+					if err != nil {
+						return result, err
 					}
+					result = r
 				default:
 					return result, fmt.Errorf("provided value was not an array")
 				}
