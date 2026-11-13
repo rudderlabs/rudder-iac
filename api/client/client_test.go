@@ -195,7 +195,60 @@ func TestClientDoReturnsRateLimitErrorWhenRetriesRunOut(t *testing.T) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	assert.Equal(t, 6, calls)
+	// the first call plus 100 retries
+	assert.Equal(t, 101, calls)
+}
+
+func TestClientDoGetsConcurrentWritersThroughASlidingWindowLimit(t *testing.T) {
+	const (
+		callers = 30
+		limit   = 4
+		window  = time.Second
+	)
+
+	var (
+		mu       sync.Mutex
+		accepted []time.Time
+	)
+	// admits limit requests per sliding window and, like the server's limiter, asks for a full window's wait
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+
+		now := time.Now()
+		recent := accepted[:0]
+		for _, at := range accepted {
+			if now.Sub(at) < window {
+				recent = append(recent, at)
+			}
+		}
+		accepted = recent
+		if len(accepted) >= limit {
+			w.Header().Set("Retry-After", "1")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		accepted = append(accepted, now)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	c, err := client.New("some-access-token", client.WithBaseURL(server.URL))
+	require.NoError(t, err)
+
+	// more callers than one window admits, so most lose several rounds; a fixed retry count runs out here
+	errs := make([]error, callers)
+	var wg sync.WaitGroup
+	for i := range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, errs[i] = c.Do(context.Background(), http.MethodPost, "path", bytes.NewReader([]byte(`{}`)))
+		}()
+	}
+	wg.Wait()
+
+	assert.Equal(t, make([]error, callers), errs)
 }
 
 type closeTrackingReader struct {

@@ -106,11 +106,15 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([
 }
 
 const (
-	maxRateLimitRetries = 5
+	// stops a server that keeps answering Retry-After: 0 from holding a call forever
+	maxRateLimitRetries = 100
 	maxRateLimitWait    = 2 * time.Minute
-	// header-less retries then wait about 62s in total, outlasting a minute-long limit window
-	baseRateLimitWait = 2 * time.Second
+	baseRateLimitWait   = 2 * time.Second
 )
+
+// rateLimitBudget is how long a throttled call keeps retrying. Concurrent writers share one limit window,
+// so a call can lose several rounds before it gets a slot; a time budget, not a retry count, bounds that.
+var rateLimitBudget = 15 * time.Minute
 
 // doRequest retries rate-limited responses for every method, as the server rejected them before acting on them.
 func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
@@ -127,6 +131,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 		}
 	}
 
+	start := time.Now()
 	for retry := 0; ; retry++ {
 		res, err := c.send(ctx, method, path, payload)
 		if err != nil || res.StatusCode != http.StatusTooManyRequests || retry == maxRateLimitRetries {
@@ -136,6 +141,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 		wait := retryAfterDelay(res.Header.Get("Retry-After"), retry)
 		// up to 10% jitter so concurrent callers told the same wait do not all retry at once; zero stays zero
 		wait += rand.N(wait/10 + 1) //nolint:gosec // timing jitter, not a secret
+		if time.Since(start)+wait > rateLimitBudget {
+			return res, nil
+		}
 		// a wait the context cannot outlast would only end in a deadline error, so surface the 429 instead
 		if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < wait {
 			return res, nil
@@ -194,18 +202,14 @@ func sleep(ctx context.Context, d time.Duration) error {
 	}
 }
 
-// retryAfterDelay reads a Retry-After value (delta-seconds or HTTP-date), capped so a bad value cannot stall a run.
-// Without a usable value it backs off exponentially by retry, so the retries still span a longer limit window.
+// retryAfterDelay reads a delta-seconds Retry-After, capped so a bad value cannot stall a run.
+// Without a usable value it backs off exponentially by retry.
 func retryAfterDelay(value string, retry int) time.Duration {
-	value = strings.TrimSpace(value)
-	// an out-of-range value saturates, so a huge positive one still lands on the cap
-	if secs, err := strconv.Atoi(value); (err == nil || errors.Is(err, strconv.ErrRange)) && secs >= 0 {
+	if secs, err := strconv.Atoi(value); err == nil && secs >= 0 {
 		return time.Duration(min(secs, int(maxRateLimitWait/time.Second))) * time.Second
 	}
-	if date, err := http.ParseTime(value); err == nil {
-		return min(max(time.Until(date), 0), maxRateLimitWait)
-	}
-	return min(baseRateLimitWait<<retry, maxRateLimitWait)
+	// the shift is clamped because a large retry count would overflow the duration
+	return min(baseRateLimitWait<<min(retry, 6), maxRateLimitWait)
 }
 
 func isRetryableMethod(method string) bool {
