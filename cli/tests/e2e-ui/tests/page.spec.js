@@ -355,7 +355,9 @@ test.describe('regressions', () => {
     }
     await page.getByRole('button', { name: 'Resume' }).click();
     await expect(page.locator('#notices')).toContainText('The requests list no longer shows them');
-    await expect(page.locator('#list-body tr')).toHaveCount(10_000);
+    // The page renders about 1,000 rows a second on a CI runner, so 10,000 rows
+    // take as long as the default 10 s wait. Failing runs stopped at 9,000 rows.
+    await expect(page.locator('#list-body tr')).toHaveCount(10_000, { timeout: 60_000 });
     await expect(page.locator('#list-body tr[data-key="1"]')).toHaveCount(0);
   });
 
