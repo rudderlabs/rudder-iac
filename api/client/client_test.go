@@ -140,14 +140,35 @@ func TestClientDoRateLimitWaitHonoursContext(t *testing.T) {
 	c, err := client.New("some-access-token", client.WithBaseURL(server.URL))
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(200*time.Millisecond, cancel)
 	defer cancel()
 
 	start := time.Now()
 	data, err := c.Do(ctx, http.MethodPost, "path", bytes.NewReader([]byte(`{}`)))
-	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.ErrorIs(t, err, context.Canceled)
 	assert.Nil(t, data)
 	assert.Less(t, time.Since(start), time.Second)
+}
+
+func TestClientDoReturnsRateLimitErrorWhenWaitOutlastsDeadline(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "3")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	c, err := client.New("some-access-token", client.WithBaseURL(server.URL))
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	start := time.Now()
+	data, err := c.Do(ctx, http.MethodPost, "path", bytes.NewReader([]byte(`{}`)))
+	assert.Equal(t, &client.APIError{HTTPStatusCode: http.StatusTooManyRequests}, err)
+	assert.Nil(t, data)
+	assert.Less(t, time.Since(start), 500*time.Millisecond)
 }
 
 func TestClientDoReturnsRateLimitErrorWhenRetriesRunOut(t *testing.T) {

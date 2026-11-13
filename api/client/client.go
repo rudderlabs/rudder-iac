@@ -119,8 +119,8 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 		var err error
 		payload, err = io.ReadAll(body)
 		// buffering detaches the body from the request, so the transport no longer closes it
-		if c, ok := body.(io.Closer); ok {
-			_ = c.Close()
+		if closer, ok := body.(io.Closer); ok {
+			_ = closer.Close()
 		}
 		if err != nil {
 			return nil, fmt.Errorf("reading request body: %w", err)
@@ -133,11 +133,16 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 			return res, err
 		}
 
-		_, _ = io.Copy(io.Discard, res.Body)
-		_ = res.Body.Close()
 		wait := retryAfterDelay(res.Header.Get("Retry-After"), retry)
 		// up to 10% jitter so concurrent callers told the same wait do not all retry at once; zero stays zero
 		wait += rand.N(wait/10 + 1) //nolint:gosec // timing jitter, not a secret
+		// a wait the context cannot outlast would only end in a deadline error, so surface the 429 instead
+		if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < wait {
+			return res, nil
+		}
+
+		_, _ = io.Copy(io.Discard, res.Body)
+		_ = res.Body.Close()
 		if err := sleep(ctx, wait); err != nil {
 			return nil, err
 		}
@@ -192,6 +197,7 @@ func sleep(ctx context.Context, d time.Duration) error {
 // retryAfterDelay reads a Retry-After value (delta-seconds or HTTP-date), capped so a bad value cannot stall a run.
 // Without a usable value it backs off exponentially by retry, so the retries still span a longer limit window.
 func retryAfterDelay(value string, retry int) time.Duration {
+	value = strings.TrimSpace(value)
 	// an out-of-range value saturates, so a huge positive one still lands on the cap
 	if secs, err := strconv.Atoi(value); (err == nil || errors.Is(err, strconv.ErrRange)) && secs >= 0 {
 		return time.Duration(min(secs, int(maxRateLimitWait/time.Second))) * time.Second

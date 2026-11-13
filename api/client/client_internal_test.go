@@ -19,6 +19,7 @@ func TestRetryAfterDelay(t *testing.T) {
 	}{
 		{name: "seconds", value: "2", want: 2 * time.Second},
 		{name: "zero", value: "0", want: 0},
+		{name: "seconds with whitespace", value: " 30 ", want: 30 * time.Second},
 		{name: "minute-long window", value: "60", want: time.Minute},
 		{name: "seconds above cap", value: "3600", want: maxRateLimitWait},
 		{name: "seconds that overflow a duration", value: "9223372036854775807", want: maxRateLimitWait},
