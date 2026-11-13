@@ -201,8 +201,9 @@ func TestClientDoReturnsRateLimitErrorWhenRetriesRunOut(t *testing.T) {
 
 func TestClientDoGetsConcurrentWritersThroughASlidingWindowLimit(t *testing.T) {
 	const (
-		callers = 30
-		limit   = 4
+		workers = 30
+		items   = 60
+		limit   = 8
 		window  = time.Second
 	)
 
@@ -236,19 +237,28 @@ func TestClientDoGetsConcurrentWritersThroughASlidingWindowLimit(t *testing.T) {
 	c, err := client.New("some-access-token", client.WithBaseURL(server.URL))
 	require.NoError(t, err)
 
-	// more callers than one window admits, so most lose several rounds; a fixed retry count runs out here
-	errs := make([]error, callers)
+	// workers pull from a shared queue, as apply does, so a worker that just succeeded sends again at once and can
+	// keep taking free slots from a call that lost an early round
+	queue := make(chan int, items)
+	for i := range items {
+		queue <- i
+	}
+	close(queue)
+
+	errs := make([]error, items)
 	var wg sync.WaitGroup
-	for i := range callers {
+	for range workers {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, errs[i] = c.Do(context.Background(), http.MethodPost, "path", bytes.NewReader([]byte(`{}`)))
+			for i := range queue {
+				_, errs[i] = c.Do(context.Background(), http.MethodPost, "path", bytes.NewReader([]byte(`{}`)))
+			}
 		}()
 	}
 	wg.Wait()
 
-	assert.Equal(t, make([]error, callers), errs)
+	assert.Equal(t, make([]error, items), errs)
 }
 
 type closeTrackingReader struct {

@@ -106,15 +106,13 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([
 }
 
 const (
-	// stops a server that keeps answering Retry-After: 0 from holding a call forever
+	// Concurrent writers share one limit window and slots are not handed out fairly, so a call can lose many rounds
+	// in a row. Only this cap (about 100 minutes at a 60s window) and the context bound it: any tighter per-call
+	// bound would cap a whole apply at that bound.
 	maxRateLimitRetries = 100
 	maxRateLimitWait    = 2 * time.Minute
 	baseRateLimitWait   = 2 * time.Second
 )
-
-// rateLimitBudget is how long a throttled call keeps retrying. Concurrent writers share one limit window,
-// so a call can lose several rounds before it gets a slot; a time budget, not a retry count, bounds that.
-var rateLimitBudget = 15 * time.Minute
 
 // doRequest retries rate-limited responses for every method, as the server rejected them before acting on them.
 func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
@@ -131,7 +129,6 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 		}
 	}
 
-	start := time.Now()
 	for retry := 0; ; retry++ {
 		res, err := c.send(ctx, method, path, payload)
 		if err != nil || res.StatusCode != http.StatusTooManyRequests || retry == maxRateLimitRetries {
@@ -141,9 +138,6 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body io.Rea
 		wait := retryAfterDelay(res.Header.Get("Retry-After"), retry)
 		// up to 10% jitter so concurrent callers told the same wait do not all retry at once; zero stays zero
 		wait += rand.N(wait/10 + 1) //nolint:gosec // timing jitter, not a secret
-		if time.Since(start)+wait > rateLimitBudget {
-			return res, nil
-		}
 		// a wait the context cannot outlast would only end in a deadline error, so surface the 429 instead
 		if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < wait {
 			return res, nil

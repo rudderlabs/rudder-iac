@@ -1,16 +1,10 @@
 package client
 
 import (
-	"bytes"
-	"context"
-	"net/http"
-	"net/http/httptest"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestRetryAfterDelay(t *testing.T) {
@@ -41,27 +35,4 @@ func TestRetryAfterDelay(t *testing.T) {
 			assert.Equal(t, tc.want, retryAfterDelay(tc.value, tc.retry))
 		})
 	}
-}
-
-// not parallel: it shrinks the package-level budget
-func TestClientDoStopsRetryingWhenBudgetRunsOut(t *testing.T) {
-	budget := rateLimitBudget
-	rateLimitBudget = 1500 * time.Millisecond
-	t.Cleanup(func() { rateLimitBudget = budget })
-
-	var calls atomic.Int32
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls.Add(1)
-		w.Header().Set("Retry-After", "1")
-		w.WriteHeader(http.StatusTooManyRequests)
-	}))
-	defer server.Close()
-
-	c, err := New("some-access-token", WithBaseURL(server.URL))
-	require.NoError(t, err)
-
-	data, err := c.Do(context.Background(), http.MethodPost, "path", bytes.NewReader([]byte(`{}`)))
-	assert.Equal(t, &APIError{HTTPStatusCode: http.StatusTooManyRequests}, err)
-	assert.Nil(t, data)
-	assert.Equal(t, int32(2), calls.Load())
 }
