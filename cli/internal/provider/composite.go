@@ -463,6 +463,27 @@ func (p *CompositeProvider) SemanticRules() []rules.Rule {
 	return allRules
 }
 
+// ProviderNames returns the names of all registered providers, sorted.
+func (p *CompositeProvider) ProviderNames() []string {
+	names := maps.Keys(p.Providers)
+	slices.Sort(names)
+	return names
+}
+
+// ResourceTypesForProviders returns all resource types supported by the specified
+// provider names. If a provider name is not found, it returns an error.
+func (p *CompositeProvider) ResourceTypesForProviders(names []string) ([]string, error) {
+	var types []string
+	for _, name := range names {
+		provider, ok := p.Providers[name]
+		if !ok {
+			return nil, fmt.Errorf("unknown provider: %s", name)
+		}
+		types = append(types, provider.SupportedTypes()...)
+	}
+	return types, nil
+}
+
 // RuleDocEntries aggregates authored doc fragments from all child providers.
 func (p *CompositeProvider) RuleDocEntries() []docs.RuleDocEntry {
 	var entries []docs.RuleDocEntry
