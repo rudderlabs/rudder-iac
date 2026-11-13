@@ -273,8 +273,10 @@ match_behavior:
               sql: SELECT conversion_id, click_id, conversion_name, conversion_time FROM conversions
           destination.yaml: &bing-destination |
             # bingads_offline_conversions is unverified: validate this project
-            # with RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is
-            # unknown.
+            # with RUDDERSTACK_CLI_EXPERIMENTAL=true
+            # RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is unknown.
+            # Both are needed: the umbrella variable ungates the other one, and
+            # without it every experimental flag reads as false.
             version: rudder/v1
             kind: destination
             metadata:

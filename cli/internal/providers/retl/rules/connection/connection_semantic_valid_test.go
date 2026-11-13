@@ -621,7 +621,7 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 			mutate:      objectMappingEntry,
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/config/sync_behaviour",
-				Message:   "source definition 'postgres' and destination 'my-bing-destination' share no sync behaviour for the object_mapping flow; the connection cannot sync",
+				Message:   "source definition 'postgres' and destination 'my-bing-destination' share no sync behaviour on object mapping; the connection cannot sync",
 			}},
 		},
 		{
@@ -634,7 +634,7 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 			destination: audienceDestination(),
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/config/sync_behaviour",
-				Message:   "'sync_behaviour' must be one of [mirror] for source definition 'postgres' and destination 'my-audience-destination' on the visual_mapper_v2 flow",
+				Message:   "'sync_behaviour' must be one of [mirror] for source definition 'postgres' and destination 'my-audience-destination' on the visual mapper v2 flow",
 			}},
 		},
 		{
@@ -650,9 +650,11 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 			}},
 		},
 		{
-			// The flow takes its mapping checks from the object-mapping side:
-			// its field set is declared up front, so constants and a CDP event
-			// have nowhere to go.
+			// The field set is declared up front, so constants and a CDP event
+			// have nowhere to go. The message names this flow, not the other
+			// one that happens to share the check: an object is refused on this
+			// destination, so "with object mapping" would send the reader to a
+			// flow it cannot run.
 			name:        "constants on a visual mapper v2 connection",
 			destination: audienceDestination(),
 			mutate: func(c *retlConnection.ConnectionSpec) {
@@ -661,8 +663,50 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 			},
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/config/constants",
-				Message:   "'constants' is not allowed with object mapping",
+				Message:   "'constants' is not allowed with the visual mapper v2 flow",
 			}},
+		},
+		{
+			name:        "an event on a visual mapper v2 connection",
+			destination: audienceDestination(),
+			mutate: func(c *retlConnection.ConnectionSpec) {
+				c.Config.SyncBehaviour = "mirror"
+				c.Config.Event = &retlConnection.EventSpec{Type: "identify"}
+			},
+			expected: []rules.ValidationResult{{
+				Reference: "/connections/0/config/event",
+				Message:   "'event' is not allowed with the visual mapper v2 flow",
+			}},
+		},
+		{
+			// The shape DEX-1108 is about. Google Ads Customer Match matches on
+			// six columns at once, and the backend carries every identifier
+			// through to identifierMappings, so the object-mapping cap of one
+			// must not reach this flow.
+			name:        "several identifiers on a visual mapper v2 connection",
+			destination: audienceDestination(),
+			mutate: func(c *retlConnection.ConnectionSpec) {
+				c.Config.SyncBehaviour = "mirror"
+				c.Config.Identifiers = []retlConnection.MappingSpec{
+					{From: "cm_email", To: "email"},
+					{From: "cm_phone", To: "phone"},
+					{From: "cm_fn", To: "firstName"},
+					{From: "cm_ln", To: "lastName"},
+					{From: "cm_zip", To: "postalCode"},
+					{From: "cm_country", To: "country"},
+				}
+			},
+		},
+		{
+			// Object mapping reserves these because it synthesises them from
+			// its one identifier. This flow synthesises nothing, so a
+			// destination field of the same name is just a field.
+			name:        "a mapping to user_id on a visual mapper v2 connection",
+			destination: audienceDestination(),
+			mutate: func(c *retlConnection.ConnectionSpec) {
+				c.Config.SyncBehaviour = "mirror"
+				c.Config.Mappings = []retlConnection.MappingSpec{{From: "uid", To: "user_id"}}
+			},
 		},
 	}
 
@@ -701,7 +745,7 @@ func TestConnectionSemanticValid_WarehouseDestinationFlows(t *testing.T) {
 		}}
 		jsonMirrorRefused = []rules.ValidationResult{{
 			Reference: "/connections/0/config/sync_behaviour",
-			Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-destination' on the json_mapper flow",
+			Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-destination' on JSON mapping",
 		}}
 	)
 
@@ -979,7 +1023,7 @@ func TestConnectionSemanticValid_SourceCapability(t *testing.T) {
 			mutate:      func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "mirror" },
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/config/sync_behaviour",
-				Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-http-destination' on the json_mapper flow",
+				Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-http-destination' on JSON mapping",
 			}},
 		},
 		{
@@ -992,7 +1036,7 @@ func TestConnectionSemanticValid_SourceCapability(t *testing.T) {
 			},
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/config/sync_behaviour",
-				Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-amplitude-destination' on the object_mapping flow",
+				Message:   "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-amplitude-destination' on object mapping",
 			}},
 		},
 		{
@@ -1003,7 +1047,7 @@ func TestConnectionSemanticValid_SourceCapability(t *testing.T) {
 			},
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/config/sync_behaviour",
-				Message:   "source definition 'postgres' and destination 'my-mirror-destination' share no sync behaviour for the json_mapper flow; the connection cannot sync",
+				Message:   "source definition 'postgres' and destination 'my-mirror-destination' share no sync behaviour on JSON mapping; the connection cannot sync",
 			}},
 		},
 		{
