@@ -417,7 +417,10 @@ match_behavior:
           destination.yaml: |
             # customerio_audience is one of the two destinations running their own
             # rETL flow, and it is unverified: validate this project with
+            # RUDDERSTACK_CLI_EXPERIMENTAL=true
             # RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is unknown.
+            # Both are needed: the umbrella variable ungates the other one, and
+            # without it every experimental flag reads as false.
             version: rudder/v1
             kind: destination
             metadata:
@@ -615,9 +618,9 @@ match_behavior:
             message_contains: "'to' is not valid: mapping to 'context.externalId[0].id' is reserved for identifiers"
       - example_id: "retl-connection-semantic-bing-upsert"
         title: "Upsert sync to Bing, which accepts mirror only"
-        description: "Bing accepts only mirror, which this CLI does not support, so the connection has no sync behaviour left."
+        description: "Bing accepts only mirror, and mirror needs a destination that declares its field set up front through its own config. Bing maps objects instead, so the connection has no sync behaviour left."
         files:
-          model.yaml: |
+          model.yaml: &conversions-model |
             version: rudder/v1
             kind: retl-source-sql-model
             metadata:
@@ -629,10 +632,12 @@ match_behavior:
               primary_key: conversion_id
               source_definition: postgres
               sql: SELECT conversion_id, click_id, conversion_name, conversion_time FROM conversions
-          destination.yaml: |
+          destination.yaml: &bing-destination |
             # bingads_offline_conversions is unverified: validate this project
-            # with RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is
-            # unknown.
+            # with RUDDERSTACK_CLI_EXPERIMENTAL=true
+            # RUDDERSTACK_X_UNVERIFIED_DESTINATIONS=true or its type is unknown.
+            # Both are needed: the umbrella variable ungates the other one, and
+            # without it every experimental flag reads as false.
             version: rudder/v1
             kind: destination
             metadata:
@@ -674,7 +679,101 @@ match_behavior:
           - file: "connections.yaml"
             reference: "/spec/connections/0/config/sync_behaviour"
             severity: "error"
-            message_contains: "source definition 'postgres' and destination 'my-bing-destination' share no sync behaviour for the object_mapping flow; the connection cannot sync"
+            message_contains: "source definition 'postgres' and destination 'my-bing-destination' share no sync behaviour on object mapping; the connection cannot sync"
+      - example_id: "retl-connection-semantic-bing-json-mapper"
+        title: "Mirror sync to Bing without an object"
+        description: "Without an object the connection runs the JSON mapper flow, which drops mirror, the only behaviour Bing accepts; no sync behaviour is left."
+        files:
+          model.yaml: *conversions-model
+          destination.yaml: *bing-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: conversions-to-bing
+                  source: "#retl-source-sql-model:conversions-model"
+                  destination: "#destination:my-bing-destination"
+                  config:
+                    sync_behaviour: mirror
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: click_id
+                        to: user_id
+                    mappings:
+                      - from: conversion_name
+                        to: properties.conversion_name
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/sync_behaviour"
+            severity: "error"
+            message_contains: "source definition 'postgres' and destination 'my-bing-destination' share no sync behaviour on JSON mapping; the connection cannot sync"
+      - example_id: "retl-connection-semantic-json-mapper-mirror"
+        title: "Mirror sync on the JSON mapper flow"
+        description: "Postgres and the HTTP destination both accept mirror, but the JSON mapper never declares the destination's field set, so there is nothing for a sync to mirror onto. The backend refuses it on this flow too."
+        files:
+          model.yaml: *users-model
+          destination.yaml: *http-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-webhook
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-http-destination"
+                  config:
+                    sync_behaviour: mirror
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: traits.email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/sync_behaviour"
+            severity: "error"
+            message_contains: "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-http-destination' on JSON mapping"
+      - example_id: "retl-connection-semantic-object-mapping-mirror"
+        title: "Mirror sync on the object mapping flow"
+        description: "An object names the destination's object, not its field set, so a sync here has nothing to mirror onto. The backend does store such a connection as mirror; this CLI refuses it rather than accept a connection that cannot do what its spec says. Mirror is for the destinations that carry their own field config."
+        files:
+          model.yaml: *users-model
+          destination.yaml: *amplitude-destination
+          connections.yaml: |
+            version: rudder/v1
+            kind: retl-connections
+            metadata:
+              name: retl-connections
+            spec:
+              connections:
+                - id: users-to-amplitude
+                  source: "#retl-source-sql-model:users-model"
+                  destination: "#destination:my-amplitude-destination"
+                  config:
+                    object: users
+                    sync_behaviour: mirror
+                    schedule:
+                      type: manual
+                    identifiers:
+                      - from: user_id
+                        to: user_id
+                    mappings:
+                      - from: email
+                        to: email
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/config/sync_behaviour"
+            severity: "error"
+            message_contains: "'sync_behaviour' must be one of [upsert full] for source definition 'postgres' and destination 'my-amplitude-destination' on object mapping"
       - example_id: "retl-connection-semantic-object-mapping-constants"
         title: "Constants on an object mapping connection"
         files:

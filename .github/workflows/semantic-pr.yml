@@ -1,24 +1,35 @@
 name: "Semantic pull requests"
 
-on: pull_request
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - labeled
+      - unlabeled
+      - synchronize
 
-permissions:
-  contents: read
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   main:
-    permissions:
-      pull-requests: read  # for amannn/action-semantic-pull-request to analyze PRs
-      statuses: write  # for amannn/action-semantic-pull-request to mark status of analyzed PR
     name: Validate PR title
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read # validateSingleCommit reads the PR commits through the API
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
         with:
           egress-policy: audit
 
-      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+      - uses: rudderlabs/github-action-check-pr-title@3967756a96b89133e6cd700a8384a1e2b95cb21c # v2.0.3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -36,25 +47,8 @@ jobs:
             The subject "{subject}" found in the pull request title "{title}"
             didn't match the configured pattern. Please ensure that the subject
             doesn't start with an uppercase character.
-          # For work-in-progress PRs you can typically use draft pull requests
-          # from GitHub. However, private repositories on the free plan don't have
-          # this option and therefore this action allows you to opt-in to using the
-          # special "[WIP]" prefix to indicate this state. This will avoid the
-          # validation of the PR title and the pull request checks remain pending.
-          # Note that a second check will be reported if this is enabled.
-          wip: true
-          # When using "Squash and merge" on a PR with only one commit, GitHub
-          # will suggest using that commit message instead of the PR title for the
-          # merge commit, and it's easy to commit this by mistake. Enable this option
-          # to also validate the commit message for one commit PRs.
           validateSingleCommit: true
-          # Related to `validateSingleCommit` you can opt-in to validate that the PR
-          # title matches a single commit to avoid confusion.
           validateSingleCommitMatchesPrTitle: true
-          # If the PR contains one of these labels, the validation is skipped.
-          # Multiple labels can be separated by newlines.
-          # If you want to rerun the validation when labels change, you might want
-          # to use the `labeled` and `unlabeled` event triggers in your workflow.
           ignoreLabels: |
             bot
             dependencies
