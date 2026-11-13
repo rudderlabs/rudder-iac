@@ -43,17 +43,28 @@ func NewPropertyImportProvider(client catalog.DataCatalog, log logger.Logger, im
 }
 
 func (p *PropertyImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	return p.load(ctx, false, idNamer)
+}
+
+// LoadManaged loads the managed properties keyed by their real externalId.
+func (p *PropertyImportProvider) LoadManaged(ctx context.Context) (*resources.RemoteResources, error) {
+	return p.load(ctx, true, nil)
+}
+
+// load lists properties with or without an externalId. A nil idNamer keeps
+// each one's externalId instead of naming it.
+func (p *PropertyImportProvider) load(ctx context.Context, managed bool, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable properties from remote catalog")
 	collection := resources.NewRemoteResources()
 
-	properties, err := p.client.GetProperties(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
+	properties, err := p.client.GetProperties(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(managed)})
 	if err != nil {
 		return nil, fmt.Errorf("getting properties from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, property := range properties {
-		if property.ExternalID != "" {
+		if (property.ExternalID != "") != managed {
 			continue
 		}
 		resourceMap[property.ID] = &resources.RemoteResource{
@@ -87,11 +98,15 @@ func (p *PropertyImportProvider) idResources(
 			return fmt.Errorf("unable to cast remote resource to catalog property")
 		}
 
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  data.Name,
-			Scope: types.PropertyResourceType})
-		if err != nil {
-			return fmt.Errorf("generating externalID for property %s: %w", data.Name, err)
+		externalID := data.ExternalID
+		if idNamer != nil {
+			var err error
+			externalID, err = idNamer.Name(namer.ScopeName{
+				Name:  data.Name,
+				Scope: types.PropertyResourceType})
+			if err != nil {
+				return fmt.Errorf("generating externalID for property %s: %w", data.Name, err)
+			}
 		}
 
 		property.ExternalID = externalID

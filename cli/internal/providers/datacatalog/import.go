@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/pkg/tasker"
@@ -58,6 +59,25 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 		}
 	}
 
+	return collection, nil
+}
+
+// LoadManaged loads the managed catalog entities, keyed by their real externalId.
+func (p *Provider) LoadManaged(ctx context.Context) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
+	for resourceType, ip := range p.providerStore {
+		m, ok := ip.(provider.ManagedExportLoader)
+		if !ok {
+			return nil, fmt.Errorf("provider for %s cannot export managed resources", resourceType)
+		}
+		c, err := m.LoadManaged(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("loading managed %s: %w", resourceType, err)
+		}
+		if collection, err = collection.Merge(c); err != nil {
+			return nil, fmt.Errorf("merging managed %s: %w", resourceType, err)
+		}
+	}
 	return collection, nil
 }
 

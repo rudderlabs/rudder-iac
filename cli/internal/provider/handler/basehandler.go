@@ -250,6 +250,19 @@ func (h *BaseHandler[Spec, Res, State, Remote]) LoadResourcesFromRemote(ctx cont
 	return collection, nil
 }
 
+// LoadManaged returns the managed resources keyed by their real externalId, in
+// the shape LoadImportable gives FormatForExport.
+func (h *BaseHandler[Spec, Res, State, Remote]) LoadManaged(ctx context.Context) (*resources.RemoteResources, error) {
+	collection, err := h.LoadResourcesFromRemote(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range collection.GetAll(h.metadata.ResourceType) {
+		r.Reference = h.reference(r.ExternalID)
+	}
+	return collection, nil
+}
+
 func (h *BaseHandler[Spec, Res, State, Remote]) MapRemoteToState(collection *resources.RemoteResources) (*state.State, error) {
 	s := state.EmptyState()
 	remoteResources := collection.GetAll(h.metadata.ResourceType)

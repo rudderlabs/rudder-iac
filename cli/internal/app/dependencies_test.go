@@ -196,3 +196,19 @@ func TestNewOfflineDepsNeedsNoToken(t *testing.T) {
 	_, err = NewOfflineDeps()
 	require.NoError(t, err)
 }
+
+// import workspace --managed skips providers without LoadManaged; every GA
+// provider must have it or its managed resources silently go missing.
+func TestProvidersExportManagedResources(t *testing.T) {
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+
+	c, err := client.New("test-token")
+	require.NoError(t, err)
+
+	_, providerMap, err := setupProviders(c)
+	require.NoError(t, err)
+	for name, p := range providerMap {
+		_, ok := p.(provider.ManagedExportLoader)
+		assert.True(t, ok, "provider %s does not implement provider.ManagedExportLoader", name)
+	}
+}

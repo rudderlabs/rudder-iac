@@ -119,8 +119,8 @@ func WorkspaceImport(
 
 	location := project.Location()
 	importDir := filepath.Join(location, ImportedDir)
-	if err := writer.Write(ctx, importDir, formatters, entities); err != nil {
-		return fmt.Errorf("writing files for formattable entities: %w", err)
+	if err := writeSpecs(ctx, importDir, formatters, entities); err != nil {
+		return err
 	}
 
 	// Only emit the import-manifest when the importMerge experimental flag is
@@ -142,7 +142,17 @@ func WorkspaceImport(
 		}
 	}
 
-	varFile, err := scaffoldSecretsVarFile(ctx, importDir, entities)
+	return nil
+}
+
+// writeSpecs writes the exported entities into dir and scaffolds the var file
+// for any secret placeholders they reference.
+func writeSpecs(ctx context.Context, dir string, formatters formatter.Formatters, entities []writer.FormattableEntity) error {
+	if err := writer.Write(ctx, dir, formatters, entities); err != nil {
+		return fmt.Errorf("writing files for formattable entities: %w", err)
+	}
+
+	varFile, err := scaffoldSecretsVarFile(ctx, dir, entities)
 	if err != nil {
 		return fmt.Errorf("scaffolding secrets var file: %w", err)
 	}
