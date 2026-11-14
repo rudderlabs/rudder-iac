@@ -624,3 +624,92 @@ func TestDelete_LeavesOtherFailuresAlone(t *testing.T) {
 	require.Error(t, err)
 	assert.Same(t, failure, errors.Unwrap(err), "the failure must be wrapped as is, with no note added")
 }
+
+func dbxTokenResource(id string) *AccountResource {
+	token := secret.New("dapi-personal-access-token")
+	return &AccountResource{
+		ID:                    id,
+		Name:                  "name-" + id,
+		AccountDefinitionName: "SOURCE_DATABRICKS",
+		Config: map[string]any{
+			"host":               "dbc-4bc58b52-08a2.cloud.databricks.com",
+			"port":               443,
+			"path":               "/sql/1.0/warehouses/abc123",
+			"catalog":            "main",
+			"authenticationType": "pat",
+			"token":              &token,
+		},
+	}
+}
+
+func TestCreate_SplitsDatabricksTokenConfig(t *testing.T) {
+	m := &mockStore{createReturnID: "remote-1"}
+	h := &HandlerImpl{store: m}
+
+	_, err := h.Create(context.Background(), dbxTokenResource("prod-dbx"))
+	require.NoError(t, err)
+
+	var opts, sec map[string]any
+	require.NoError(t, json.Unmarshal(m.created.Options, &opts))
+	require.NoError(t, json.Unmarshal(m.created.Secret, &sec))
+	// port stays a number: the account schema types it as an integer, unlike
+	// every other warehouse option the CLI sends.
+	assert.Equal(t, map[string]any{
+		"host": "dbc-4bc58b52-08a2.cloud.databricks.com", "port": float64(443),
+		"path": "/sql/1.0/warehouses/abc123", "catalog": "main", "authenticationType": "pat",
+	}, opts)
+	assert.Equal(t, map[string]any{"token": "dapi-personal-access-token"}, sec)
+	assert.Equal(t, "SOURCE_DATABRICKS", m.created.AccountDefinitionName)
+}
+
+func dbxOAuthResource(id string) *AccountResource {
+	clientSecret := secret.New("oauth-m2m-client-secret")
+	return &AccountResource{
+		ID:                    id,
+		Name:                  "name-" + id,
+		AccountDefinitionName: "SOURCE_DATABRICKS",
+		Config: map[string]any{
+			"host":               "dbc-4bc58b52-08a2.cloud.databricks.com",
+			"port":               443,
+			"path":               "/sql/1.0/warehouses/abc123",
+			"authenticationType": "oauth",
+			"oauthClientId":      "svc-principal-1",
+			"oauthClientSecret":  &clientSecret,
+		},
+	}
+}
+
+func TestCreate_SplitsDatabricksOAuthConfig(t *testing.T) {
+	m := &mockStore{createReturnID: "remote-1"}
+	h := &HandlerImpl{store: m}
+
+	_, err := h.Create(context.Background(), dbxOAuthResource("prod-dbx-oauth"))
+	require.NoError(t, err)
+
+	var opts, sec map[string]any
+	require.NoError(t, json.Unmarshal(m.created.Options, &opts))
+	require.NoError(t, json.Unmarshal(m.created.Secret, &sec))
+	// oauthClientId is an option, not a secret; token belongs to the other mode
+	// and the account schema rejects it here, so it must not be sent.
+	assert.Equal(t, map[string]any{
+		"host": "dbc-4bc58b52-08a2.cloud.databricks.com", "port": float64(443),
+		"path": "/sql/1.0/warehouses/abc123", "authenticationType": "oauth",
+		"oauthClientId": "svc-principal-1",
+	}, opts)
+	assert.Equal(t, map[string]any{"oauthClientSecret": "oauth-m2m-client-secret"}, sec)
+}
+
+// Each Databricks auth mode requires its own secret and nothing from the other
+// one, so a complete account of either mode passes and a bare one names exactly
+// what it is missing.
+func TestMissingRequiredConfig_DatabricksPerAuthMode(t *testing.T) {
+	assert.Empty(t, missingRequiredConfig("SOURCE_DATABRICKS", dbxTokenResource("x").Config))
+	assert.Empty(t, missingRequiredConfig("SOURCE_DATABRICKS", dbxOAuthResource("x").Config))
+
+	assert.Equal(t, []string{"token"}, missingRequiredConfig("SOURCE_DATABRICKS", map[string]any{
+		"host": "h", "port": 443, "path": "/p", "authenticationType": "pat",
+	}))
+	assert.Equal(t, []string{"oauthClientId", "oauthClientSecret"}, missingRequiredConfig("SOURCE_DATABRICKS", map[string]any{
+		"host": "h", "port": 443, "path": "/p", "authenticationType": "oauth",
+	}))
+}

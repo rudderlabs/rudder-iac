@@ -1,0 +1,15 @@
+version: rudder/v1
+kind: account
+metadata:
+  name: prod-dbx
+spec:
+  id: prod-dbx
+  name: Production Databricks
+  account_definition_name: SOURCE_DATABRICKS
+  config:
+    host: dbc-00000000-0000.cloud.databricks.com
+    port: 443
+    path: /sql/1.0/warehouses/abc123
+    catalog: main
+    authenticationType: pat
+    token: "{{ .DBX_TOKEN }}"

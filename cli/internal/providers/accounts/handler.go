@@ -75,6 +75,13 @@ var registeredAccounts = map[string]accountDefinition{
 		Type: "snowflake", SecretKeys: []string{"password", "privateKey", "privateKeyPassphrase"},
 		RequiredOptions: []string{"account", "dbname", "warehouse", "user", "authenticationType"},
 	},
+	"SOURCE_DATABRICKS": {
+		Type: "databricks", SecretKeys: []string{"token", "oauthClientSecret"},
+		// catalog is optional: the client falls back to hive_metastore. port is
+		// the one option the account schema types as an integer, so a spec
+		// quoting it is refused by the backend rather than coerced.
+		RequiredOptions: []string{"host", "port", "path", "authenticationType"},
+	},
 }
 
 // optionalSecrets are secret keys an account schema does not require.
@@ -117,6 +124,15 @@ var authModeRequirements = map[string]authModeRequirement{
 		Required: map[string][]string{
 			"keyPair":  requiredSecrets(authModeSecrets["SOURCE_SNOWFLAKE"]["keyPair"]),
 			"password": requiredSecrets(authModeSecrets["SOURCE_SNOWFLAKE"]["password"]),
+		},
+	},
+	"SOURCE_DATABRICKS": {
+		Key: "authenticationType",
+		Required: map[string][]string{
+			"pat": requiredSecrets(authModeSecrets["SOURCE_DATABRICKS"]["pat"]),
+			// oauth is the one mode that also requires an option, so it is
+			// spelled out rather than derived from the secret set alone.
+			"oauth": append([]string{"oauthClientId"}, requiredSecrets(authModeSecrets["SOURCE_DATABRICKS"]["oauth"])...),
 		},
 	},
 }
@@ -192,6 +208,10 @@ var authModeSecrets = map[string]map[string][]string{
 		"keyPair":  {"privateKey", "privateKeyPassphrase"},
 		"password": {"password"},
 	},
+	"SOURCE_DATABRICKS": {
+		"pat":   {"token"},
+		"oauth": {"oauthClientSecret"},
+	},
 }
 
 // absentAuthModes maps a discriminated definition to the mode an account
@@ -201,6 +221,10 @@ var authModeSecrets = map[string]map[string][]string{
 var absentAuthModes = map[string]string{
 	"SOURCE_BIGQUERY":  "serviceAccountKey",
 	"SOURCE_SNOWFLAKE": "password",
+	// rudder-sources treats any value but "oauth" as a personal access token
+	// (databricks.NewClient sets UseOAuth only on "oauth"), so an account with
+	// no discriminator is a PAT account.
+	"SOURCE_DATABRICKS": "pat",
 }
 
 // authMode is the account's auth mode, or "" for a definition with a single mode.
