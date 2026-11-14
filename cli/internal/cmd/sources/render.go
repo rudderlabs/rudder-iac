@@ -91,7 +91,7 @@ func (t streamTable) row(ev gjson.Result) []string {
 		first(ev, "userId", "anonymousId"),
 	}
 	if t.view == "compact" {
-		row = append(row, value(ev.Get("properties")))
+		row = append(row, value(lastValue(ev, "properties")))
 	}
 	return row
 }
@@ -99,15 +99,49 @@ func (t streamTable) row(ev gjson.Result) []string {
 // lookup walks a dotted path key by key, so gjson path syntax in a key
 // selects nothing by accident.
 func lookup(ev gjson.Result, path string) gjson.Result {
-	for _, key := range strings.Split(path, ".") {
-		ev = ev.Get(gjson.Escape(key))
+	if ev.IsArray() {
+		// The API's field selection keeps every element, so the table does
+		// too: an object takes the rest of the path, anything else stays as
+		// sent, and a missing key shows null to keep the positions.
+		var values []string
+		for _, item := range ev.Array() {
+			if !item.IsObject() {
+				values = append(values, item.Raw)
+				continue
+			}
+			if v := lookup(item, path); v.Exists() {
+				values = append(values, v.Raw)
+				continue
+			}
+			values = append(values, "null")
+		}
+		return gjson.Parse("[" + strings.Join(values, ",") + "]")
+	}
+	key, rest, more := strings.Cut(path, ".")
+	ev = lastValue(ev, key)
+	if more {
+		return lookup(ev, rest)
 	}
 	return ev
 }
 
+// lastValue matches the last-key-wins lookup used by filters and field selection.
+func lastValue(ev gjson.Result, key string) gjson.Result {
+	var found gjson.Result
+	if ev.IsObject() {
+		ev.ForEach(func(k, v gjson.Result) bool {
+			if k.Str == key {
+				found = v
+			}
+			return true
+		})
+	}
+	return found
+}
+
 func first(ev gjson.Result, keys ...string) string {
 	for _, key := range keys {
-		if v := ev.Get(gjson.Escape(key)); v.Exists() {
+		if v := lastValue(ev, key); v.Exists() {
 			return value(v)
 		}
 	}

@@ -61,6 +61,19 @@ func TestHandlerPolicyAllowsOnlyThisOrigin(t *testing.T) {
 		w.Header().Get("Content-Security-Policy"))
 }
 
+func TestPageOffersEveryEventType(t *testing.T) {
+	t.Parallel()
+	for _, typ := range []string{"track", "page", "screen", "identify", "group", "alias", "merge", "audiencelist", "extract", "record"} {
+		t.Run(typ, func(t *testing.T) {
+			t.Parallel()
+			w := serve(http.MethodGet, "/_dev/ui/?type="+typ)
+
+			require.Equal(t, http.StatusOK, w.Code)
+			require.Contains(t, w.Body.String(), `<input type="checkbox" name="type" value="`+typ+`">`)
+		})
+	}
+}
+
 func TestHandlerAnswersHeadWithoutABody(t *testing.T) {
 	t.Parallel()
 

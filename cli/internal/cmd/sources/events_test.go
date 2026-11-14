@@ -397,3 +397,69 @@ func TestReadCommandsTakeTheURLFromTheEnvironment(t *testing.T) {
 	require.Equal(t, []string{"/_dev/v1/events"}, env.sent())
 	require.Equal(t, []string{"/_dev/v1/events"}, flag.sent())
 }
+
+func TestEventsTableFieldsThroughAList(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		body string
+		want string
+	}{
+		{name: "multiple values", body: `{"properties":{"products":[{"sku":"a"},{"sku":"b"}]}}`, want: `["a","b"]`},
+		{name: "missing keys and non-objects keep their place", body: `{"properties":{"products":[{"sku":"a"},{},"x",null,3]}}`, want: `["a",null,"x",null,3]`},
+		{name: "no selected values", body: `{"properties":{"products":[{},"x",null,3]}}`, want: `[null,"x",null,3]`},
+		{name: "a list inside a list stays as sent", body: `{"properties":{"products":[[{"sku":"a","x":1}]]}}`, want: `[[{"sku":"a","x":1}]]`},
+		{name: "empty list", body: `{"properties":{"products":[]}}`, want: `[]`},
+		{name: "missing path", body: `{}`, want: ""},
+		{name: "scalar path", body: `{"properties":{"products":{"sku":"a"}}}`, want: "a"},
+		{name: "JSON values", body: `{"properties":{"products":[{"sku":null},{"sku":false},{"sku":42},{"sku":"a\"b"}]}}`, want: `[null,false,42,"a\"b"]`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rec := newRecorder(t, http.StatusOK, streamHeader, tc.body+"\n")
+
+			stdout, stderr, err := execute("sources", "events", "--url", rec.srv.URL, "--fields", "properties.products.sku")
+
+			require.NoError(t, err)
+			require.Empty(t, stderr)
+			require.Equal(t, "1 events after cursor 0\nPROPERTIES.PRODUCTS.SKU\n"+tc.want+"\n", stdout)
+		})
+	}
+}
+
+func TestEventsTableLastDuplicateKeyWins(t *testing.T) {
+	t.Parallel()
+	const body = `{"originalTimestamp":"old","originalTimestamp":"new","type":"page","type":"track","event":"Old","event":"New","userId":"u1","userId":"u2","properties":{"old":1},"properties":{"sku":"old","sku":"new"}}` + "\n"
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "standard columns",
+			args: []string{"--event", "New"},
+			want: "TIME  TYPE   EVENT  USER\nnew   track  New    u2\n",
+		},
+		{
+			name: "compact properties",
+			args: []string{"--view", "compact"},
+			want: "TIME  TYPE   EVENT  USER  PROPERTIES\nnew   track  New    u2    {\"sku\":\"old\",\"sku\":\"new\"}\n",
+		},
+		{
+			name: "selected field",
+			args: []string{"--fields", "properties.sku"},
+			want: "PROPERTIES.SKU\nnew\n",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rec := newRecorder(t, http.StatusOK, streamHeader, body)
+
+			stdout, stderr, err := execute(append([]string{"sources", "events", "--url", rec.srv.URL}, tc.args...)...)
+
+			require.NoError(t, err)
+			require.Empty(t, stderr)
+			require.Equal(t, "1 events after cursor 0\n"+tc.want, stdout)
+		})
+	}
+}
