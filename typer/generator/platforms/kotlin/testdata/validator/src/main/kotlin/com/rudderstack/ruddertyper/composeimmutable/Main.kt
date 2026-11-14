@@ -205,6 +205,9 @@ typealias PropertySpecialField = String
 /** User account status */
 typealias PropertyStatus = com.rudderstack.ruddertyper.composeimmutable.CustomTypeStatus
 
+/** Previous account statuses */
+typealias PropertyStatusHistory = List<com.rudderstack.ruddertyper.composeimmutable.CustomTypeStatus>
+
 /** Street address */
 typealias PropertyStreet = String
 
@@ -1174,6 +1177,9 @@ data class TrackUserSignedUpProperties(
     /** User account status */
     val status: com.rudderstack.ruddertyper.composeimmutable.PropertyStatus? = null,
 
+    /** Previous account statuses */
+    val statusHistory: com.rudderstack.ruddertyper.composeimmutable.PropertyStatusHistory? = null,
+
     /** Property that can be string or null */
     val stringOrNull: com.rudderstack.ruddertyper.composeimmutable.PropertyStringOrNull? = null,
 
@@ -1327,6 +1333,9 @@ fun TrackUserSignedUpProperties.rudderSerialize(): JsonObject = buildJsonObject 
     }
     if (status != null) {
         put("status", status.rudderSerialize())
+    }
+    if (statusHistory != null) {
+        put("status_history", statusHistory.rudderSerialize())
     }
     if (stringOrNull != null) {
         put("string_or_null", stringOrNull.rudderSerialize())
