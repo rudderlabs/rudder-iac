@@ -1,0 +1,39 @@
+# Generate the Xcode project with XcodeGen (brew install xcodegen), then open it.
+#   cd iosApp && xcodegen generate && open iosApp.xcodeproj
+name: iosApp
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "15.0"
+packages:
+  RudderStackAnalytics:
+    url: https://github.com/rudderlabs/rudder-sdk-swift
+    from: 2.1.0
+targets:
+  iosApp:
+    type: application
+    platform: iOS
+    sources: [iosApp]
+    info:
+      path: iosApp/Info.plist
+      properties:
+        UILaunchScreen: {}
+        # Compose Multiplatform aborts at startup on iPhone without this key.
+        CADisableMinimumFrameDurationOnPhone: true
+    dependencies:
+      - package: RudderStackAnalytics
+    preBuildScripts:
+      - name: Build the Kotlin framework
+        basedOnDependencyAnalysis: false
+        script: |
+          # Xcode does not inherit your shell JAVA_HOME; AGP needs JDK 17+.
+          # Set RUDDER_JAVA_HOME (for example Android Studio's bundled JBR).
+          if [ -n "$RUDDER_JAVA_HOME" ]; then export JAVA_HOME="$RUDDER_JAVA_HOME"; fi
+          cd "$SRCROOT/.."
+          ./gradlew :shared:embedAndSignAppleFrameworkForXcode
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.typerapp.ios
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        FRAMEWORK_SEARCH_PATHS: "$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)"
+        OTHER_LDFLAGS: ["$(inherited)", "-framework", "Shared"]
