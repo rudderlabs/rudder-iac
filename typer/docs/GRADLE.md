@@ -89,3 +89,4 @@ An Android module has one Kotlin compile task per variant, such as `compileDebug
 
 - `typer generate --local --location <dir>` reads YAML specs instead of a snapshot.
 - `rudder-cli typer options --platform kotlin` lists the Kotlin options for `--option key=value`.
+- For Kotlin Multiplatform common code, an iOS target, or a module that cannot depend on the Kotlin SDK, generate with `--option emit=common`. See [KOTLIN_MULTIPLATFORM.md](KOTLIN_MULTIPLATFORM.md).
