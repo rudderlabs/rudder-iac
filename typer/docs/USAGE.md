@@ -53,7 +53,7 @@ The command prints the plan name, version and event count it saved. The file con
 
 ## Platforms and options
 
-`--platform` takes `kotlin`, `swift` or `typescript`. `--option key=value` sets a platform option and can repeat. List the options for a platform with `typer options`:
+`--platform` takes `kotlin`, `swift` or `typescript`, and `generate` requires it. `--option key=value` sets a platform option and can repeat. List the options for a platform with `typer options`:
 
 ```bash
 rudder-cli typer options --platform kotlin
