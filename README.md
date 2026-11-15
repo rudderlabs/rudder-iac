@@ -12,6 +12,8 @@
     - [Linux](#linux)
   - [Docker](#docker)
   - [Build from Source](#build-from-source)
+- [Generating typed tracking code](#generating-typed-tracking-code)
+- [Rate limits](#rate-limits)
 
 ## ⚠️ Work in Progress
 
@@ -119,3 +121,19 @@ To build the Docker image locally:
 ```sh
 make docker-build
 ```
+
+## Generating typed tracking code
+
+`rudder-cli typer` generates typed tracking code for Kotlin, Swift and TypeScript from a tracking plan. It can read the plan from your workspace, from a snapshot file you saved earlier, or from local YAML specs. It can also pin a tracking plan version.
+
+```sh
+rudder-cli typer generate --platform kotlin --tracking-plan-id <id> -o ./generated
+```
+
+See [typer/docs/USAGE.md](typer/docs/USAGE.md) for the commands, the three plan sources and version pinning. To generate during a Gradle build without credentials on the build machine, see [typer/docs/GRADLE.md](typer/docs/GRADLE.md).
+
+## Rate limits
+
+When the RudderStack API answers `429 Too Many Requests`, the CLI waits and sends the request again, for every kind of request. It waits for the time in the `Retry-After` header, up to 2 minutes. Without a usable header it backs off from 2 seconds, doubling each time, up to the same 2 minutes, and it adds up to 10% random delay so that parallel workers do not retry together.
+
+A long `apply` keeps going through rate limiting instead of stopping partway. There is no retry limit on real waits, so press Ctrl-C to stop a run that is stuck waiting. If the server keeps answering with a wait under one second, the CLI gives up after 100 retries and reports the error.
