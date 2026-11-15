@@ -17,33 +17,118 @@ The file needs only `kotlinx-serialization-json`. It contains:
 
 ## What you write
 
-You implement `RudderTyperTransport` once per platform, on top of that platform's SDK. In the example project the Android adapter is 62 lines, most of them a helper that converts maps to `JsonObject`, and the Swift adapter is 33 lines. Shared code only sees `RudderTyper`.
+You implement `RudderTyperTransport` once per platform, on top of that platform's SDK. Shared code only sees `RudderTyper`.
 
-The transport receives plain Kotlin values (`String`, `Boolean`, `Long`, `Double`, `Map`, `List`, `null`), so the interface also works from Swift. `context` holds the `ruddertyper` context (platform, CLI version, tracking plan ID and version) and any `customContext` the caller passed. Send it as the event's custom context.
+The transport receives plain Kotlin values (`String`, `Boolean`, `Long`, `Double`, `Map`, `List`, `null`), so the interface also works from Swift. `context` holds the `ruddertyper` context (platform, CLI version, tracking plan ID and version) and any `customContext` the caller passed. Send it as the event's custom context, which both SDKs accept in the options of an event call.
 
-Android, with the Kotlin SDK:
+### Android, with the Kotlin SDK
+
+Add `com.rudderstack.sdk.kotlin:android` to the Android module. The Kotlin SDK takes `JsonObject` values, so the adapter converts the maps first.
 
 ```kotlin
-class AndroidTransport(private val analytics: Analytics) : RudderTyperTransport {
+import android.app.Application
+import com.example.analytics.RudderTyperTransport
+import com.rudderstack.sdk.kotlin.android.Analytics
+import com.rudderstack.sdk.kotlin.android.Configuration
+import com.rudderstack.sdk.kotlin.core.internals.logger.Logger
+import com.rudderstack.sdk.kotlin.core.internals.models.RudderOption
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+
+/** Implements the generated transport on top of the RudderStack Kotlin SDK. */
+class AndroidTransport(
+    application: Application,
+    writeKey: String,
+    dataPlaneUrl: String,
+    controlPlaneUrl: String = "https://api.rudderstack.com",
+) : RudderTyperTransport {
+    private val analytics = Analytics(
+        Configuration(
+            writeKey = writeKey,
+            application = application,
+            dataPlaneUrl = dataPlaneUrl,
+            controlPlaneUrl = controlPlaneUrl,
+            logLevel = Logger.LogLevel.DEBUG,
+        )
+    )
+
     override fun track(name: String, properties: Map<String, Any?>, context: Map<String, Any?>) {
-        analytics.track(name, properties.toJsonObject(), RudderOption(customContext = context.toJsonObject()))
+        analytics.track(name, properties.toJsonObject(), context.toOption())
     }
-    // identify, group and screen follow the same pattern.
+
+    override fun identify(userId: String, traits: Map<String, Any?>, context: Map<String, Any?>) {
+        analytics.identify(userId, traits.toJsonObject(), context.toOption())
+    }
+
+    override fun group(groupId: String, traits: Map<String, Any?>, context: Map<String, Any?>) {
+        analytics.group(groupId, traits.toJsonObject(), context.toOption())
+    }
+
+    override fun screen(screenName: String, category: String, properties: Map<String, Any?>, context: Map<String, Any?>) {
+        analytics.screen(screenName, category, properties.toJsonObject(), context.toOption())
+    }
+}
+
+private fun Map<String, Any?>.toOption() = RudderOption(customContext = toJsonObject())
+
+private fun Map<String, Any?>.toJsonObject() = JsonObject(mapValues { it.value.toJsonElement() })
+
+private fun Any?.toJsonElement(): JsonElement = when (this) {
+    null -> JsonNull
+    is JsonElement -> this
+    is Boolean -> JsonPrimitive(this)
+    is Number -> JsonPrimitive(this)
+    is String -> JsonPrimitive(this)
+    is Map<*, *> -> JsonObject(entries.associate { (k, v) -> k.toString() to v.toJsonElement() })
+    is Iterable<*> -> JsonArray(map { it.toJsonElement() })
+    else -> JsonPrimitive(toString())
 }
 ```
 
-iOS, with the Swift SDK, implementing the Kotlin interface as a Swift protocol:
+### iOS, with the Swift SDK
+
+Add the `rudder-sdk-swift` package to the iOS app, and link the shared Kotlin module as a framework named `Shared`. Kotlin exports `RudderTyperTransport` as a Swift protocol, and the `Map` values arrive as `[String: Any]`.
 
 ```swift
+import Foundation
+import RudderStackAnalytics
+import Shared
+
+/// Implements the generated Kotlin RudderTyperTransport protocol on top of the RudderStack Swift SDK.
 final class IosTransport: RudderTyperTransport {
+    private let analytics: Analytics
+
+    init(writeKey: String, dataPlaneUrl: String, controlPlaneUrl: String) {
+        analytics = Analytics(configuration: Configuration(
+            writeKey: writeKey,
+            dataPlaneUrl: dataPlaneUrl,
+            controlPlaneUrl: controlPlaneUrl,
+            logLevel: .debug
+        ))
+    }
+
     func track(name: String, properties: [String: Any], context: [String: Any]) {
         analytics.track(name: name, properties: properties, options: RudderOption(customContext: context))
     }
-    // identify, group and screen follow the same pattern.
+
+    func identify(userId: String, traits: [String: Any], context: [String: Any]) {
+        analytics.identify(userId: userId, traits: traits, options: RudderOption(customContext: context))
+    }
+
+    func group(groupId: String, traits: [String: Any], context: [String: Any]) {
+        analytics.group(groupId: groupId, traits: traits, options: RudderOption(customContext: context))
+    }
+
+    func screen(screenName: String, category: String, properties: [String: Any], context: [String: Any]) {
+        analytics.screen(screenName: screenName, category: category, properties: properties, options: RudderOption(customContext: context))
+    }
 }
 ```
 
-[`examples/compose-multiplatform`](../examples/compose-multiplatform) has both adapters and a Compose screen that calls the typed client from `commonMain`.
+Create the transport in each app and hand it to the shared code, for example through a Compose Multiplatform entry point that takes a `RudderTyperTransport`.
 
 ## Switching between workspaces
 
@@ -62,6 +147,6 @@ Pick the pair at runtime, the same way you pick the data plane URL. The models o
 
 ## Tested with
 
-The example project builds and runs with Kotlin 2.2.21, Compose Multiplatform 1.9.3, Android Gradle Plugin 8.12.3, Kotlin SDK 2.2.0 (`com.rudderstack.sdk.kotlin:android`) and Swift SDK 2.1.0, on an Android emulator and an iPhone simulator. It has not been run on a physical iOS device. The Swift SDK receives the Kotlin `Map` values as `[String: Any]`.
+The adapters above were built and run with Kotlin 2.2.21, Compose Multiplatform 1.9.3, Android Gradle Plugin 8.12.3, Kotlin SDK 2.2.0 and Swift SDK 2.1.0, on an Android emulator and an iPhone simulator. They have not been run on a physical iOS device.
 
 To generate without credentials on the build machine, use a snapshot file. See [GRADLE.md](GRADLE.md).
