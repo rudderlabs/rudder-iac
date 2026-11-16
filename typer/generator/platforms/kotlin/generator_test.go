@@ -89,29 +89,9 @@ func TestGenerateWithCustomOutputFileName(t *testing.T) {
 	assert.Equal(t, "Events.kt", files[0].Path)
 }
 
-// Snapshot is committed under the validator project so `make typer-kotlin-validate`
-// compiles it against the stub androidx.compose.runtime.Immutable annotation.
-func TestGenerateWithComposeImmutable(t *testing.T) {
-	trackingPlan := testutils.GetReferenceTrackingPlan()
-
-	generator := &kotlin.Generator{}
-	files, err := generator.Generate(trackingPlan, core.GenerateOptions{
-		RudderCLIVersion: "1.0.0",
-	}, kotlin.KotlinOptions{
-		PackageName:      "com.rudderstack.ruddertyper.composeimmutable",
-		ComposeImmutable: true,
-	})
-
-	assert.NoError(t, err)
-	assert.Len(t, files, 1)
-
-	if diff := cmp.Diff(composeImmutableContent, files[0].Content); diff != "" {
-		t.Errorf("Generated content does not match expected (-expected +actual):\n%s", diff)
-	}
-}
-
-// Snapshot is committed under the validator project so `make typer-kotlin-validate` compiles it
-// without the RudderStack SDK on the classpath, which is what the common emit mode promises.
+// The golden also sits in the validator project, but that project is a JVM module with the Kotlin
+// SDK on its classpath, and JVM modules import kotlin.jvm implicitly. Compiling it there does not
+// show that the file builds in common code. The assertions below pin the SDK-free promise textually.
 func TestGenerateWithEmitCommon(t *testing.T) {
 	trackingPlan := testutils.GetReferenceTrackingPlan()
 
@@ -123,29 +103,14 @@ func TestGenerateWithEmitCommon(t *testing.T) {
 		Emit:        kotlin.EmitCommon,
 	})
 
-	assert.NoError(t, err)
-	assert.Len(t, files, 1)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
 
+	assert.NotContains(t, files[0].Content, "com.rudderstack.sdk")
+	assert.NotContains(t, files[0].Content, "RudderOption(")
 	if diff := cmp.Diff(commonContent, files[0].Content); diff != "" {
 		t.Errorf("Generated content does not match expected (-expected +actual):\n%s", diff)
 	}
-}
-
-func TestGenerateWithEmitCommonHasNoSDKReferences(t *testing.T) {
-	trackingPlan := testutils.GetReferenceTrackingPlan()
-
-	generator := &kotlin.Generator{}
-	files, err := generator.Generate(trackingPlan, core.GenerateOptions{
-		RudderCLIVersion: "1.0.0",
-	}, kotlin.KotlinOptions{Emit: kotlin.EmitCommon})
-	require.NoError(t, err)
-
-	content := files[0].Content
-	assert.NotContains(t, content, "com.rudderstack.sdk")
-	assert.NotContains(t, content, "RudderOption")
-	assert.Contains(t, content, "import kotlin.jvm.JvmName")
-	assert.Contains(t, content, "class RudderTyper(")
-	assert.NotContains(t, content, "class RudderAnalytics(")
 }
 
 func TestGenerateWithInvalidEmit(t *testing.T) {

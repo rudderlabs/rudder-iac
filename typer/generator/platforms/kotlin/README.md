@@ -627,6 +627,24 @@ The Kotlin generator supports options to customize code generation behavior. Opt
 **Default:** `Main.kt`
 **Description:** Name of the generated Kotlin file (e.g., `MyEvents.kt`).
 
+#### `emit`
+
+**Type:** `string`
+**Default:** `all`
+**Description:** What to generate. Allowed values are `all` and `common`. Any other value fails with `invalid emit value "<value>": must be "all" or "common"`.
+
+- `all` writes the models and a `RudderAnalytics` client that calls the RudderStack Kotlin SDK (`Analytics`, `RudderOption`). The file needs the SDK on the classpath, so it doesn't compile in Kotlin Multiplatform common code or for iOS.
+- `common` writes the models and an SDK-free `RudderTyper` client. The file imports only `kotlinx-serialization-json` and `kotlin.jvm.JvmName`. `RudderTyper` sends events through a `RudderTyperTransport` that the app implements once for each platform, on the Kotlin SDK for Android and the Swift SDK for iOS.
+
+##### Shape of the `common` output
+
+- `RudderTyperTransport` has four methods (`track`, `identify`, `group`, `screen`). Each ends with a `RudderTyperOptions` parameter, a class that holds `context` and `integrations`, so a later release can add fields without breaking transports that apps have written.
+- `RudderTyper(transport, trackingPlanId, trackingPlanVersion)` defaults both values to the generated plan. The version has to exist for that plan, because RudderStack drops an event that names a version the plan doesn't have.
+- Traits for `identify` and `group` always go through the `traits` parameter, whichever identity section the rule uses.
+- Values in the maps are `String`, `Boolean`, `Long`, `Double`, `Map`, `List` and `null`. Swift receives a Kotlin `Boolean` as `KotlinBoolean`, an `NSNumber`, which the Swift SDK encodes as `1` or `0`. The iOS transport has to convert it to a Swift `Bool`, recursively.
+
+The reference output for this mode is `testdata/validator/.../common/Main.kt`. The Docker validator compiles it as a JVM file with the SDK on the classpath, so it doesn't prove the file builds in common code.
+
 #### `composeImmutable`
 
 **Type:** `bool`

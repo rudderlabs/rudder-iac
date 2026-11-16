@@ -13,7 +13,6 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
-// Common code has no implicit kotlin.jvm imports, and the generated serializers need this one.
 import kotlin.jvm.JvmName
 
 private fun Unit.rudderSerialize(): JsonObject = buildJsonObject {}
@@ -1344,23 +1343,44 @@ private fun JsonElement.toTransportValue(): Any? = when (this) {
 private fun JsonObject.toTransportMap(): Map<String, Any?> = mapValues { it.value.toTransportValue() }
 
 /**
+ * Per-event options that [RudderTyper] hands to a [RudderTyperTransport].
+ *
+ * [context] is custom context for the event. When a transport receives it, it already holds the
+ * ruddertyper context (platform, CLI version, tracking plan ID and version) next to any custom
+ * context the caller passed. Attach it to the event as custom context, which both the Kotlin and
+ * the Swift SDK accept in the options of an event call.
+ *
+ * [integrations] turns destinations on or off for the event, for example `mapOf("All" to true)`.
+ * Attach it as the integrations of the event's options.
+ *
+ * This is a class so that a later release can add fields without breaking the transports you have
+ * already written.
+ */
+data class RudderTyperOptions(
+    val context: Map<String, Any?> = emptyMap(),
+    val integrations: Map<String, Any?> = emptyMap(),
+)
+
+/**
  * Sends the events built by [RudderTyper] through a RudderStack SDK.
  *
  * Implement it once per platform on top of that platform's SDK, for example the Kotlin SDK on
  * Android and the Swift SDK on iOS. Values are plain Kotlin types (String, Boolean, Long, Double,
- * Map, List, null) so that the interface also bridges to Swift.
+ * Map, List, null).
  *
- * [context] holds the ruddertyper context and any custom context. Attach it to the event as custom
- * context, which both the Kotlin and the Swift SDK accept in the options of an event call.
+ * Swift receives a Kotlin Boolean as KotlinBoolean, a subclass of NSNumber, and the Swift SDK
+ * encodes an NSNumber as an integer, so `true` would go out as `1`. In the iOS transport, convert
+ * every KotlinBoolean to a Swift Bool, including the ones inside nested maps and lists, before you
+ * pass the values to the SDK.
  */
 interface RudderTyperTransport {
-    fun track(name: String, properties: Map<String, Any?> = emptyMap(), context: Map<String, Any?> = emptyMap())
+    fun track(name: String, properties: Map<String, Any?> = emptyMap(), options: RudderTyperOptions)
 
-    fun identify(userId: String, traits: Map<String, Any?> = emptyMap(), context: Map<String, Any?> = emptyMap())
+    fun identify(userId: String, traits: Map<String, Any?> = emptyMap(), options: RudderTyperOptions)
 
-    fun group(groupId: String, traits: Map<String, Any?> = emptyMap(), context: Map<String, Any?> = emptyMap())
+    fun group(groupId: String, traits: Map<String, Any?> = emptyMap(), options: RudderTyperOptions)
 
-    fun screen(screenName: String, category: String = "", properties: Map<String, Any?> = emptyMap(), context: Map<String, Any?> = emptyMap())
+    fun screen(screenName: String, category: String, properties: Map<String, Any?> = emptyMap(), options: RudderTyperOptions)
 }
 
 /**
@@ -1380,7 +1400,9 @@ interface RudderTyperTransport {
  * ```
  *
  * To send events to another workspace, for example staging, pass that workspace's tracking plan
- * ID and version: `RudderTyper(transport, trackingPlanId = "...", trackingPlanVersion = 3)`.
+ * ID and version: `RudderTyper(transport, trackingPlanId = "...", trackingPlanVersion = 3)`. The
+ * version has to exist for that plan. RudderStack validates the event against the plan version it
+ * names, and an event that names a version the plan doesn't have is dropped without a violation.
  */
 class RudderTyper(
     private val transport: RudderTyperTransport,
@@ -1392,9 +1414,12 @@ class RudderTyper(
             "platform" to "kotlin",
             "rudderCLIVersion" to "1.0.0",
             "trackingPlanId" to trackingPlanId,
-            "trackingPlanVersion" to trackingPlanVersion,
+            "trackingPlanVersion" to trackingPlanVersion.toLong(),
         ),
     )
+
+    private fun merge(options: RudderTyperOptions) =
+        RudderTyperOptions(context = context + options.context, integrations = options.integrations)
 
     /**
      * Group association event
@@ -1404,12 +1429,13 @@ class RudderTyper(
      *
      * @param groupId
      * @param traits The traits to include with this event
-     * @param customContext Optional custom context to add to this event
+     * @param options Optional per-event options: custom context and integrations
      */
-    fun group(groupId: String, traits: GroupTraits, customContext: Map<String, Any?> = emptyMap()) {
+    fun group(groupId: String, traits: GroupTraits, options: RudderTyperOptions = RudderTyperOptions()) {
         transport.group(
             groupId = groupId,
-            context = context + mapOf("traits" to traits.rudderSerialize().toTransportMap()) + customContext
+            traits = traits.rudderSerialize().toTransportMap(),
+            options = merge(options)
         )
     }
 
@@ -1421,13 +1447,13 @@ class RudderTyper(
      *
      * @param userId
      * @param traits The traits to include with this event
-     * @param customContext Optional custom context to add to this event
+     * @param options Optional per-event options: custom context and integrations
      */
-    fun identify(userId: String = "", traits: IdentifyTraits, customContext: Map<String, Any?> = emptyMap()) {
+    fun identify(userId: String = "", traits: IdentifyTraits, options: RudderTyperOptions = RudderTyperOptions()) {
         transport.identify(
             userId = userId,
             traits = traits.rudderSerialize().toTransportMap(),
-            context = context + customContext
+            options = merge(options)
         )
     }
 
@@ -1440,14 +1466,14 @@ class RudderTyper(
      * @param screenName
      * @param category
      * @param properties The properties to include with this event
-     * @param customContext Optional custom context to add to this event
+     * @param options Optional per-event options: custom context and integrations
      */
-    fun screen(screenName: String, category: String = "", properties: ScreenProperties, customContext: Map<String, Any?> = emptyMap()) {
+    fun screen(screenName: String, category: String = "", properties: ScreenProperties, options: RudderTyperOptions = RudderTyperOptions()) {
         transport.screen(
             screenName = screenName,
             category = category,
             properties = properties.rudderSerialize().toTransportMap(),
-            context = context + customContext
+            options = merge(options)
         )
     }
 
@@ -1459,13 +1485,13 @@ class RudderTyper(
      *   Identity Section: "properties"
      *
      * @param properties The properties to include with this event
-     * @param customContext Optional custom context to add to this event
+     * @param options Optional per-event options: custom context and integrations
      */
-    fun trackVariableString(properties: TrackVariableStringProperties, customContext: Map<String, Any?> = emptyMap()) {
+    fun trackVariableString(properties: TrackVariableStringProperties, options: RudderTyperOptions = RudderTyperOptions()) {
         transport.track(
             name = "\$Variable\$String",
             properties = properties.rudderSerialize().toTransportMap(),
-            context = context + customContext
+            options = merge(options)
         )
     }
 
@@ -1477,13 +1503,13 @@ class RudderTyper(
      *   Identity Section: "properties"
      *
      * @param properties The properties to include with this event
-     * @param customContext Optional custom context to add to this event
+     * @param options Optional per-event options: custom context and integrations
      */
-    fun trackEventWithNameCamelCase(properties: TrackEventWithNameCamelCaseProperties, customContext: Map<String, Any?> = emptyMap()) {
+    fun trackEventWithNameCamelCase(properties: TrackEventWithNameCamelCaseProperties, options: RudderTyperOptions = RudderTyperOptions()) {
         transport.track(
             name = "\$eventWithNameCamelCase\$!",
             properties = properties.rudderSerialize().toTransportMap(),
-            context = context + customContext
+            options = merge(options)
         )
     }
 
@@ -1493,12 +1519,12 @@ class RudderTyper(
      * Event:
      *   Name: "Empty Event No Additional Props"
      *   Identity Section: "properties"
-     * @param customContext Optional custom context to add to this event
+     * @param options Optional per-event options: custom context and integrations
      */
-    fun trackEmptyEventNoAdditionalProps(customContext: Map<String, Any?> = emptyMap()) {
+    fun trackEmptyEventNoAdditionalProps(options: RudderTyperOptions = RudderTyperOptions()) {
         transport.track(
             name = "Empty Event No Additional Props",
-            context = context + customContext
+            options = merge(options)
         )
     }
 
@@ -1510,13 +1536,13 @@ class RudderTyper(
      *   Identity Section: "properties"
      *
      * @param properties The properties to include with this event
-     * @param customContext Optional custom context to add to this event
+     * @param options Optional per-event options: custom context and integrations
      */
-    fun trackEmptyEventWithAdditionalProps(properties: TrackEmptyEventWithAdditionalPropsProperties, customContext: Map<String, Any?> = emptyMap()) {
+    fun trackEmptyEventWithAdditionalProps(properties: TrackEmptyEventWithAdditionalPropsProperties, options: RudderTyperOptions = RudderTyperOptions()) {
         transport.track(
             name = "Empty Event With Additional Props",
             properties = properties.rudderSerialize().toTransportMap(),
-            context = context + customContext
+            options = merge(options)
         )
     }
 
@@ -1528,13 +1554,13 @@ class RudderTyper(
      *   Identity Section: "properties"
      *
      * @param properties The properties to include with this event
-     * @param customContext Optional custom context to add to this event
+     * @param options Optional per-event options: custom context and integrations
      */
-    fun trackEventWithVariants(properties: TrackEventWithVariantsProperties, customContext: Map<String, Any?> = emptyMap()) {
+    fun trackEventWithVariants(properties: TrackEventWithVariantsProperties, options: RudderTyperOptions = RudderTyperOptions()) {
         transport.track(
             name = "Event With Variants",
             properties = properties.rudderSerialize().toTransportMap(),
-            context = context + customContext
+            options = merge(options)
         )
     }
 
@@ -1546,13 +1572,13 @@ class RudderTyper(
      *   Identity Section: "properties"
      *
      * @param properties The properties to include with this event
-     * @param customContext Optional custom context to add to this event
+     * @param options Optional per-event options: custom context and integrations
      */
-    fun trackProductPremiumClicked(properties: TrackProductPremiumClickedProperties, customContext: Map<String, Any?> = emptyMap()) {
+    fun trackProductPremiumClicked(properties: TrackProductPremiumClickedProperties, options: RudderTyperOptions = RudderTyperOptions()) {
         transport.track(
             name = "Product \"Premium\" Clicked",
             properties = properties.rudderSerialize().toTransportMap(),
-            context = context + customContext
+            options = merge(options)
         )
     }
 
@@ -1564,13 +1590,13 @@ class RudderTyper(
      *   Identity Section: "properties"
      *
      * @param properties The properties to include with this event
-     * @param customContext Optional custom context to add to this event
+     * @param options Optional per-event options: custom context and integrations
      */
-    fun trackUserSignedUp(properties: TrackUserSignedUpProperties, customContext: Map<String, Any?> = emptyMap()) {
+    fun trackUserSignedUp(properties: TrackUserSignedUpProperties, options: RudderTyperOptions = RudderTyperOptions()) {
         transport.track(
             name = "User Signed Up",
             properties = properties.rudderSerialize().toTransportMap(),
-            context = context + customContext
+            options = merge(options)
         )
     }
 
@@ -1582,13 +1608,13 @@ class RudderTyper(
      *   Identity Section: "properties"
      *
      * @param properties The properties to include with this event
-     * @param customContext Optional custom context to add to this event
+     * @param options Optional per-event options: custom context and integrations
      */
-    fun trackEventWithNameCamelCase1(properties: TrackEventWithNameCamelCaseProperties1, customContext: Map<String, Any?> = emptyMap()) {
+    fun trackEventWithNameCamelCase1(properties: TrackEventWithNameCamelCaseProperties1, options: RudderTyperOptions = RudderTyperOptions()) {
         transport.track(
             name = "eventWithNameCamelCase",
             properties = properties.rudderSerialize().toTransportMap(),
-            context = context + customContext
+            options = merge(options)
         )
     }
 }

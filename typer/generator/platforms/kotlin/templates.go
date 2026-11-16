@@ -24,6 +24,9 @@ var rudderanalyticsTemplate string
 //go:embed templates/ruddertyper.tmpl
 var ruddertyperTemplate string
 
+//go:embed templates/eventmethod.tmpl
+var eventmethodTemplate string
+
 //go:embed templates/enum.tmpl
 var enumTemplate string
 
@@ -85,6 +88,11 @@ func GenerateFile(path string, ctx *KotlinContext) (*core.File, error) {
 	}
 
 	_, err = tmpl.New("ruddertyper.tmpl").Parse(ruddertyperTemplate)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tmpl.New("eventmethod.tmpl").Parse(eventmethodTemplate)
 	if err != nil {
 		return nil, err
 	}
