@@ -14,12 +14,15 @@ The file needs only `kotlinx-serialization-json`. It contains:
 - The models: data classes, enums, sealed classes and `rudderSerialize()` functions.
 - `RudderTyper`, a client with one typed method per event, such as `trackProductClicked(properties)`.
 - `RudderTyperTransport`, a four-method interface (`track`, `identify`, `group`, `screen`) that `RudderTyper` calls.
+- `RudderTyperOptions`, the per-event custom context and integrations that every transport method receives.
 
 ## What you write
 
 You implement `RudderTyperTransport` once per platform, on top of that platform's SDK. Shared code only sees `RudderTyper`.
 
-The transport receives plain Kotlin values (`String`, `Boolean`, `Long`, `Double`, `Map`, `List`, `null`), so the interface also works from Swift. `context` holds the `ruddertyper` context (platform, CLI version, tracking plan ID and version) and any `customContext` the caller passed. Send it as the event's custom context, which both SDKs accept in the options of an event call.
+Every transport method ends with a `RudderTyperOptions` parameter, a class with two fields. `context` is custom context for the event, and it already holds the `ruddertyper` context (platform, CLI version, tracking plan ID and version) next to any custom context the caller passed. `integrations` turns destinations on or off for the event. Attach both to the SDK's event options. Because the options are a class, a later release can add a field without breaking the transports you wrote.
+
+The maps hold plain Kotlin values (`String`, `Boolean`, `Long`, `Double`, `Map`, `List`, `null`).
 
 ### Android, with the Kotlin SDK
 
@@ -27,6 +30,7 @@ Add `com.rudderstack.sdk.kotlin:android` to the Android module. The Kotlin SDK t
 
 ```kotlin
 import android.app.Application
+import com.example.analytics.RudderTyperOptions
 import com.example.analytics.RudderTyperTransport
 import com.rudderstack.sdk.kotlin.android.Analytics
 import com.rudderstack.sdk.kotlin.android.Configuration
@@ -55,24 +59,25 @@ class AndroidTransport(
         )
     )
 
-    override fun track(name: String, properties: Map<String, Any?>, context: Map<String, Any?>) {
-        analytics.track(name, properties.toJsonObject(), context.toOption())
+    override fun track(name: String, properties: Map<String, Any?>, options: RudderTyperOptions) {
+        analytics.track(name, properties.toJsonObject(), options.toOption())
     }
 
-    override fun identify(userId: String, traits: Map<String, Any?>, context: Map<String, Any?>) {
-        analytics.identify(userId, traits.toJsonObject(), context.toOption())
+    override fun identify(userId: String, traits: Map<String, Any?>, options: RudderTyperOptions) {
+        analytics.identify(userId, traits.toJsonObject(), options.toOption())
     }
 
-    override fun group(groupId: String, traits: Map<String, Any?>, context: Map<String, Any?>) {
-        analytics.group(groupId, traits.toJsonObject(), context.toOption())
+    override fun group(groupId: String, traits: Map<String, Any?>, options: RudderTyperOptions) {
+        analytics.group(groupId, traits.toJsonObject(), options.toOption())
     }
 
-    override fun screen(screenName: String, category: String, properties: Map<String, Any?>, context: Map<String, Any?>) {
-        analytics.screen(screenName, category, properties.toJsonObject(), context.toOption())
+    override fun screen(screenName: String, category: String, properties: Map<String, Any?>, options: RudderTyperOptions) {
+        analytics.screen(screenName, category, properties.toJsonObject(), options.toOption())
     }
 }
 
-private fun Map<String, Any?>.toOption() = RudderOption(customContext = toJsonObject())
+private fun RudderTyperOptions.toOption() =
+    RudderOption(integrations = integrations.toJsonObject(), customContext = context.toJsonObject())
 
 private fun Map<String, Any?>.toJsonObject() = JsonObject(mapValues { it.value.toJsonElement() })
 
@@ -90,7 +95,9 @@ private fun Any?.toJsonElement(): JsonElement = when (this) {
 
 ### iOS, with the Swift SDK
 
-Add the `rudder-sdk-swift` package to the iOS app, and link the shared Kotlin module as a framework named `Shared`. Kotlin exports `RudderTyperTransport` as a Swift protocol, and the `Map` values arrive as `[String: Any]`.
+Add the `rudder-sdk-swift` package to the iOS app, and link the shared Kotlin module as a framework named `Shared`. Kotlin exports `RudderTyperTransport` as a Swift protocol, and the maps arrive as `[String: Any]`.
+
+Convert every Kotlin `Boolean` to a Swift `Bool` before you pass the values to the SDK. Swift receives a Kotlin `Boolean` as `KotlinBoolean`, a subclass of `NSNumber`, and the Swift SDK encodes an `NSNumber` as an integer, so `true` would go out as `1`. The `plainMap` function below does the conversion, including for nested maps and lists.
 
 ```swift
 import Foundation
@@ -110,25 +117,44 @@ final class IosTransport: RudderTyperTransport {
         ))
     }
 
-    func track(name: String, properties: [String: Any], context: [String: Any]) {
-        analytics.track(name: name, properties: properties, options: RudderOption(customContext: context))
+    func track(name: String, properties: [String: Any], options: RudderTyperOptions) {
+        analytics.track(name: name, properties: plainMap(properties), options: options.toOption())
     }
 
-    func identify(userId: String, traits: [String: Any], context: [String: Any]) {
-        analytics.identify(userId: userId, traits: traits, options: RudderOption(customContext: context))
+    func identify(userId: String, traits: [String: Any], options: RudderTyperOptions) {
+        analytics.identify(userId: userId, traits: plainMap(traits), options: options.toOption())
     }
 
-    func group(groupId: String, traits: [String: Any], context: [String: Any]) {
-        analytics.group(groupId: groupId, traits: traits, options: RudderOption(customContext: context))
+    func group(groupId: String, traits: [String: Any], options: RudderTyperOptions) {
+        analytics.group(groupId: groupId, traits: plainMap(traits), options: options.toOption())
     }
 
-    func screen(screenName: String, category: String, properties: [String: Any], context: [String: Any]) {
-        analytics.screen(screenName: screenName, category: category, properties: properties, options: RudderOption(customContext: context))
+    func screen(screenName: String, category: String, properties: [String: Any], options: RudderTyperOptions) {
+        analytics.screen(screenName: screenName, category: category, properties: plainMap(properties), options: options.toOption())
     }
+}
+
+private extension RudderTyperOptions {
+    func toOption() -> RudderOption {
+        RudderOption(integrations: plainMap(integrations), customContext: plainMap(context))
+    }
+}
+
+/// Kotlin Boolean values reach Swift as KotlinBoolean, an NSNumber. The Swift SDK encodes an NSNumber
+/// as an integer, so a Kotlin `true` would go out as 1. Unwrap them to Swift Bool, recursively.
+private func plainMap(_ map: [String: Any]) -> [String: Any] {
+    map.mapValues(plainValue)
+}
+
+private func plainValue(_ value: Any) -> Any {
+    if let boolean = value as? KotlinBoolean { return boolean.boolValue }
+    if let map = value as? [String: Any] { return plainMap(map) }
+    if let list = value as? [Any] { return list.map(plainValue) }
+    return value
 }
 ```
 
-Create the transport in each app and hand it to the shared code, for example through a Compose Multiplatform entry point that takes a `RudderTyperTransport`.
+Create the transport in each app and pass it to your shared code, for example through the entry point of a Compose Multiplatform screen.
 
 ## Switching between workspaces
 
@@ -140,13 +166,16 @@ val typer = RudderTyper(transport, trackingPlanId = "tp_staging_plan", trackingP
 
 Pick the pair at runtime, the same way you pick the data plane URL. The models only match if both workspaces have the same event shapes at the versions you choose.
 
+The version has to exist for that plan. RudderStack validates an event against the plan version it names, and drops an event that names a version the plan doesn't have, without reporting a violation.
+
 ## Differences from `emit=all`
 
-- `RudderTyper` takes `customContext: Map<String, Any?>` where `RudderAnalytics` takes the SDK's `RudderOption`. Integration toggles are not available through it. Call the SDK directly for those.
+- `RudderTyper` methods take `options: RudderTyperOptions` where `RudderAnalytics` methods take the SDK's `RudderOption`. It carries custom context and integrations, which are the parts of `RudderOption` that the typed client uses.
+- `identify` and `group` always send traits through the `traits` argument of the transport, whichever identity section the rule uses.
 - The generated file imports `kotlin.jvm.JvmName`, because common code has no implicit `kotlin.jvm` imports.
 
 ## Tested with
 
-The adapters above were built and run with Kotlin 2.2.21, Compose Multiplatform 1.9.3, Android Gradle Plugin 8.12.3, Kotlin SDK 2.2.0 and Swift SDK 2.1.0, on an Android emulator and an iPhone simulator. They have not been run on a physical iOS device.
+The adapters above were built and run with Kotlin 2.2.21, Compose Multiplatform 1.9.3, Android Gradle Plugin 8.12.3, Kotlin SDK 2.2.0 and Swift SDK 2.1.0, on an Android emulator and an iPhone simulator. They have not been run on a physical iOS device. A typed event with a boolean property, custom context and integrations was sent from the iPhone simulator, and the data plane received `true`, not `1`.
 
 To generate without credentials on the build machine, use a snapshot file. See [GRADLE.md](GRADLE.md).
