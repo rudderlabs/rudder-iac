@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -202,4 +204,27 @@ func TestOAuthDefinitionIsRecognised(t *testing.T) {
 	keys, ok := secretKeys(oauthDefinition)
 	require.True(t, ok)
 	assert.Empty(t, keys)
+}
+
+// An OAuth account nobody has adopted is importable: 'import workspace' writes
+// it a spec under a proposed external id, carrying the remote account's ID as
+// import metadata, so the apply that follows adopts the account instead of
+// trying to create one (which the API refuses).
+func TestOAuthUnmanagedAccountIsExportedForAdoption(t *testing.T) {
+	t.Parallel()
+	h := &HandlerImpl{store: &mockStore{}}
+
+	entities, entries, err := h.FormatForExport(
+		map[string]*RemoteAccount{"google-ads-prod": oauthRemote("")},
+		nil, nil,
+	)
+	require.NoError(t, err)
+
+	require.Len(t, entities, 1)
+	assert.Equal(t, "accounts/google-ads-prod.yaml", entities[0].RelativePath)
+	assert.Equal(t, []importmanifest.ImportEntry{{
+		WorkspaceID: "ws-1",
+		URN:         resources.URN("google-ads-prod", AccountResourceType),
+		RemoteID:    "remote-oauth-1",
+	}}, entries)
 }

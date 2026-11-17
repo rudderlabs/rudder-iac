@@ -1,6 +1,7 @@
 package destination
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -103,8 +104,10 @@ func withAccountRef(destinationType string, config map[string]any) error {
 // left in a spec for such a type is caught at plan time by
 // checkAdoptedAccountLiterals rather than diffing silently.
 //
-// An account the CLI does not manage keeps its literal id on both sides, which
-// is equally drift-free and is the only option: there is no URN to point at.
+// An account nobody has adopted keeps its literal id on both sides: there is no
+// URN to point at. For a type that supports references that state is transient —
+// 'import workspace' writes such an account a spec with a proposed external id,
+// and the apply that adopts it moves both sides to the reference form.
 func remoteAccountRef(destinationType string, config map[string]any, urnResolver handler.URNResolver) error {
 	remoteID, ok := config[accountConfigKey].(string)
 	if !ok || remoteID == "" || !accounts.SupportsReference(destinationType) {
@@ -112,7 +115,14 @@ func remoteAccountRef(destinationType string, config map[string]any, urnResolver
 	}
 	urn, err := urnResolver.GetURNByID(accounts.AccountResourceType, remoteID)
 	if err != nil {
-		if err == resources.ErrRemoteResourceExternalIdNotFound {
+		// Not adopted by this project, so there is no URN and the literal
+		// stays. Both not-found errors mean that: the remote collection holds
+		// only accounts that already carry an external ID, so an unadopted
+		// account is missing outright rather than present without one. This is
+		// the state of every pipeline whose account nobody has adopted, which
+		// is why it cannot be an error.
+		if errors.Is(err, resources.ErrRemoteResourceNotFound) ||
+			errors.Is(err, resources.ErrRemoteResourceExternalIdNotFound) {
 			return nil
 		}
 		return fmt.Errorf("resolving account URN for %q: %w", remoteID, err)
@@ -124,7 +134,8 @@ func remoteAccountRef(destinationType string, config map[string]any, urnResolver
 // exportAccountRef rewrites the config's literal account id to a
 // "#account:<id>" reference for a type that supports one, so an imported
 // project names the account spec that import writes beside it. A type without
-// the capability, or an account the CLI does not manage, keeps the literal.
+// the capability, or an account whose definition the CLI does not recognise,
+// keeps the literal.
 func exportAccountRef(destinationType string, config map[string]any, inputResolver resolver.ReferenceResolver) error {
 	remoteID, ok := config[accountConfigKey].(string)
 	if !ok || remoteID == "" || !accounts.SupportsReference(destinationType) {
@@ -132,8 +143,12 @@ func exportAccountRef(destinationType string, config map[string]any, inputResolv
 	}
 	ref, err := inputResolver.ResolveToReference(accounts.AccountResourceType, remoteID)
 	if err != nil {
-		// The account is not in this import and not managed, so there is
-		// nothing to reference. The literal is correct and still applies.
+		// Nothing to reference. For a type that supports references an account
+		// of a registered definition always resolves — an unadopted one is in
+		// the importable set and gets a spec with a proposed external id — so
+		// this is an account the CLI does not recognise, such as one from the
+		// legacy role-keyed OAuth flow. Remote state keeps the literal for that
+		// same account, so the two sides agree.
 		return nil
 	}
 	config[accountConfigKey] = ref

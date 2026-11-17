@@ -185,7 +185,12 @@ func (r urnResolver) GetURNByID(resourceType string, remoteID string) (string, e
 		if urn, ok := r.accountURNByID[remoteID]; ok {
 			return urn, nil
 		}
-		return "", resources.ErrRemoteResourceExternalIdNotFound
+		// The real collection holds only accounts that already carry an
+		// external ID (LoadRemoteResources lists with WithHasExternalID(true)),
+		// so an unadopted account is missing outright rather than present
+		// without one. Answering ErrRemoteResourceExternalIdNotFound here would
+		// hide that the remote mapping has to tolerate both.
+		return "", resources.ErrRemoteResourceNotFound
 	}
 	return "", resources.ErrRemoteResourceExternalIdNotFound
 }

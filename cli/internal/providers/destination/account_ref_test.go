@@ -151,6 +151,10 @@ func TestAccountRef_RemoteStateMatchesSpec(t *testing.T) {
 
 // An account the CLI does not manage has no URN to point at, so both sides keep
 // the literal id. That is equally drift-free.
+// A capable type whose account nobody has adopted: the account is absent from
+// the remote collection, so the literal stays on the remote side and matches the
+// literal a spec carries. This is the state of every pipeline today, so the
+// lookup miss must not fail the mapping.
 func TestAccountRef_UnmanagedRemoteAccountStaysLiteral(t *testing.T) {
 	t.Parallel()
 
@@ -347,8 +351,11 @@ func TestAccountRef_ExportWritesAReferenceForACapableType(t *testing.T) {
 		"an imported spec must name the account spec written beside it")
 }
 
-// An account the CLI does not manage has no reference to write.
-func TestAccountRef_ExportKeepsTheLiteralForAnUnmanagedAccount(t *testing.T) {
+// An account that resolves to nothing has no reference to write. For a capable
+// type that means a definition the CLI does not recognise, such as an account
+// from the legacy role-keyed OAuth flow: an unadopted account of a registered
+// definition is in the importable set and does resolve.
+func TestAccountRef_ExportKeepsTheLiteralWhenNothingResolves(t *testing.T) {
 	t.Parallel()
 
 	h := destination.NewHandler(nil, adsRegistry(t))
