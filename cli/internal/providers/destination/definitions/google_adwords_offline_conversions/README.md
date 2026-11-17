@@ -74,11 +74,50 @@ The above example reaches the customer account through a manager account, so it 
 
 ID of the RudderStack account that holds the OAuth connection to Google Ads. RudderStack authenticates every upload with that account, so the destination config carries no Google credentials of its own.
 
+Accepts either the account's remote ID or a reference to an [`account` spec](#manage-the-account-as-a-spec).
+
 > [!NOTE]
-> Rudder CLI can't create this account. It's an OAuth connection, made by signing in to Google from the RudderStack dashboard: create it there, then write its ID here. `rudder-cli workspace accounts list` lists the workspace's accounts with their IDs.
+> Rudder CLI can't create this account. It's an OAuth connection, made by signing in to Google from the RudderStack dashboard. Create it there, then either write its ID here, or adopt it into the project and reference it — see below. `rudder-cli workspace accounts list` lists the workspace's accounts with their IDs.
 
 - The Google user who authorizes the account needs **Standard** or **Admin** access to the Google Ads account.
-- Rudder CLI doesn't check the value — neither that the account exists nor that it's a Google Ads account.
+- Rudder CLI doesn't check a literal ID — neither that the account exists nor that it's a Google Ads account. A `#account:<id>` reference is checked: `apply` fails if the project has no `account` spec with that ID.
+
+### Manage the account as a spec
+
+The account can be adopted into the project as an [`account` spec](../../../accounts/docs) and referenced, so no opaque ID appears in the destination spec:
+
+```yaml
+# accounts/google-ads-prod.yaml
+version: rudder/v1
+kind: account
+metadata:
+  name: google-ads-prod
+spec:
+  id: google-ads-prod
+  name: Google Ads (prod)
+  account_definition_name: DESTINATION_GOOGLE_ADWORDS_OFFLINE_CONVERSIONS_OAUTH
+```
+
+```yaml
+# the destination spec
+config:
+  rudder_account_id: "#account:google-ads-prod"
+```
+
+There's no `config` block: this account definition declares no option fields, and the OAuth credentials are held by RudderStack, not by the spec.
+
+`rudder-cli import workspace` writes that spec for an account that already exists in the dashboard and claims it, so adopting one needs no hand-written YAML.
+
+An adopted account is read-only to Rudder CLI, because the API refuses both operations:
+
+| Operation | Result |
+| :--- | :--- |
+| `apply` creating it | Refused. Create it in the dashboard, then adopt it. |
+| `apply` changing it, `name` included | Refused. Rename it in the dashboard, then re-import. |
+| `apply` with it unchanged | No diff. An adopted account never appears in a plan. |
+| `destroy` | Deletes it, unless a destination still uses it. |
+
+Re-authorizing a connection whose grant was revoked is a dashboard operation. Token refresh is automatic and server-side, so an unattended `apply` never needs a browser.
 
 #### `customer_id` — string, required
 

@@ -131,6 +131,16 @@ func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]
 		{Title: "ID", Width: idWidth},
 		{Title: "Name", Width: nameWidth},
 	}
+	// A resource type that carries "managed" gets the extra column; the others
+	// are untouched, so this stays one table printer for every lister.
+	managed := hasManaged(rs)
+	if managed {
+		width := 27
+		if w, ok := columnWidths["managed"]; ok {
+			width = w
+		}
+		columns = append(columns, table.Column{Title: "Managed as", Width: width})
+	}
 
 	rows := make([]table.Row, len(rs))
 	for i, resource := range rs {
@@ -146,6 +156,13 @@ func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]
 			fmt.Sprintf("%d", i+1),
 			resource["id"].(string),
 			nameStr,
+		}
+		if managed {
+			cell, _ := resource["managed"].(string)
+			if cell == "" {
+				cell = "-"
+			}
+			rows[i] = append(rows[i], cell)
 		}
 	}
 
@@ -180,4 +197,15 @@ func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]
 	}
 
 	return nil
+}
+
+// hasManaged reports whether this resource type carries adoption state. Keyed
+// on the data rather than the resource type, so no lister has to opt in.
+func hasManaged(rs []resources.ResourceData) bool {
+	for _, r := range rs {
+		if _, ok := r["managed"]; ok {
+			return true
+		}
+	}
+	return false
 }

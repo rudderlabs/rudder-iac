@@ -81,6 +81,12 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) 
 	// backend persists (see ApplyDefaults).
 	config := registered.ApplyDefaults(spec.Config)
 
+	// A "#account:<id>" value becomes a PropertyRef the apply framework
+	// resolves; a literal account id is left as written.
+	if err := withAccountRef(config); err != nil {
+		return nil, fmt.Errorf("destination %q: %w", spec.ID, err)
+	}
+
 	resource := &DestinationResource{
 		ID:                spec.ID,
 		DisplayName:       spec.DisplayName,
@@ -240,6 +246,12 @@ func (h *HandlerImpl) MapRemoteToState(
 	// present after conversion (defensive); absent keys stay absent so
 	// presence-based wrapping never invents conditional secrets.
 	localConfig = secret.WrapUnknownSecrets(localConfig, registered.SecretKeys())
+
+	// Mirror the spec side: a remote account the CLI manages becomes the same
+	// PropertyRef the spec produces, so the two compare equal.
+	if err := remoteAccountRef(localConfig, urnResolver); err != nil {
+		return nil, nil, err
+	}
 
 	transformationRef, transformationID, err := h.transformationRef(remote, urnResolver)
 	if err != nil {
@@ -548,6 +560,13 @@ func (h *HandlerImpl) localConfigToAPI(destType string, version int64, local map
 	registered, err := h.registry.Get(destType, version)
 	if err != nil {
 		return nil, fmt.Errorf("getting destination definition: %w", err)
+	}
+
+	// An account reference is a PropertyRef in the graph; the API wants the
+	// remote id it resolved to.
+	local, err = flattenAccountRef(local)
+	if err != nil {
+		return nil, err
 	}
 
 	// Reveal before conversion: LocalToAPI json.Marshals the map, and a

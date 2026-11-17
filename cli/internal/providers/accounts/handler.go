@@ -52,6 +52,16 @@ type accountDefinition struct {
 	// validate can flag a missing one before apply reaches the API (DEX-994).
 	// Required secrets are derived from SecretKeys, see requiredSecrets.
 	RequiredOptions []string
+	// OAuth marks a definition whose credentials are held by RudderStack's auth
+	// service rather than by the account row, so the CLI can only adopt, read
+	// and delete one. The public account API refuses the other two operations
+	// outright: createNonOAuthAccount answers "OAuth-based accounts cannot be
+	// created through this endpoint" and editAccount answers "Editing of
+	// Oauth-based account is currently not supported". Such a definition has no
+	// secret keys and no options — integrations-config declares optionFields []
+	// — so an OAuth account spec carries an id, a name and a definition, and
+	// nothing else.
+	OAuth bool
 }
 
 // registeredAccounts is every account definition the CLI can manage. One entry
@@ -75,6 +85,35 @@ var registeredAccounts = map[string]accountDefinition{
 		Type: "snowflake", SecretKeys: []string{"password", "privateKey", "privateKeyPassphrase"},
 		RequiredOptions: []string{"account", "dbname", "warehouse", "user", "authenticationType"},
 	},
+	// The OAuth account behind the google_adwords_offline_conversions
+	// destination's rudder_account_id. Adopt only, see accountDefinition.OAuth.
+	//
+	// integrations-config has three more OAuth definitions of the same shape
+	// (DESTINATION_GOOGLE_ADWORDS_ENHANCED_CONVERSIONS_OAUTH and the two
+	// DESTINATION_GOOGLE_ADWORDS_REMARKETING_LISTS*_OAUTH), all for
+	// destinations the CLI does not register yet — add an entry each when it
+	// does. linkedin_ads and bingads_offline_conversions have no account
+	// definition at all: their accounts come from the legacy role-keyed OAuth
+	// flow and carry a null accountDefinitionName, so the API reports no
+	// definition name for them and they cannot be adopted through this path.
+	"DESTINATION_GOOGLE_ADWORDS_OFFLINE_CONVERSIONS_OAUTH": {
+		Type: "google_adwords_offline_conversions", OAuth: true,
+	},
+}
+
+// isOAuthDefinition reports whether a definition's credentials live outside the
+// account row. An unregistered definition is not one, which is the safe answer:
+// the handler refuses it by name before any of the OAuth branches matter.
+func isOAuthDefinition(accountDefinitionName string) bool {
+	return registeredAccounts[accountDefinitionName].OAuth
+}
+
+// oauthConfig is the config an OAuth account carries on both the spec and the
+// remote side: nothing. Normalising both sides to the same empty map is what
+// keeps a managed OAuth account off every plan — a nil against an empty map
+// would diff forever, and the resulting Update would be refused by the API.
+func oauthConfig() map[string]any {
+	return map[string]any{}
 }
 
 // optionalSecrets are secret keys an account schema does not require.
@@ -276,6 +315,14 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *AccountSpec) (map
 	if !ok {
 		return nil, fmt.Errorf("unsupported account definition %q", spec.AccountDefinitionName)
 	}
+	if isOAuthDefinition(spec.AccountDefinitionName) {
+		return map[string]*AccountResource{spec.ID: {
+			ID:                    spec.ID,
+			Name:                  spec.Name,
+			AccountDefinitionName: spec.AccountDefinitionName,
+			Config:                oauthConfig(),
+		}}, nil
+	}
 	config := spec.Config
 	if spec.AccountDefinitionName == "SOURCE_BIGQUERY" {
 		var err error
@@ -298,6 +345,14 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *AccountSpec) (map
 // resource behind. Import still adopts an existing account via Update +
 // SetExternalID (it cannot create).
 func (h *HandlerImpl) Create(ctx context.Context, data *AccountResource) (*AccountState, error) {
+	if isOAuthDefinition(data.AccountDefinitionName) {
+		return nil, fmt.Errorf(
+			"account %q cannot be created by rudder-cli: %s accounts hold their credentials in RudderStack's auth service, "+
+				"so they are made by signing in to the provider from the RudderStack dashboard. "+
+				"Create it there, then adopt it with 'rudder-cli import workspace'",
+			data.ID, data.AccountDefinitionName)
+	}
+
 	options, secretPayload, err := h.splitConfig(data)
 	if err != nil {
 		return nil, err
@@ -322,6 +377,16 @@ func (h *HandlerImpl) Create(ctx context.Context, data *AccountResource) (*Accou
 func (h *HandlerImpl) Update(ctx context.Context, newData *AccountResource, oldData *AccountResource, oldState *AccountState) (*AccountState, error) {
 	if newData.AccountDefinitionName != oldData.AccountDefinitionName {
 		return nil, fmt.Errorf("account definition change is not supported: old %q, new %q", oldData.AccountDefinitionName, newData.AccountDefinitionName)
+	}
+
+	// Nothing on an OAuth account is writable, the display name included: the
+	// API refuses every edit. Reaching here means the spec drifted from the
+	// remote, so name the one field that can have changed.
+	if isOAuthDefinition(newData.AccountDefinitionName) {
+		return nil, fmt.Errorf(
+			"account %q cannot be changed by rudder-cli: the API refuses edits to %s accounts. "+
+				"Restore 'name: %s' in the spec, or rename the account in the RudderStack dashboard and re-import",
+			newData.ID, newData.AccountDefinitionName, oldData.Name)
 	}
 
 	options, secretPayload, err := h.splitConfig(newData)
@@ -362,6 +427,19 @@ func (h *HandlerImpl) MapRemoteToState(remote *RemoteAccount, _ handler.URNResol
 	keys, ok := secretKeys(remote.Definition.Name)
 	if !ok {
 		return nil, nil, fmt.Errorf("managed account %s has unsupported definition %q", remote.ID, remote.Definition.Name)
+	}
+
+	// An OAuth account has no secret to mark unknown and no options the CLI can
+	// write, so its remote options are dropped rather than carried: anything
+	// here would diff against a spec that cannot express it, and the Update
+	// that diff provokes would be refused by the API.
+	if isOAuthDefinition(remote.Definition.Name) {
+		return &AccountResource{
+			ID:                    remote.ExternalID,
+			Name:                  remote.Name,
+			AccountDefinitionName: remote.Definition.Name,
+			Config:                oauthConfig(),
+		}, &AccountState{ID: remote.ID}, nil
 	}
 
 	config, err := unmarshalOptions(remote.Options)
@@ -417,6 +495,18 @@ func (h *HandlerImpl) Import(ctx context.Context, data *AccountResource, remoteI
 	remote, err := h.store.Get(ctx, remoteId)
 	if err != nil {
 		return nil, fmt.Errorf("getting account during import: %w", err)
+	}
+
+	// Adopting an OAuth account is the external-id claim alone. There is
+	// nothing in its spec to push, and the Update the non-OAuth path runs would
+	// be refused by the API ("Editing of Oauth-based account is currently not
+	// supported") — and if it were not, its full-replace semantics would write
+	// an empty secret over a live token pair.
+	if isOAuthDefinition(remote.Definition.Name) {
+		if err := h.store.SetExternalID(ctx, remoteId, data.ID); err != nil {
+			return nil, fmt.Errorf("setting external id for account during import: %w", err)
+		}
+		return &AccountState{ID: remoteId}, nil
 	}
 
 	oldData := &AccountResource{AccountDefinitionName: remote.Definition.Name}
@@ -486,6 +576,16 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteAccount) 
 	keys, ok := secretKeys(remote.Definition.Name)
 	if !ok {
 		return nil, fmt.Errorf("account %s has unsupported definition %q", remote.ID, remote.Definition.Name)
+	}
+
+	// An OAuth account spec has no config block to write: its definition
+	// declares no option fields and its credentials are not the CLI's to hold.
+	if isOAuthDefinition(remote.Definition.Name) {
+		return map[string]any{
+			"id":                      externalID,
+			"name":                    remote.Name,
+			"account_definition_name": remote.Definition.Name,
+		}, nil
 	}
 
 	config, err := unmarshalOptions(remote.Options)

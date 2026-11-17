@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
@@ -170,11 +171,18 @@ func resolvedRef(urn, value string) *resources.PropertyRef {
 // urnResolver is a minimal URNResolver for MapRemoteToState tests.
 type urnResolver struct {
 	transformationURNByID map[string]string // remote ID -> URN
+	accountURNByID        map[string]string // remote ID -> URN
 }
 
 func (r urnResolver) GetURNByID(resourceType string, remoteID string) (string, error) {
 	if resourceType == ttypes.TransformationResourceType {
 		if urn, ok := r.transformationURNByID[remoteID]; ok {
+			return urn, nil
+		}
+		return "", resources.ErrRemoteResourceExternalIdNotFound
+	}
+	if resourceType == accounts.AccountResourceType {
+		if urn, ok := r.accountURNByID[remoteID]; ok {
 			return urn, nil
 		}
 		return "", resources.ErrRemoteResourceExternalIdNotFound
