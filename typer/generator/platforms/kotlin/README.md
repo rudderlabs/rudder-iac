@@ -639,7 +639,7 @@ The Kotlin generator supports options to customize code generation behavior. Opt
 ##### Shape of the `common` output
 
 - `RudderTyperTransport` has four methods (`track`, `identify`, `group`, `screen`). Each ends with a `RudderTyperOptions` parameter, a class that holds `context` and `integrations`, so a later release can add fields without breaking transports that apps have written.
-- `RudderTyper(transport, trackingPlanId, trackingPlanVersion)` defaults both values to the generated plan. The version has to exist for that plan, because RudderStack drops an event that names a version the plan doesn't have.
+- `RudderTyper(transport, trackingPlanId, trackingPlanVersion)` defaults both values to the generated plan. Swift can't see Kotlin default arguments, so a `RudderTyper` built in Swift must pass both values, and every typed call must pass `options`. The version has to exist for that plan, because RudderStack drops an event that names a version the plan doesn't have.
 - Traits for `identify` and `group` always go through the `traits` parameter, whichever identity section the rule uses.
 - Values in the maps are `String`, `Boolean`, `Long`, `Double`, `Map`, `List` and `null`. Swift receives a Kotlin `Boolean` as `KotlinBoolean`, an `NSNumber`, which the Swift SDK encodes as `1` or `0`. The iOS transport has to convert it to a Swift `Bool`, recursively.
 

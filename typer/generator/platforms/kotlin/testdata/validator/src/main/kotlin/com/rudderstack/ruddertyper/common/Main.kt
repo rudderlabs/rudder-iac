@@ -1419,7 +1419,7 @@ class RudderTyper(
     )
 
     private fun merge(options: RudderTyperOptions) =
-        RudderTyperOptions(context = context + options.context, integrations = options.integrations)
+        options.copy(context = context + options.context)
 
     /**
      * Group association event
