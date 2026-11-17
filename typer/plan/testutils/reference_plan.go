@@ -243,6 +243,14 @@ func init() {
 		Types:       []plan.PropertyType{*ReferenceCustomTypes["status"]},
 	}
 
+	// Array property whose items are an enum custom type
+	ReferenceProperties["status_history"] = &plan.Property{
+		Name:        "status_history",
+		Description: "Previous account statuses",
+		Types:       []plan.PropertyType{plan.PrimitiveTypeArray},
+		ItemTypes:   []plan.PropertyType{*ReferenceCustomTypes["status"]},
+	}
+
 	// Custom array type with primitive items
 	ReferenceCustomTypes["email_list"] = &plan.CustomType{
 		Name:        "email_list",
@@ -795,6 +803,7 @@ func GetReferenceTrackingPlan() *plan.TrackingPlan {
 				"untyped_array":                      {Property: *ReferenceProperties["untyped_array"]},
 				"object_property":                    {Property: *ReferenceProperties["object_property"]},
 				"status":                             {Property: *ReferenceProperties["status"]},
+				"status_history":                     {Property: *ReferenceProperties["status_history"]},
 				"email_list":                         {Property: *ReferenceProperties["email_list"]},
 				"profile_list":                       {Property: *ReferenceProperties["profile_list"]},
 				"addresses":                          {Property: *ReferenceProperties["addresses"]},

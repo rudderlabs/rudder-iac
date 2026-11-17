@@ -15,6 +15,11 @@ let package = Package(
             name: "RudderTyper",
             dependencies: [
                 .product(name: "RudderStackAnalytics", package: "rudder-sdk-swift"),
+            ],
+            swiftSettings: [
+                // Apps that adopt this (or the Swift 6 language mode with it
+                // enabled) need the generated file to import the SDK publicly.
+                .enableUpcomingFeature("InternalImportsByDefault"),
             ]
         ),
         .testTarget(

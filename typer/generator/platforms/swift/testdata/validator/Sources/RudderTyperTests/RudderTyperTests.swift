@@ -441,6 +441,27 @@ final class RudderTyperTests: XCTestCase {
         ]))
     }
 
+    // MARK: - track (list of enum custom type)
+    //
+    // Each element has to be sent as its raw value. Swift enum values in the
+    // properties make the SDK fail to encode the event, so it is dropped.
+
+    func testTrackUserSignedUpStatusHistory() {
+        typer.trackUserSignedUp(properties: TrackUserSignedUpProperties(
+            active: true,
+            profile: CustomTypeUserProfile(email: "history.user@example.com", firstName: "Mia"),
+            statusHistory: [.pending, .active, .suspended]
+        ))
+        analytics.flush()
+
+        validations.validateCount(1)
+        validations.validateNext(.track(name: "User Signed Up", properties: [
+            "active": true,
+            "profile": ["email": "history.user@example.com", "first_name": "Mia"],
+            "status_history": ["pending", "active", "suspended"],
+        ]))
+    }
+
     // MARK: - track (empty-object field)
 
     func testTrackUserSignedUpUnitSerialization() {

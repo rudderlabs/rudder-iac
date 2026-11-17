@@ -1,6 +1,13 @@
 {{ template "disclaimer.tmpl" . }}
+// The generated API exposes Foundation and RudderStackAnalytics types publicly,
+// which needs public imports when imports default to internal (SE-0409).
+#if compiler(>=6.0)
+public import Foundation
+public import RudderStackAnalytics
+#else
 import Foundation
 import RudderStackAnalytics
+#endif
 {{- if .UsesRudderValue }}
 
 // MARK: - Foundation Types

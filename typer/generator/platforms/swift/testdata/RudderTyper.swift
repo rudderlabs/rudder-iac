@@ -4,8 +4,15 @@
 // Do not modify manually.
 //
 
+// The generated API exposes Foundation and RudderStackAnalytics types publicly,
+// which needs public imports when imports default to internal (SE-0409).
+#if compiler(>=6.0)
+public import Foundation
+public import RudderStackAnalytics
+#else
 import Foundation
 import RudderStackAnalytics
+#endif
 
 // MARK: - Foundation Types
 
@@ -502,6 +509,9 @@ public typealias PropertyQuery = String
 /// Field with special chars: "quotes", backslash\path, and /* comment */
 public typealias PropertySpecialField = String
 
+/// Previous account statuses
+public typealias PropertyStatusHistory = [CustomTypeStatus]
+
 /// Street address
 public typealias PropertyStreet = String
 
@@ -935,6 +945,8 @@ public struct TrackUserSignedUpProperties {
     public let rating: PropertyRating?
     /// User account status
     public let status: CustomTypeStatus?
+    /// Previous account statuses
+    public let statusHistory: PropertyStatusHistory?
     /// Property that can be string or null
     public let stringOrNull: PropertyStringOrNull?
     /// User tags as array of strings
@@ -1028,6 +1040,7 @@ public struct TrackUserSignedUpProperties {
         propertyOfAny: RudderValue? = nil,
         rating: PropertyRating? = nil,
         status: CustomTypeStatus? = nil,
+        statusHistory: PropertyStatusHistory? = nil,
         stringOrNull: PropertyStringOrNull? = nil,
         tags: PropertyTags? = nil,
         unicodeCustomType: CustomTypeТипыДанных? = nil,
@@ -1068,6 +1081,7 @@ public struct TrackUserSignedUpProperties {
         self.propertyOfAny = propertyOfAny
         self.rating = rating
         self.status = status
+        self.statusHistory = statusHistory
         self.stringOrNull = stringOrNull
         self.tags = tags
         self.unicodeCustomType = unicodeCustomType
@@ -1112,6 +1126,7 @@ public struct TrackUserSignedUpProperties {
         if let propertyOfAny = propertyOfAny { props["property_of_any"] = propertyOfAny.value }
         if let rating = rating { props["rating"] = rating.rawValue }
         if let status = status { props["status"] = status.rawValue }
+        if let statusHistory = statusHistory { props["status_history"] = statusHistory.map { $0.rawValue } }
         if let stringOrNull = stringOrNull { props["string_or_null"] = stringOrNull.value }
         if let tags = tags { props["tags"] = tags }
         if let unicodeCustomType = unicodeCustomType { props["unicode_custom_type"] = unicodeCustomType.rawValue }

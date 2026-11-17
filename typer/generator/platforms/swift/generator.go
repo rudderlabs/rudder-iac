@@ -886,22 +886,7 @@ func resolveStructPropertyType(fieldName string, propSchema *plan.PropertySchema
 		if err != nil {
 			return "", "", err
 		}
-		// Determine serialize expression based on custom type kind
-		itemCT := plan.AsCustomType(ct.ItemType)
-		switch {
-		case len(ct.Variants) > 0:
-			return typeName, fieldName + ".toProperties()", nil
-		case hasEnumConfig(ct.Config):
-			return typeName, fieldName + ".rawValue", nil
-		case ct.Type == plan.PrimitiveTypeObject && ct.Schema != nil &&
-			(len(ct.Schema.Properties) > 0 || !ct.Schema.AdditionalProperties):
-			return typeName, fieldName + ".toProperties()", nil
-		case ct.Type == plan.PrimitiveTypeArray && itemCT != nil &&
-			itemCT.Type == plan.PrimitiveTypeObject && itemCT.Schema != nil && len(itemCT.Schema.Properties) > 0:
-			return typeName, fieldName + ".map { $0.toProperties() }", nil
-		default:
-			return typeName, fieldName, nil
-		}
+		return typeName, fieldName + customTypeSerializeSuffix(ct), nil
 	}
 
 	if plan.IsPrimitiveType(pt) {
@@ -919,12 +904,44 @@ func resolveStructPropertyType(fieldName string, propSchema *plan.PropertySchema
 			case len(prop.ItemTypes) > 1:
 				// Multi-item-type enum: unwrap each element via .value.
 				return typeName, fieldName + ".map { $0.value }", nil
+			case plan.IsCustomType(prop.ItemTypes[0]):
+				// Array of a custom type: serialize each element the same way a
+				// scalar of that custom type is serialized (e.g. enums via
+				// .rawValue), otherwise Swift enum values reach the SDK and the
+				// whole event fails to encode.
+				if itemCT := plan.AsCustomType(prop.ItemTypes[0]); itemCT != nil {
+					if suffix := customTypeSerializeSuffix(itemCT); suffix != "" {
+						return typeName, fieldName + ".map { $0" + suffix + " }", nil
+					}
+				}
 			}
 		}
 		return typeName, fieldName, nil
 	}
 
 	return "Any", fieldName, nil
+}
+
+// customTypeSerializeSuffix returns the expression to append to a value of the
+// given custom type to turn it into something the SDK can serialize, or "" if
+// the value can be passed through as is.
+func customTypeSerializeSuffix(ct *plan.CustomType) string {
+	switch {
+	case len(ct.Variants) > 0:
+		return ".toProperties()"
+	case hasEnumConfig(ct.Config):
+		return ".rawValue"
+	case ct.Type == plan.PrimitiveTypeObject && ct.Schema != nil &&
+		(len(ct.Schema.Properties) > 0 || !ct.Schema.AdditionalProperties):
+		return ".toProperties()"
+	case ct.Type == plan.PrimitiveTypeArray:
+		if itemCT := plan.AsCustomType(ct.ItemType); itemCT != nil {
+			if suffix := customTypeSerializeSuffix(itemCT); suffix != "" {
+				return ".map { $0" + suffix + " }"
+			}
+		}
+	}
+	return ""
 }
 
 // ========== Type Alias Builders ==========

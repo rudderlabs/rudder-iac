@@ -389,6 +389,8 @@ export interface UserSignedUp {
     rating?: PropertyRating;
     /** User account status */
     status?: CustomTypeStatus;
+    /** Previous account statuses */
+    statusHistory?: CustomTypeStatus[];
     /** Property that can be string or null */
     stringOrNull?: string | null;
     /** User tags as array of strings */
@@ -533,6 +535,7 @@ const UserSignedUpKeyMap: KeyMap = {
     profile: { key: "profile", map: CustomTypeUserProfileKeyMap },
     profileList: { key: "profile_list", map: CustomTypeUserProfileKeyMap },
     propertyOfAny: "property_of_any",
+    statusHistory: "status_history",
     stringOrNull: "string_or_null",
     unicodeCustomType: "unicode_custom_type",
     unicodeEnumField: "unicode_enum_field",
