@@ -83,7 +83,7 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) 
 
 	// A "#account:<id>" value becomes a PropertyRef the apply framework
 	// resolves; a literal account id is left as written.
-	if err := withAccountRef(config); err != nil {
+	if err := withAccountRef(spec.Type, config); err != nil {
 		return nil, fmt.Errorf("destination %q: %w", spec.ID, err)
 	}
 
@@ -249,7 +249,7 @@ func (h *HandlerImpl) MapRemoteToState(
 
 	// Mirror the spec side: a remote account the CLI manages becomes the same
 	// PropertyRef the spec produces, so the two compare equal.
-	if err := remoteAccountRef(localConfig, urnResolver); err != nil {
+	if err := remoteAccountRef(registered.Type, localConfig, urnResolver); err != nil {
 		return nil, nil, err
 	}
 
@@ -484,6 +484,13 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 
 	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)
+	}
+
+	// A type whose account the CLI can adopt names it by reference, so the
+	// written spec points at the account spec import writes beside it instead of
+	// carrying an opaque id.
+	if err := exportAccountRef(registered.Type, localConfig, inputResolver); err != nil {
+		return nil, fmt.Errorf("resolving account reference for destination %s: %w", remote.ID, err)
 	}
 
 	specMap := map[string]any{

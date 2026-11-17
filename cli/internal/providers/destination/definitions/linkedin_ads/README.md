@@ -65,7 +65,7 @@ ID of the RudderStack account that holds the OAuth connection to LinkedIn. Rudde
 
 - The LinkedIn user who authorizes the account needs one of these ad account roles: `ACCOUNT_BILLING_ADMIN`, `ACCOUNT_MANAGER`, `CAMPAIGN_MANAGER`, or `CREATIVE_MANAGER`.
 - Rudder CLI doesn't check the value — neither that the account exists nor that it's a LinkedIn account.
-- This key takes a literal ID only. A `#account:<id>` reference to an [`account` spec](../../../accounts/docs) isn't available for LinkedIn Ads: `linkedin_ads` has no account definition, so its accounts come from an older OAuth flow and carry no definition name for `import workspace` to match on. Google Ads Offline Conversions is the one account-taking destination where the account can be adopted as a spec.
+- This key takes a literal ID only. A `#account:<id>` reference to an [`account` spec](../../../accounts/docs) isn't available for LinkedIn Ads: `linkedin_ads` has no account definition, so its accounts come from an older OAuth flow and carry no definition name for `import workspace` to match on. Whether this key takes a reference is a property of the destination type: Google Ads Offline Conversions is the one account-taking destination whose account can be adopted, so it's the one imported as a reference. A reference written here fails validation.
 
 #### `hash_data` — boolean, required
 

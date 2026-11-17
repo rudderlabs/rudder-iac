@@ -695,3 +695,27 @@ func supportedRemoteAccounts(accounts []client.Account) []*RemoteAccount {
 	}
 	return result
 }
+
+// SupportsReference reports whether a destination of this local type can name
+// its integration account as a "#account:<id>" reference instead of the
+// account's remote id.
+//
+// It is true only for a type whose account the CLI can adopt: an adoptable
+// account becomes a project resource with a URN to point at, and an account
+// that cannot be adopted has nothing for a reference to resolve to. That is why
+// the capability is per definition rather than per spec — import writes the form
+// the type supports, and remote state is mapped in the same form, so the two
+// always compare equal.
+//
+// The OAuth check matters: the RETL source definitions above carry warehouse
+// types (postgres, snowflake, bigquery) that are also destination type names,
+// and those accounts belong to sources, not to a destination's
+// rudder_account_id.
+func SupportsReference(destinationType string) bool {
+	for _, def := range registeredAccounts {
+		if def.OAuth && def.Type == destinationType {
+			return true
+		}
+	}
+	return false
+}

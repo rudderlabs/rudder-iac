@@ -52,7 +52,7 @@ ID of the RudderStack account that holds the OAuth connection to Microsoft Adver
 > Rudder CLI can't create this account, and can't adopt it into the project either. It's an OAuth connection, made by signing in to Microsoft from the RudderStack dashboard: create it there, then write its ID here. `rudder-cli workspace accounts list` lists the workspace's accounts with their IDs.
 
 - Rudder CLI doesn't check the value — neither that the account exists nor that it's a Microsoft Advertising account.
-- This key takes a literal ID only. A `#account:<id>` reference to an [`account` spec](../../../accounts/docs) isn't available for BingAds Offline Conversions: `bingads_offline_conversions` has no account definition, so its accounts come from an older OAuth flow and carry no definition name for `import workspace` to match on. Google Ads Offline Conversions is the one account-taking destination where the account can be adopted as a spec.
+- This key takes a literal ID only. A `#account:<id>` reference to an [`account` spec](../../../accounts/docs) isn't available for BingAds Offline Conversions: `bingads_offline_conversions` has no account definition, so its accounts come from an older OAuth flow and carry no definition name for `import workspace` to match on. Whether this key takes a reference is a property of the destination type: Google Ads Offline Conversions is the one account-taking destination whose account can be adopted, so it's the one imported as a reference. A reference written here fails validation.
 
 #### `customer_account_id` — string, required
 

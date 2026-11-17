@@ -106,7 +106,12 @@ config:
 
 There's no `config` block: this account definition declares no option fields, and the OAuth credentials are held by RudderStack, not by the spec.
 
-`rudder-cli import workspace` writes that spec for an account that already exists in the dashboard and claims it, so adopting one needs no hand-written YAML.
+`rudder-cli import workspace` writes that spec for an account that already exists in the dashboard and claims it, so adopting one needs no hand-written YAML. It writes the reference into the destination spec too, because this type supports one.
+
+Whether `rudder_account_id` takes a reference is a property of the destination type, not of the spec: a type whose account Rudder CLI can adopt is imported as a reference, and a type whose account it can't is imported as the account's ID. `linkedin_ads` and `bingads_offline_conversions` are the second kind, and a reference written there fails validation.
+
+> [!NOTE]
+> Once an account is adopted, name it by reference rather than by its ID. `apply` refuses a literal ID that names an adopted account, because remote state resolves that account to its reference and the destination would otherwise be rewritten with an identical config on every apply. The error names the reference to use. A literal ID naming an account the project doesn't manage stays valid.
 
 An adopted account is read-only to Rudder CLI, because the API refuses both operations:
 
