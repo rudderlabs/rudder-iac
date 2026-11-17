@@ -62,9 +62,12 @@ scheme changes: `rudder-api` takes the `Bearer` token, resolves it, and calls
 the config backend with basic auth, which is what `authenticateAccessToken`
 reads. So the CLI sends `Bearer` and nothing about it has to change, but the
 `/v2/oauth/cli-sessions` routes have to exist in **both** services. The config
-backend half is implemented in rudderlabs/rudder-config-backend#6972; the
-`rudder-api` half is not written yet, and it is the only thing standing between
-that PR and a working `rudder-cli workspace accounts create`.
+backend half is implemented in rudderlabs/rudder-config-backend#6972 and the
+`rudder-api` half in rudderlabs/rudder-control-plane#2806, which proxies the two
+routes the CLI calls. Only those two are public: the consent page's own read and
+result routes are the dashboard talking to the config backend directly, under
+the signed-in user's session, and putting them on the public API would expose a
+session to any workspace token rather than to the user whose consent it is.
 
 ### 1. Open a session
 
@@ -227,7 +230,7 @@ instead of creating a second one.
 | --- | --- | --- |
 | Session TTL while `pending` | 10 minutes, reported as `expiresAt` | long enough for a provider consent screen with a sign-in and an MFA prompt |
 | Retention after a terminal status | at least 1 hour; the implementation keeps a day | the window in which `--resume` can still read the result |
-| Long-poll `wait` | `0s`–`2m0s`, default `30s` | a value under most proxy idle timeouts; the CLI re-requests, so a dropped connection costs one poll rather than the whole wait |
+| Long-poll `wait` | `0s`–`2m0s`, default `30s` | the default stays under a typical 60s proxy idle timeout; the CLI re-requests, so a cut poll costs one request rather than the whole wait. Confirm the ingress idle timeout before raising it past 60s: Node's own `keepAliveTimeout` and `headersTimeout` do not bound a response in progress, so the edge is what decides |
 | CLI wait, end to end | `--timeout`, default 5 minutes | the CLI stops waiting, prints the `--resume` line, and exits non-zero; the session stays claimable until it expires |
 
 The CLI's `--timeout` is independent of the session TTL. A CLI timeout does not
@@ -241,24 +244,28 @@ which is already open to the CLI and already idempotent
 `PUT` update for an OAuth account (`account/index.ts:1332` and `:1474`), which
 is why the create path has to go through this handoff at all.
 
-## What the backend still owes
+## Where the server half is
 
-The config backend half is implemented in
-rudderlabs/rudder-config-backend#6972: the endpoints, a Postgres
-`oauth_cli_sessions` table, the TTLs, the terminal statuses, first-call-wins on
-the result, and the webapp twin of the external-id route. What is left:
+Both services are implemented, in two open pull requests.
 
-1. **The `rudder-api` routes.** `/v2/oauth/cli-sessions` has to be declared
-   there and proxied to `/apigateway/v1/workspaces/{workspaceId}/...`, as every
-   other `/v2` route is. Until that lands the CLI cannot reach the handoff at
-   all. Note that `ConfigBackendClient` wraps its calls in `axiosRetry` with
-   three retries, which is harmless on an idempotent poll but worth capping on
-   a request that is held open for 30 seconds.
-2. Nothing else. The create and re-auth paths behind the webapp's calls are
-   reused unchanged; `callBackV1`'s re-auth branch (`oauth.service.ts:728`)
-   already updates an existing account's secret in place and returns the same
-   account id, so re-authorize is a payload difference rather than a new
-   mechanism.
+rudderlabs/rudder-config-backend#6972 holds the session itself: the four
+endpoints, a Postgres `oauth_cli_sessions` table, the TTLs, the terminal
+statuses, first-call-wins on the result, and the webapp twin of the external-id
+route the dashboard needs. rudderlabs/rudder-control-plane#2806 proxies the two
+public ones from `/v2` onto it.
+
+Neither changes an existing OAuth path. The create and re-auth flows behind the
+webapp's calls are reused as they are: `callBackV1`'s re-auth branch
+(`oauth.service.ts:728`) already updates an existing account's secret in place
+and returns the same account id, so re-authorize is a payload difference rather
+than a new mechanism.
+
+What is not yet proven is the chain end to end. Each half is covered by its own
+tests and by this document's test double, but no run has gone CLI to rudder-api
+to config backend against a real consent screen, because the local stack would
+not come up in either session (an expired registry token in one, a full Docker
+disk in the other). That is the first thing to do once a local stack is
+available.
 
 ### The poll does not have to wake on an event
 
