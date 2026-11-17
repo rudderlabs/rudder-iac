@@ -112,6 +112,8 @@ unknown config field "<key>"
 
 A key that's valid for one destination type isn't valid for another. There are no shared optional extras beyond `connection_mode` and `consent_management`.
 
+A destination created in the dashboard can store keys a spec can't carry: keys its type doesn't declare, and fields the dashboard cleared but kept as empty values, which `import` leaves out. `apply` keeps these when it updates or adopts the destination, so leaving them out of a spec doesn't remove them. `apply --dry-run` lists every config change an import makes to the destination it adopts, under that destination in `Importable resources`.
+
 ### Omitting a key with a default is safe
 
 Where a key declares a default, Rudder CLI fills that value in before it validates the spec and before the spec reaches the API, because the backend applies the same default when it stores the destination. Omitting such a key is equivalent to writing its default: it doesn't produce a permanent diff on the next `apply`, and it's validated as though you had written the default — which can make another key required.

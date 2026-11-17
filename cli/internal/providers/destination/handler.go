@@ -109,7 +109,7 @@ func (h *HandlerImpl) Create(ctx context.Context, data *DestinationResource) (*D
 		return nil, fmt.Errorf("getting destination definition: %w", err)
 	}
 
-	apiConfig, err := h.localConfigToAPI(data.Type, data.DefinitionVersion, data.Config)
+	apiConfig, err := h.localConfigToAPI(data.Type, data.DefinitionVersion, data.Config, nil)
 	if err != nil {
 		return nil, fmt.Errorf("converting local config to API: %w", err)
 	}
@@ -158,7 +158,7 @@ func (h *HandlerImpl) Update(
 		return nil, fmt.Errorf("getting destination definition: %w", err)
 	}
 
-	apiConfig, err := h.localConfigToAPI(newData.Type, newData.DefinitionVersion, newData.Config)
+	apiConfig, err := h.localConfigToAPI(newData.Type, newData.DefinitionVersion, newData.Config, oldState.PreservedConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -227,19 +227,13 @@ func (h *HandlerImpl) MapRemoteToState(
 		return nil, nil, errUnregisteredManagedType(remote.ID, remote.Type, remote.Version)
 	}
 
-	localConfig, err := h.apiConfigToLocal(
-		registered.Type,
-		version,
-		remote.Config,
-	)
+	// API responses omit secret values. Secret keys still present after
+	// conversion are wrapped as unknown (defensive); absent keys stay absent so
+	// presence-based wrapping never invents conditional secrets.
+	rc, err := h.remoteLocalConfig(registered, remote.Config)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	// API responses omit secret values. Wrap only secret keys that are still
-	// present after conversion (defensive); absent keys stay absent so
-	// presence-based wrapping never invents conditional secrets.
-	localConfig = secret.WrapUnknownSecrets(localConfig, registered.SecretKeys())
 
 	transformationRef, transformationID, err := h.transformationRef(remote, urnResolver)
 	if err != nil {
@@ -253,12 +247,13 @@ func (h *HandlerImpl) MapRemoteToState(
 		Enabled:           remote.IsEnabled,
 		DefinitionVersion: version,
 		Transformation:    transformationRef,
-		Config:            localConfig,
+		Config:            rc.local,
 	}
 
 	state := &DestinationState{
 		ID:               remote.ID,
 		TransformationID: transformationID,
+		PreservedConfig:  rc.preserved,
 	}
 
 	return resource, state, nil
@@ -369,10 +364,16 @@ func (h *HandlerImpl) Import(ctx context.Context, data *DestinationResource, rem
 
 	// Translate API type to local type so Update's immutable-type check
 	// compares local names (e.g. "s3" vs "s3"), not "s3" vs "S3".
+	rc, err := readRemoteConfig(registered, remote.Config)
+	if err != nil {
+		return nil, fmt.Errorf("reading destination config during import: %w", err)
+	}
+
 	oldData := &DestinationResource{Type: registered.Type}
 	oldState := &DestinationState{
 		ID:               remoteId,
 		TransformationID: transformationID,
+		PreservedConfig:  rc.preserved,
 	}
 
 	newState, err := h.Update(ctx, data, oldData, oldState)
@@ -543,8 +544,10 @@ func isEmptyConfigValue(value any) bool {
 }
 
 // localConfigToAPI resolves the registered definition and converts snake_case
-// config to the camelCase form the API expects, returning JSON-serializable bytes.
-func (h *HandlerImpl) localConfigToAPI(destType string, version int64, local map[string]any) (json.RawMessage, error) {
+// config to the camelCase form the API expects, returning JSON-serializable
+// bytes. preserved fills in the remote keys the spec cannot carry (see
+// readRemoteConfig), since the API replaces the whole config on update.
+func (h *HandlerImpl) localConfigToAPI(destType string, version int64, local map[string]any, preserved map[string]any) (json.RawMessage, error) {
 	registered, err := h.registry.Get(destType, version)
 	if err != nil {
 		return nil, fmt.Errorf("getting destination definition: %w", err)
@@ -562,7 +565,7 @@ func (h *HandlerImpl) localConfigToAPI(destType string, version int64, local map
 		return nil, fmt.Errorf("converting local config to API: %w", err)
 	}
 
-	bytes, err := json.Marshal(apiConfig)
+	bytes, err := json.Marshal(withPreserved(apiConfig, preserved))
 	if err != nil {
 		return nil, fmt.Errorf("marshalling destination config: %w", err)
 	}

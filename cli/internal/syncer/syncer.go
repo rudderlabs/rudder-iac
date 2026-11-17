@@ -137,6 +137,14 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
 
+	if previewer, ok := s.provider.(provider.ImportPreviewer); ok && len(plan.Diff.ImportableResources) > 0 {
+		diffs, err := previewer.PreviewImports(ctx, plan)
+		if err != nil {
+			return []error{err}
+		}
+		plan.Diff.ImportableDiffs = diffs
+	}
+
 	ui.StopSpinner()
 
 	if checker, ok := s.provider.(provider.PlanChecker); ok {

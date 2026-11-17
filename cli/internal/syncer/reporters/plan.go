@@ -38,7 +38,11 @@ func renderDiff(diff *differ.Diff) string {
 	b := &strings.Builder{}
 
 	if len(diff.ImportableResources) > 0 {
-		listResources(b, "Importable resources", diff.ImportableResources, nil)
+		// Adopting a resource can change it as well, and those changes render
+		// under its URN the way an update's do.
+		listResources(b, "Importable resources", diff.ImportableResources, func(urn string) string {
+			return renderResourceDiff(diff.ImportableDiffs[urn])
+		})
 	}
 
 	if len(diff.NewResources) > 0 {
@@ -71,19 +75,7 @@ func renderUpdatedResources(b *strings.Builder, diff *differ.Diff) {
 	}
 
 	detail := func(urn string) string {
-		r := diff.UpdatedResources[urn]
-		details := ""
-		diffKeys := make([]string, 0, len(r.Diffs))
-		for k := range r.Diffs {
-			diffKeys = append(diffKeys, k)
-		}
-		sort.Strings(diffKeys)
-		for _, k := range diffKeys {
-			for _, line := range renderPropertyDiff(r.Diffs[k]) {
-				details += line
-			}
-		}
-		return details
+		return renderResourceDiff(diff.UpdatedResources[urn])
 	}
 
 	if len(updated) > 0 {
@@ -94,6 +86,23 @@ func renderUpdatedResources(b *strings.Builder, diff *differ.Diff) {
 		sort.Strings(secretOnly)
 		listResources(b, "Always re-applied (secret values can't be read back)", secretOnly, detail)
 	}
+}
+
+// renderResourceDiff renders a resource's property diffs, one line per
+// changed path, in a stable order. A zero ResourceDiff renders nothing.
+func renderResourceDiff(r differ.ResourceDiff) string {
+	details := ""
+	diffKeys := make([]string, 0, len(r.Diffs))
+	for k := range r.Diffs {
+		diffKeys = append(diffKeys, k)
+	}
+	sort.Strings(diffKeys)
+	for _, k := range diffKeys {
+		for _, line := range renderPropertyDiff(r.Diffs[k]) {
+			details += line
+		}
+	}
+	return details
 }
 
 func listResources(b *strings.Builder, label string, resources []string, detailFn func(string) string) {

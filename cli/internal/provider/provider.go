@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -193,6 +194,15 @@ type ConsolidateSyncer interface {
 // is how a check reads an Output value such as a remote id.
 type PlanChecker interface {
 	CheckPlan(ctx context.Context, plan *planner.Plan, st *state.State) error
+}
+
+// ImportPreviewer is implemented by a provider whose Import pushes the spec to
+// the remote resource it adopts, so adopting it can change that resource. It
+// returns, per importable URN in the plan, the changes the import writes, for
+// the plan to show before anything runs. A URN may be left out when its
+// import changes nothing.
+type ImportPreviewer interface {
+	PreviewImports(ctx context.Context, plan *planner.Plan) (map[string]differ.ResourceDiff, error)
 }
 
 // ImportManifestLoader receives a single workspace's import metadata after all

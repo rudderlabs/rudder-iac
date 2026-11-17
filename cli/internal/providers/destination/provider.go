@@ -8,11 +8,13 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	destdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/docs"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	vdocs "github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -27,20 +29,49 @@ const importDir = ""
 type Provider struct {
 	*provider.BaseProvider
 	registry *definitions.Registry
+	handler  *HandlerImpl
 }
 
-var _ provider.PlanChecker = &Provider{}
+var (
+	_ provider.PlanChecker     = &Provider{}
+	_ provider.ImportPreviewer = &Provider{}
+)
 
 // NewProvider constructs the destination provider with the given API client and
 // definition registry. The registry is expected to be populated by the caller;
 // this constructor registers no definitions itself.
 func NewProvider(c *client.Client, registry *definitions.Registry) *Provider {
+	impl := &HandlerImpl{client: c, registry: registry}
 	return &Provider{
-		BaseProvider: provider.NewBaseProvider([]provider.Handler{
-			NewHandler(c, registry),
-		}),
-		registry: registry,
+		BaseProvider: provider.NewBaseProvider([]provider.Handler{handler.NewHandler(impl)}),
+		registry:     registry,
+		handler:      impl,
 	}
+}
+
+// PreviewImports reports, per destination the plan imports, the config the
+// import writes over the remote one. Import pushes the spec to the destination
+// it adopts, so a value the spec does not share with the remote changes it. See
+// provider.ImportPreviewer.
+func (p *Provider) PreviewImports(ctx context.Context, plan *planner.Plan) (map[string]differ.ResourceDiff, error) {
+	result := map[string]differ.ResourceDiff{}
+	for _, op := range plan.Operations {
+		if op.Type != planner.Import || op.Resource.Type() != DestinationResourceType {
+			continue
+		}
+		data, ok := op.Resource.RawData().(*DestinationResource)
+		if !ok || op.Resource.ImportMetadata() == nil {
+			continue
+		}
+		diffs, secretOnly, err := p.handler.previewImport(ctx, data, op.Resource.ImportMetadata().RemoteId)
+		if err != nil {
+			return nil, fmt.Errorf("previewing import of %s: %w", op.Resource.URN(), err)
+		}
+		if len(diffs) > 0 {
+			result[op.Resource.URN()] = differ.ResourceDiff{URN: op.Resource.URN(), Diffs: diffs, SecretOnly: secretOnly}
+		}
+	}
+	return result, nil
 }
 
 // CheckPlan refuses a destination linked to a transformation the same plan

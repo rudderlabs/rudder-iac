@@ -387,3 +387,27 @@ func TestRenderDiff_SecretSections(t *testing.T) {
 	assert.Contains(t, out, "(secret, always re-applied)")
 	assert.NotContains(t, out, "sk_live_x")
 }
+
+// TestRenderDiff_ImportableDiffs pins that the config an import changes is
+// shown under the importable resource, so a dry run lists what the adopt
+// writes; an importable resource without changes renders as before.
+func TestRenderDiff_ImportableDiffs(t *testing.T) {
+	diff := &differ.Diff{
+		ImportableResources: []string{"destination:changed", "destination:unchanged"},
+		ImportableDiffs: map[string]differ.ResourceDiff{
+			"destination:changed": {URN: "destination:changed", Diffs: map[string]differ.PropertyDiff{
+				"Config": {
+					Property:    "Config",
+					SourceValue: map[string]any{"address": "redis:6379"},
+					TargetValue: map[string]any{"address": "redis:6379", "skip_verify": false},
+				},
+			}},
+		},
+	}
+
+	assert.Equal(t, "Importable resources:\n"+
+		"  - destination:changed\n"+
+		"    - Config.skip_verify: <nil> => false\n"+
+		"  - destination:unchanged\n"+
+		"\n", renderDiff(diff))
+}
