@@ -30,6 +30,12 @@ type ExperimentalConfig struct {
 	// SourcesListen shows and enables the `sources` command group: a local listener that
 	// captures the events an app sends, and the commands that read them.
 	SourcesListen bool `mapstructure:"sourcesListen"`
+	// OAuthAccounts enables `workspace accounts create` and
+	// `workspace accounts reauthorize`, which authorize an OAuth integration
+	// account in a browser. They call a control-plane handoff API that is not
+	// released yet (docs/oauth-account-handoff.md), so they cannot work against
+	// production and must stay opt-in until it ships.
+	OAuthAccounts bool `mapstructure:"oauthAccounts"`
 }
 
 // getAvailableExperimentalFlags returns information about all available experimental flags
