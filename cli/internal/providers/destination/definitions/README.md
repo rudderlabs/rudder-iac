@@ -156,7 +156,7 @@ A source's own definition resolves to exactly one token. Note that `cloud` and `
 
 Rudder CLI doesn't manage connections from AMP, Shopify, or cloud app sources, so `amp`, `shopify`, and `cloud_source` aren't valid for any type here, even where the dashboard offers the destination to them.
 
-A Reverse ETL connection reaches its destination as a `warehouse` source, and is checked against the same destination config rules as an event stream connection. A destination can't receive from both event stream and Reverse ETL sources in the same project.
+A Reverse ETL connection reaches its destination as a `warehouse` source, and is checked against the same destination config rules as an event stream connection, except that it needs no `connection_mode` entry: `cloud` is the only mode a warehouse source runs in, so an absent entry means `cloud`. A destination can't receive from both event stream and Reverse ETL sources in the same project.
 
 ## Connection modes
 
@@ -187,7 +187,7 @@ config:
 
 Naming a source type the destination doesn't support fails validation, and so does a mode that source type doesn't support on this destination.
 
-An entry is required for every source type you connect. Without one, `validate` reports:
+An entry is required for every event stream source type you connect; a `warehouse` source needs none. Without one, `validate` reports:
 
 ```text
 destination '<id>' config has no 'connection_mode' entry for source type '<source_type>'

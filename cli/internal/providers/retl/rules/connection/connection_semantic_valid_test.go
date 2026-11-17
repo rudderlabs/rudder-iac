@@ -587,14 +587,26 @@ func TestConnectionSemanticValid_DestinationCompatibility(t *testing.T) {
 			}},
 		},
 		{
+			// Every destination's only warehouse mode is cloud, and the dashboard
+			// leaves connectionMode.warehouse out on older destinations, so a
+			// spec imported from one carries no entry and must still validate.
 			name: "a destination config naming no settings for the warehouse source type",
 			destination: destinationFixture{
 				id: "my-http-destination", typ: "http", enabled: true,
 				config: map[string]any{"api_url": "https://example.com/events", "auth": "noAuth"},
 			},
+		},
+		{
+			// An absent warehouse entry runs in cloud mode, so the fields cloud
+			// mode needs are still required.
+			name: "a braze config with no warehouse entry still needs what cloud mode needs",
+			destination: destinationFixture{
+				id: "my-braze-destination", typ: "braze", enabled: true,
+				config: map[string]any{},
+			},
 			expected: []rules.ValidationResult{{
 				Reference: "/connections/0/destination",
-				Message:   "destination 'my-http-destination' config has no 'connection_mode' entry for source type 'warehouse'",
+				Message:   "destination 'my-braze-destination' config is missing fields required to connect a 'warehouse' source: rest_api_key",
 			}},
 		},
 		{

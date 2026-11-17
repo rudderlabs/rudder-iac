@@ -164,7 +164,7 @@ destination 'amazon-s3-prod' config has no 'connection_mode' entry for source ty
 
 Amazon S3 needs no additional config keys to connect a source of any type.
 
-A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
+A Reverse ETL connection reaches this destination as source type `warehouse`. It needs no `connection_mode` entry, since `cloud` is the only mode a warehouse source runs in; `connection_mode.warehouse: cloud` is accepted but optional.
 
 ## Secrets
 

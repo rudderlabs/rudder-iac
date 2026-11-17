@@ -303,6 +303,16 @@ func ValidateDestinationConfig(
 			),
 		})
 	}
+	// A warehouse source needs no entry: cloud is the only warehouse mode any
+	// destination offers upstream, the backend accepts and runs a destination
+	// without connectionMode.warehouse, and the dashboard leaves it out on
+	// older ones, so demanding it fails specs imported from them over a field
+	// that changes nothing. A written entry is still checked against the
+	// definition by the destination's own config rule. Restore the check for
+	// warehouse if a destination ever offers it a second mode.
+	if sourceType == common.SourceTypeWarehouse {
+		return results
+	}
 	if candidates := settingsBlocksMissingSourceType(registered, sourceType, config); len(candidates) > 0 {
 		results = append(results, rules.ValidationResult{
 			Reference: reference,
@@ -390,6 +400,10 @@ func missingRequiredConfigKeys(
 	return missing
 }
 
+// warehouseDefaultMode is the mode a warehouse source runs in when the
+// destination declares none: the only one upstream offers it.
+const warehouseDefaultMode = "cloud"
+
 // connectTimeRequiredKeys returns the keys the definition requires for a source
 // of this type to connect, in the mode the destination spec declares for it.
 // Only the spec can say: ConnectionModes lists the modes a destination
@@ -398,7 +412,8 @@ func missingRequiredConfigKeys(
 // metadata — a destination gaining a mode would switch it off silently.
 //
 // No guard on an undeclared mode: it reads as "", which no definition can list
-// as a mode, so the lookup misses and this source type requires nothing.
+// as a mode, so the lookup misses and this source type requires nothing. The
+// exception is warehouse, whose entry may be left out and then means cloud.
 func connectTimeRequiredKeys(
 	registered *definitions.RegisteredDefinition,
 	sourceType string,
@@ -406,6 +421,11 @@ func connectTimeRequiredKeys(
 ) []string {
 	block, _ := config["connection_mode"].(map[string]any)
 	mode, _ := block[sourceType].(string)
+	// ValidateDestinationConfig lets a warehouse entry be left out, and such a
+	// connection runs in cloud mode, so it still needs what cloud mode needs.
+	if mode == "" && sourceType == common.SourceTypeWarehouse {
+		mode = warehouseDefaultMode
+	}
 	return registered.ConnectionRequiredKeys(sourceType, mode)
 }
 
