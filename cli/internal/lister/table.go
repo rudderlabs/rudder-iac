@@ -112,59 +112,7 @@ func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]
 		return nil
 	}
 
-	// Default column widths
-	idWidth := 27
-	nameWidth := 30
-
-	// Override with custom widths if provided
-	if len(columnWidths) > 0 {
-		if w, ok := columnWidths["id"]; ok {
-			idWidth = w
-		}
-		if w, ok := columnWidths["name"]; ok {
-			nameWidth = w
-		}
-	}
-
-	columns := []table.Column{
-		{Title: "#", Width: 4},
-		{Title: "ID", Width: idWidth},
-		{Title: "Name", Width: nameWidth},
-	}
-	// A resource type that carries "managed" gets the extra column; the others
-	// are untouched, so this stays one table printer for every lister.
-	managed := hasManaged(rs)
-	if managed {
-		width := 27
-		if w, ok := columnWidths["managed"]; ok {
-			width = w
-		}
-		columns = append(columns, table.Column{Title: "Managed as", Width: width})
-	}
-
-	rows := make([]table.Row, len(rs))
-	for i, resource := range rs {
-		name := resource["name"]
-		nameStr := ""
-		if name == nil || name == "" {
-			nameStr = "- not set -"
-		} else {
-			nameStr = name.(string)
-		}
-
-		rows[i] = table.Row{
-			fmt.Sprintf("%d", i+1),
-			resource["id"].(string),
-			nameStr,
-		}
-		if managed {
-			cell, _ := resource["managed"].(string)
-			if cell == "" {
-				cell = "-"
-			}
-			rows[i] = append(rows[i], cell)
-		}
-	}
+	columns, rows := tableData(rs, columnWidths)
 
 	t := table.New(
 		table.WithColumns(columns),
@@ -208,4 +156,51 @@ func hasManaged(rs []resources.ResourceData) bool {
 		}
 	}
 	return false
+}
+
+// tableData builds the table's columns and rows. Split out of
+// printTableWithDetails so the column and cell decisions can be tested without
+// a terminal to render into.
+func tableData(rs []resources.ResourceData, columnWidths map[string]int) ([]table.Column, []table.Row) {
+	width := func(key string, fallback int) int {
+		if w, ok := columnWidths[key]; ok {
+			return w
+		}
+		return fallback
+	}
+
+	columns := []table.Column{
+		{Title: "#", Width: 4},
+		{Title: "ID", Width: width("id", 27)},
+		{Title: "Name", Width: width("name", 30)},
+	}
+	// A resource type that carries "managed" gets the extra column; the others
+	// are untouched, so this stays one table printer for every lister.
+	managed := hasManaged(rs)
+	if managed {
+		columns = append(columns, table.Column{Title: "Managed as", Width: width("managed", 27)})
+	}
+
+	rows := make([]table.Row, len(rs))
+	for i, resource := range rs {
+		name := resource["name"]
+		nameStr := "- not set -"
+		if name != nil && name != "" {
+			nameStr = name.(string)
+		}
+
+		rows[i] = table.Row{
+			fmt.Sprintf("%d", i+1),
+			resource["id"].(string),
+			nameStr,
+		}
+		if managed {
+			cell, _ := resource["managed"].(string)
+			if cell == "" {
+				cell = "-"
+			}
+			rows[i] = append(rows[i], cell)
+		}
+	}
+	return columns, rows
 }
