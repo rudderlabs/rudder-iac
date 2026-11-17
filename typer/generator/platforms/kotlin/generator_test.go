@@ -89,6 +89,27 @@ func TestGenerateWithCustomOutputFileName(t *testing.T) {
 	assert.Equal(t, "Events.kt", files[0].Path)
 }
 
+// Snapshot is committed under the validator project so `make typer-kotlin-validate`
+// compiles it against the stub androidx.compose.runtime.Immutable annotation.
+func TestGenerateWithComposeImmutable(t *testing.T) {
+	trackingPlan := testutils.GetReferenceTrackingPlan()
+
+	generator := &kotlin.Generator{}
+	files, err := generator.Generate(trackingPlan, core.GenerateOptions{
+		RudderCLIVersion: "1.0.0",
+	}, kotlin.KotlinOptions{
+		PackageName:      "com.rudderstack.ruddertyper.composeimmutable",
+		ComposeImmutable: true,
+	})
+
+	assert.NoError(t, err)
+	assert.Len(t, files, 1)
+
+	if diff := cmp.Diff(composeImmutableContent, files[0].Content); diff != "" {
+		t.Errorf("Generated content does not match expected (-expected +actual):\n%s", diff)
+	}
+}
+
 // The golden also sits in the validator project, but that project is a JVM module with the Kotlin
 // SDK on its classpath, and JVM modules import kotlin.jvm implicitly. Compiling it there does not
 // show that the file builds in common code. The assertions below pin the SDK-free promise textually.
