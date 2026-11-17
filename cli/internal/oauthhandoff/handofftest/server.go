@@ -95,7 +95,7 @@ func Start(t *testing.T) *Server {
 	mux.HandleFunc("GET /v2/oauth/cli-sessions/{id}", s.pollSession)
 	// Proposed webapp page and its report, user session auth: what the browser calls.
 	mux.HandleFunc("GET /oauth/cli/{id}", s.consentPage)
-	mux.HandleFunc("POST /v2/oauth/cli-sessions/{id}/result", s.reportResult)
+	mux.HandleFunc("POST /oauth/cli-sessions/{id}/result", s.reportResult)
 	// Existing public account API.
 	mux.HandleFunc("PUT /v2/accounts/{id}/external-id", s.setExternalID)
 	mux.HandleFunc("GET /v2/accounts/{id}", s.getAccount)
@@ -470,7 +470,7 @@ rudder-auth, posts <code>oauth/callback</code>, and reports the account id.</p>
 consent screen behind these buttons.</p>
 <script>
 async function report(error){
-  await fetch('/v2/oauth/cli-sessions/%s/result',{method:'POST',
+  await fetch('/oauth/cli-sessions/%s/result',{method:'POST',
     headers:{'content-type':'application/json'},
     body:JSON.stringify(error?{error}:{accountId:null})});
   document.getElementById('act').innerHTML =

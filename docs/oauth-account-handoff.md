@@ -52,8 +52,19 @@ CLI                         config backend                 browser (user session
 
 ## Endpoints
 
-Three endpoints are new. All of them live on the config backend's public API
+Three endpoints are new, written here as the CLI sees them: on the public API
 host, alongside `/v2/accounts`.
+
+**Two services carry them.** `/v2/...` is served by `rudder-api`, which
+resolves the workspace from the access token and calls the config backend at
+`/apigateway/v1/workspaces/{workspaceId}/...`. That is also where the auth
+scheme changes: `rudder-api` takes the `Bearer` token, resolves it, and calls
+the config backend with basic auth, which is what `authenticateAccessToken`
+reads. So the CLI sends `Bearer` and nothing about it has to change, but the
+`/v2/oauth/cli-sessions` routes have to exist in **both** services. The config
+backend half is implemented in rudderlabs/rudder-config-backend#6972; the
+`rudder-api` half is not written yet, and it is the only thing standing between
+that PR and a working `rudder-cli workspace accounts create`.
 
 ### 1. Open a session
 
@@ -122,8 +133,11 @@ GET /v2/oauth/cli-sessions/{sessionId}?wait=30s
 Authorization: Bearer <workspace access token>
 ```
 
-`wait` is an optional Go-style duration, `0s` to `120s`, default `30s`. A
-value above the maximum is clamped rather than refused. While the session is
+`wait` is an optional Go duration string, `0s` to `2m0s`, default `30s`. A
+value above the maximum is clamped rather than refused; a value that is not a
+duration is a `400`. Parse the full Go format rather than a seconds suffix:
+the CLI sends what `time.Duration.String()` emits, which is `2m0s` rather than
+`120s`, and `29.8s` when it trims a poll to the time it has left. While the session is
 `pending` the server holds the request open until the status changes or `wait`
 elapses, then answers with the current state. Any other status answers
 immediately.
@@ -146,8 +160,10 @@ Response `200 OK`:
 | `name` | echoed from the opening request, same reason |
 | `error` | on `denied`, a sentence to show the user; empty otherwise |
 
-Errors: `401` for a bad token, `404` for an unknown or purged session, `403` if
-the token's workspace is not the session's workspace.
+Errors: `401` for a bad token, and `404` for an unknown session, a purged one,
+or one belonging to another workspace. A mismatch is deliberately not a `403`:
+with the workspace resolved from the token, "a session by that id exists, but
+not yours" is more than the caller should learn. The CLI treats both alike.
 
 The session must be readable by any valid access token for its workspace, not
 only by the exact token that opened it: a user may re-run the command in
@@ -156,11 +172,13 @@ another shell to `--resume`.
 ### 3. Report the result (webapp to backend)
 
 ```
-POST /v2/oauth/cli-sessions/{sessionId}/result
+POST /oauth/cli-sessions/{sessionId}/result
 ```
 
 Called by the webapp page under the user's own dashboard session, never by the
-CLI. Body on success:
+CLI. It is not a `/v2` route: the page is served by the dashboard and talks to
+the config backend directly, carrying only the session id, so there is no
+workspace in the path and no access token involved. Body on success:
 
 ```json
 { "accountId": "2fS9kQwPzX7rTnV4yLbH8mJcD1e" }
@@ -208,8 +226,8 @@ instead of creating a second one.
 | Bound | Value | Why |
 | --- | --- | --- |
 | Session TTL while `pending` | 10 minutes, reported as `expiresAt` | long enough for a provider consent screen with a sign-in and an MFA prompt |
-| Retention after a terminal status | at least 1 hour | the window in which `--resume` can still read the result |
-| Long-poll `wait` | `0s`–`120s`, default `30s` | a value under most proxy idle timeouts; the CLI re-requests, so a dropped connection costs one poll rather than the whole wait |
+| Retention after a terminal status | at least 1 hour; the implementation keeps a day | the window in which `--resume` can still read the result |
+| Long-poll `wait` | `0s`–`2m0s`, default `30s` | a value under most proxy idle timeouts; the CLI re-requests, so a dropped connection costs one poll rather than the whole wait |
 | CLI wait, end to end | `--timeout`, default 5 minutes | the CLI stops waiting, prints the `--resume` line, and exits non-zero; the session stays claimable until it expires |
 
 The CLI's `--timeout` is independent of the session TTL. A CLI timeout does not
@@ -225,21 +243,50 @@ is why the create path has to go through this handoff at all.
 
 ## What the backend still owes
 
-1. The three endpoints above, with the session store, its TTL and its
-   workspace scoping.
-2. A long-poll that wakes on a state change rather than on a timer, so consent
-   shows up in the terminal at once.
-3. Reuse of the existing create and re-auth paths behind the webapp's calls.
-   `callBackV1`'s re-auth branch (`oauth.service.ts:728`) already updates an
-   existing account's secret in place and returns the same account id, so
-   re-authorize is a payload difference rather than a new mechanism.
+The config backend half is implemented in
+rudderlabs/rudder-config-backend#6972: the endpoints, a Postgres
+`oauth_cli_sessions` table, the TTLs, the terminal statuses, first-call-wins on
+the result, and the webapp twin of the external-id route. What is left:
+
+1. **The `rudder-api` routes.** `/v2/oauth/cli-sessions` has to be declared
+   there and proxied to `/apigateway/v1/workspaces/{workspaceId}/...`, as every
+   other `/v2` route is. Until that lands the CLI cannot reach the handoff at
+   all. Note that `ConfigBackendClient` wraps its calls in `axiosRetry` with
+   three retries, which is harmless on an idempotent poll but worth capping on
+   a request that is held open for 30 seconds.
+2. Nothing else. The create and re-auth paths behind the webapp's calls are
+   reused unchanged; `callBackV1`'s re-auth branch (`oauth.service.ts:728`)
+   already updates an existing account's secret in place and returns the same
+   account id, so re-authorize is a payload difference rather than a new
+   mechanism.
+
+### The poll does not have to wake on an event
+
+An earlier draft of this document asked for a long-poll that wakes on a state
+change rather than on a timer. That was a mechanism where a latency bound
+belongs, and the config backend has nothing to build it on: no pub/sub, an
+in-process array for message relay, and one SSE endpoint that only proxies an
+upstream stream. With several pods, the pod holding the CLI's poll is almost
+never the pod the browser posts the result to.
+
+The requirement is therefore latency, not mechanism: a terminal status must
+reach a waiting CLI within a second of being written. #6972 does it by
+re-reading the session row every 500 ms inside the held request, which costs
+one primary-key read per waiter per interval, on a call that happens once per
+`accounts create`. That is indistinguishable from an event at the pace of a
+human finishing a consent screen.
 
 ## What the webapp still owes
 
-One page at `webUrl`, which:
+One page at `webUrl`, which #6972 builds as
+`${webAppURL}/oauth/cli/<sessionId>`, so the webapp has to serve that path. It
+reads and reports through two routes of its own, reached by session id with no
+workspace in the path, under the user's dashboard session:
+`GET /oauth/cli-sessions/{sessionId}` and endpoint 3 below. The page:
 
-1. Reads the session by id, under the user's dashboard session, and shows which
-   account definition or account it is about.
+1. Reads the session by id and shows which account definition or account it is
+   about. A user outside the session's workspace is refused with a `403` there,
+   which is the refusal to report back to the terminal.
 2. Refuses with a clear message, reported through endpoint 3, when the signed-in
    user is not a member of the session's workspace, or lacks the
    `credentialsManagement` role that `callBackV1` requires. Surfacing the
