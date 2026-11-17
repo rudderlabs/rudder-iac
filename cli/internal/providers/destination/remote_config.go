@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
@@ -179,4 +180,31 @@ func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResour
 	}
 	diffs, secretOnly := differ.CompareData(source, target)
 	return diffs, secretOnly, nil
+}
+
+// requiredAbsentSecrets returns the top-level secret keys config leaves out
+// that the definition's own validation requires for it, such as an HTTP bearer
+// token when auth is bearerTokenAuth. Deriving them from validation keeps a
+// conditional requirement conditional: S3 access keys are asked for only when
+// role-based auth is off.
+func requiredAbsentSecrets(registered *definitions.RegisteredDefinition, config map[string]any) []string {
+	absent := map[string]bool{}
+	for _, key := range registered.SecretKeys() {
+		if _, present := config[key]; !present && !strings.Contains(key, ".") {
+			absent[key] = true
+		}
+	}
+	if len(absent) == 0 {
+		return nil
+	}
+
+	var required []string
+	for _, configErr := range registered.ValidateConfig(config) {
+		key := strings.TrimPrefix(configErr.Path, "/")
+		if absent[key] && !slices.Contains(required, key) {
+			required = append(required, key)
+		}
+	}
+	slices.Sort(required)
+	return required
 }

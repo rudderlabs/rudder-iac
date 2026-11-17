@@ -471,6 +471,13 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 	// reference, asking the user to supply a credential the destination does not use.
 	pruneEmptyValues(localConfig, registered.SelectedKeyRoots(apiConfig)...)
 
+	// The API leaves some secrets out of its responses. One the config needs is
+	// written as a reference all the same, so filling in the var file is enough
+	// for the spec to validate; one it can do without stays out.
+	for _, key := range requiredAbsentSecrets(registered, localConfig) {
+		localConfig[key] = ""
+	}
+
 	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)
 	}
