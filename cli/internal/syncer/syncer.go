@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importreport"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -23,6 +24,7 @@ type ProjectSyncer struct {
 	concurrency     int
 	dryRun          bool
 	askConfirmation bool
+	importReport    *importreport.Report
 }
 
 type SyncProvider interface {
@@ -97,6 +99,16 @@ func WithAskConfirmation(askConfirmation bool) Option {
 	}
 }
 
+// WithImportReport sets the import report the syncer checks before it adopts a
+// resource whose config the spec cannot carry. Without one nothing is
+// acknowledged.
+func WithImportReport(report *importreport.Report) Option {
+	return func(s *ProjectSyncer) error {
+		s.importReport = report
+		return nil
+	}
+}
+
 type SyncReporter interface {
 	ReportPlan(plan *planner.Plan)
 	AskConfirmation() (bool, error)
@@ -141,6 +153,12 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 
 	if checker, ok := s.provider.(provider.PlanChecker); ok {
 		if err := checker.CheckPlan(ctx, plan, state); err != nil {
+			return []error{err}
+		}
+	}
+
+	if guard, ok := s.provider.(provider.ImportGuard); ok {
+		if err := guard.CheckImports(ctx, plan, state, s.importReport); err != nil {
 			return []error{err}
 		}
 	}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importreport"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
@@ -325,4 +326,57 @@ func TestWorkspaceImport_NothingNewToImport(t *testing.T) {
 
 	_, err = os.Stat(filepath.Join(dir, ImportedDir))
 	assert.True(t, os.IsNotExist(err), "nothing must be written when every entry is already linked")
+}
+
+type reportingImportProvider struct {
+	stubImportProvider
+	report []importreport.Entry
+}
+
+func (p *reportingImportProvider) ImportReport(*resources.RemoteResources, []importmanifest.ImportEntry) ([]importreport.Entry, error) {
+	return p.report, nil
+}
+
+// Config the specs cannot carry is written next to them, so the person who
+// reviews the imported specs reviews the loss in the same diff.
+func TestWorkspaceImport_WritesTheImportReportNextToTheSpecs(t *testing.T) {
+	dir := t.TempDir()
+	entities, entries := exportFixture()
+	lost := importreport.Entry{
+		URN:      "source:my-src",
+		RemoteID: "rid-1",
+		Lost:     []importreport.Lost{{Path: "legacyBlock", Value: "(object, 2 keys)"}},
+	}
+
+	err := WorkspaceImport(context.Background(), &stubProject{
+		location: dir,
+		graph:    resources.NewGraph(),
+	}, &reportingImportProvider{
+		stubImportProvider: stubImportProvider{importable: importableCollection(), entities: entities, entries: entries},
+		report:             []importreport.Entry{lost},
+	}, ImportOptions{})
+	require.NoError(t, err)
+
+	got, err := importreport.Load(dir)
+	require.NoError(t, err)
+	assert.Equal(t, &importreport.Report{Entries: []importreport.Entry{lost}}, got)
+
+	_, err = os.Stat(filepath.Join(dir, ImportedDir, importreport.FileName))
+	assert.NoError(t, err)
+}
+
+func TestWorkspaceImport_WritesNoReportWhenNothingIsLost(t *testing.T) {
+	dir := t.TempDir()
+	entities, entries := exportFixture()
+
+	err := WorkspaceImport(context.Background(), &stubProject{
+		location: dir,
+		graph:    resources.NewGraph(),
+	}, &reportingImportProvider{
+		stubImportProvider: stubImportProvider{importable: importableCollection(), entities: entities, entries: entries},
+	}, ImportOptions{})
+	require.NoError(t, err)
+
+	_, err = os.Stat(filepath.Join(dir, ImportedDir, importreport.FileName))
+	assert.True(t, os.IsNotExist(err))
 }

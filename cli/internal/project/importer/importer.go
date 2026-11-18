@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importreport"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
@@ -148,6 +149,22 @@ func WorkspaceImport(
 		}
 	}
 
+	if reporter, ok := p.(provider.ImportReporter); ok {
+		report, err := reporter.ImportReport(importable, importEntries)
+		if err != nil {
+			return fmt.Errorf("reporting config the import cannot carry: %w", err)
+		}
+		if err := importreport.Write(importDir, report); err != nil {
+			return err
+		}
+		if len(report) > 0 {
+			ui.PrintInfo(fmt.Sprintf("%d imported %s remote config the spec cannot hold, which adopting removes.\n"+
+				"Review %s and set \"acknowledged\": true on each entry before apply; apply refuses to adopt it until then.",
+				len(report), pluralNoun(len(report), "resource has", "resources have"),
+				filepath.Join(importDir, importreport.FileName)))
+		}
+	}
+
 	varFile, err := scaffoldSecretsVarFile(ctx, importDir, entities)
 	if err != nil {
 		return fmt.Errorf("scaffolding secrets var file: %w", err)
@@ -257,4 +274,11 @@ func initResolver(
 		Graph:      graph,
 		Importable: importable,
 	}, nil
+}
+
+func pluralNoun(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
 }
