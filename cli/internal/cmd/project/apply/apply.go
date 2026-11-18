@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importreport"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
@@ -97,7 +98,13 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("getting resource graph: %w", err)
 			}
 
+			report, err := importreport.Load(location)
+			if err != nil {
+				return err
+			}
+
 			options := []syncer.Option{
+				syncer.WithImportReport(report),
 				syncer.WithDryRun(dryRun),
 				syncer.WithAskConfirmation(confirm),
 				syncer.WithReporter(app.SyncReporter()),

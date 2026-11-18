@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importreport"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
@@ -424,6 +425,39 @@ func (p *CompositeProvider) CheckPlan(ctx context.Context, plan *planner.Plan, s
 		}
 		if err := checker.CheckPlan(ctx, plan, st); err != nil {
 			return fmt.Errorf("checking plan for provider %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+// ImportReport collects the entries of every child provider that reports config
+// an import cannot carry.
+func (p *CompositeProvider) ImportReport(collection *resources.RemoteResources, entries []importmanifest.ImportEntry) ([]importreport.Entry, error) {
+	var report []importreport.Entry
+	for _, name := range p.Order {
+		reporter, ok := p.Providers[name].(ImportReporter)
+		if !ok {
+			continue
+		}
+		providerEntries, err := reporter.ImportReport(collection, entries)
+		if err != nil {
+			return nil, fmt.Errorf("reporting import for provider %s: %w", name, err)
+		}
+		report = append(report, providerEntries...)
+	}
+	return report, nil
+}
+
+// CheckImports lets each child provider refuse an adopt whose loss is not
+// acknowledged, in Order so the first refusal is the same on every run.
+func (p *CompositeProvider) CheckImports(ctx context.Context, plan *planner.Plan, st *state.State, report *importreport.Report) error {
+	for _, name := range p.Order {
+		guard, ok := p.Providers[name].(ImportGuard)
+		if !ok {
+			continue
+		}
+		if err := guard.CheckImports(ctx, plan, st, report); err != nil {
+			return fmt.Errorf("checking imports for provider %s: %w", name, err)
 		}
 	}
 	return nil

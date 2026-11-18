@@ -5,6 +5,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importreport"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
@@ -193,6 +194,23 @@ type ConsolidateSyncer interface {
 // is how a check reads an Output value such as a remote id.
 type PlanChecker interface {
 	CheckPlan(ctx context.Context, plan *planner.Plan, st *state.State) error
+}
+
+// ImportReporter is implemented by a provider whose adopt pushes the spec over
+// the remote resource, so a remote value the spec cannot carry is removed. It
+// returns, for the remote resources an import is writing as specs, one entry per
+// resource that loses config. entries maps each remote ID to the URN its spec
+// gets. See importreport.
+type ImportReporter interface {
+	ImportReport(collection *resources.RemoteResources, entries []importmanifest.ImportEntry) ([]importreport.Entry, error)
+}
+
+// ImportGuard is implemented by a provider that can refuse to adopt a resource
+// whose config loss nobody acknowledged. Like PlanChecker it runs before the
+// plan is shown, so --dry-run and apply fail alike. It may read from the API
+// for the importable resources in the plan, and only for those.
+type ImportGuard interface {
+	CheckImports(ctx context.Context, plan *planner.Plan, st *state.State, report *importreport.Report) error
 }
 
 // ImportManifestLoader receives a single workspace's import metadata after all
