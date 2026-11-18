@@ -249,3 +249,44 @@ func TestProvider_PreviewImports_SkipsBackendDerivedKeys(t *testing.T) {
 	assert.True(t, diffs["destination:amp"].SecretOnly)
 	assert.NotContains(t, diffs["destination:amp"].Diffs, "Config (API keys the import removes)")
 }
+
+// TestProvider_PreviewImports_ReadErrors pins that the preview fails, naming
+// the destination, when it cannot read what the import would change: the
+// destination itself, or its transformation link (a 404 there only means no
+// link).
+func TestProvider_PreviewImports_ReadErrors(t *testing.T) {
+	t.Parallel()
+
+	run := func(t *testing.T, failPath string) error {
+		t.Helper()
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case failPath:
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`{"error":"boom"}`))
+			case "/v2/destinations/dst-1":
+				_, _ = w.Write([]byte(`{"destination":{"id":"dst-1","name":"Hook","type":"WEBHOOK","version":1,"enabled":true,"config":{"webhookUrl":"https://example.com/hook"}}}`))
+			default:
+				t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			}
+		}))
+		t.Cleanup(srv.Close)
+
+		data := &destination.DestinationResource{ID: "hook", DisplayName: "Hook", Type: "WEBHOOK", Enabled: true, DefinitionVersion: 1,
+			Config: map[string]any{"webhook_url": "https://example.com/hook"}}
+		plan := &planner.Plan{Operations: []*planner.Operation{{Type: planner.Import, Resource: resources.NewResource(
+			"hook", destination.DestinationResourceType, resources.ResourceData{}, nil,
+			resources.WithRawData(data), resources.WithResourceImportMetadata("dst-1", "ws-1"),
+		)}}}
+		_, err := destination.NewProvider(newTestClient(t, srv.URL), testRegistry(t)).PreviewImports(context.Background(), plan, state.EmptyState())
+		return err
+	}
+
+	err := run(t, "/v2/destinations/dst-1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "previewing import of destination:hook: getting destination")
+
+	err = run(t, "/v2/destinations/dst-1/transformation")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "previewing import of destination:hook: getting destination transformation")
+}
