@@ -239,6 +239,14 @@ func renderPropertyDiff(diff differ.PropertyDiff) []string {
 }
 
 func formattedLine(property string, pair ValuePair) string {
+	// A secret the change drops has no value to show on either side.
+	if pair.Target == nil && isSecretValue(pair.Source) {
+		return fmt.Sprintf(
+			"    - %s: %s\n",
+			ui.Color(property, ui.ColorWhite),
+			ui.Color("(secret, removed)", ui.ColorYellow),
+		)
+	}
 	return fmt.Sprintf(
 		"    - %s: %s %s %s\n",
 		ui.Color(property, ui.ColorWhite),
@@ -246,6 +254,15 @@ func formattedLine(property string, pair ValuePair) string {
 		ui.Color("=>", ui.ColorYellow),
 		printable(pair.Target),
 	)
+}
+
+func isSecretValue(v any) bool {
+	switch v.(type) {
+	case secret.String, *secret.String:
+		return true
+	default:
+		return false
+	}
 }
 
 // renderSecretDiff renders a property whose only change is a secret. The remote

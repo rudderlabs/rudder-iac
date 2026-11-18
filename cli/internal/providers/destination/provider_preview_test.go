@@ -17,14 +17,16 @@ import (
 // TestProvider_PreviewImports pins that the plan sees what adopting a
 // destination writes. The adopt replaces the whole config with the spec's, so
 // a value the spec adds is a change and so is one it leaves out, even an empty
-// one import pruned. A destination the spec matches has no entry.
+// one import pruned. A key the definition does not model is named in the API's
+// spelling, since no local line can show it. A destination the spec matches
+// has no entry.
 func TestProvider_PreviewImports(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v2/destinations/dst-changed":
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-changed","name":"GA4","type":"GA4","version":1,"enabled":true,"config":{"measurementId":"G-1","blacklistedEvents":[{"eventName":""}]}}}`))
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-changed","name":"GA4","type":"GA4","version":1,"enabled":true,"config":{"measurementId":"G-1","blacklistedEvents":[{"eventName":""}],"legacySetting":"keep-me"}}}`))
 		case "/v2/destinations/dst-same":
 			_, _ = w.Write([]byte(`{"destination":{"id":"dst-same","name":"Hook","type":"WEBHOOK","version":1,"enabled":true,"config":{"webhookUrl":"https://example.com/hook"}}}`))
 		default:
@@ -60,6 +62,11 @@ func TestProvider_PreviewImports(t *testing.T) {
 				Property:    "Config",
 				SourceValue: map[string]any{"measurement_id": "G-1", "blacklisted_events": []any{""}},
 				TargetValue: map[string]any{"measurement_id": "G-1", "debug_mode": true},
+			},
+			"Config (API keys the import removes)": {
+				Property:    "Config (API keys the import removes)",
+				SourceValue: map[string]any{"legacySetting": "keep-me"},
+				TargetValue: map[string]any{},
 			},
 		}},
 	}, diffs)

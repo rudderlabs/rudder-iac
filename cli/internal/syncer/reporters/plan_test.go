@@ -398,7 +398,7 @@ func TestRenderDiff_ImportableDiffs(t *testing.T) {
 			"destination:changed": {URN: "destination:changed", Diffs: map[string]differ.PropertyDiff{
 				"Config": {
 					Property:    "Config",
-					SourceValue: map[string]any{"address": "redis:6379", "prefix": ""},
+					SourceValue: map[string]any{"address": "redis:6379", "prefix": "", "password": secret.NewUnknown()},
 					TargetValue: map[string]any{"address": "redis:6379", "skip_verify": false},
 				},
 			}},
@@ -413,6 +413,7 @@ func TestRenderDiff_ImportableDiffs(t *testing.T) {
 		"\n"+
 		"Importable resources, changed on import:\n"+
 		"  - destination:changed\n"+
+		"    - Config.password: (secret, removed)\n"+
 		"    - Config.prefix:  => <nil>\n"+
 		"    - Config.skip_verify: <nil> => false\n"+
 		"\n"+
