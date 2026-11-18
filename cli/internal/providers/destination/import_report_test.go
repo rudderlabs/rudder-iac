@@ -65,6 +65,12 @@ func TestUnmodelledConfig(t *testing.T) {
 		assert.NotContains(t, got[0].Value, "hunter2")
 	})
 
+	t.Run("a derived key loses nothing", func(t *testing.T) {
+		got, err := unmodelledConfig(registered, json.RawMessage(`{"apiUrl":"https://example.com","auth":"noAuth","useNativeSDK":{"web":true}}`))
+		require.NoError(t, err)
+		assert.Empty(t, got)
+	})
+
 	t.Run("a config with only modelled keys and empty values loses nothing", func(t *testing.T) {
 		got, err := unmodelledConfig(registered, json.RawMessage(`{"apiUrl":"https://example.com","auth":"noAuth","headers":[],"queryParams":[],"ketchConsentPurposes":{}}`))
 		require.NoError(t, err)

@@ -60,7 +60,7 @@ func unmodelledConfig(registered *definitions.RegisteredDefinition, raw json.Raw
 
 	var lost []importreport.Lost
 	for key, value := range remote {
-		if neutral[key] {
+		if neutral[key] || derivedAPIKeys[key] {
 			continue
 		}
 		collectUnmodelled(value, roundTrip[key], key, roundTripHas(roundTrip, key), &lost)
@@ -68,6 +68,12 @@ func unmodelledConfig(registered *definitions.RegisteredDefinition, raw json.Raw
 	slices.SortFunc(lost, func(a, b importreport.Lost) int { return strings.Compare(a.Path, b.Path) })
 	return lost, nil
 }
+
+// derivedAPIKeys are keys the backend derives from other config, so losing them
+// to an adopt loses nothing. useNativeSDK follows connectionMode; #1041 excludes
+// it for the same reason. Found by running this report on a real workspace: 16
+// of 106 destinations listed it and nothing else.
+var derivedAPIKeys = map[string]bool{"useNativeSDK": true}
 
 func roundTripHas(m map[string]any, key string) bool {
 	_, ok := m[key]
