@@ -10,8 +10,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/typer/plan/testutils"
 )
 
-// Writes the reference Kotlin output (and a composeImmutable variant) into the
-// validator project so `make typer-kotlin-validate` compiles both. Defaults are
+// Writes the reference Kotlin output (and composeImmutable and common variants) into the
+// validator project so `make typer-kotlin-validate` compiles all of them. Defaults are
 // suitable for the in-repo Makefile target; override the destination root via
 // the first arg if needed.
 func main() {
@@ -36,6 +36,13 @@ func main() {
 			opts: kotlin.KotlinOptions{
 				PackageName:      "com.rudderstack.ruddertyper.composeimmutable",
 				ComposeImmutable: true,
+			},
+		},
+		{
+			path: filepath.Join(root, "com/rudderstack/ruddertyper/common/Main.kt"),
+			opts: kotlin.KotlinOptions{
+				PackageName: "com.rudderstack.ruddertyper.common",
+				Emit:        kotlin.EmitCommon,
 			},
 		},
 	}

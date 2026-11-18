@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/rudderlabs/rudder-iac/compare/v1.1.0...v1.2.0) (2026-11-17)
+
+
+### Features
+
+* **typer:** add emit=common for SDK-free Kotlin multiplatform output ([#1035](https://github.com/rudderlabs/rudder-iac/issues/1035)) ([92b4ae2](https://github.com/rudderlabs/rudder-iac/commit/92b4ae2ae4633dfb36ecede6e7dac2b097d989d1))
+
 ## [1.1.0](https://github.com/rudderlabs/rudder-iac/compare/v1.0.0...v1.1.0) (2026-11-13)
 
 
