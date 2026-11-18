@@ -278,7 +278,7 @@
 <!-- pr:1041 -->
 - A warehouse (Reverse ETL) source needs no `connection_mode.warehouse` entry: `RegisteredDefinition.ImpliedConnectionMode` returns `cloud` for `warehouse` only while the definition's warehouse modes are exactly `["cloud"]`, `ValidateDestinationConfig` skips the V-C8 settings-block check for a source type with an implied mode, and V-C5 (`connectTimeRequiredKeys`) reads an undeclared mode through `ConnectMode`, so cloud-mode required keys such as Braze `rest_api_key` are still demanded.
 - The skip fails closed: a definition offering a warehouse source a second mode implies none, and the entry is required again. Event stream source types never imply a mode (DEX-706 still holds for them). A written `connection_mode.warehouse` is still checked by the destination's own `validateConnectionMode`.
-- Grounding: every rudder-integrations-config `db-config.json` with `supportedConnectionModes.warehouse` lists only `cloud` (main 5b509f46); `schema.json` does not require `connectionMode`; rudder-server `FilterEventsForHybridMode` treats a missing mode as default, so the field is inert for rETL. Older dashboard destinations lack it (Zoopla prod: 2 of 115 rETL-connected).
+- Grounding: every rudder-integrations-config `db-config.json` with `supportedConnectionModes.warehouse` lists only `cloud` (main 5b509f46); `schema.json` does not require `connectionMode`; rudder-server `FilterEventsForHybridMode` treats a missing mode as default, so the field is inert for rETL. Older dashboard destinations lack it (one customer workspace in prod: 2 of 115 rETL-connected).
 
 ## rudder-iac#1041 — Destination Import Preview In The Plan
 <!-- pr:1041 -->
