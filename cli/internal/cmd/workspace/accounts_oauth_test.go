@@ -465,3 +465,19 @@ func TestResumeWarnsRatherThanFailsWhenTheSpecExists(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "version: \"rudder/v1\"\n", string(content))
 }
+
+func TestReauthorizeTimeoutDoesNotOfferResume(t *testing.T) {
+	server := useHandoffServer(t)
+	telemetrytest.Record(t)
+	server.SeedAccount(handofftest.NewAccount("acc-live", "Google Ads (prod)", oauthDefinition, "google-ads-prod"))
+
+	// No consent: the wait runs out while the session is still pending.
+	_, err := execReauthorize(t, "#account:google-ads-prod", "--no-browser", "--timeout", "200ms")
+	require.Error(t, err)
+
+	assert.Contains(t, err.Error(), "timed out after 200ms")
+	// reauthorize has no --resume flag, so naming one sends the user to a
+	// command that cannot take it. Finishing in the browser is enough on its own.
+	assert.NotContains(t, err.Error(), "--resume")
+	assert.Contains(t, err.Error(), "re-authorizes")
+}

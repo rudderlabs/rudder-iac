@@ -247,7 +247,9 @@ func (r *handoffRunner) create(ctx context.Context, definition, name, specDir, r
 
 	state, err := oauthhandoff.Wait(ctx, r.api, sessionID, r.waitOptions())
 	if err != nil {
-		return r.explainWaitFailure(err, sessionID)
+		return r.explainWaitFailure(err, fmt.Sprintf(
+			"  The link stays valid until it expires. Finish in the browser, then run:\n"+
+				"    rudder-cli workspace accounts create --resume %s", sessionID))
 	}
 	fmt.Fprintln(r.out, ui.Success("Account created: "+state.AccountID))
 
@@ -299,7 +301,9 @@ func (r *handoffRunner) reauthorize(ctx context.Context, ref string) error {
 	r.narrate(session)
 
 	if _, err := oauthhandoff.Wait(ctx, r.api, session.ID, r.waitOptions()); err != nil {
-		return r.explainWaitFailure(err, session.ID)
+		return r.explainWaitFailure(err,
+			"  The link stays valid until it expires. Finishing in the browser re-authorizes\n"+
+				"  the account, whether or not this command is still watching.")
 	}
 
 	fmt.Fprintln(r.out, ui.Success("Re-authorized "+account.ID))
@@ -389,9 +393,14 @@ func (r *handoffRunner) paintWait(elapsed time.Duration) {
 	fmt.Fprintf(r.out, "\r%c waiting for authorization ... %ds", frame, int(elapsed.Seconds()))
 }
 
-// explainWaitFailure turns a failed wait into the next command to run, rather
-// than just the error.
-func (r *handoffRunner) explainWaitFailure(err error, sessionID string) error {
+// explainWaitFailure turns a failed wait into the next thing to do, rather than
+// just the error.
+//
+// The recovery differs by command, so each caller supplies it: create can pick
+// the session up with --resume, while re-authorize has no such flag and needs
+// none. Finishing in the browser re-authorizes the account whether or not the
+// CLI was still watching, and there is nothing left for it to claim.
+func (r *handoffRunner) explainWaitFailure(err error, recovery string) error {
 	if r.paints() {
 		fmt.Fprintf(r.out, "\n")
 	}
@@ -399,12 +408,9 @@ func (r *handoffRunner) explainWaitFailure(err error, sessionID string) error {
 	var denied *oauthhandoff.DeniedError
 	switch {
 	case errors.Is(err, oauthhandoff.ErrTimedOut):
-		return fmt.Errorf("timed out after %s waiting for authorization.\n"+
-			"  The link stays valid until it expires. Finish in the browser, then run:\n"+
-			"    rudder-cli workspace accounts create --resume %s", r.timeout, sessionID)
+		return fmt.Errorf("timed out after %s waiting for authorization.\n%s", r.timeout, recovery)
 	case errors.Is(err, context.Canceled):
-		return fmt.Errorf("cancelled. The authorization session is untouched; finish in the browser, then run:\n"+
-			"    rudder-cli workspace accounts create --resume %s", sessionID)
+		return fmt.Errorf("cancelled. The authorization session is untouched.\n%s", recovery)
 	case errors.As(err, &denied):
 		return fmt.Errorf("%w\n"+
 			"  Ask a workspace admin to create the account, then adopt it with 'rudder-cli import workspace'", err)
