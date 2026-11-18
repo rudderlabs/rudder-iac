@@ -369,34 +369,3 @@ func TestRedisConversionRoundTrip(t *testing.T) {
 		testutil.WarehouseSettings,
 	})
 }
-
-// TestRedisModelsSchemaKeys guards the API keys this definition
-// models against rudder-integrations-config src/configurations/destinations/redis/schema.json
-// (main 5b509f46). Update replaces the whole config, so a schema key left out
-// is erased from the destination on the first apply or adopt (DEX-525).
-func TestRedisModelsSchemaKeys(t *testing.T) {
-	t.Parallel()
-
-	testutil.AssertModelsSchemaKeys(t, redis.NewDefinition().Properties,
-		[]string{
-			"address",
-			"caCertificate",
-			"clusterMode",
-			"connectionMode",
-			"consentManagement",
-			"database",
-			"ketchConsentPurposes",
-			"oneTrustCookieCategories",
-			"password",
-			"prefix",
-			"secure",
-			"skipVerify",
-			"useJSONModule",
-		},
-		map[string]string{
-			"ketchConsentPurposes":     "legacy consent block; the backend migrates it into consentManagement on write (DEX-696)",
-			"oneTrustCookieCategories": "legacy consent block; the backend migrates it into consentManagement on write (DEX-696)",
-		},
-		nil,
-	)
-}

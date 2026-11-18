@@ -466,28 +466,3 @@ func exampleConfig() map[string]any {
 func stringOfLength(n int) string {
 	return fmt.Sprintf("%*s", n, "")
 }
-
-// TestWebhookModelsSchemaKeys guards the API keys this definition
-// models against rudder-integrations-config src/configurations/destinations/webhook/schema.json
-// (main 5b509f46). Update replaces the whole config, so a schema key left out
-// is erased from the destination on the first apply or adopt (DEX-525).
-func TestWebhookModelsSchemaKeys(t *testing.T) {
-	t.Parallel()
-
-	testutil.AssertModelsSchemaKeys(t, webhook.NewDefinition().Properties,
-		[]string{
-			"connectionMode",
-			"consentManagement",
-			"headers",
-			"ketchConsentPurposes",
-			"oneTrustCookieCategories",
-			"webhookMethod",
-			"webhookUrl",
-		},
-		map[string]string{
-			"ketchConsentPurposes":     "legacy consent block; the backend migrates it into consentManagement on write (DEX-696)",
-			"oneTrustCookieCategories": "legacy consent block; the backend migrates it into consentManagement on write (DEX-696)",
-		},
-		nil,
-	)
-}

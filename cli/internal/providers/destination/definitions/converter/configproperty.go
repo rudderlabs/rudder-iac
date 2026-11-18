@@ -12,10 +12,6 @@ import (
 type ConfigProperty struct {
 	ToLocalFunc   ToLocalFunc
 	FromLocalFunc FromLocalFunc
-	// APIKey is the gjson dot path of this property in API config (e.g.
-	// "webhookUrl", "connectionMode.web"), so a definition test can check the
-	// keys it models against upstream's schema.json.
-	APIKey string
 	// LocalKey is the gjson dot path of this property in local config
 	// (e.g. "webhook_url"). Empty for derived properties that have no
 	// single local key, such as Discriminator.
@@ -51,7 +47,6 @@ type ToLocalFunc func(local, config string) (string, error)
 // Simple returns a ConfigProperty that maps an API config key to a local config key and vice versa.
 func Simple(apiKey, localKey string, filters ...ValueFilter) ConfigProperty {
 	return ConfigProperty{
-		APIKey:        apiKey,
 		LocalKey:      localKey,
 		FromLocalFunc: copyFromLocal(apiKey, localKey, filters...),
 		ToLocalFunc:   copyToLocal(apiKey, localKey),
@@ -91,7 +86,6 @@ func SkipZeroValue(a any) bool {
 // only if the provided condition is satisfied for that API config.
 func Conditional(apiKey, localKey string, condition ConfigConditionFunc) ConfigProperty {
 	return ConfigProperty{
-		APIKey:        apiKey,
 		LocalKey:      localKey,
 		FromLocalFunc: copyFromLocal(apiKey, localKey),
 		ToLocalFunc:   copyToLocalConditional(apiKey, localKey, condition),
@@ -120,7 +114,6 @@ func Equals(key, value string) ConfigConditionFunc {
 // absent discriminator names nothing and drops nothing — see LocalKeyFor.
 func Discriminator(apiKey string, values DiscriminatorValues) ConfigProperty {
 	return ConfigProperty{
-		APIKey:        apiKey,
 		FromLocalFunc: discriminatorValue(apiKey, values),
 		ToLocalFunc:   func(local, config string) (string, error) { return local, nil },
 		Selector:      &KeySelector{APIKey: apiKey, LocalKeys: map[string]any(values)},
@@ -160,7 +153,6 @@ func (g KeySelector) LocalKeyFor(apiConfig map[string]any) (selected string, pre
 
 func ArrayWithStrings(rootAPIKey, nestedAPIField, localKey string) ConfigProperty {
 	return ConfigProperty{
-		APIKey:   rootAPIKey,
 		LocalKey: localKey,
 		FromLocalFunc: func(config, local string) (string, error) {
 			result := config
@@ -230,7 +222,6 @@ func ArrayWithObjects(rootAPIKey, localKey string, fields map[string]any) Config
 	inverseFields := GetInverseFields(fields)
 
 	return ConfigProperty{
-		APIKey:   rootAPIKey,
 		LocalKey: localKey,
 		FromLocalFunc: func(config, local string) (string, error) {
 			result := config

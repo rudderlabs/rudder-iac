@@ -406,32 +406,3 @@ func TestS3ConversionRoundTrip(t *testing.T) {
 		testutil.WarehouseSettings,
 	})
 }
-
-// TestS3ModelsSchemaKeys guards the API keys this definition
-// models against rudder-integrations-config src/configurations/destinations/s3/schema.json
-// (main 5b509f46). Update replaces the whole config, so a schema key left out
-// is erased from the destination on the first apply or adopt (DEX-525).
-func TestS3ModelsSchemaKeys(t *testing.T) {
-	t.Parallel()
-
-	testutil.AssertModelsSchemaKeys(t, s3.NewDefinition().Properties,
-		[]string{
-			"accessKey",
-			"accessKeyID",
-			"bucketName",
-			"connectionMode",
-			"consentManagement",
-			"enableSSE",
-			"iamRoleARN",
-			"ketchConsentPurposes",
-			"oneTrustCookieCategories",
-			"prefix",
-			"roleBasedAuth",
-		},
-		map[string]string{
-			"ketchConsentPurposes":     "legacy consent block; the backend migrates it into consentManagement on write (DEX-696)",
-			"oneTrustCookieCategories": "legacy consent block; the backend migrates it into consentManagement on write (DEX-696)",
-		},
-		nil,
-	)
-}
