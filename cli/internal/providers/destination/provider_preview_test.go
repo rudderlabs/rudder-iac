@@ -31,6 +31,8 @@ func TestProvider_PreviewImports(t *testing.T) {
 			_, _ = w.Write([]byte(`{"destination":{"id":"dst-filtered","name":"Filtered","type":"FILTERED","version":1,"enabled":true,"config":{"trackingID":"T-1","eventFilteringOption":"disable","blacklistedEvents":[{"eventName":"Old"}]}}}`))
 		case "/v2/destinations/dst-same":
 			_, _ = w.Write([]byte(`{"destination":{"id":"dst-same","name":"Hook","type":"WEBHOOK","version":1,"enabled":true,"config":{"webhookUrl":"https://example.com/hook"}}}`))
+		case "/v2/destinations/dst-changed/transformation", "/v2/destinations/dst-filtered/transformation", "/v2/destinations/dst-same/transformation":
+			w.WriteHeader(http.StatusNotFound)
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -71,7 +73,7 @@ func TestProvider_PreviewImports(t *testing.T) {
 			},
 			"Config (API keys the import removes)": {
 				Property:    "Config (API keys the import removes)",
-				SourceValue: map[string]any{"legacySetting": "keep-me"},
+				SourceValue: map[string]any{"legacySetting": "(value)"},
 				TargetValue: map[string]any{},
 			},
 		}},
@@ -80,7 +82,7 @@ func TestProvider_PreviewImports(t *testing.T) {
 		"destination:filtered": {URN: "destination:filtered", Diffs: map[string]differ.PropertyDiff{
 			"Config (API keys the import removes)": {
 				Property:    "Config (API keys the import removes)",
-				SourceValue: map[string]any{"blacklistedEvents": []any{map[string]any{"eventName": "Old"}}},
+				SourceValue: map[string]any{"blacklistedEvents": "(list, 1 item)"},
 				TargetValue: map[string]any{},
 			},
 		}},
