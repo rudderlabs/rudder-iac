@@ -1395,9 +1395,10 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 				Type:      "GA4",
 				Version:   1,
 				IsEnabled: true,
-				// The API strips secrets. The definition requires api_secret, so
-				// export scaffolds a reference for it (an optional secret stays
-				// out; see TestHandlerImpl_FormatForExport_RequiredSecretsTheAPIStrips).
+				// The API strips this secret from every response. The test
+				// definition requires api_secret, so export scaffolds a reference
+				// for it; an optional one stays out (see
+				// TestHandlerImpl_FormatForExport_RequiredSecretsTheAPIStrips).
 				Config: []byte(`{"measurementId":"G-123"}`),
 			}},
 		}
@@ -1440,8 +1441,7 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, map[string]any{
 			"measurement_id": "G-123",
-			"api_secret":     "{{ .GA4_PRODUCTION_API_SECRET }}",
-		}, config, "an empty secret is pruned, then referenced only because the definition requires it")
+		}, config, "an empty secret gives the user nothing to fill in")
 	})
 
 	t.Run("prunes null secret keys instead of masking them", func(t *testing.T) {
@@ -1468,7 +1468,6 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, map[string]any{
 			"measurement_id": "G-123",
-			"api_secret":     "{{ .GA4_PRODUCTION_API_SECRET }}",
 		}, config)
 	})
 
@@ -1496,7 +1495,6 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, map[string]any{
 			"debug_mode": false,
-			"api_secret": "{{ .GA4_PRODUCTION_API_SECRET }}",
 		}, config, "false is a meaningful setting, not absence")
 	})
 
@@ -1511,6 +1509,7 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 				Version:   1,
 				IsEnabled: true,
 				Config: []byte(`{
+					"apiSecret": "",
 					"measurementId": "G-123",
 					"blacklistedEvents": [{"eventName": ""}, {"eventName": null}],
 					"advancedOptions": {"provider": "", "categories": [], "overrides": {"enabledFor": null}}
@@ -1528,7 +1527,6 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, map[string]any{
 			"measurement_id": "G-123",
-			"api_secret":     "{{ .GA4_PRODUCTION_API_SECRET }}",
 		}, config, "a container whose every member is empty is itself empty")
 	})
 
@@ -1542,7 +1540,7 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 				Type:      "GA4",
 				Version:   1,
 				IsEnabled: true,
-				Config:    []byte(`{"blacklistedEvents":[{"eventName":""},{"eventName":"Order Completed"}]}`),
+				Config:    []byte(`{"apiSecret":"","blacklistedEvents":[{"eventName":""},{"eventName":"Order Completed"}]}`),
 			}},
 		}
 
@@ -1556,7 +1554,6 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, map[string]any{
 			"blacklisted_events": []any{"", "Order Completed"},
-			"api_secret":         "{{ .GA4_PRODUCTION_API_SECRET }}",
 		}, config, "emptiness is a property of the whole value, not of each member")
 	})
 

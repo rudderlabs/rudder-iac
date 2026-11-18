@@ -32,13 +32,10 @@ type DestinationResource struct {
 
 // DestinationState is the persisted apply-cycle state. ID is the remote
 // destination API ID; TransformationID is the linked transformation's remote
-// ID (empty when no link exists). PreservedConfig holds the remote API config
-// keys a spec cannot carry, which an update sends back unchanged (see
-// readRemoteConfig); it is read from the remote, never from a spec.
+// ID (empty when no link exists).
 type DestinationState struct {
 	ID               string
 	TransformationID string
-	PreservedConfig  map[string]any
 }
 
 // RemoteDestination wraps client.Destination to satisfy handler.RemoteResource

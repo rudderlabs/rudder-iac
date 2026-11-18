@@ -15,17 +15,18 @@ import (
 )
 
 // TestProvider_PreviewImports pins that the plan sees what adopting a
-// destination writes: a value the spec sets that the remote lacks is a change,
-// while keys the update carries over (unmodelled ones, cleared values) are not.
+// destination writes. The adopt replaces the whole config with the spec's, so
+// a value the spec adds is a change and so is one it leaves out, even an empty
+// one import pruned. A destination the spec matches has no entry.
 func TestProvider_PreviewImports(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v2/destinations/dst-changed":
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-changed","name":"GA4","type":"GA4","version":1,"enabled":true,"config":{"measurementId":"G-1","legacySetting":"keep-me","blacklistedEvents":[{"eventName":""}]}}}`))
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-changed","name":"GA4","type":"GA4","version":1,"enabled":true,"config":{"measurementId":"G-1","blacklistedEvents":[{"eventName":""}]}}}`))
 		case "/v2/destinations/dst-same":
-			_, _ = w.Write([]byte(`{"destination":{"id":"dst-same","name":"Hook","type":"WEBHOOK","version":1,"enabled":true,"config":{"webhookUrl":"https://example.com/hook","ketchConsentPurposes":{}}}}`))
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-same","name":"Hook","type":"WEBHOOK","version":1,"enabled":true,"config":{"webhookUrl":"https://example.com/hook"}}}`))
 		default:
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -57,7 +58,7 @@ func TestProvider_PreviewImports(t *testing.T) {
 		"destination:ga4": {URN: "destination:ga4", Diffs: map[string]differ.PropertyDiff{
 			"Config": {
 				Property:    "Config",
-				SourceValue: map[string]any{"measurement_id": "G-1"},
+				SourceValue: map[string]any{"measurement_id": "G-1", "blacklisted_events": []any{""}},
 				TargetValue: map[string]any{"measurement_id": "G-1", "debug_mode": true},
 			},
 		}},
