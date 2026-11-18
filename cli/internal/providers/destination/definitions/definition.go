@@ -233,6 +233,36 @@ func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, err
 	return append([]string(nil), modes...), nil
 }
 
+// ImpliedConnectionMode returns the mode a source type connects in when the
+// config declares none, or "" when there is none to imply. Only a warehouse
+// source has one: cloud, and only while cloud is the single warehouse mode the
+// definition offers (true of every destination upstream today). The day a
+// definition offers a warehouse source a second mode, nothing is implied and a
+// warehouse connection must declare its mode like any other.
+func (d *RegisteredDefinition) ImpliedConnectionMode(sourceType string) string {
+	if sourceType != common.SourceTypeWarehouse {
+		return ""
+	}
+	modes, err := d.ConnectionModes(sourceType)
+	if err != nil || !slices.Equal(modes, []string{warehouseImpliedMode}) {
+		return ""
+	}
+	return warehouseImpliedMode
+}
+
+// ConnectMode returns the mode a source of sourceType connects in: the one
+// config declares under connection_mode, else the implied one (see
+// ImpliedConnectionMode), else "".
+func (d *RegisteredDefinition) ConnectMode(sourceType string, config map[string]any) string {
+	block, _ := config["connection_mode"].(map[string]any)
+	if mode, _ := block[sourceType].(string); mode != "" {
+		return mode
+	}
+	return d.ImpliedConnectionMode(sourceType)
+}
+
+const warehouseImpliedMode = "cloud"
+
 // ConnectionRequiredKeys returns the keys the given source type must carry to
 // connect in the given mode. A nil result means the pair requires none.
 func (d *RegisteredDefinition) ConnectionRequiredKeys(sourceType, mode string) []string {
