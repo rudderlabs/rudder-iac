@@ -124,9 +124,16 @@ func (varFileFormatter) Format(data any) ([]byte, error) {
 // rather than threading names through every export strategy — keeps the var
 // file in sync with what the specs actually reference, regardless of which
 // provider or strategy produced them.
+//
+// Raw code files are skipped: they are loaded verbatim, never substituted, so a
+// "{{ .NAME }}" in them needs no value, and an unfilled entry would fail every
+// run that loads the var file.
 func collectVariableNames(entities []writer.FormattableEntity) []string {
 	found := make(map[string]struct{})
 	for _, entity := range entities {
+		if !isSubstitutedSpec(entity.Content) {
+			continue
+		}
 		extractVariableNames(entity.Content, found)
 	}
 

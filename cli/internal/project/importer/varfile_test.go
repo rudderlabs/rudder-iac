@@ -33,12 +33,13 @@ func TestCollectVariableNames(t *testing.T) {
 				map[string]any{"id": "c", "plain": "no token", "count": 3},
 			},
 		}),
-		// Every generated entity is scanned, spec file or not.
-		{Content: "select * from {{ .RAW_TABLE }}", RelativePath: "raw.txt"},
+		// A raw code file is loaded verbatim, never substituted, so its
+		// "{{ .NAME }}" is code and needs no var file entry.
+		{Content: "export function transformEvent(e) { return '{{ .CODE_ONLY }}' }", RelativePath: "transformations/t.js"},
 	}
 
 	assert.Equal(t,
-		[]string{"A_TOKEN", "B_ACCESS_KEY", "RAW_TABLE"},
+		[]string{"A_TOKEN", "B_ACCESS_KEY"},
 		collectVariableNames(entities),
 	)
 }
