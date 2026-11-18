@@ -158,3 +158,17 @@ func TestCheckVariableOwners_AllowsReimportingAnExistingOwner(t *testing.T) {
 		"id": "one", "config": map[string]any{"api_key": "{{ .ONE_API_KEY }}"},
 	})))
 }
+
+// TestCheckVariableOwners_CountsReferencesAnywhereInTheDocument pins that a
+// reference counts wherever substitution would replace it, not only in the
+// spec body: in metadata, and as a mapping key.
+func TestCheckVariableOwners_CountsReferencesAnywhereInTheDocument(t *testing.T) {
+	for name, content := range map[string]string{
+		"metadata.name": "version: rudder/v1\nkind: account\nmetadata:\n  name: '{{ .PG_PASSWORD }}'\nspec:\n  id: pg\n",
+		"mapping key":   "version: rudder/v1\nkind: account\nmetadata:\n  name: pg\nspec:\n  id: pg\n  config:\n    '{{ .PG_PASSWORD }}': x\n",
+	} {
+		dir := t.TempDir()
+		writeProjectFile(t, dir, "accounts/pg.yaml", content)
+		assert.ErrorContains(t, importInto(t, dir, newPGDestination()), "PG_PASSWORD (in accounts/pg.yaml and destinations/pg.yaml)", name)
+	}
+}

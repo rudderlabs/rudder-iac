@@ -188,8 +188,14 @@ func checkVariableOwners(location string, entities []writer.FormattableEntity) e
 			if err != nil {
 				return fmt.Errorf("reading project spec %s for secret variables: %w", rel, err)
 			}
+			// Substitution runs over the whole document, so every field and
+			// mapping key counts, not only the spec body.
+			var document map[string]any
+			if err := yaml.Unmarshal(replaced.Data, &document); err != nil {
+				return fmt.Errorf("reading project spec %s for secret variables: %w", rel, err)
+			}
 			id := specOwner(spec, rel)
-			walkStrings(spec.Spec, "spec", func(keyPath, value string) {
+			walkStrings(document, "", func(keyPath, value string) {
 				for _, ref := range replaced.ReferencesIn(value) {
 					owner := id + ":" + keyPath
 					uses[ref.Name] = append(uses[ref.Name], use{owner: owner, file: rel})
@@ -207,9 +213,10 @@ func checkVariableOwners(location string, entities []writer.FormattableEntity) e
 		}
 		id, content := entity.RelativePath, entity.Content
 		if spec, ok := entity.Content.(*specs.Spec); ok && spec != nil {
-			id, content = specOwner(spec, entity.RelativePath), spec.Spec
+			id = specOwner(spec, entity.RelativePath)
+			content = map[string]any{"version": spec.Version, "kind": spec.Kind, "metadata": spec.Metadata, "spec": spec.Spec}
 		}
-		walkStrings(content, "spec", func(keyPath, value string) {
+		walkStrings(content, "", func(keyPath, value string) {
 			for _, name := range varsubst.ExtractVariableNames([]byte(value)) {
 				uses[name] = append(uses[name], use{owner: id + ":" + keyPath, file: entity.RelativePath, isNew: true})
 			}
@@ -239,12 +246,19 @@ func checkVariableOwners(location string, entities []writer.FormattableEntity) e
 		strings.Join(clashes, ", "))
 }
 
-// walkStrings calls visit with the key path of every string under value.
+// walkStrings calls visit with the document path of every string under value,
+// mapping keys included: a key is visited at its own path with a "(key)"
+// suffix, since substitution replaces a reference wherever it is written.
 func walkStrings(value any, path string, visit func(keyPath, value string)) {
 	switch v := value.(type) {
 	case map[string]any:
 		for key, item := range v {
-			walkStrings(item, path+"."+key, visit)
+			keyPath := key
+			if path != "" {
+				keyPath = path + "." + key
+			}
+			visit(keyPath+" (key)", key)
+			walkStrings(item, keyPath, visit)
 		}
 	case []any:
 		for i, item := range v {
