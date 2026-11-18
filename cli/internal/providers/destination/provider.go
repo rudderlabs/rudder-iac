@@ -54,6 +54,15 @@ func NewProvider(c *client.Client, registry *definitions.Registry) *Provider {
 // it adopts, so a value the spec does not share with the remote changes it. See
 // provider.ImportPreviewer.
 func (p *Provider) PreviewImports(ctx context.Context, plan *planner.Plan, st *state.State) (map[string]differ.ResourceDiff, error) {
+	// A resource the same plan imports keeps its remote ID, so a reference to it
+	// resolves to that ID once its import runs.
+	adopted := map[string]string{}
+	for _, op := range plan.Operations {
+		if op.Type == planner.Import && op.Resource.ImportMetadata() != nil {
+			adopted[op.Resource.URN()] = op.Resource.ImportMetadata().RemoteId
+		}
+	}
+
 	result := map[string]differ.ResourceDiff{}
 	for _, op := range plan.Operations {
 		if op.Type != planner.Import || op.Resource.Type() != DestinationResourceType {
@@ -63,7 +72,7 @@ func (p *Provider) PreviewImports(ctx context.Context, plan *planner.Plan, st *s
 		if !ok || op.Resource.ImportMetadata() == nil {
 			continue
 		}
-		diffs, secretOnly, err := p.handler.previewImport(ctx, data, op.Resource.ImportMetadata().RemoteId, st)
+		diffs, secretOnly, err := p.handler.previewImport(ctx, data, op.Resource.ImportMetadata().RemoteId, st, adopted)
 		if err != nil {
 			return nil, fmt.Errorf("previewing import of %s: %w", op.Resource.URN(), err)
 		}

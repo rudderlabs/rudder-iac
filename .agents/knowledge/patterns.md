@@ -303,3 +303,7 @@
 ## rudder-iac#1041 — Import Preview Compares Transformation Links By Remote ID
 <!-- pr:1041 -->
 - `ImportPreviewer.PreviewImports` takes the stored state, so the destination preview resolves the spec's transformation reference on a copy (`state.DereferenceByReflection`) before the apply does, and compares remote IDs exactly as `syncTransformationLink` will: a disconnect, a new link and a switch (`trf-OLD (remote id) => trf-NEW (transformation:x)`) each show a line, an unchanged link shows none, and a transformation created in the same apply (no ID yet) shows `<urn> (created in this apply)`.
+
+## rudder-iac#1041 — Import Preview Resolves Transformations Adopted In The Same Apply
+<!-- pr:1041 -->
+- A transformation reference to a resource the same plan imports resolves, in the destination import preview, to that import's metadata `remote_id` (an adopt keeps the remote ID), so the normal `import workspace` -> `apply` flow shows no link line when the destination already points at it, and `old (remote id) => <id> (<urn>, adopted in this apply)` when it does not. Only a reference with neither state nor an importable shows `(created in this apply)`.

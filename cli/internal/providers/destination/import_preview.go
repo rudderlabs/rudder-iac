@@ -25,9 +25,10 @@ import (
 // the spec leaves out, connects one the spec names, and switches one to
 // another. Each shows as a Transformation line; a link the spec names that is
 // already the remote one shows none. The spec's reference is resolved from st
-// as the apply resolves it; a transformation the same apply creates has no ID
-// yet, and is a change by construction.
-func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResource, remoteID string, st *state.State) (map[string]differ.PropertyDiff, bool, error) {
+// as the apply resolves it, or, for a transformation the same plan imports,
+// from adopted (URN to the remote ID its import keeps). A transformation the
+// same apply creates has no ID yet, and is a change by construction.
+func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResource, remoteID string, st *state.State, adopted map[string]string) (map[string]differ.PropertyDiff, bool, error) {
 	remote, err := h.client.Destinations.Get(ctx, remoteID)
 	if err != nil {
 		return nil, false, fmt.Errorf("getting destination: %w", err)
@@ -70,7 +71,7 @@ func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResour
 	}
 	diffs, secretOnly := differ.CompareData(source, target)
 
-	if line, changed := transformationChange(remoteTransformationID, data.Transformation, st); changed {
+	if line, changed := transformationChange(remoteTransformationID, data.Transformation, st, adopted); changed {
 		diffs["Transformation"] = line
 		secretOnly = false
 	}
@@ -221,7 +222,7 @@ func plural(n int, word string) string {
 
 // transformationChange compares the remote transformation link with the one the
 // spec names, as Import's syncTransformationLink will: by remote ID.
-func transformationChange(remoteID string, ref *resources.PropertyRef, st *state.State) (differ.PropertyDiff, bool) {
+func transformationChange(remoteID string, ref *resources.PropertyRef, st *state.State, adopted map[string]string) (differ.PropertyDiff, bool) {
 	line := differ.PropertyDiff{Property: "Transformation"}
 	if remoteID != "" {
 		line.SourceValue = remoteID + " (remote id)"
@@ -231,13 +232,16 @@ func transformationChange(remoteID string, ref *resources.PropertyRef, st *state
 	}
 
 	wantedID, resolved := resolvedTransformationID(ref, st)
+	adoptedID, isAdopted := adopted[ref.URN]
 	switch {
-	case !resolved:
-		line.TargetValue = ref.URN + " (created in this apply)"
-	case wantedID == remoteID:
+	case resolved && wantedID == remoteID, !resolved && isAdopted && adoptedID == remoteID:
 		return line, false
-	default:
+	case resolved:
 		line.TargetValue = wantedID + " (" + ref.URN + ")"
+	case isAdopted:
+		line.TargetValue = adoptedID + " (" + ref.URN + ", adopted in this apply)"
+	default:
+		line.TargetValue = ref.URN + " (created in this apply)"
 	}
 	return line, true
 }

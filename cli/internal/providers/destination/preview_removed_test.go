@@ -24,7 +24,7 @@ func previewOne(t *testing.T, registry *definitions.Registry, body, link string,
 	return previewOneWithState(t, registry, body, link, data, state.EmptyState())
 }
 
-func previewOneWithState(t *testing.T, registry *definitions.Registry, body, link string, data *destination.DestinationResource, st *state.State) map[string]differ.ResourceDiff {
+func previewOneWithState(t *testing.T, registry *definitions.Registry, body, link string, data *destination.DestinationResource, st *state.State, others ...*planner.Operation) map[string]differ.ResourceDiff {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -42,10 +42,10 @@ func previewOneWithState(t *testing.T, registry *definitions.Registry, body, lin
 	}))
 	t.Cleanup(srv.Close)
 
-	plan := &planner.Plan{Operations: []*planner.Operation{{Type: planner.Import, Resource: resources.NewResource(
+	plan := &planner.Plan{Operations: append(others, &planner.Operation{Type: planner.Import, Resource: resources.NewResource(
 		data.ID, destination.DestinationResourceType, resources.ResourceData{}, nil,
 		resources.WithRawData(data), resources.WithResourceImportMetadata("dst-1", "ws-1"),
-	)}}}
+	)})}
 	diffs, err := destination.NewProvider(newTestClient(t, srv.URL), registry).PreviewImports(context.Background(), plan, st)
 	require.NoError(t, err)
 	return diffs
@@ -150,5 +150,19 @@ func TestProvider_PreviewImports_TransformationLink(t *testing.T) {
 		"a transformation the same apply creates has no ID yet and is a change")
 
 	assert.Empty(t, previewOneWithState(t, testRegistry(t), body, "trf-NEW", spec(unresolved()), st), "the link already in place is no change")
+
+	// A transformation the same apply imports keeps its remote ID, so the
+	// reference resolves to that ID: the usual import workspace -> apply flow.
+	adopting := &planner.Operation{Type: planner.Import, Resource: resources.NewResource(
+		"t1", "transformation", resources.ResourceData{}, nil, resources.WithResourceImportMetadata("trf-1", "ws-1"),
+	)}
+	adoptedRef := func() *resources.PropertyRef {
+		return &resources.PropertyRef{URN: "transformation:t1", Resolve: func(out any) (string, error) { return out.(string), nil }}
+	}
+	assert.Empty(t, previewOneWithState(t, testRegistry(t), body, "trf-1", spec(adoptedRef()), state.EmptyState(), adopting),
+		"a link to the transformation being adopted, already in place, is no change")
+	assert.Equal(t, differ.PropertyDiff{Property: "Transformation", SourceValue: "trf-OLD (remote id)", TargetValue: "trf-1 (transformation:t1, adopted in this apply)"},
+		line(previewOneWithState(t, testRegistry(t), body, "trf-OLD", spec(adoptedRef()), state.EmptyState(), adopting)),
+		"switching to a transformation the same apply adopts")
 	assert.Empty(t, previewOne(t, testRegistry(t), body, "", spec(nil)), "no link on either side is no change")
 }
