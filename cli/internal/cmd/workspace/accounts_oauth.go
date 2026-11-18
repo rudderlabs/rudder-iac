@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -73,8 +74,9 @@ An OAuth account's credentials are held by RudderStack's auth service, and the
 public account API refuses to create one. So the CLI opens a handoff session,
 sends you to a RudderStack page that runs the provider consent flow under your
 own dashboard session, and waits. It then claims the new account under the
-spec id it derives from --name, and with --write-spec writes the matching
-'kind: account' spec, so 'rudder-cli apply' adopts the same account afterwards.
+spec id it derives from --name, suffixed if that id is already taken, and with
+--write-spec writes the matching 'kind: account' spec, so 'rudder-cli apply'
+adopts the same account afterwards.
 
 ` + experimentalNotice,
 		Args:    cobra.NoArgs,
@@ -226,7 +228,7 @@ func (r *handoffRunner) create(ctx context.Context, definition, name, specDir, r
 	// Checked before the session is opened: a refusal here costs a flag
 	// correction, while the same refusal after the account exists leaves an
 	// OAuth account the CLI has no way to delete.
-	if err := checkSpecTarget(specDir, baseExternalID(name)); err != nil {
+	if err := requireSpecDir(specDir); err != nil {
 		return err
 	}
 
@@ -257,7 +259,7 @@ func (r *handoffRunner) create(ctx context.Context, definition, name, specDir, r
 	// The claim needs nothing new from the API: PUT /v2/accounts/{id}/external-id
 	// is already open to the CLI and already idempotent.
 	displayName := firstNonEmpty(name, state.Name)
-	externalID, err := r.externalIDFor(ctx, displayName)
+	externalID, taken, err := r.externalIDFor(ctx, displayName, specDir)
 	if err != nil {
 		return fmt.Errorf("deriving the spec id to claim %s under: %w", state.AccountID, err)
 	}
@@ -268,7 +270,7 @@ func (r *handoffRunner) create(ctx context.Context, definition, name, specDir, r
 	// id is seen here rather than discovered on the next apply.
 	fmt.Fprintln(r.out, ui.Success("Claimed as "+externalID))
 	if base := baseExternalID(displayName); externalID != base {
-		fmt.Fprintf(r.out, "   (%q was already claimed in this workspace)\n", base)
+		fmt.Fprintf(r.out, "   (%q is taken by %s)\n", base, taken.describe(base, specDir))
 	}
 
 	if specDir != "" {
@@ -426,27 +428,73 @@ func (r *handoffRunner) explainWaitFailure(err error, recovery string) error {
 	}
 }
 
-// checkSpecTarget reports an unwritable --write-spec target. create calls it
-// before the handoff session is opened, so the common case (a second run with
-// the same --name) is refused while nothing has been created yet.
+// requireSpecDir refuses a --write-spec target that cannot hold a spec at all:
+// a path that names a regular file, or one no directory can be made at. create
+// calls it before the handoff session is opened, so that failure costs a flag
+// correction rather than an OAuth account the CLI has no way to delete.
 //
-// An empty externalID means --resume, whose name comes from the session: there
-// is nothing to check yet, and the write failure that follows is a warning
-// rather than a failure, because by then the account exists.
-func checkSpecTarget(dir, externalID string) error {
-	if dir == "" || externalID == "" {
+// It says nothing about the spec's own name. An id another spec in the
+// directory already uses is not a refusal any more: externalIDFor steps around
+// it, the same way it steps around an id the workspace already claims.
+func requireSpecDir(dir string) error {
+	if dir == "" {
 		return nil
 	}
-
-	path := filepath.Join(dir, externalID+".yaml")
-	switch _, err := os.Stat(path); {
-	case err == nil:
-		return fmt.Errorf("%s already exists, and the spec is never overwritten.\n"+
-			"  Pick another --name, drop --write-spec, or move that file aside", path)
-	case !errors.Is(err, fs.ErrNotExist):
-		return fmt.Errorf("checking %s: %w", path, err)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("--write-spec %s cannot hold the account spec: %w", dir, err)
 	}
 	return nil
+}
+
+// takenIDs is the ids externalIDFor steps around, and which side each came
+// from, so a disambiguated id can say why.
+type takenIDs struct {
+	claimed map[string]bool // accounts this workspace has already claimed
+	local   map[string]bool // specs already in the --write-spec directory
+}
+
+func (t takenIDs) describe(id string, dir string) string {
+	switch {
+	case t.claimed[id] && t.local[id]:
+		return fmt.Sprintf("an account in this workspace and a spec in %s", dir)
+	case t.claimed[id]:
+		return "an account in this workspace"
+	case t.local[id]:
+		return fmt.Sprintf("a spec in %s", dir)
+	default:
+		// Reached when the namer stepped around an id this run itself derived,
+		// which the two sets above cannot explain.
+		return "another account"
+	}
+}
+
+// localSpecIDs is the ids the specs in dir already use. The id is the file's
+// base name, which is how both this command and 'import workspace' name the
+// file they write, and is what the write would collide on either way.
+func localSpecIDs(dir string) (map[string]bool, error) {
+	ids := map[string]bool{}
+	if dir == "" {
+		return ids, nil
+	}
+
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return ids, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", dir, err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if ext := filepath.Ext(name); ext == ".yaml" || ext == ".yml" {
+			ids[strings.TrimSuffix(name, ext)] = true
+		}
+	}
+	return ids, nil
 }
 
 // writeAccountSpec renders the 'kind: account' spec create and adopt share. An
@@ -489,41 +537,54 @@ func baseExternalID(name string) string {
 	return namer.StrategyKebabCase.Name(name)
 }
 
-// externalIDFor is baseExternalID disambiguated against the external ids the
-// workspace already uses, so a display name that collides with an
-// already-claimed account gets "-1" appended instead of failing the claim with
-// a 409 after the user has already given consent in the browser.
+// externalIDFor is baseExternalID disambiguated against every id that is
+// already spoken for, so a display name whose id is taken gets "-1" appended
+// instead of failing the claim with a 409 after the user has already given
+// consent in the browser.
+//
+// Both sides count: an id the workspace has claimed, and an id a spec in the
+// --write-spec directory uses. One rule, so --write-spec changes which file is
+// written and never whether the command runs.
 //
 // A free name is claimed unchanged: the namer only resolves a collision.
-func (r *handoffRunner) externalIDFor(ctx context.Context, name string) (string, error) {
+func (r *handoffRunner) externalIDFor(ctx context.Context, name, specDir string) (string, takenIDs, error) {
+	taken := takenIDs{claimed: map[string]bool{}}
 	if baseExternalID(name) == "" {
-		return "", fmt.Errorf("%q has no letters or digits to build a spec id from", name)
+		return "", taken, fmt.Errorf("%q has no letters or digits to build a spec id from", name)
 	}
 
 	claimed, err := r.accounts.Accounts.ListAll(ctx, client.WithHasExternalID(true))
 	if err != nil {
-		return "", fmt.Errorf("listing the workspace's claimed accounts: %w", err)
+		return "", taken, fmt.Errorf("listing the workspace's claimed accounts: %w", err)
+	}
+	for _, account := range claimed {
+		if account.ExternalID != "" {
+			taken.claimed[account.ExternalID] = true
+		}
 	}
 
-	// Deduplicated because Load rejects a repeated id, and the list is remote
-	// data this command does not control.
-	var (
-		seen  = make(map[string]bool, len(claimed))
-		taken = make([]namer.ScopeName, 0, len(claimed))
-	)
-	for _, account := range claimed {
-		if account.ExternalID == "" || seen[account.ExternalID] {
-			continue
+	if taken.local, err = localSpecIDs(specDir); err != nil {
+		return "", taken, err
+	}
+
+	// One ScopeName per id: Load rejects a repeated one, and the two sides
+	// overlap whenever a spec has been applied.
+	scope := make([]namer.ScopeName, 0, len(taken.claimed)+len(taken.local))
+	for _, id := range slices.Sorted(maps.Keys(taken.claimed)) {
+		scope = append(scope, namer.ScopeName{Scope: accounts.AccountResourceType, Name: id})
+	}
+	for _, id := range slices.Sorted(maps.Keys(taken.local)) {
+		if !taken.claimed[id] {
+			scope = append(scope, namer.ScopeName{Scope: accounts.AccountResourceType, Name: id})
 		}
-		seen[account.ExternalID] = true
-		taken = append(taken, namer.ScopeName{Scope: accounts.AccountResourceType, Name: account.ExternalID})
 	}
 
 	idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
-	if err := idNamer.Load(taken); err != nil {
-		return "", fmt.Errorf("loading the claimed ids: %w", err)
+	if err := idNamer.Load(scope); err != nil {
+		return "", taken, fmt.Errorf("loading the ids already in use: %w", err)
 	}
-	return idNamer.Name(namer.ScopeName{Scope: accounts.AccountResourceType, Name: name})
+	id, err := idNamer.Name(namer.ScopeName{Scope: accounts.AccountResourceType, Name: name})
+	return id, taken, err
 }
 
 func firstNonEmpty(values ...string) string {

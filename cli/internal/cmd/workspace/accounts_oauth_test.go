@@ -403,17 +403,18 @@ func TestBaseExternalID(t *testing.T) {
 	}
 }
 
-// An existing spec file is the second run of the same command, and it used to
-// fail after the account was already created and claimed: a script reading the
-// exit code retried, and the retry created a second OAuth account nobody can
-// delete. The refusal has to come before the session is opened.
-func TestCreateRefusesAnExistingSpecBeforeOpeningTheSession(t *testing.T) {
+// A spec file already using the id is the second run of the same command. It
+// used to fail after the account had been created and claimed, so a script
+// reading the exit code retried and the retry created a second OAuth account
+// nobody can delete. Now it is the same collision as a claimed id, resolved
+// the same way: one rule, whether or not --write-spec is passed.
+func TestCreateStepsAroundAnExistingSpecFile(t *testing.T) {
 	server := useHandoffServer(t)
 	telemetrytest.Record(t)
 	specDir := t.TempDir()
 
-	path := filepath.Join(specDir, "google-ads-prod.yaml")
-	require.NoError(t, os.WriteFile(path, []byte("version: \"rudder/v1\"\n"), 0644))
+	existing := filepath.Join(specDir, "google-ads-prod.yaml")
+	require.NoError(t, os.WriteFile(existing, []byte("version: \"rudder/v1\"\n"), 0644))
 
 	server.OnSessionOpened(server.Consent)
 	out, err := execCreate(t,
@@ -422,50 +423,74 @@ func TestCreateRefusesAnExistingSpecBeforeOpeningTheSession(t *testing.T) {
 		"--write-spec", specDir,
 		"--no-browser",
 	)
+	require.NoError(t, err, out)
+
+	created, ok := server.Account(server.LastSession().AccountID)
+	require.True(t, ok)
+	assert.Equal(t,
+		handofftest.NewAccount(created.ID, "Google Ads (prod)", oauthDefinition, "google-ads-prod-1"),
+		created)
+
+	assert.Contains(t, out, "Claimed as google-ads-prod-1")
+	assert.Contains(t, out, `"google-ads-prod" is taken by a spec in `+specDir)
+	assert.FileExists(t, filepath.Join(specDir, "google-ads-prod-1.yaml"))
+
+	// The file that held the name is not touched.
+	content, err := os.ReadFile(existing)
+	require.NoError(t, err)
+	assert.Equal(t, "version: \"rudder/v1\"\n", string(content))
+}
+
+// The one --write-spec refusal left is a target that cannot hold a spec at all,
+// and it still has to come before the session: a refusal afterwards leaves an
+// account the CLI cannot delete.
+func TestCreateRefusesAnUnusableSpecDirBeforeOpeningTheSession(t *testing.T) {
+	server := useHandoffServer(t)
+	telemetrytest.Record(t)
+
+	notADir := filepath.Join(t.TempDir(), "specs")
+	require.NoError(t, os.WriteFile(notADir, nil, 0644))
+
+	server.OnSessionOpened(server.Consent)
+	out, err := execCreate(t,
+		"--definition", oauthDefinition, "--name", "Ads",
+		"--write-spec", notADir, "--no-browser",
+	)
 	require.Error(t, err)
 	assert.Equal(t, 0, server.Sessions(), "no account may be created when the spec cannot be written")
-	assert.Contains(t, err.Error(), path+" already exists")
-	assert.Contains(t, err.Error(), "Pick another --name, drop --write-spec, or move that file aside")
-	// The path is named once, not once per wrapping layer.
-	assert.Equal(t, 1, strings.Count(err.Error(), path))
+	assert.Contains(t, err.Error(), "--write-spec "+notADir+" cannot hold the account spec")
 	assert.NotContains(t, out, "Account created")
 }
 
-// --resume takes its name from the session, so the target is not known until
-// the account exists. A write failure then cannot fail the command: the remote
-// work has succeeded, and a non-zero exit would invite the retry that creates
-// a second account.
-func TestResumeWarnsRatherThanFailsWhenTheSpecExists(t *testing.T) {
+// A write that fails for a reason no id can step around (here a directory the
+// process cannot write to) must not fail the command: the remote work has
+// succeeded by then, and a non-zero exit invites the retry that creates a
+// second account.
+func TestWriteFailureAfterTheClaimWarnsRatherThanFails(t *testing.T) {
 	server := useHandoffServer(t)
 	telemetrytest.Record(t)
-	specDir := t.TempDir()
 
-	_, err := execCreate(t,
+	specDir := filepath.Join(t.TempDir(), "specs")
+	require.NoError(t, os.Mkdir(specDir, 0500))
+	t.Cleanup(func() { _ = os.Chmod(specDir, 0700) })
+
+	server.OnSessionOpened(server.Consent)
+	out, err := execCreate(t,
 		"--definition", oauthDefinition, "--name", "Google Ads (prod)",
-		"--no-browser", "--timeout", "200ms",
+		"--write-spec", specDir, "--no-browser",
 	)
-	require.Error(t, err)
-	sessionID := server.LastSession().ID
-	server.Consent(sessionID)
-
-	path := filepath.Join(specDir, "google-ads-prod.yaml")
-	require.NoError(t, os.WriteFile(path, []byte("version: \"rudder/v1\"\n"), 0644))
-
-	out, err := execCreate(t, "--resume", sessionID, "--write-spec", specDir)
 	require.NoError(t, err, out)
 
 	account, ok := server.Account(server.LastSession().AccountID)
 	require.True(t, ok)
-	assert.Equal(t, "google-ads-prod", account.ExternalID)
+	assert.Equal(t,
+		handofftest.NewAccount(account.ID, "Google Ads (prod)", oauthDefinition, "google-ads-prod"),
+		account)
 
 	assert.Contains(t, out, "Claimed as google-ads-prod")
-	assert.Contains(t, out, path+" already exists")
 	assert.Contains(t, out, "The spec was not written, but the account is created and claimed")
+	assert.Contains(t, out, "id: google-ads-prod")
 	assert.Contains(t, out, "account_definition_name: "+oauthDefinition)
-	// The pre-existing file is left alone.
-	content, err := os.ReadFile(path)
-	require.NoError(t, err)
-	assert.Equal(t, "version: \"rudder/v1\"\n", string(content))
 }
 
 func TestReauthorizeTimeoutDoesNotOfferResume(t *testing.T) {
@@ -527,7 +552,7 @@ func TestCreateDisambiguatesAClaimedName(t *testing.T) {
 
 	// Printed, so the id is seen now rather than discovered on the next apply.
 	assert.Contains(t, out, "Claimed as google-ads-prod-1")
-	assert.Contains(t, out, `"google-ads-prod" was already claimed in this workspace`)
+	assert.Contains(t, out, `"google-ads-prod" is taken by an account in this workspace`)
 	assert.Contains(t, out, `rudder_account_id: "#account:google-ads-prod-1"`)
 }
 
@@ -580,4 +605,22 @@ spec:
   name: "Ads"
 `, string(spec))
 	assert.Contains(t, out, "Wrote "+filepath.Join(specDir, "ads-1.yaml"))
+}
+
+// writeAccountSpec is reached with a taken path only in a race now, since the
+// id steps around the spec files it can see. The message still has to name the
+// path once: writer.Write wraps os.OpenFile's own *PathError twice over, so the
+// raw error says it three times.
+func TestWriteAccountSpecNamesThePathOnce(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	path, err := writeAccountSpec(context.Background(), dir, "ads", "Ads", oauthDefinition)
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(dir, "ads.yaml"), path)
+
+	_, err = writeAccountSpec(context.Background(), dir, "ads", "Ads", oauthDefinition)
+	require.Error(t, err)
+	assert.Equal(t, path+" already exists, and the spec is never overwritten", err.Error())
+	assert.Equal(t, 1, strings.Count(err.Error(), path))
 }
