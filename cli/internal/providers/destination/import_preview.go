@@ -70,6 +70,14 @@ func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResour
 		return nil, false, fmt.Errorf("decoding destination spec: %w", err)
 	}
 	diffs, secretOnly := differ.CompareData(source, target)
+	// CompareData counts a secret only the remote holds as one to re-apply, but
+	// the adopt's payload leaves it out, so it is removed: the config change is
+	// then a real one, and renders as (secret, removed).
+	if config, ok := diffs["Config"]; ok && config.SecretOnly && removesSecret(config.SourceValue, config.TargetValue) {
+		config.SecretOnly = false
+		diffs["Config"] = config
+		secretOnly = false
+	}
 
 	if line, changed := transformationChange(remoteTransformationID, data.Transformation, st, adopted); changed {
 		diffs["Transformation"] = line
@@ -150,25 +158,27 @@ func (h *HandlerImpl) removedAPIKeys(registered *definitions.RegisteredDefinitio
 
 // collectRemoved records under path each part of value (found at key in the
 // remote parent) that payload leaves out and roundTrip, the parent as local
-// config can carry it, does not hold either.
+// config can carry it, does not hold either. A part the payload leaves out but
+// the round trip holds is shown by a local line, but its own children may not
+// be, so it is walked against an empty payload.
 func collectRemoved(key string, value any, payload, roundTrip map[string]any, path string, removed map[string]any) {
 	sent, inPayload := payload[key]
 	held, inRoundTrip := roundTrip[key]
-	if !inPayload {
-		if !inRoundTrip {
-			removed[path] = summarise(value)
-		}
+	if !inPayload && !inRoundTrip {
+		removed[path] = summarise(value)
 		return
 	}
 	collectRemovedIn(value, sent, held, path, removed)
 }
 
+// collectRemovedIn walks value against sent (nil when the payload leaves it
+// out) and held, down maps by key and lists by index.
 func collectRemovedIn(value, sent, held any, path string, removed map[string]any) {
 	switch remote := value.(type) {
 	case map[string]any:
 		sentMap, ok := sent.(map[string]any)
-		if !ok {
-			return
+		if !ok && sent != nil {
+			return // a changed type is a value change, shown by a local line
 		}
 		heldMap, _ := held.(map[string]any)
 		for key, item := range remote {
@@ -176,30 +186,74 @@ func collectRemovedIn(value, sent, held any, path string, removed map[string]any
 		}
 	case []any:
 		sentList, ok := sent.([]any)
-		if !ok {
+		if !ok && sent != nil {
 			return
 		}
 		heldList, _ := held.([]any)
 		for i, item := range remote {
 			itemPath := fmt.Sprintf("%s[%d]", path, i)
-			if i >= len(sentList) {
-				if i >= len(heldList) {
-					removed[itemPath] = summarise(item)
-				}
+			if i >= len(heldList) && i >= len(sentList) {
+				removed[itemPath] = summarise(item)
 				continue
 			}
-			var heldItem any
+			var sentItem, heldItem any
+			if i < len(sentList) {
+				sentItem = sentList[i]
+			}
 			if i < len(heldList) {
 				heldItem = heldList[i]
 			}
-			collectRemovedIn(item, sentList[i], heldItem, itemPath, removed)
+			collectRemovedIn(item, sentItem, heldItem, itemPath, removed)
 		}
 	}
+}
+
+// removesSecret reports whether source holds a secret target lacks, at any
+// depth: a secret the remote has that the adopt's payload leaves out.
+func removesSecret(source, target any) bool {
+	switch typed := source.(type) {
+	case secret.String, *secret.String:
+		return target == nil
+	case map[string]any:
+		targetMap, _ := target.(map[string]any)
+		for key, item := range typed {
+			if removesSecret(item, targetMap[key]) {
+				return true
+			}
+		}
+	case []any:
+		targetList, _ := target.([]any)
+		for i, item := range typed {
+			var targetItem any
+			if i < len(targetList) {
+				targetItem = targetList[i]
+			}
+			if removesSecret(item, targetItem) {
+				return true
+			}
+		}
+	case []map[string]any:
+		targetList, _ := target.([]map[string]any)
+		for i, item := range typed {
+			var targetItem any
+			if i < len(targetList) {
+				targetItem = targetList[i]
+			}
+			if removesSecret(item, targetItem) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // summarise describes a removed value without printing it: an empty one as it
 // is, anything else by its shape.
 func summarise(value any) any {
+	// A null removed would read as absence, and absence is no line at all.
+	if value == nil {
+		return "(null)"
+	}
 	if isEmptyConfigValue(value) {
 		return value
 	}

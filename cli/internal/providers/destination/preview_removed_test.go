@@ -8,6 +8,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/redis"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/webhook"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -165,4 +166,56 @@ func TestProvider_PreviewImports_TransformationLink(t *testing.T) {
 		line(previewOneWithState(t, testRegistry(t), body, "trf-OLD", spec(adoptedRef()), state.EmptyState(), adopting)),
 		"switching to a transformation the same apply adopts")
 	assert.Empty(t, previewOne(t, testRegistry(t), body, "", spec(nil)), "no link on either side is no change")
+}
+
+// TestProvider_PreviewImports_RemovedSecretIsAChange pins that a secret only
+// the remote holds, which the adopt's payload leaves out, is a removal rather
+// than a secret re-application: the import changes the destination.
+func TestProvider_PreviewImports_RemovedSecretIsAChange(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(redis.NewDefinition()))
+
+	diffs := previewOne(t, registry, `{"destination":{"id":"dst-1","name":"R","type":"REDIS","version":1,"enabled":true,"config":{
+		"address":"redis:6379","database":"1","secure":false,"clusterMode":false,"skipVerify":false,"useJSONModule":false,"password":""}}}`, "",
+		&destination.DestinationResource{
+			ID: "r", DisplayName: "R", Type: "redis", Enabled: true, DefinitionVersion: 1,
+			Config: map[string]any{"address": "redis:6379", "database": "1", "secure": false, "cluster_mode": false, "skip_verify": false, "use_json_module": false},
+		})
+
+	require.Contains(t, diffs, "destination:r")
+	assert.False(t, diffs["destination:r"].SecretOnly, "a removed secret is a change, not a re-application")
+	assert.False(t, diffs["destination:r"].Diffs["Config"].SecretOnly)
+}
+
+// TestProvider_PreviewImports_RemovalsUnderOmittedParents pins that a parent
+// the spec leaves out, which local config partly holds, does not hide its
+// unmodelled children, and that a shortened list names the dropped element's
+// unmapped fields. A removed null is listed too.
+func TestProvider_PreviewImports_RemovalsUnderOmittedParents(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(webhook.NewDefinition()))
+
+	diffs := previewOne(t, registry, `{"destination":{"id":"dst-1","name":"Hook","type":"WEBHOOK","version":1,"enabled":true,"config":{
+		"webhookUrl":"https://example.com/hook","webhookMethod":"POST",
+		"headers":[{"from":"A","to":"a"},{"from":"B","to":"b","description":"note"}],
+		"consentManagement":{"web":[{"provider":"custom","resolutionStrategy":"and","consents":[{"consent":"c1"}]}],"amp":[{"provider":"ketch"}]},
+		"legacyNull":null,"legacyOther":"x"}}}`, "", &destination.DestinationResource{
+		ID: "hook", DisplayName: "Hook", Type: "webhook", Enabled: true, DefinitionVersion: 1,
+		Config: map[string]any{
+			"webhook_url": "https://example.com/hook", "webhook_method": "POST",
+			"headers": []any{map[string]any{"from": "A", "to": "a"}},
+		},
+	})
+
+	require.Contains(t, diffs, "destination:hook")
+	assert.Equal(t, map[string]any{
+		"consentManagement.amp":  "(list, 1 item)",
+		"headers[1].description": "(value)",
+		"legacyNull":             "(null)",
+		"legacyOther":            "(value)",
+	}, diffs["destination:hook"].Diffs["Config (API keys the import removes)"].SourceValue)
 }
