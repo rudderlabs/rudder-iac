@@ -403,15 +403,16 @@ func TestBaseExternalID(t *testing.T) {
 	}
 }
 
-// A spec file already using the id is the second run of the same command. It
-// used to fail after the account had been created and claimed, so a script
-// reading the exit code retried and the retry created a second OAuth account
-// nobody can delete. Now it is the same collision as a claimed id, resolved
-// the same way: one rule, whether or not --write-spec is passed.
-func TestCreateStepsAroundAnExistingSpecFile(t *testing.T) {
+// A spec file using the id while the workspace has claimed it too is the second
+// run of the same command: the first run's account is adopted under that id, so
+// this one is a deliberate second account and steps around it. It used to fail
+// after the account had been created and claimed, so a script reading the exit
+// code retried and the retry created a third account nobody can delete.
+func TestCreateStepsAroundASpecForAnAdoptedAccount(t *testing.T) {
 	server := useHandoffServer(t)
 	telemetrytest.Record(t)
 	specDir := t.TempDir()
+	server.SeedAccount(handofftest.NewAccount("acc-live", "Google Ads (prod)", oauthDefinition, "google-ads-prod"))
 
 	existing := filepath.Join(specDir, "google-ads-prod.yaml")
 	require.NoError(t, os.WriteFile(existing, []byte("version: \"rudder/v1\"\n"), 0644))
@@ -432,13 +433,55 @@ func TestCreateStepsAroundAnExistingSpecFile(t *testing.T) {
 		created)
 
 	assert.Contains(t, out, "Claimed as google-ads-prod-1")
-	assert.Contains(t, out, `"google-ads-prod" is taken by a spec in `+specDir)
+	assert.Contains(t, out, `"google-ads-prod" is taken by an account in this workspace and a spec in `+specDir)
 	assert.FileExists(t, filepath.Join(specDir, "google-ads-prod-1.yaml"))
 
 	// The file that held the name is not touched.
 	content, err := os.ReadFile(existing)
 	require.NoError(t, err)
 	assert.Equal(t, "version: \"rudder/v1\"\n", string(content))
+}
+
+// A spec file using the id while nothing in the workspace is claimed as it is
+// a spec for an account that does not exist, and an apply cannot create one for
+// an OAuth definition. Stepping around it would leave a second account the user
+// did not ask for, so this is refused, and refused before the session opens,
+// which is the only place a refusal costs nothing.
+func TestCreateRefusesASpecIDNoAccountHolds(t *testing.T) {
+	server := useHandoffServer(t)
+	telemetrytest.Record(t)
+	specDir := t.TempDir()
+
+	require.NoError(t, os.WriteFile(filepath.Join(specDir, "google-ads-prod.yaml"), []byte("version: \"rudder/v1\"\n"), 0644))
+
+	server.OnSessionOpened(server.Consent)
+	out, err := execCreate(t,
+		"--definition", oauthDefinition,
+		"--name", "Google Ads (prod)",
+		"--write-spec", specDir,
+		"--no-browser",
+	)
+	require.Error(t, err)
+	assert.Equal(t, 0, server.Sessions(), "no account may be created when the id is refused")
+	assert.Contains(t, err.Error(), specDir+` already uses the id "google-ads-prod", and no account in this workspace is claimed as it`)
+	assert.Contains(t, err.Error(), "drop --write-spec")
+	assert.NotContains(t, out, "Account created")
+
+	// The advice the refusal gives has to work: without --write-spec the spec
+	// already on disk is left alone and the claim takes the id it names, so the
+	// apply that follows adopts this account into it.
+	server.OnSessionOpened(server.Consent)
+	out, err = execCreate(t, "--definition", oauthDefinition, "--name", "Google Ads (prod)", "--no-browser")
+	require.NoError(t, err, out)
+
+	created, ok := server.Account(server.LastSession().AccountID)
+	require.True(t, ok)
+	assert.Equal(t,
+		handofftest.NewAccount(created.ID, "Google Ads (prod)", oauthDefinition, "google-ads-prod"),
+		created)
+	entries, err := os.ReadDir(specDir)
+	require.NoError(t, err)
+	assert.Len(t, entries, 1, "a run without --write-spec writes no spec")
 }
 
 // The one --write-spec refusal left is a target that cannot hold a spec at all,

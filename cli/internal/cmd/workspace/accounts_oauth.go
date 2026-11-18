@@ -74,9 +74,9 @@ An OAuth account's credentials are held by RudderStack's auth service, and the
 public account API refuses to create one. So the CLI opens a handoff session,
 sends you to a RudderStack page that runs the provider consent flow under your
 own dashboard session, and waits. It then claims the new account under the
-spec id it derives from --name, suffixed if that id is already taken, and with
---write-spec writes the matching 'kind: account' spec, so 'rudder-cli apply'
-adopts the same account afterwards.
+spec id it derives from --name, suffixed if an account here already holds it,
+and with --write-spec writes the matching 'kind: account' spec, so
+'rudder-cli apply' adopts the same account afterwards.
 
 ` + experimentalNotice,
 		Args:    cobra.NoArgs,
@@ -229,6 +229,9 @@ func (r *handoffRunner) create(ctx context.Context, definition, name, specDir, r
 	// correction, while the same refusal after the account exists leaves an
 	// OAuth account the CLI has no way to delete.
 	if err := requireSpecDir(specDir); err != nil {
+		return err
+	}
+	if err := r.refuseStaleSpecID(ctx, specDir, baseExternalID(name)); err != nil {
 		return err
 	}
 
@@ -444,6 +447,47 @@ func requireSpecDir(dir string) error {
 		return fmt.Errorf("--write-spec %s cannot hold the account spec: %w", dir, err)
 	}
 	return nil
+}
+
+// refuseStaleSpecID refuses a run whose id a spec in the --write-spec directory
+// already uses while no account in the workspace is claimed as it. That spec
+// names an account that does not exist, which an 'apply' cannot create for an
+// OAuth definition, so it is either the account the user is creating right now
+// or a leftover. Creating a second account under a suffixed id serves neither.
+//
+// An id the workspace has claimed is the opposite case: a deliberate second
+// account, which externalIDFor steps around.
+//
+// This runs before the session is opened, which is the only place a refusal is
+// free. After consent the account exists, so a collision there is resolved
+// rather than refused, and --resume skips this check because its name comes
+// from the session.
+func (r *handoffRunner) refuseStaleSpecID(ctx context.Context, dir, base string) error {
+	if dir == "" || base == "" {
+		return nil
+	}
+
+	local, err := localSpecIDs(dir)
+	if err != nil {
+		return err
+	}
+	if !local[base] {
+		return nil
+	}
+
+	// Read separately from the list externalIDFor takes after consent, which
+	// has to be the fresher one: minutes of browser time sit between them.
+	claimed, err := r.accounts.Accounts.ListAll(ctx, client.WithHasExternalID(true))
+	if err != nil {
+		return fmt.Errorf("listing the workspace's claimed accounts: %w", err)
+	}
+	if slices.ContainsFunc(claimed, func(a client.Account) bool { return a.ExternalID == base }) {
+		return nil
+	}
+
+	return fmt.Errorf(`a spec in %s already uses the id %q, and no account in this workspace is claimed as it.
+  If that spec is for the account you are creating, drop --write-spec: the spec is already there, and the claim adopts it.
+  Otherwise pick another --name, or move that file aside`, dir, base)
 }
 
 // takenIDs is the ids externalIDFor steps around, and which side each came
