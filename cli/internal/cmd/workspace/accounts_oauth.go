@@ -18,6 +18,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/oauthhandoff"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/formatter"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -225,7 +226,7 @@ func (r *handoffRunner) create(ctx context.Context, definition, name, specDir, r
 	// Checked before the session is opened: a refusal here costs a flag
 	// correction, while the same refusal after the account exists leaves an
 	// OAuth account the CLI has no way to delete.
-	if err := checkSpecTarget(specDir, specID(name)); err != nil {
+	if err := checkSpecTarget(specDir, baseExternalID(name)); err != nil {
 		return err
 	}
 
@@ -255,18 +256,24 @@ func (r *handoffRunner) create(ctx context.Context, definition, name, specDir, r
 
 	// The claim needs nothing new from the API: PUT /v2/accounts/{id}/external-id
 	// is already open to the CLI and already idempotent.
-	externalID := specID(firstNonEmpty(name, state.Name))
-	if externalID == "" {
-		return fmt.Errorf("the session reported no account name, so there is no spec id to claim %s under", state.AccountID)
+	displayName := firstNonEmpty(name, state.Name)
+	externalID, err := r.externalIDFor(ctx, displayName)
+	if err != nil {
+		return fmt.Errorf("deriving the spec id to claim %s under: %w", state.AccountID, err)
 	}
 	if err := r.accounts.Accounts.SetExternalID(ctx, state.AccountID, externalID); err != nil {
 		return fmt.Errorf("claiming account %s as %q: %w", state.AccountID, externalID, err)
 	}
+	// The id is printed whether or not the namer changed it, so a disambiguated
+	// id is seen here rather than discovered on the next apply.
 	fmt.Fprintln(r.out, ui.Success("Claimed as "+externalID))
+	if base := baseExternalID(displayName); externalID != base {
+		fmt.Fprintf(r.out, "   (%q was already claimed in this workspace)\n", base)
+	}
 
 	if specDir != "" {
 		path, err := writeAccountSpec(ctx, specDir, externalID,
-			firstNonEmpty(name, state.Name), firstNonEmpty(definition, state.AccountDefinitionName))
+			displayName, firstNonEmpty(definition, state.AccountDefinitionName))
 		switch {
 		// The account exists and is claimed, so the command has succeeded
 		// whatever the spec file does. Failing here would tell a script to
@@ -275,7 +282,7 @@ func (r *handoffRunner) create(ctx context.Context, definition, name, specDir, r
 			fmt.Fprintln(r.out, ui.Warning(err.Error()))
 			fmt.Fprintf(r.out, "   The spec was not written, but the account is created and claimed. Its fields are:\n"+
 				"     id: %s\n     name: %s\n     account_definition_name: %s\n",
-				externalID, firstNonEmpty(name, state.Name), firstNonEmpty(definition, state.AccountDefinitionName))
+				externalID, displayName, firstNonEmpty(definition, state.AccountDefinitionName))
 		default:
 			fmt.Fprintf(r.out, "   Wrote %s\n", path)
 		}
@@ -474,24 +481,49 @@ func writeAccountSpec(ctx context.Context, dir, externalID, name, definition str
 	return path, nil
 }
 
-// specID turns a display name into the URN-safe spec id the account is claimed
-// under, so a user never has to invent one.
-func specID(name string) string {
-	id := strings.Map(func(r rune) rune {
-		switch {
-		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-':
-			return r
-		case r >= 'A' && r <= 'Z':
-			return r + ('a' - 'A')
-		default:
-			return '-'
-		}
-	}, name)
+// baseExternalID is the spec id a display name maps to before any collision is
+// resolved. It is the import flow's convention (namer's kebab-case strategy),
+// so an account created here and one adopted by 'import workspace' get the same
+// id for the same name.
+func baseExternalID(name string) string {
+	return namer.StrategyKebabCase.Name(name)
+}
 
-	for strings.Contains(id, "--") {
-		id = strings.ReplaceAll(id, "--", "-")
+// externalIDFor is baseExternalID disambiguated against the external ids the
+// workspace already uses, so a display name that collides with an
+// already-claimed account gets "-1" appended instead of failing the claim with
+// a 409 after the user has already given consent in the browser.
+//
+// A free name is claimed unchanged: the namer only resolves a collision.
+func (r *handoffRunner) externalIDFor(ctx context.Context, name string) (string, error) {
+	if baseExternalID(name) == "" {
+		return "", fmt.Errorf("%q has no letters or digits to build a spec id from", name)
 	}
-	return strings.Trim(id, "-")
+
+	claimed, err := r.accounts.Accounts.ListAll(ctx, client.WithHasExternalID(true))
+	if err != nil {
+		return "", fmt.Errorf("listing the workspace's claimed accounts: %w", err)
+	}
+
+	// Deduplicated because Load rejects a repeated id, and the list is remote
+	// data this command does not control.
+	var (
+		seen  = make(map[string]bool, len(claimed))
+		taken = make([]namer.ScopeName, 0, len(claimed))
+	)
+	for _, account := range claimed {
+		if account.ExternalID == "" || seen[account.ExternalID] {
+			continue
+		}
+		seen[account.ExternalID] = true
+		taken = append(taken, namer.ScopeName{Scope: accounts.AccountResourceType, Name: account.ExternalID})
+	}
+
+	idNamer := namer.NewExternalIdNamer(namer.StrategyKebabCase)
+	if err := idNamer.Load(taken); err != nil {
+		return "", fmt.Errorf("loading the claimed ids: %w", err)
+	}
+	return idNamer.Name(namer.ScopeName{Scope: accounts.AccountResourceType, Name: name})
 }
 
 func firstNonEmpty(values ...string) string {

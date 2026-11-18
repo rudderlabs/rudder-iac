@@ -383,7 +383,9 @@ func TestNewCmdAccountsRegistersTheOAuthCommands(t *testing.T) {
 	assert.ElementsMatch(t, []string{"list", "create", "reauthorize"}, names)
 }
 
-func TestSpecID(t *testing.T) {
+// The derivation is the import flow's, so the same display name gets the same
+// spec id whether the account is created here or adopted by 'import workspace'.
+func TestBaseExternalID(t *testing.T) {
 	t.Parallel()
 
 	for name, want := range map[string]string{
@@ -396,7 +398,7 @@ func TestSpecID(t *testing.T) {
 		"!!!":               "",
 	} {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, want, specID(name))
+			assert.Equal(t, want, baseExternalID(name))
 		})
 	}
 }
@@ -480,4 +482,102 @@ func TestReauthorizeTimeoutDoesNotOfferResume(t *testing.T) {
 	// command that cannot take it. Finishing in the browser is enough on its own.
 	assert.NotContains(t, err.Error(), "--resume")
 	assert.Contains(t, err.Error(), "re-authorizes")
+}
+
+// A --name whose spec id is free is claimed exactly as the user asked.
+func TestCreateClaimsAFreeNameUnchanged(t *testing.T) {
+	server := useHandoffServer(t)
+	telemetrytest.Record(t)
+	server.SeedAccount(handofftest.NewAccount("acc-other", "Bing Ads", oauthDefinition, "bing-ads"))
+
+	server.OnSessionOpened(server.Consent)
+	out, err := execCreate(t, "--definition", oauthDefinition, "--name", "Google Ads (prod)", "--no-browser")
+	require.NoError(t, err, out)
+
+	created, ok := server.Account(server.LastSession().AccountID)
+	require.True(t, ok)
+	want := handofftest.NewAccount(created.ID, "Google Ads (prod)", oauthDefinition, "google-ads-prod")
+	assert.Equal(t, want, created)
+	assert.Contains(t, out, "Claimed as google-ads-prod")
+	assert.NotContains(t, out, "was already claimed")
+}
+
+// A display name that collides with an already-claimed account used to 409 on
+// the claim, after the user had already given consent in the browser: the
+// account existed and the command had nothing to do but fail. The id is
+// disambiguated the way the import flow disambiguates one instead.
+func TestCreateDisambiguatesAClaimedName(t *testing.T) {
+	server := useHandoffServer(t)
+	telemetrytest.Record(t)
+	server.SeedAccount(handofftest.NewAccount("acc-live", "Google Ads (prod)", oauthDefinition, "google-ads-prod"))
+
+	server.OnSessionOpened(server.Consent)
+	out, err := execCreate(t, "--definition", oauthDefinition, "--name", "Google Ads (prod)", "--no-browser")
+	require.NoError(t, err, out)
+
+	created, ok := server.Account(server.LastSession().AccountID)
+	require.True(t, ok)
+	want := handofftest.NewAccount(created.ID, "Google Ads (prod)", oauthDefinition, "google-ads-prod-1")
+	assert.Equal(t, want, created)
+
+	// The adopted account keeps the id its spec names.
+	existing, ok := server.Account("acc-live")
+	require.True(t, ok)
+	assert.Equal(t, handofftest.NewAccount("acc-live", "Google Ads (prod)", oauthDefinition, "google-ads-prod"), existing)
+
+	// Printed, so the id is seen now rather than discovered on the next apply.
+	assert.Contains(t, out, "Claimed as google-ads-prod-1")
+	assert.Contains(t, out, `"google-ads-prod" was already claimed in this workspace`)
+	assert.Contains(t, out, `rudder_account_id: "#account:google-ads-prod-1"`)
+}
+
+// Two runs of the same command claim two accounts, which is the sequence that
+// 409d: the second run's id has to step around the first run's.
+func TestCreateTwiceWithTheSameNameClaimsDistinctIDs(t *testing.T) {
+	server := useHandoffServer(t)
+	telemetrytest.Record(t)
+
+	var claimed []string
+	for range 3 {
+		// Armed per run: openSession takes the callback once, so that a test can
+		// let one session through and leave the next pending.
+		server.OnSessionOpened(server.Consent)
+		// Bounded so a regression that stops consenting fails in seconds rather
+		// than waiting out the default timeout.
+		out, err := execCreate(t, "--definition", oauthDefinition, "--name", "Ads", "--no-browser", "--timeout", "10s")
+		require.NoError(t, err, out)
+
+		account, ok := server.Account(server.LastSession().AccountID)
+		require.True(t, ok)
+		claimed = append(claimed, account.ExternalID)
+	}
+
+	assert.Equal(t, []string{"ads", "ads-1", "ads-2"}, claimed)
+}
+
+// The spec a disambiguated run writes names the id that was claimed, so the
+// apply that follows adopts the account this run created rather than the one
+// that held the name first.
+func TestCreateWritesTheDisambiguatedIDIntoTheSpec(t *testing.T) {
+	server := useHandoffServer(t)
+	telemetrytest.Record(t)
+	specDir := t.TempDir()
+	server.SeedAccount(handofftest.NewAccount("acc-live", "Ads", oauthDefinition, "ads"))
+
+	server.OnSessionOpened(server.Consent)
+	out, err := execCreate(t, "--definition", oauthDefinition, "--name", "Ads", "--write-spec", specDir, "--no-browser")
+	require.NoError(t, err, out)
+
+	spec, err := os.ReadFile(filepath.Join(specDir, "ads-1.yaml"))
+	require.NoError(t, err)
+	assert.Equal(t, `version: "rudder/v1"
+kind: "account"
+metadata:
+  name: "ads-1"
+spec:
+  account_definition_name: "`+oauthDefinition+`"
+  id: "ads-1"
+  name: "Ads"
+`, string(spec))
+	assert.Contains(t, out, "Wrote "+filepath.Join(specDir, "ads-1.yaml"))
 }

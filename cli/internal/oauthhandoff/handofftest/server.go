@@ -386,6 +386,17 @@ func (s *Server) setExternalID(w http.ResponseWriter, r *http.Request) {
 		apiError(w, http.StatusNotFound, "no such account")
 		return
 	}
+	// The real route is backed by a partial unique index on
+	// (workspaceId, externalId), and the repository maps the violation to a 409
+	// (rudder-config-backend account.repository.ts, update()). Modelled here
+	// because an id collision is otherwise invisible to a test.
+	for otherID, other := range s.accounts {
+		if otherID != id && other.ExternalID == req.ExternalID {
+			apiError(w, http.StatusConflict, "An account with this externalId already exists in this workspace")
+			return
+		}
+	}
+
 	account.ExternalID = req.ExternalID
 	s.accounts[id] = account
 	w.WriteHeader(http.StatusNoContent)
