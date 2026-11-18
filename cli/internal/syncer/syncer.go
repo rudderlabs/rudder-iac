@@ -137,6 +137,9 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
 
+	// A preview that cannot be read fails the plan, dry run and apply alike:
+	// adopting a resource whose changes could not be shown is what the preview
+	// exists to prevent. The error names the resource.
 	if previewer, ok := s.provider.(provider.ImportPreviewer); ok && len(plan.Diff.ImportableResources) > 0 {
 		diffs, err := previewer.PreviewImports(ctx, plan)
 		if err != nil {
