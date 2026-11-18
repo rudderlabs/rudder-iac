@@ -8,10 +8,12 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/am"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/redis"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/webhook"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/stretchr/testify/assert"
@@ -218,4 +220,32 @@ func TestProvider_PreviewImports_RemovalsUnderOmittedParents(t *testing.T) {
 		"legacyNull":             "(null)",
 		"legacyOther":            "(value)",
 	}, diffs["destination:hook"].Diffs["Config (API keys the import removes)"].SourceValue)
+}
+
+// TestProvider_PreviewImports_SkipsBackendDerivedKeys pins that a key the
+// backend sets from connectionMode on every write is not reported as removed:
+// the CLI never sends useNativeSDK, and the destination keeps it after the
+// adopt, so an otherwise unchanged destination is adopted unchanged.
+func TestProvider_PreviewImports_SkipsBackendDerivedKeys(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(am.NewDefinition()))
+	spec := func(config map[string]any) *destination.DestinationResource {
+		return &destination.DestinationResource{ID: "amp", DisplayName: "Amp", Type: "am", Enabled: true, DefinitionVersion: 1, Config: config}
+	}
+
+	assert.Empty(t, previewOne(t, registry, `{"destination":{"id":"dst-1","name":"Amp","type":"AM","version":1,"enabled":true,"config":{
+		"residencyServer":"standard","connectionMode":{"web":"cloud"},"useNativeSDK":{"web":false},"useNativeSDKToSend":{"web":false}}}}`, "",
+		spec(map[string]any{"residency_server": "standard", "connection_mode": map[string]any{"web": "cloud"}})),
+		"adopted unchanged")
+
+	// The reported repro: the exported spec carries the returned api_key, so
+	// the import only re-applies that secret, with no removal line.
+	diffs := previewOne(t, registry, `{"destination":{"id":"dst-1","name":"Amp","type":"AM","version":1,"enabled":true,"config":{
+		"apiKey":"k","residencyServer":"standard","connectionMode":{"web":"cloud"},"useNativeSDK":{"web":false}}}}`, "",
+		spec(secret.WrapKnownSecrets(map[string]any{"api_key": "k", "residency_server": "standard", "connection_mode": map[string]any{"web": "cloud"}}, []string{"api_key"})))
+	require.Contains(t, diffs, "destination:amp")
+	assert.True(t, diffs["destination:amp"].SecretOnly)
+	assert.NotContains(t, diffs["destination:amp"].Diffs, "Config (API keys the import removes)")
 }

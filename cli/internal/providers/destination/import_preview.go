@@ -103,6 +103,16 @@ func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResour
 // drops that the local comparison cannot show.
 const removedFieldsProperty = "Config (API keys the import removes)"
 
+// backendDerivedKeys are config keys the backend sets from other config on
+// every write, so an update that leaves them out does not remove them:
+// useNativeSDK and useNativeSDKToSend, both derived from connectionMode. The
+// CLI never sends them, yet the destination update e2e snapshots still carry
+// them after a CLI write (cli/tests/command_destinations_apply_test.go).
+var backendDerivedKeys = map[string]bool{
+	"useNativeSDK":       true,
+	"useNativeSDKToSend": true,
+}
+
 // removedAPIKeys returns the parts of the remote API config that the import's
 // payload leaves out and that local config cannot hold, keyed by their path in
 // the API's spelling (consentManagement.amp, headers[0].description). Local
@@ -148,7 +158,7 @@ func (h *HandlerImpl) removedAPIKeys(registered *definitions.RegisteredDefinitio
 
 	removed := map[string]any{}
 	for key, value := range remote {
-		if neutral[key] {
+		if neutral[key] || backendDerivedKeys[key] {
 			continue
 		}
 		collectRemoved(key, value, payload, roundTrip, key, removed)
