@@ -389,25 +389,35 @@ func TestRenderDiff_SecretSections(t *testing.T) {
 }
 
 // TestRenderDiff_ImportableDiffs pins that the config an import changes is
-// shown under the importable resource, so a dry run lists what the adopt
-// writes; an importable resource without changes renders as before.
+// shown under the importable resource, split like updates: a resource the
+// import changes, one that only re-applies secrets, and one adopted as it is.
 func TestRenderDiff_ImportableDiffs(t *testing.T) {
 	diff := &differ.Diff{
-		ImportableResources: []string{"destination:changed", "destination:unchanged"},
+		ImportableResources: []string{"destination:changed", "destination:secrets", "destination:unchanged"},
 		ImportableDiffs: map[string]differ.ResourceDiff{
 			"destination:changed": {URN: "destination:changed", Diffs: map[string]differ.PropertyDiff{
 				"Config": {
 					Property:    "Config",
-					SourceValue: map[string]any{"address": "redis:6379"},
+					SourceValue: map[string]any{"address": "redis:6379", "prefix": ""},
 					TargetValue: map[string]any{"address": "redis:6379", "skip_verify": false},
 				},
+			}},
+			"destination:secrets": {URN: "destination:secrets", SecretOnly: true, Diffs: map[string]differ.PropertyDiff{
+				"Config": {Property: "Config", SecretOnly: true},
 			}},
 		},
 	}
 
 	assert.Equal(t, "Importable resources:\n"+
-		"  - destination:changed\n"+
-		"    - Config.skip_verify: <nil> => false\n"+
 		"  - destination:unchanged\n"+
+		"\n"+
+		"Importable resources, changed on import:\n"+
+		"  - destination:changed\n"+
+		"    - Config.prefix:  => <nil>\n"+
+		"    - Config.skip_verify: <nil> => false\n"+
+		"\n"+
+		"Importable resources, secrets re-applied on import (values can't be read back):\n"+
+		"  - destination:secrets\n"+
+		"    - Config: (secret, always re-applied)\n"+
 		"\n", renderDiff(diff))
 }

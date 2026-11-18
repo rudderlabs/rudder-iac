@@ -38,11 +38,7 @@ func renderDiff(diff *differ.Diff) string {
 	b := &strings.Builder{}
 
 	if len(diff.ImportableResources) > 0 {
-		// Adopting a resource can change it as well, and those changes render
-		// under its URN the way an update's do.
-		listResources(b, "Importable resources", diff.ImportableResources, func(urn string) string {
-			return renderResourceDiff(diff.ImportableDiffs[urn])
-		})
+		renderImportableResources(b, diff)
 	}
 
 	if len(diff.NewResources) > 0 {
@@ -85,6 +81,39 @@ func renderUpdatedResources(b *strings.Builder, diff *differ.Diff) {
 	if len(secretOnly) > 0 {
 		sort.Strings(secretOnly)
 		listResources(b, "Always re-applied (secret values can't be read back)", secretOnly, detail)
+	}
+}
+
+// renderImportableResources splits importable resources the way updates are
+// split. An import can push the spec over the resource it adopts, so one its
+// provider previews as changing it is listed with the changes, and one that
+// only re-applies secrets is listed apart, as an update's would be. The rest
+// adopt without a change their provider can see.
+func renderImportableResources(b *strings.Builder, diff *differ.Diff) {
+	var adoptOnly, changed, secretOnly []string
+	for _, urn := range diff.ImportableResources {
+		r, ok := diff.ImportableDiffs[urn]
+		switch {
+		case !ok || len(r.Diffs) == 0:
+			adoptOnly = append(adoptOnly, urn)
+		case r.IsSecretOnly():
+			secretOnly = append(secretOnly, urn)
+		default:
+			changed = append(changed, urn)
+		}
+	}
+
+	detail := func(urn string) string {
+		return renderResourceDiff(diff.ImportableDiffs[urn])
+	}
+	if len(adoptOnly) > 0 {
+		listResources(b, "Importable resources", adoptOnly, nil)
+	}
+	if len(changed) > 0 {
+		listResources(b, "Importable resources, changed on import", changed, detail)
+	}
+	if len(secretOnly) > 0 {
+		listResources(b, "Importable resources, secrets re-applied on import (values can't be read back)", secretOnly, detail)
 	}
 }
 
