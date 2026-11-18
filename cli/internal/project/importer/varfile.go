@@ -145,10 +145,17 @@ func collectVariableNames(entities []writer.FormattableEntity) []string {
 // bearer_token and destination "hook-bearer" with key token, or a destination
 // and an account both imported as "pg" with a password. One var file entry
 // would then fill both.
+//
+// Only specs count: a raw code file, such as a transformation's script, is
+// loaded verbatim rather than variable-substituted, so a "{{ .NAME }}" in it is
+// code and two scripts may hold the same one.
 func checkVariableOwners(entities []writer.FormattableEntity) error {
 	owners := map[string]string{}
 	var clashes []string
 	for _, entity := range entities {
+		if !isSubstitutedSpec(entity.Content) {
+			continue
+		}
 		found := make(map[string]struct{})
 		extractVariableNames(entity.Content, found)
 		for name := range found {
@@ -168,6 +175,17 @@ func checkVariableOwners(entities []writer.FormattableEntity) error {
 	sort.Strings(clashes)
 	return fmt.Errorf("imported specs would share secret variables: %s; the names come from each resource's id, so rename one of the resources whose ids collide and import again",
 		strings.Join(clashes, ", "))
+}
+
+// isSubstitutedSpec reports whether content is a spec the loader runs
+// variable substitution over, as opposed to a raw file written as is.
+func isSubstitutedSpec(content any) bool {
+	switch content.(type) {
+	case *specs.Spec, map[string]any:
+		return true
+	default:
+		return false
+	}
 }
 
 // extractVariableNames recursively walks an entity's content — spec wrappers,

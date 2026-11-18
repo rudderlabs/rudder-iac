@@ -120,3 +120,15 @@ func TestScaffoldSecretsVarFile_RefusesSharedVariables(t *testing.T) {
 	_, statErr := os.Stat(filepath.Join(dir, SecretsVarFileName))
 	assert.True(t, os.IsNotExist(statErr), "no var file is written for a refused import")
 }
+
+// TestScaffoldSecretsVarFile_IgnoresSharedReferencesInRawCode pins that raw code
+// files, which are loaded verbatim rather than variable-substituted, never
+// count as sharing a secret variable: two transformation scripts may hold the
+// same literal "{{ .NAME }}".
+func TestScaffoldSecretsVarFile_IgnoresSharedReferencesInRawCode(t *testing.T) {
+	_, err := scaffoldSecretsVarFile(t.Context(), t.TempDir(), []writer.FormattableEntity{
+		{Content: "export function transformEvent(e) { return '{{ .NAME }}' }", RelativePath: "transformations/a.js"},
+		{Content: "def transformEvent(e): return '{{ .NAME }}'", RelativePath: "transformations/b.py"},
+	})
+	require.NoError(t, err)
+}
