@@ -27,6 +27,8 @@ func TestProvider_PreviewImports(t *testing.T) {
 		switch r.URL.Path {
 		case "/v2/destinations/dst-changed":
 			_, _ = w.Write([]byte(`{"destination":{"id":"dst-changed","name":"GA4","type":"GA4","version":1,"enabled":true,"config":{"measurementId":"G-1","blacklistedEvents":[{"eventName":""}],"legacySetting":"keep-me"}}}`))
+		case "/v2/destinations/dst-filtered":
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-filtered","name":"Filtered","type":"FILTERED","version":1,"enabled":true,"config":{"trackingID":"T-1","eventFilteringOption":"disable","blacklistedEvents":[{"eventName":"Old"}]}}}`))
 		case "/v2/destinations/dst-same":
 			_, _ = w.Write([]byte(`{"destination":{"id":"dst-same","name":"Hook","type":"WEBHOOK","version":1,"enabled":true,"config":{"webhookUrl":"https://example.com/hook"}}}`))
 		default:
@@ -45,6 +47,10 @@ func TestProvider_PreviewImports(t *testing.T) {
 		importing("ga4", "dst-changed", &destination.DestinationResource{
 			ID: "ga4", DisplayName: "GA4", Type: "GA4", Enabled: true, DefinitionVersion: 1,
 			Config: map[string]any{"measurement_id": "G-1", "debug_mode": true},
+		}),
+		importing("filtered", "dst-filtered", &destination.DestinationResource{
+			ID: "filtered", DisplayName: "Filtered", Type: "FILTERED", Enabled: true, DefinitionVersion: 1,
+			Config: map[string]any{"tracking_id": "T-1"},
 		}),
 		importing("hook", "dst-same", &destination.DestinationResource{
 			ID: "hook", DisplayName: "Hook", Type: "WEBHOOK", Enabled: true, DefinitionVersion: 1,
@@ -66,6 +72,15 @@ func TestProvider_PreviewImports(t *testing.T) {
 			"Config (API keys the import removes)": {
 				Property:    "Config (API keys the import removes)",
 				SourceValue: map[string]any{"legacySetting": "keep-me"},
+				TargetValue: map[string]any{},
+			},
+		}},
+		// The unselected list the converter drops is named; the discriminator
+		// naming no list says what its absence says, so it is not.
+		"destination:filtered": {URN: "destination:filtered", Diffs: map[string]differ.PropertyDiff{
+			"Config (API keys the import removes)": {
+				Property:    "Config (API keys the import removes)",
+				SourceValue: map[string]any{"blacklistedEvents": []any{map[string]any{"eventName": "Old"}}},
 				TargetValue: map[string]any{},
 			},
 		}},

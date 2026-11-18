@@ -104,6 +104,17 @@ func (h *HandlerImpl) removedAPIKeys(registered *definitions.RegisteredDefinitio
 		root, _, _ := strings.Cut(key, ".")
 		secretRoots[root] = true
 	}
+	// A discriminator naming no member says the same as its absence, so the
+	// backend keeping or defaulting it is no change worth a line.
+	neutral := map[string]bool{}
+	for _, prop := range registered.Properties {
+		if prop.Selector == nil {
+			continue
+		}
+		if selected, present := prop.Selector.LocalKeyFor(remote); present && selected == "" {
+			neutral[prop.Selector.APIKey] = true
+		}
+	}
 	localRoot := map[string]string{}
 	for _, prop := range registered.Properties {
 		apiRoot, _, _ := strings.Cut(prop.APIKey, ".")
@@ -115,7 +126,7 @@ func (h *HandlerImpl) removedAPIKeys(registered *definitions.RegisteredDefinitio
 
 	removed := map[string]any{}
 	for key, value := range remote {
-		if _, kept := payload[key]; kept {
+		if _, kept := payload[key]; kept || neutral[key] {
 			continue
 		}
 		local, modelled := localRoot[key]
