@@ -120,6 +120,9 @@ func WorkspaceImport(
 	if err := checkVariableOwners(entities); err != nil {
 		return err
 	}
+	if err := checkExistingVariableOwners(project.Location(), entities); err != nil {
+		return err
+	}
 
 	formatters := formatter.Setup(formatter.DefaultYAML, formatter.DefaultText)
 
