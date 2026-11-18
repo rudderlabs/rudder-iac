@@ -108,3 +108,53 @@ spec:
 		"id": "three", "config": map[string]any{"api_key": "{{ .THREE_API_KEY }}"},
 	})))
 }
+
+func existingAccount(t *testing.T, dir, passwordLine string) {
+	t.Helper()
+	writeProjectFile(t, dir, "accounts/pg.yaml", "version: rudder/v1\nkind: account\nmetadata:\n  name: pg\nspec:\n  id: pg\n  config:\n    "+passwordLine+"\n")
+}
+
+func newPGDestination() writer.FormattableEntity {
+	return newSpecEntity("destination", "destinations/pg.yaml", map[string]any{
+		"id": "pg", "config": map[string]any{"password": "{{ .PG_PASSWORD }}"},
+	})
+}
+
+// TestCheckVariableOwners_ReadsReferencesAsSubstitutionDoes pins that existing
+// references are found the way substitution finds them, in the bytes as
+// written: an unquoted reference, which does not parse as YAML until it is
+// substituted, still counts, and an escaped literal that only decodes to a
+// reference does not.
+func TestCheckVariableOwners_ReadsReferencesAsSubstitutionDoes(t *testing.T) {
+	for _, line := range []string{"password: {{ .PG_PASSWORD }}", `password: "{{ .PG_PASSWORD }}"`, "password: '{{ .PG_PASSWORD }}'"} {
+		dir := t.TempDir()
+		existingAccount(t, dir, line)
+		assert.ErrorContains(t, importInto(t, dir, newPGDestination()), "PG_PASSWORD (in accounts/pg.yaml and destinations/pg.yaml)", line)
+	}
+
+	dir := t.TempDir()
+	existingAccount(t, dir, `password: "\x7B{ .PG_PASSWORD }}"`)
+	assert.NoError(t, importInto(t, dir, newPGDestination()), "substitution never sees an escaped literal")
+}
+
+// TestCheckVariableOwners_FailsOnASpecItCannotRead pins that a project spec
+// holding references is never skipped silently: one that cannot be parsed
+// fails the import, naming the file.
+func TestCheckVariableOwners_FailsOnASpecItCannotRead(t *testing.T) {
+	dir := t.TempDir()
+	writeProjectFile(t, dir, "accounts/pg.yaml", "version: rudder/v1\nkind: account\nspec: [unclosed\n  password: '{{ .PG_PASSWORD }}'\n")
+	assert.ErrorContains(t, importInto(t, dir, newPGDestination()), "reading project spec accounts/pg.yaml for secret variables")
+}
+
+// TestCheckVariableOwners_AllowsReimportingAnExistingOwner pins that a new
+// reference whose spec key already uses the variable is fine, even when other
+// existing specs share it too.
+func TestCheckVariableOwners_AllowsReimportingAnExistingOwner(t *testing.T) {
+	dir := t.TempDir()
+	for _, id := range []string{"one", "two"} {
+		writeProjectFile(t, dir, "destinations/"+id+".yaml", "version: rudder/v1\nkind: destination\nmetadata:\n  name: d\nspec:\n  id: "+id+"\n  config:\n    api_key: '{{ .ONE_API_KEY }}'\n")
+	}
+	assert.NoError(t, importInto(t, dir, newSpecEntity("destination", "imported-one.yaml", map[string]any{
+		"id": "one", "config": map[string]any{"api_key": "{{ .ONE_API_KEY }}"},
+	})))
+}

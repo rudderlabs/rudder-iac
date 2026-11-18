@@ -112,7 +112,7 @@ func TestCheckVariableOwners_RefusesNewResourcesSharingAVariable(t *testing.T) {
 	err := checkVariableOwners("", []writer.FormattableEntity{
 		{Content: map[string]any{"password": "{{ .PG_PASSWORD }}"}, RelativePath: "destinations/pg.yaml"},
 		{Content: map[string]any{"password": "{{ .PG_PASSWORD }}"}, RelativePath: "accounts/pg.yaml"},
-		{Content: map[string]any{"token": "{{ .OTHER_TOKEN }}", "again": "{{ .OTHER_TOKEN }}"}, RelativePath: "destinations/other.yaml"},
+		{Content: map[string]any{"token": "{{ .OTHER_TOKEN }}"}, RelativePath: "destinations/other.yaml"},
 	})
 	require.EqualError(t, err, "imported specs would share secret variables: PG_PASSWORD (in accounts/pg.yaml and destinations/pg.yaml); "+
 		"the names come from each resource's id, so rename one of the resources whose ids collide and import again")

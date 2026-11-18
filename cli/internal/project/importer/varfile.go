@@ -143,35 +143,29 @@ func collectVariableNames(entities []writer.FormattableEntity) []string {
 }
 
 // checkVariableOwners refuses an import in which one secret variable would
-// stand for two resources' secrets. Every provider names a secret variable from
+// stand for two different secrets. Every provider names a secret variable from
 // the resource id and key path joined with "_" (secret.VariableName), so two
 // different secrets can share a name: destination "hook" with key bearer_token
 // and destination "hook-bearer" with key token, or a destination and an
 // account both imported as "pg" with a password. A slice-by-slice adoption
 // imports into a project that already holds earlier slices, so the specs
 // already under location count as well as the new entities. One var file entry
-// would otherwise fill both. Specs already in the project that share a
-// variable among themselves are left alone.
+// would otherwise fill both.
 //
-// A variable's owner is the resource that references it: kind and spec id for
-// a spec, its file otherwise. A resource reusing its own variable, such as a
-// re-import of the same secret, is not a collision. Only specs count: raw code
+// A reference's owner is the spec key it fills: kind, spec id and key path (or
+// the file, for content that is not a spec). A new reference is refused only
+// when it adds an owner the variable does not have yet next to another one: a
+// re-import of a key that already uses the variable is fine, and so are specs
+// already in the project that share a variable among themselves. Raw code
 // files, such as a transformation's script, are loaded verbatim rather than
-// variable-substituted, and the project's specs are read as written, before
-// substitution.
+// substituted and do not count.
 func checkVariableOwners(location string, entities []writer.FormattableEntity) error {
 	type use struct {
 		owner, file string
 		isNew       bool
 	}
 	uses := map[string][]use{}
-	record := func(owner, file string, content any, isNew bool) {
-		found := make(map[string]struct{})
-		extractVariableNames(content, found)
-		for name := range found {
-			uses[name] = append(uses[name], use{owner: owner, file: file, isNew: isNew})
-		}
-	}
+	existingOwners := map[string]map[string]bool{}
 
 	if location != "" {
 		raw, err := (&loader.Loader{}).Load(location)
@@ -179,35 +173,54 @@ func checkVariableOwners(location string, entities []writer.FormattableEntity) e
 			return fmt.Errorf("reading project specs for secret variables: %w", err)
 		}
 		for path, rawSpec := range raw {
-			spec, err := rawSpec.Parse()
-			if err != nil || spec == nil {
-				continue // loading the project reports it
-			}
 			rel, err := filepath.Rel(location, path)
 			if err != nil {
 				rel = path
 			}
-			record(specOwner(spec, rel), rel, spec, false)
+			// References are found as substitution finds them, in the bytes as
+			// written, and each is swapped for a placeholder so the spec parses
+			// even where a reference is unquoted.
+			replaced := varsubst.ReplaceReferences(rawSpec.Data)
+			if len(replaced.References) == 0 {
+				continue
+			}
+			spec, err := specs.New(replaced.Data)
+			if err != nil {
+				return fmt.Errorf("reading project spec %s for secret variables: %w", rel, err)
+			}
+			id := specOwner(spec, rel)
+			walkStrings(spec.Spec, "spec", func(keyPath, value string) {
+				for _, ref := range replaced.ReferencesIn(value) {
+					owner := id + ":" + keyPath
+					uses[ref.Name] = append(uses[ref.Name], use{owner: owner, file: rel})
+					if existingOwners[ref.Name] == nil {
+						existingOwners[ref.Name] = map[string]bool{}
+					}
+					existingOwners[ref.Name][owner] = true
+				}
+			})
 		}
 	}
 	for _, entity := range entities {
 		if !isSubstitutedSpec(entity.Content) {
 			continue
 		}
-		owner := entity.RelativePath
+		id, content := entity.RelativePath, entity.Content
 		if spec, ok := entity.Content.(*specs.Spec); ok && spec != nil {
-			owner = specOwner(spec, entity.RelativePath)
+			id, content = specOwner(spec, entity.RelativePath), spec.Spec
 		}
-		record(owner, entity.RelativePath, entity.Content, true)
+		walkStrings(content, "spec", func(keyPath, value string) {
+			for _, name := range varsubst.ExtractVariableNames([]byte(value)) {
+				uses[name] = append(uses[name], use{owner: id + ":" + keyPath, file: entity.RelativePath, isNew: true})
+			}
+		})
 	}
 
-	// Only a clash the import introduces counts: specs already in the project
-	// may share a variable on purpose, and that is the user's to keep.
 	var clashes []string
 	for name, all := range uses {
 	clash:
 		for _, added := range all {
-			if !added.isNew {
+			if !added.isNew || existingOwners[name][added.owner] {
 				continue
 			}
 			for _, other := range all {
@@ -224,6 +237,22 @@ func checkVariableOwners(location string, entities []writer.FormattableEntity) e
 	sort.Strings(clashes)
 	return fmt.Errorf("imported specs would share secret variables: %s; the names come from each resource's id, so rename one of the resources whose ids collide and import again",
 		strings.Join(clashes, ", "))
+}
+
+// walkStrings calls visit with the key path of every string under value.
+func walkStrings(value any, path string, visit func(keyPath, value string)) {
+	switch v := value.(type) {
+	case map[string]any:
+		for key, item := range v {
+			walkStrings(item, path+"."+key, visit)
+		}
+	case []any:
+		for i, item := range v {
+			walkStrings(item, fmt.Sprintf("%s[%d]", path, i), visit)
+		}
+	case string:
+		visit(path, v)
+	}
 }
 
 // specOwner names the resource a spec declares: kind and spec id, or the file
