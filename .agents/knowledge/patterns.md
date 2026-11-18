@@ -307,3 +307,9 @@
 ## rudder-iac#1041 — Import Preview Resolves Transformations Adopted In The Same Apply
 <!-- pr:1041 -->
 - A transformation reference to a resource the same plan imports resolves, in the destination import preview, to that import's metadata `remote_id` (an adopt keeps the remote ID), so the normal `import workspace` -> `apply` flow shows no link line when the destination already points at it, and `old (remote id) => <id> (<urn>, adopted in this apply)` when it does not. Only a reference with neither state nor an importable shows `(created in this apply)`.
+
+## rudder-iac#1041 — Review Follow-Ups On Import Secrets And Preview
+<!-- pr:1041 -->
+- Connect-time secret references for a `warehouse` source are written only when the same import holds a Reverse ETL connection to that destination: destination `Provider.FormatForExport` reads `retl-connection` remotes from the import collection (through the `WarehouseDestinationID` interface, since retl/connection imports destination) before exporting. A stored `connectionMode.warehouse` alone does not count.
+- The import-wide secret variable collision check covers specs only: raw transformation and library code is written verbatim and never variable-substituted.
+- In the import preview a secret only the remote holds counts as removed, not re-applied, so the destination lands under "changed on import" with a `(secret, removed)` line; removed parents and list elements are walked against an empty payload so their unmodelled children are still named, and a removed null is summarised as `(null)`.
