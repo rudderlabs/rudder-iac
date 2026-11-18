@@ -1,13 +1,11 @@
 package destination
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
-	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 )
 
 // absentSecretKeys returns the top-level secret keys missing from config as
@@ -67,29 +65,4 @@ func requiredSecretKeys(registered *definitions.RegisteredDefinition, config map
 
 	slices.Sort(required)
 	return required
-}
-
-// secretVariables records which secret each generated variable name stands
-// for across one export. VariableName joins the spec id and key path with "_",
-// so two different secrets can map to one name: id "hook" with key
-// "bearer_token" and id "hook-bearer" with key "token" both give
-// HOOK_BEARER_TOKEN. One var file entry would then fill both, so the export
-// refuses instead.
-type secretVariables map[string]string
-
-func (v secretVariables) claim(externalID string, config map[string]any, secretKeys []string) error {
-	var err error
-	secret.WalkSecrets(config, secretKeys, func(segments []string, _ any) {
-		if err != nil {
-			return
-		}
-		name := secret.VariableName(externalID, segments...)
-		owner := fmt.Sprintf("destination %q key %q", externalID, strings.Join(segments, "."))
-		if other, taken := v[name]; taken && other != owner {
-			err = fmt.Errorf("secret variable %s would stand for both %s and %s; rename one destination's id so their variables differ", name, other, owner)
-			return
-		}
-		v[name] = owner
-	})
-	return err
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/am"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/braze"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
 	facebookpixel "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_pixel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlesheets"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
@@ -155,37 +154,4 @@ func TestHandlerImpl_FormatForExport_RequiredSecretsTheAPIStrips(t *testing.T) {
 			}
 		})
 	}
-}
-
-// TestHandlerImpl_FormatForExport_RefusesCollidingSecretVariables pins that one
-// import never gives two different secrets the same variable name. The name
-// joins the spec id and key path with "_", so "hook" + bearer_token and
-// "hook-bearer" + token both read HOOK_BEARER_TOKEN, and one var file entry
-// would fill both.
-func TestHandlerImpl_FormatForExport_RefusesCollidingSecretVariables(t *testing.T) {
-	t.Parallel()
-
-	secretDefinition := func(apiType, apiKey, localKey string) *definitions.DestinationDefinition {
-		return &definitions.DestinationDefinition{
-			Type: apiType, APIType: apiType, DisplayName: "Test", Version: 1,
-			Properties: []converter.ConfigProperty{converter.Simple(apiKey, localKey)},
-			SecretKeys: []string{localKey},
-			NewConfig: func() any {
-				return &struct {
-					BearerToken string `mapstructure:"bearer_token"`
-					Token       string `mapstructure:"token"`
-				}{}
-			},
-		}
-	}
-	registry := definitions.NewRegistry()
-	require.NoError(t, registry.Register(secretDefinition("BEARER", "bearerToken", "bearer_token")))
-	require.NoError(t, registry.Register(secretDefinition("TOKEN", "token", "token")))
-
-	h := destination.NewHandler(nil, registry)
-	_, _, err := h.Impl.FormatForExport(map[string]*destination.RemoteDestination{
-		"hook":        {Destination: &client.Destination{ID: "dst-1", Name: "A", Type: "BEARER", Version: 1, Config: []byte(`{"bearerToken":"a"}`)}},
-		"hook-bearer": {Destination: &client.Destination{ID: "dst-2", Name: "B", Type: "TOKEN", Version: 1, Config: []byte(`{"token":"b"}`)}},
-	}, nil, stubResolver{})
-	require.EqualError(t, err, `secret variable HOOK_BEARER_TOKEN would stand for both destination "hook" key "bearer_token" and destination "hook-bearer" key "token"; rename one destination's id so their variables differ`)
 }

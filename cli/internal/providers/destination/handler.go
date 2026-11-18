@@ -1,11 +1,11 @@
 package destination
 
 import (
-	"maps"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -408,10 +408,9 @@ func (h *HandlerImpl) FormatForExport(
 		entries  []importmanifest.ImportEntry
 	)
 
-	variables := secretVariables{}
 	for _, externalID := range slices.Sorted(maps.Keys(collection)) {
 		remote := collection[externalID]
-		specMap, err := h.toExportSpecMap(externalID, remote, inputResolver, variables)
+		specMap, err := h.toExportSpecMap(externalID, remote, inputResolver)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -452,7 +451,7 @@ func (h *HandlerImpl) FormatForExport(
 // toExportSpecMap builds the "spec" section of an importable destination's
 // YAML: local config with empty values pruned and secrets masked, plus an
 // optional transformation ref.
-func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestination, inputResolver resolver.ReferenceResolver, variables secretVariables) (map[string]any, error) {
+func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestination, inputResolver resolver.ReferenceResolver) (map[string]any, error) {
 	registered, err := h.registry.GetByAPIType(remote.Type, remote.Version)
 	if err != nil {
 		return nil, fmt.Errorf("getting destination definition for %s: %w", remote.ID, err)
@@ -483,9 +482,6 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 
 	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)
-	}
-	if err := variables.claim(externalID, localConfig, registered.SecretKeys()); err != nil {
-		return nil, err
 	}
 
 	specMap := map[string]any{
