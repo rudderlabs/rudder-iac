@@ -232,34 +232,16 @@ func (h *HandlerImpl) MapRemoteToState(
 		return nil, nil, errUnregisteredManagedType(remote.ID, remote.Type, remote.Version)
 	}
 
-	localConfig, err := h.apiConfigToLocal(
-		registered.Type,
-		version,
-		remote.Config,
-	)
+	resource, err := h.remoteResource(remote.Destination, registered, remote.ExternalID)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	// API responses omit secret values. Wrap only secret keys that are still
-	// present after conversion (defensive); absent keys stay absent so
-	// presence-based wrapping never invents conditional secrets.
-	localConfig = secret.WrapUnknownSecrets(localConfig, registered.SecretKeys())
 
 	transformationRef, transformationID, err := h.transformationRef(remote, urnResolver)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolving transformation reference: %w", err)
 	}
-
-	resource := &DestinationResource{
-		ID:                remote.ExternalID,
-		DisplayName:       remote.Name,
-		Type:              registered.Type,
-		Enabled:           remote.IsEnabled,
-		DefinitionVersion: version,
-		Transformation:    transformationRef,
-		Config:            localConfig,
-	}
+	resource.Transformation = transformationRef
 
 	state := &DestinationState{
 		ID:               remote.ID,
@@ -267,6 +249,26 @@ func (h *HandlerImpl) MapRemoteToState(
 	}
 
 	return resource, state, nil
+}
+
+// remoteResource reads a remote destination as the plan compares it with a
+// spec: local config, with the secret keys still present after conversion
+// wrapped as unknown (API responses omit secret values; absent keys stay
+// absent so presence-based wrapping never invents conditional secrets). The
+// transformation link is left for the caller.
+func (h *HandlerImpl) remoteResource(remote *client.Destination, registered *definitions.RegisteredDefinition, id string) (*DestinationResource, error) {
+	localConfig, err := h.apiConfigToLocal(registered.Type, remote.Version, remote.Config)
+	if err != nil {
+		return nil, err
+	}
+	return &DestinationResource{
+		ID:                id,
+		DisplayName:       remote.Name,
+		Type:              registered.Type,
+		Enabled:           remote.IsEnabled,
+		DefinitionVersion: remote.Version,
+		Config:            secret.WrapUnknownSecrets(localConfig, registered.SecretKeys()),
+	}, nil
 }
 
 // errUnregisteredManagedType reports a managed destination the CLI has no
@@ -395,7 +397,8 @@ func (h *HandlerImpl) Import(ctx context.Context, data *DestinationResource, rem
 // FormatForExport converts unmanaged remote destinations into importable YAML
 // specs: config is converted to local snake_case, empty values are pruned,
 // registered secret keys that are present are masked with per-resource
-// placeholders (absent secrets are not invented), and a linked transformation
+// placeholders, a secret key the API leaves out gets one only when the config
+// requires it (see requiredSecretKeys), and a linked transformation
 // resolves to a "#transformation:<id>" reference (failing the export if the link
 // can't be resolved — mirrors the source handler, no silent fallback to a raw ID).
 func (h *HandlerImpl) FormatForExport(

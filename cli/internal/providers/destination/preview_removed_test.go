@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
@@ -78,13 +79,11 @@ func TestProvider_PreviewImports_NestedRemovals(t *testing.T) {
 	})
 
 	assert.Equal(t, map[string]differ.ResourceDiff{"destination:hook": {URN: "destination:hook", Diffs: map[string]differ.PropertyDiff{
-		"Config (API keys the import removes)": {
-			Property: "Config (API keys the import removes)",
-			SourceValue: map[string]any{
-				"consentManagement.amp":              "(list, 1 item)",
-				"consentManagement.web[0].extraItem": "(value)",
-			},
-			TargetValue: map[string]any{},
+		"Config (API keys the import removes).consentManagement.amp": {
+			Property: "Config (API keys the import removes).consentManagement.amp", SourceValue: "(list, 1 item)",
+		},
+		"Config (API keys the import removes).consentManagement.web[0].extraItem": {
+			Property: "Config (API keys the import removes).consentManagement.web[0].extraItem", SourceValue: "(value)",
 		},
 	}}}, diffs)
 }
@@ -103,10 +102,18 @@ func TestProvider_PreviewImports_SiblingRemovalUnderChangedRoot(t *testing.T) {
 		Config: map[string]any{"tracking_id": "T-1", "event_filtering": map[string]any{"blacklist": []any{"New"}}},
 	})
 
-	require.Contains(t, diffs, "destination:f")
-	removed := diffs["destination:f"].Diffs["Config (API keys the import removes)"]
-	assert.Equal(t, map[string]any{"whitelistedEvents": "(list, 1 item)"}, removed.SourceValue)
-	assert.Contains(t, diffs["destination:f"].Diffs, "Config", "the blacklist change still shows as a local line")
+	assert.Equal(t, map[string]differ.ResourceDiff{"destination:f": {URN: "destination:f", Diffs: map[string]differ.PropertyDiff{
+		// The blacklist change still shows as a local line...
+		"Config": {
+			Property:    "Config",
+			SourceValue: map[string]any{"tracking_id": "T-1", "event_filtering": map[string]any{"blacklist": []any{"Old"}}},
+			TargetValue: map[string]any{"tracking_id": "T-1", "event_filtering": map[string]any{"blacklist": []any{"New"}}},
+		},
+		// ...and does not hide the whitelist's removal.
+		"Config (API keys the import removes).whitelistedEvents": {
+			Property: "Config (API keys the import removes).whitelistedEvents", SourceValue: "(list, 1 item)",
+		},
+	}}}, diffs)
 }
 
 // TestProvider_PreviewImports_TransformationLink pins that the preview shows
@@ -148,9 +155,15 @@ func TestProvider_PreviewImports_TransformationLink(t *testing.T) {
 	assert.Equal(t, differ.PropertyDiff{Property: "Transformation", TargetValue: "trf-NEW (transformation:new-one)"},
 		line(previewOneWithState(t, testRegistry(t), body, "", spec(unresolved()), st)), "a new link")
 
-	assert.Equal(t, differ.PropertyDiff{Property: "Transformation", SourceValue: "trf-OLD (remote id)", TargetValue: "transformation:clean (created in this apply)"},
-		line(previewOne(t, testRegistry(t), body, "trf-OLD", spec(&resources.PropertyRef{URN: "transformation:clean"}))),
-		"a transformation the same apply creates has no ID yet and is a change")
+	// A link to a transformation the same apply creates is refused by
+	// CheckPlan before any preview is shown.
+	created := &planner.Plan{Operations: []*planner.Operation{
+		{Type: planner.Create, Resource: resources.NewResource("clean", "transformation", resources.ResourceData{}, nil)},
+		{Type: planner.Import, Resource: resources.NewResource("hook", destination.DestinationResourceType, resources.ResourceData{}, nil,
+			resources.WithRawData(spec(&resources.PropertyRef{URN: "transformation:clean"})), resources.WithResourceImportMetadata("dst-1", "ws-1"))},
+	}}
+	assert.ErrorContains(t, destination.NewProvider(nil, testRegistry(t)).CheckPlan(context.Background(), created, state.EmptyState()),
+		"cannot link a destination to a transformation created in the same apply")
 
 	assert.Empty(t, previewOneWithState(t, testRegistry(t), body, "trf-NEW", spec(unresolved()), st), "the link already in place is no change")
 
@@ -219,7 +232,7 @@ func TestProvider_PreviewImports_RemovalsUnderOmittedParents(t *testing.T) {
 		"headers[1].description": "(value)",
 		"legacyNull":             "(null)",
 		"legacyOther":            "(value)",
-	}, diffs["destination:hook"].Diffs["Config (API keys the import removes)"].SourceValue)
+	}, removedFields(diffs["destination:hook"]))
 }
 
 // TestProvider_PreviewImports_SkipsBackendDerivedKeys pins that a key the
@@ -247,7 +260,7 @@ func TestProvider_PreviewImports_SkipsBackendDerivedKeys(t *testing.T) {
 		spec(secret.WrapKnownSecrets(map[string]any{"api_key": "k", "residency_server": "standard", "connection_mode": map[string]any{"web": "cloud"}}, []string{"api_key"})))
 	require.Contains(t, diffs, "destination:amp")
 	assert.True(t, diffs["destination:amp"].SecretOnly)
-	assert.NotContains(t, diffs["destination:amp"].Diffs, "Config (API keys the import removes)")
+	assert.Empty(t, removedFields(diffs["destination:amp"]))
 }
 
 // TestProvider_PreviewImports_ReadErrors pins that the preview fails, naming
@@ -289,4 +302,17 @@ func TestProvider_PreviewImports_ReadErrors(t *testing.T) {
 	err = run(t, "/v2/destinations/dst-1/transformation")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "previewing import of destination:hook: getting destination transformation")
+}
+
+// removedFields collects the preview's "API keys the import removes" lines as
+// path -> summary.
+func removedFields(r differ.ResourceDiff) map[string]any {
+	const prefix = "Config (API keys the import removes)."
+	out := map[string]any{}
+	for name, diff := range r.Diffs {
+		if path, ok := strings.CutPrefix(name, prefix); ok {
+			out[path] = diff.SourceValue
+		}
+	}
+	return out
 }

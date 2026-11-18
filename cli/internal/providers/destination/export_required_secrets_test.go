@@ -35,9 +35,6 @@ func TestHandlerImpl_FormatForExport_RequiredSecretsTheAPIStrips(t *testing.T) {
 		apiType  string
 		config   string
 		expected map[string]any
-		// contains, when set, replaces expected with a subset check on the
-		// keys a connect-time requirement adds.
-		contains map[string]any
 	}{
 		{
 			name:    "http bearer token when auth is bearerTokenAuth",
@@ -128,15 +125,7 @@ func TestHandlerImpl_FormatForExport_RequiredSecretsTheAPIStrips(t *testing.T) {
 
 			spec, ok := entities[0].Content.(*specs.Spec)
 			require.True(t, ok)
-			if tc.contains == nil {
-				assert.Equal(t, tc.expected, spec.Spec["config"])
-				return
-			}
-			config, ok := spec.Spec["config"].(map[string]any)
-			require.True(t, ok)
-			for key, value := range tc.contains {
-				assert.Equal(t, value, config[key], key)
-			}
+			assert.Equal(t, tc.expected, spec.Spec["config"])
 		})
 	}
 }

@@ -26,8 +26,9 @@ import (
 // another. Each shows as a Transformation line; a link the spec names that is
 // already the remote one shows none. The spec's reference is resolved from st
 // as the apply resolves it, or, for a transformation the same plan imports,
-// from adopted (URN to the remote ID its import keeps). A transformation the
-// same apply creates has no ID yet, and is a change by construction.
+// from adopted (URN to the remote ID its import keeps). A link to a
+// transformation the same apply creates never gets here: CheckPlan refuses
+// that plan.
 func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResource, remoteID string, st *state.State, adopted map[string]string) (map[string]differ.PropertyDiff, bool, error) {
 	remote, err := h.client.Destinations.Get(ctx, remoteID)
 	if err != nil {
@@ -37,18 +38,9 @@ func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResour
 	if err != nil {
 		return nil, false, fmt.Errorf("getting destination definition: %w", err)
 	}
-	localConfig, err := h.apiConfigToLocal(registered.Type, remote.Version, remote.Config)
+	current, err := h.remoteResource(remote, registered, data.ID)
 	if err != nil {
 		return nil, false, err
-	}
-
-	current := &DestinationResource{
-		ID:                data.ID,
-		DisplayName:       remote.Name,
-		Type:              registered.Type,
-		Enabled:           remote.IsEnabled,
-		DefinitionVersion: remote.Version,
-		Config:            secret.WrapUnknownSecrets(localConfig, registered.SecretKeys()),
 	}
 	wanted := *data
 	wanted.Transformation = nil
@@ -88,12 +80,11 @@ func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResour
 	if err != nil {
 		return nil, false, err
 	}
-	if len(removed) > 0 {
-		diffs[removedFieldsProperty] = differ.PropertyDiff{
-			Property:    removedFieldsProperty,
-			SourceValue: removed,
-			TargetValue: map[string]any{},
-		}
+	// One line per removed path, named in full, so the path reads as the
+	// README writes it rather than as a quoted map key.
+	for path, summary := range removed {
+		name := removedFieldsProperty + "." + path
+		diffs[name] = differ.PropertyDiff{Property: name, SourceValue: summary}
 		secretOnly = false
 	}
 	return diffs, secretOnly, nil
@@ -296,18 +287,18 @@ func transformationChange(remoteID string, ref *resources.PropertyRef, st *state
 	}
 
 	wantedID, resolved := resolvedTransformationID(ref, st)
-	adoptedID, isAdopted := adopted[ref.URN]
-	switch {
-	case resolved && wantedID == remoteID, !resolved && isAdopted && adoptedID == remoteID:
-		return line, false
-	case resolved:
+	if resolved {
 		line.TargetValue = wantedID + " (" + ref.URN + ")"
-	case isAdopted:
-		line.TargetValue = adoptedID + " (" + ref.URN + ", adopted in this apply)"
-	default:
-		line.TargetValue = ref.URN + " (created in this apply)"
+		return line, wantedID != remoteID
 	}
-	return line, true
+	adoptedID, isAdopted := adopted[ref.URN]
+	if !isAdopted {
+		// Not in state nor imported: created by this apply, which CheckPlan
+		// refuses before the preview runs.
+		return line, false
+	}
+	line.TargetValue = adoptedID + " (" + ref.URN + ", adopted in this apply)"
+	return line, adoptedID != remoteID
 }
 
 // resolvedTransformationID resolves a copy of ref against st, leaving the

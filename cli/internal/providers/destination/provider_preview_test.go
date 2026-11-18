@@ -72,19 +72,17 @@ func TestProvider_PreviewImports(t *testing.T) {
 				SourceValue: map[string]any{"measurement_id": "G-1", "blacklisted_events": []any{""}},
 				TargetValue: map[string]any{"measurement_id": "G-1", "debug_mode": true},
 			},
-			"Config (API keys the import removes)": {
-				Property:    "Config (API keys the import removes)",
-				SourceValue: map[string]any{"legacySetting": "(value)"},
-				TargetValue: map[string]any{},
+			"Config (API keys the import removes).legacySetting": {
+				Property:    "Config (API keys the import removes).legacySetting",
+				SourceValue: "(value)",
 			},
 		}},
 		// The unselected list the converter drops is named; the discriminator
 		// naming no list says what its absence says, so it is not.
 		"destination:filtered": {URN: "destination:filtered", Diffs: map[string]differ.PropertyDiff{
-			"Config (API keys the import removes)": {
-				Property:    "Config (API keys the import removes)",
-				SourceValue: map[string]any{"blacklistedEvents": "(list, 1 item)"},
-				TargetValue: map[string]any{},
+			"Config (API keys the import removes).blacklistedEvents": {
+				Property:    "Config (API keys the import removes).blacklistedEvents",
+				SourceValue: "(list, 1 item)",
 			},
 		}},
 	}, diffs)
