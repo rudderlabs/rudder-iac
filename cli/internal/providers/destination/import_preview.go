@@ -59,8 +59,8 @@ func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResour
 		return nil, false, err
 	}
 	if len(removed) > 0 {
-		diffs[removedAPIKeysProperty] = differ.PropertyDiff{
-			Property:    removedAPIKeysProperty,
+		diffs[removedFieldsProperty] = differ.PropertyDiff{
+			Property:    removedFieldsProperty,
 			SourceValue: removed,
 			TargetValue: map[string]any{},
 		}
@@ -69,9 +69,9 @@ func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResour
 	return diffs, secretOnly, nil
 }
 
-// removedAPIKeysProperty names the preview entry for remote API keys the
+// removedFieldsProperty names the preview entry for remote API keys the
 // import drops that the local comparison cannot show.
-const removedAPIKeysProperty = "Config (API keys the import removes)"
+const removedFieldsProperty = "Config (API keys the import removes)"
 
 // removedAPIKeys returns the top-level keys of the remote API config that the
 // import's payload leaves out and that no local config line already shows:
