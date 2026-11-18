@@ -52,6 +52,9 @@ const varFileHeader = `# Variables referenced by the imported specs. Fill in eve
 // scaffoldSecretsVarFile writes a fill-in-the-blanks var file for every
 // variable referenced by the generated entities.
 func scaffoldSecretsVarFile(ctx context.Context, baseDir string, entities []writer.FormattableEntity) (string, error) {
+	if err := checkVariableOwners(entities); err != nil {
+		return "", err
+	}
 	names := collectVariableNames(entities)
 	if len(names) == 0 {
 		return "", nil
@@ -121,9 +124,16 @@ func (varFileFormatter) Format(data any) ([]byte, error) {
 // rather than threading names through every export strategy — keeps the var
 // file in sync with what the specs actually reference, regardless of which
 // provider or strategy produced them.
+//
+// Raw code files are skipped: they are loaded verbatim, never substituted, so a
+// "{{ .NAME }}" in them needs no value, and an unfilled entry would fail every
+// run that loads the var file.
 func collectVariableNames(entities []writer.FormattableEntity) []string {
 	found := make(map[string]struct{})
 	for _, entity := range entities {
+		if !isSubstitutedSpec(entity.Content) {
+			continue
+		}
 		extractVariableNames(entity.Content, found)
 	}
 
@@ -133,6 +143,56 @@ func collectVariableNames(entities []writer.FormattableEntity) []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// checkVariableOwners refuses an import where two generated files reference
+// the same variable. Each provider names its secret variables from the
+// resource id and key path joined with "_" (secret.VariableName), so two
+// different secrets can share a name: destination "hook" with key
+// bearer_token and destination "hook-bearer" with key token, or a destination
+// and an account both imported as "pg" with a password. One var file entry
+// would then fill both.
+//
+// Only specs count: a raw code file, such as a transformation's script, is
+// loaded verbatim rather than variable-substituted, so a "{{ .NAME }}" in it is
+// code and two scripts may hold the same one.
+func checkVariableOwners(entities []writer.FormattableEntity) error {
+	owners := map[string]string{}
+	var clashes []string
+	for _, entity := range entities {
+		if !isSubstitutedSpec(entity.Content) {
+			continue
+		}
+		found := make(map[string]struct{})
+		extractVariableNames(entity.Content, found)
+		for name := range found {
+			other, taken := owners[name]
+			if !taken {
+				owners[name] = entity.RelativePath
+				continue
+			}
+			if other != entity.RelativePath {
+				clashes = append(clashes, fmt.Sprintf("%s (in %s and %s)", name, other, entity.RelativePath))
+			}
+		}
+	}
+	if len(clashes) == 0 {
+		return nil
+	}
+	sort.Strings(clashes)
+	return fmt.Errorf("imported specs would share secret variables: %s; the names come from each resource's id, so rename one of the resources whose ids collide and import again",
+		strings.Join(clashes, ", "))
+}
+
+// isSubstitutedSpec reports whether content is a spec the loader runs
+// variable substitution over, as opposed to a raw file written as is.
+func isSubstitutedSpec(content any) bool {
+	switch content.(type) {
+	case *specs.Spec, map[string]any:
+		return true
+	default:
+		return false
+	}
 }
 
 // extractVariableNames recursively walks an entity's content — spec wrappers,

@@ -6,12 +6,18 @@ import (
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	destdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/docs"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	vdocs "github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
@@ -27,6 +33,7 @@ const importDir = ""
 type Provider struct {
 	*provider.BaseProvider
 	registry *definitions.Registry
+	handler  *HandlerImpl
 }
 
 var _ provider.PlanChecker = &Provider{}
@@ -35,12 +42,40 @@ var _ provider.PlanChecker = &Provider{}
 // definition registry. The registry is expected to be populated by the caller;
 // this constructor registers no definitions itself.
 func NewProvider(c *client.Client, registry *definitions.Registry) *Provider {
+	impl := &HandlerImpl{client: c, registry: registry}
 	return &Provider{
-		BaseProvider: provider.NewBaseProvider([]provider.Handler{
-			NewHandler(c, registry),
-		}),
-		registry: registry,
+		BaseProvider: provider.NewBaseProvider([]provider.Handler{handler.NewHandler(impl)}),
+		registry:     registry,
+		handler:      impl,
 	}
+}
+
+// RETLConnectionResourceType is retl/connection.ResourceType, which imports
+// this package and so cannot be imported here; a test pins the two together.
+const RETLConnectionResourceType = "retl-connection"
+
+// warehouseConnection is a remote Reverse ETL connection in an import.
+type warehouseConnection interface {
+	WarehouseDestinationID() string
+}
+
+// FormatForExport exports importable destinations. Which secrets a destination
+// needs at connect time depends on the sources it connects to, so the
+// destinations the same import connects a warehouse source to are noted first
+// (see requiredSecretKeys).
+func (p *Provider) FormatForExport(
+	collection *resources.RemoteResources,
+	idNamer namer.Namer,
+	inputResolver resolver.ReferenceResolver,
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
+	connected := map[string]bool{}
+	for _, res := range collection.GetAll(RETLConnectionResourceType) {
+		if conn, ok := res.Data.(warehouseConnection); ok {
+			connected[conn.WarehouseDestinationID()] = true
+		}
+	}
+	p.handler.warehouseConnected = connected
+	return p.BaseProvider.FormatForExport(collection, idNamer, inputResolver)
 }
 
 // CheckPlan refuses a destination linked to a transformation the same plan

@@ -33,12 +33,13 @@ func TestCollectVariableNames(t *testing.T) {
 				map[string]any{"id": "c", "plain": "no token", "count": 3},
 			},
 		}),
-		// Every generated entity is scanned, spec file or not.
-		{Content: "select * from {{ .RAW_TABLE }}", RelativePath: "raw.txt"},
+		// A raw code file is loaded verbatim, never substituted, so its
+		// "{{ .NAME }}" is code and needs no var file entry.
+		{Content: "export function transformEvent(e) { return '{{ .CODE_ONLY }}' }", RelativePath: "transformations/t.js"},
 	}
 
 	assert.Equal(t,
-		[]string{"A_TOKEN", "B_ACCESS_KEY", "RAW_TABLE"},
+		[]string{"A_TOKEN", "B_ACCESS_KEY"},
 		collectVariableNames(entities),
 	)
 }
@@ -101,4 +102,34 @@ func readVarFile(t *testing.T, path string) map[string]any {
 	vars := make(map[string]any)
 	require.NoError(t, yaml.Unmarshal(data, &vars))
 	return vars
+}
+
+// TestScaffoldSecretsVarFile_RefusesSharedVariables pins that two generated
+// files never share a secret variable. Names come from the resource id and key
+// path joined with "_", so a destination and an account both imported as "pg"
+// with a password both reference PG_PASSWORD, and one entry would fill both.
+func TestScaffoldSecretsVarFile_RefusesSharedVariables(t *testing.T) {
+	dir := t.TempDir()
+
+	_, err := scaffoldSecretsVarFile(t.Context(), dir, []writer.FormattableEntity{
+		{Content: map[string]any{"password": "{{ .PG_PASSWORD }}"}, RelativePath: "destinations/pg.yaml"},
+		{Content: map[string]any{"password": "{{ .PG_PASSWORD }}"}, RelativePath: "accounts/pg.yaml"},
+		{Content: map[string]any{"token": "{{ .OTHER_TOKEN }}", "again": "{{ .OTHER_TOKEN }}"}, RelativePath: "destinations/other.yaml"},
+	})
+	require.EqualError(t, err, "imported specs would share secret variables: PG_PASSWORD (in destinations/pg.yaml and accounts/pg.yaml); "+
+		"the names come from each resource's id, so rename one of the resources whose ids collide and import again")
+	_, statErr := os.Stat(filepath.Join(dir, SecretsVarFileName))
+	assert.True(t, os.IsNotExist(statErr), "no var file is written for a refused import")
+}
+
+// TestScaffoldSecretsVarFile_IgnoresSharedReferencesInRawCode pins that raw code
+// files, which are loaded verbatim rather than variable-substituted, never
+// count as sharing a secret variable: two transformation scripts may hold the
+// same literal "{{ .NAME }}".
+func TestScaffoldSecretsVarFile_IgnoresSharedReferencesInRawCode(t *testing.T) {
+	_, err := scaffoldSecretsVarFile(t.Context(), t.TempDir(), []writer.FormattableEntity{
+		{Content: "export function transformEvent(e) { return '{{ .NAME }}' }", RelativePath: "transformations/a.js"},
+		{Content: "def transformEvent(e): return '{{ .NAME }}'", RelativePath: "transformations/b.py"},
+	})
+	require.NoError(t, err)
 }

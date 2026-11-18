@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -47,6 +48,10 @@ var HandlerMetadata = handler.HandlerMetadata{
 type HandlerImpl struct {
 	client   *client.Client
 	registry *definitions.Registry
+	// warehouseConnected holds the remote IDs of the destinations an import
+	// connects a warehouse (Reverse ETL) source to, set by Provider before it
+	// exports; see Provider.FormatForExport.
+	warehouseConnected map[string]bool
 }
 
 // NewHandler builds a *DestinationHandler wired to the given client and registry.
@@ -407,7 +412,8 @@ func (h *HandlerImpl) FormatForExport(
 		entries  []importmanifest.ImportEntry
 	)
 
-	for externalID, remote := range collection {
+	for _, externalID := range slices.Sorted(maps.Keys(collection)) {
+		remote := collection[externalID]
 		specMap, err := h.toExportSpecMap(externalID, remote, inputResolver)
 		if err != nil {
 			return nil, nil, err
@@ -468,7 +474,15 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 
 	// Prune before masking: an empty secret would otherwise become a "{{ .VAR }}"
 	// reference, asking the user to supply a credential the destination does not use.
+	// Secrets the API never returns are told apart from ones it returns empty
+	// before pruning: only the absent ones can get a reference below.
+	absent := absentSecretKeys(registered, localConfig)
+
 	pruneEmptyValues(localConfig, registered.SelectedKeyRoots(apiConfig)...)
+
+	for _, key := range requiredSecretKeys(registered, localConfig, absent, h.warehouseConnected[remote.ID]) {
+		localConfig[key] = ""
+	}
 
 	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)
