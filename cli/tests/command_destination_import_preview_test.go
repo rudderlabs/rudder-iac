@@ -96,8 +96,12 @@ func TestImportPreviewShowsWhatTheAdoptChanges(t *testing.T) {
 
 	reference := regexp.MustCompile(`bearer_token: '\{\{ \.([A-Z0-9_]+) \}\}'`).FindStringSubmatch(spec)
 	require.Len(t, reference, 2, "import must scaffold a bearer_token reference: %s", spec)
+	// The import is workspace-wide, so on a shared workspace the scaffolded var
+	// file also lists the secrets of every other unmanaged resource. pruneImport
+	// dropped their specs; keep only this destination's entry, as a user who
+	// adopts one slice would.
 	varFile := filepath.Join(importedDir, importer.SecretsVarFileName)
-	fillVarFile(t, varFile, map[string]string{reference[1]: importPreviewFillValue})
+	writeVarFile(t, varFile, map[string]string{reference[1]: importPreviewFillValue})
 
 	out, err = executor.Execute(cliBinPath, "validate", "-l", projectDir, "--var-file", varFile)
 	require.NoError(t, err, "the imported spec must validate once the var file is filled in: %s", out)
@@ -127,21 +131,15 @@ func TestImportPreviewShowsWhatTheAdoptChanges(t *testing.T) {
 	assert.NotContains(t, string(afterPlan), "Updated resources")
 }
 
-// fillVarFile sets the given scaffolded "KEY:" entries of a var file.
-func fillVarFile(t *testing.T, path string, values map[string]string) {
+// writeVarFile replaces a var file with exactly the given entries.
+func writeVarFile(t *testing.T, path string, values map[string]string) {
 	t.Helper()
 
-	raw, err := os.ReadFile(path)
-	require.NoError(t, err)
-	lines := strings.Split(string(raw), "\n")
-	for i, line := range lines {
-		for key, value := range values {
-			if strings.TrimSpace(line) == key+":" {
-				lines[i] = fmt.Sprintf("%s: '%s'", key, value)
-			}
-		}
+	var b strings.Builder
+	for key, value := range values {
+		fmt.Fprintf(&b, "%s: '%s'\n", key, value)
 	}
-	require.NoError(t, os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o600))
+	require.NoError(t, os.WriteFile(path, []byte(b.String()), 0o600))
 }
 
 // removedConfigKeys returns the top-level keys of before that after lacks.
