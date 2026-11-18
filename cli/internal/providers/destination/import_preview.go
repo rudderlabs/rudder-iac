@@ -94,14 +94,38 @@ func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResour
 // drops that the local comparison cannot show.
 const removedFieldsProperty = "Config (API keys the import removes)"
 
-// backendDerivedKeys are config keys the backend sets from other config on
-// every write, so an update that leaves them out does not remove them:
-// useNativeSDK and useNativeSDKToSend, both derived from connectionMode. The
-// CLI never sends them, yet the destination update e2e snapshots still carry
-// them after a CLI write (cli/tests/command_destinations_apply_test.go).
+// backendDerivedKeys are config keys the backend sets from connectionMode on
+// every write, per source type: useNativeSDK and useNativeSDKToSend. The CLI
+// never sends them, yet the destination update e2e snapshots still carry them
+// after a CLI write (cli/tests/command_destinations_apply_test.go), so an
+// entry whose source type the payload's connectionMode names is rederived, not
+// removed.
 var backendDerivedKeys = map[string]bool{
 	"useNativeSDK":       true,
 	"useNativeSDKToSend": true,
+}
+
+// collectUnderivable records the entries of a backend-derived key the backend
+// cannot rederive after the adopt: those whose source type the payload sends
+// no connectionMode for, such as a legacy useNativeSDK on a destination that
+// never stored a mode.
+func collectUnderivable(key string, value any, payload, removed map[string]any) {
+	if _, sent := payload[key]; sent {
+		return
+	}
+	modes, _ := payload["connectionMode"].(map[string]any)
+	entries, ok := value.(map[string]any)
+	if !ok {
+		if len(modes) == 0 {
+			removed[key] = summarise(value)
+		}
+		return
+	}
+	for sourceType, entry := range entries {
+		if _, derived := modes[sourceType]; !derived {
+			removed[key+"."+sourceType] = summarise(entry)
+		}
+	}
 }
 
 // removedAPIKeys returns the parts of the remote API config that the import's
@@ -149,7 +173,11 @@ func (h *HandlerImpl) removedAPIKeys(registered *definitions.RegisteredDefinitio
 
 	removed := map[string]any{}
 	for key, value := range remote {
-		if neutral[key] || backendDerivedKeys[key] {
+		if neutral[key] {
+			continue
+		}
+		if backendDerivedKeys[key] {
+			collectUnderivable(key, value, payload, removed)
 			continue
 		}
 		collectRemoved(key, value, payload, roundTrip, key, removed)

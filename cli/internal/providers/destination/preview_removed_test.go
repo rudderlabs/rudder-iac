@@ -316,3 +316,25 @@ func removedFields(r differ.ResourceDiff) map[string]any {
 	}
 	return out
 }
+
+// TestProvider_PreviewImports_ListsUnderivableNativeSDK pins that a
+// backend-derived key is skipped only where the backend can rederive it: a
+// legacy useNativeSDK with no connectionMode for its source type is removed
+// by the adopt, and the preview says so.
+func TestProvider_PreviewImports_ListsUnderivableNativeSDK(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(am.NewDefinition()))
+
+	diffs := previewOne(t, registry, `{"destination":{"id":"dst-1","name":"Amp","type":"AM","version":1,"enabled":true,"config":{
+		"residencyServer":"standard","useNativeSDK":{"web":true}}}}`, "",
+		&destination.DestinationResource{ID: "amp", DisplayName: "Amp", Type: "am", Enabled: true, DefinitionVersion: 1,
+			Config: map[string]any{"residency_server": "standard"}})
+
+	assert.Equal(t, map[string]differ.ResourceDiff{"destination:amp": {URN: "destination:amp", Diffs: map[string]differ.PropertyDiff{
+		"Config (API keys the import removes).useNativeSDK.web": {
+			Property: "Config (API keys the import removes).useNativeSDK.web", SourceValue: "(value)",
+		},
+	}}}, diffs)
+}
