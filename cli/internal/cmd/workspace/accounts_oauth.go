@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -221,6 +222,13 @@ func newHandoffRunner(out io.Writer, noBrowser bool, timeout time.Duration) (*ha
 }
 
 func (r *handoffRunner) create(ctx context.Context, definition, name, specDir, resume string) error {
+	// Checked before the session is opened: a refusal here costs a flag
+	// correction, while the same refusal after the account exists leaves an
+	// OAuth account the CLI has no way to delete.
+	if err := checkSpecTarget(specDir, specID(name)); err != nil {
+		return err
+	}
+
 	sessionID := resume
 	if sessionID == "" {
 		session, err := r.api.Open(ctx, oauthhandoff.OpenRequest{
@@ -257,10 +265,18 @@ func (r *handoffRunner) create(ctx context.Context, definition, name, specDir, r
 	if specDir != "" {
 		path, err := writeAccountSpec(ctx, specDir, externalID,
 			firstNonEmpty(name, state.Name), firstNonEmpty(definition, state.AccountDefinitionName))
-		if err != nil {
-			return err
+		switch {
+		// The account exists and is claimed, so the command has succeeded
+		// whatever the spec file does. Failing here would tell a script to
+		// retry, and the retry would create a second account.
+		case err != nil:
+			fmt.Fprintln(r.out, ui.Warning(err.Error()))
+			fmt.Fprintf(r.out, "   The spec was not written, but the account is created and claimed. Its fields are:\n"+
+				"     id: %s\n     name: %s\n     account_definition_name: %s\n",
+				externalID, firstNonEmpty(name, state.Name), firstNonEmpty(definition, state.AccountDefinitionName))
+		default:
+			fmt.Fprintf(r.out, "   Wrote %s\n", path)
 		}
-		fmt.Fprintf(r.out, "   Wrote %s\n", path)
 	}
 
 	fmt.Fprintf(r.out, "\nReference it from a destination spec:\n   rudder_account_id: \"%s%s\"\n",
@@ -397,6 +413,29 @@ func (r *handoffRunner) explainWaitFailure(err error, sessionID string) error {
 	}
 }
 
+// checkSpecTarget reports an unwritable --write-spec target. create calls it
+// before the handoff session is opened, so the common case (a second run with
+// the same --name) is refused while nothing has been created yet.
+//
+// An empty externalID means --resume, whose name comes from the session: there
+// is nothing to check yet, and the write failure that follows is a warning
+// rather than a failure, because by then the account exists.
+func checkSpecTarget(dir, externalID string) error {
+	if dir == "" || externalID == "" {
+		return nil
+	}
+
+	path := filepath.Join(dir, externalID+".yaml")
+	switch _, err := os.Stat(path); {
+	case err == nil:
+		return fmt.Errorf("%s already exists, and the spec is never overwritten.\n"+
+			"  Pick another --name, drop --write-spec, or move that file aside", path)
+	case !errors.Is(err, fs.ErrNotExist):
+		return fmt.Errorf("checking %s: %w", path, err)
+	}
+	return nil
+}
+
 // writeAccountSpec renders the 'kind: account' spec create and adopt share. An
 // OAuth account carries no config block: its definition declares no option
 // fields and its credentials are not the CLI's to hold.
@@ -416,10 +455,17 @@ func writeAccountSpec(ctx context.Context, dir, externalID, name, definition str
 	entity := writer.FormattableEntity{Content: spec, RelativePath: relative}
 	// writer.Write refuses to overwrite, so an existing spec is reported rather
 	// than replaced.
+	path := filepath.Join(dir, relative)
+	// writer.Write wraps os.OpenFile's own message twice, so the raw error
+	// names the path three times. Only the exists case is worth reporting in
+	// its own words; anything else keeps the wrapped detail.
 	if err := writer.Write(ctx, dir, formatter.Setup(formatter.DefaultYAML), []writer.FormattableEntity{entity}); err != nil {
-		return "", fmt.Errorf("writing the account spec: %w", err)
+		if errors.Is(err, fs.ErrExist) {
+			return "", fmt.Errorf("%s already exists, and the spec is never overwritten", path)
+		}
+		return "", fmt.Errorf("writing %s: %w", path, err)
 	}
-	return filepath.Join(dir, relative), nil
+	return path, nil
 }
 
 // specID turns a display name into the URN-safe spec id the account is claimed
