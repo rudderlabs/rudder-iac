@@ -104,21 +104,6 @@ func TestHandlerImpl_FormatForExport_RequiredSecretsTheAPIStrips(t *testing.T) {
 			},
 		},
 		{
-			// Connecting a warehouse source needs rest_api_key in cloud mode,
-			// the mode a warehouse source runs in when connection_mode leaves
-			// it out (V-C5).
-			name:     "braze rest api key a warehouse source needs, with no connection mode stored",
-			apiType:  "BRAZE",
-			config:   `{"dataCenter":"US-01"}`,
-			contains: map[string]any{"rest_api_key": "{{ .DEST_REST_API_KEY }}"},
-		},
-		{
-			name:     "facebook pixel access token a warehouse source needs",
-			apiType:  "FACEBOOK_PIXEL",
-			config:   `{"connectionMode":{"warehouse":"cloud"}}`,
-			contains: map[string]any{"access_token": "{{ .DEST_ACCESS_TOKEN }}"},
-		},
-		{
 			name:    "amplitude api secret is optional and stays out",
 			apiType: "AM",
 			config:  `{"apiKey":"key","residencyServer":"standard"}`,

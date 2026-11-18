@@ -48,6 +48,10 @@ var HandlerMetadata = handler.HandlerMetadata{
 type HandlerImpl struct {
 	client   *client.Client
 	registry *definitions.Registry
+	// warehouseConnected holds the remote IDs of the destinations an import
+	// connects a warehouse (Reverse ETL) source to, set by Provider before it
+	// exports; see Provider.FormatForExport.
+	warehouseConnected map[string]bool
 }
 
 // NewHandler builds a *DestinationHandler wired to the given client and registry.
@@ -476,7 +480,7 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 
 	pruneEmptyValues(localConfig, registered.SelectedKeyRoots(apiConfig)...)
 
-	for _, key := range requiredSecretKeys(registered, localConfig, absent) {
+	for _, key := range requiredSecretKeys(registered, localConfig, absent, h.warehouseConnected[remote.ID]) {
 		localConfig[key] = ""
 	}
 

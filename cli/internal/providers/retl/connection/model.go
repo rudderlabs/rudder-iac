@@ -78,6 +78,12 @@ const (
 // Config is the spec-shaped config remoteConnection already rebuilt to prove
 // the row representable; carrying it spares state, export and import a second
 // conversion of the same row.
+// WarehouseDestinationID names the destination this connection delivers to. A
+// destination being imported reads it, through an interface since that
+// package cannot import this one, to tell which destinations a warehouse
+// source connects to.
+func (r *RemoteConnection) WarehouseDestinationID() string { return r.DestinationID }
+
 type RemoteConnection struct {
 	retlClient.RETLConnection
 	Config                ConfigSpec

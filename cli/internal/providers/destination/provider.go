@@ -6,13 +6,18 @@ import (
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	destdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/docs"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
@@ -47,6 +52,34 @@ func NewProvider(c *client.Client, registry *definitions.Registry) *Provider {
 		registry:     registry,
 		handler:      impl,
 	}
+}
+
+// RETLConnectionResourceType is retl/connection.ResourceType, which imports
+// this package and so cannot be imported here; a test pins the two together.
+const RETLConnectionResourceType = "retl-connection"
+
+// warehouseConnection is a remote Reverse ETL connection in an import.
+type warehouseConnection interface {
+	WarehouseDestinationID() string
+}
+
+// FormatForExport exports importable destinations. Which secrets a destination
+// needs at connect time depends on the sources it connects to, so the
+// destinations the same import connects a warehouse source to are noted first
+// (see requiredSecretKeys).
+func (p *Provider) FormatForExport(
+	collection *resources.RemoteResources,
+	idNamer namer.Namer,
+	inputResolver resolver.ReferenceResolver,
+) ([]writer.FormattableEntity, []importmanifest.ImportEntry, error) {
+	connected := map[string]bool{}
+	for _, res := range collection.GetAll(RETLConnectionResourceType) {
+		if conn, ok := res.Data.(warehouseConnection); ok {
+			connected[conn.WarehouseDestinationID()] = true
+		}
+	}
+	p.handler.warehouseConnected = connected
+	return p.BaseProvider.FormatForExport(collection, idNamer, inputResolver)
 }
 
 // PreviewImports reports, per destination the plan imports, the config the
