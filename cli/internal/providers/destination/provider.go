@@ -53,7 +53,7 @@ func NewProvider(c *client.Client, registry *definitions.Registry) *Provider {
 // import writes over the remote one. Import pushes the spec to the destination
 // it adopts, so a value the spec does not share with the remote changes it. See
 // provider.ImportPreviewer.
-func (p *Provider) PreviewImports(ctx context.Context, plan *planner.Plan) (map[string]differ.ResourceDiff, error) {
+func (p *Provider) PreviewImports(ctx context.Context, plan *planner.Plan, st *state.State) (map[string]differ.ResourceDiff, error) {
 	result := map[string]differ.ResourceDiff{}
 	for _, op := range plan.Operations {
 		if op.Type != planner.Import || op.Resource.Type() != DestinationResourceType {
@@ -63,7 +63,7 @@ func (p *Provider) PreviewImports(ctx context.Context, plan *planner.Plan) (map[
 		if !ok || op.Resource.ImportMetadata() == nil {
 			continue
 		}
-		diffs, secretOnly, err := p.handler.previewImport(ctx, data, op.Resource.ImportMetadata().RemoteId)
+		diffs, secretOnly, err := p.handler.previewImport(ctx, data, op.Resource.ImportMetadata().RemoteId, st)
 		if err != nil {
 			return nil, fmt.Errorf("previewing import of %s: %w", op.Resource.URN(), err)
 		}

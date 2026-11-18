@@ -200,9 +200,10 @@ type PlanChecker interface {
 // the remote resource it adopts, so adopting it can change that resource. It
 // returns, per importable URN in the plan, the changes the import writes, for
 // the plan to show before anything runs. A URN may be left out when its
-// import changes nothing.
+// import changes nothing. st is the stored state, read to resolve references
+// the plan has not resolved yet.
 type ImportPreviewer interface {
-	PreviewImports(ctx context.Context, plan *planner.Plan) (map[string]differ.ResourceDiff, error)
+	PreviewImports(ctx context.Context, plan *planner.Plan, st *state.State) (map[string]differ.ResourceDiff, error)
 }
 
 // ImportManifestLoader receives a single workspace's import metadata after all

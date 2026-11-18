@@ -10,6 +10,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/webhook"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/stretchr/testify/assert"
@@ -20,6 +21,10 @@ import (
 // against a remote served from body, with the remote reporting link as its
 // transformation (none when empty).
 func previewOne(t *testing.T, registry *definitions.Registry, body, link string, data *destination.DestinationResource) map[string]differ.ResourceDiff {
+	return previewOneWithState(t, registry, body, link, data, state.EmptyState())
+}
+
+func previewOneWithState(t *testing.T, registry *definitions.Registry, body, link string, data *destination.DestinationResource, st *state.State) map[string]differ.ResourceDiff {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -41,7 +46,7 @@ func previewOne(t *testing.T, registry *definitions.Registry, body, link string,
 		data.ID, destination.DestinationResourceType, resources.ResourceData{}, nil,
 		resources.WithRawData(data), resources.WithResourceImportMetadata("dst-1", "ws-1"),
 	)}}}
-	diffs, err := destination.NewProvider(newTestClient(t, srv.URL), registry).PreviewImports(context.Background(), plan)
+	diffs, err := destination.NewProvider(newTestClient(t, srv.URL), registry).PreviewImports(context.Background(), plan, st)
 	require.NoError(t, err)
 	return diffs
 }
@@ -101,9 +106,10 @@ func TestProvider_PreviewImports_SiblingRemovalUnderChangedRoot(t *testing.T) {
 	assert.Contains(t, diffs["destination:f"].Diffs, "Config", "the blacklist change still shows as a local line")
 }
 
-// TestProvider_PreviewImports_TransformationLink pins that the preview shows a
-// transformation link the import changes: Import disconnects a remote link the
-// spec leaves out, and links one the spec names.
+// TestProvider_PreviewImports_TransformationLink pins that the preview shows
+// every transformation link change Import makes, compared by remote ID as
+// syncTransformationLink compares them: a disconnect, a new link, and a switch
+// from one transformation to another; a link already in place shows none.
 func TestProvider_PreviewImports_TransformationLink(t *testing.T) {
 	t.Parallel()
 
@@ -114,15 +120,35 @@ func TestProvider_PreviewImports_TransformationLink(t *testing.T) {
 			Transformation: ref, Config: map[string]any{"webhook_url": "https://example.com/hook"},
 		}
 	}
-	ref := &resources.PropertyRef{URN: "transformation:clean"}
+	line := func(diffs map[string]differ.ResourceDiff) differ.PropertyDiff {
+		return diffs["destination:hook"].Diffs["Transformation"]
+	}
 
-	disconnected := previewOne(t, testRegistry(t), body, "trn-remote", spec(nil))
-	assert.Equal(t, differ.PropertyDiff{Property: "Transformation", SourceValue: "trn-remote (remote id)", TargetValue: nil},
-		disconnected["destination:hook"].Diffs["Transformation"])
+	// The managed transformation the spec names, as stored state holds it; the
+	// spec's reference is still unresolved at plan time.
+	st := state.EmptyState()
+	st.AddResource(&state.ResourceState{ID: "new-one", Type: "transformation", OutputRaw: "trf-NEW"})
+	unresolved := func() *resources.PropertyRef {
+		return &resources.PropertyRef{URN: "transformation:new-one", Resolve: func(out any) (string, error) { return out.(string), nil }}
+	}
 
-	linked := previewOne(t, testRegistry(t), body, "", spec(ref))
-	assert.Equal(t, differ.PropertyDiff{Property: "Transformation", SourceValue: nil, TargetValue: ref},
-		linked["destination:hook"].Diffs["Transformation"])
+	assert.Equal(t, differ.PropertyDiff{Property: "Transformation", SourceValue: "trf-OLD (remote id)"},
+		line(previewOne(t, testRegistry(t), body, "trf-OLD", spec(nil))), "a remote link the spec leaves out is disconnected")
 
+	assert.Equal(t, differ.PropertyDiff{Property: "Transformation", SourceValue: "trf-OLD (remote id)", TargetValue: "trf-NEW (transformation:new-one)"},
+		line(previewOneWithState(t, testRegistry(t), body, "trf-OLD", spec(unresolved()), st)), "a link to another transformation is switched")
+
+	assert.Equal(t, differ.PropertyDiff{Property: "Transformation", SourceValue: "trf-OLD (remote id)", TargetValue: "trf-NEW (transformation:new-one)"},
+		line(previewOne(t, testRegistry(t), body, "trf-OLD", spec(&resources.PropertyRef{URN: "transformation:new-one", IsResolved: true, Value: "trf-NEW"}))),
+		"an already resolved reference is compared by its value")
+
+	assert.Equal(t, differ.PropertyDiff{Property: "Transformation", TargetValue: "trf-NEW (transformation:new-one)"},
+		line(previewOneWithState(t, testRegistry(t), body, "", spec(unresolved()), st)), "a new link")
+
+	assert.Equal(t, differ.PropertyDiff{Property: "Transformation", SourceValue: "trf-OLD (remote id)", TargetValue: "transformation:clean (created in this apply)"},
+		line(previewOne(t, testRegistry(t), body, "trf-OLD", spec(&resources.PropertyRef{URN: "transformation:clean"}))),
+		"a transformation the same apply creates has no ID yet and is a change")
+
+	assert.Empty(t, previewOneWithState(t, testRegistry(t), body, "trf-NEW", spec(unresolved()), st), "the link already in place is no change")
 	assert.Empty(t, previewOne(t, testRegistry(t), body, "", spec(nil)), "no link on either side is no change")
 }

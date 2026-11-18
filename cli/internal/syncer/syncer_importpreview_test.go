@@ -20,7 +20,7 @@ type previewingProvider struct {
 	previewed []string
 }
 
-func (p *previewingProvider) PreviewImports(_ context.Context, plan *planner.Plan) (map[string]differ.ResourceDiff, error) {
+func (p *previewingProvider) PreviewImports(_ context.Context, plan *planner.Plan, _ *state.State) (map[string]differ.ResourceDiff, error) {
 	for _, op := range plan.Operations {
 		p.previewed = append(p.previewed, op.String())
 	}

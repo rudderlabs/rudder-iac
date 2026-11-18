@@ -8,6 +8,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/stretchr/testify/assert"
@@ -61,7 +62,7 @@ func TestProvider_PreviewImports(t *testing.T) {
 	}}
 
 	p := destination.NewProvider(newTestClient(t, srv.URL), testRegistry(t))
-	diffs, err := p.PreviewImports(context.Background(), plan)
+	diffs, err := p.PreviewImports(context.Background(), plan, state.EmptyState())
 	require.NoError(t, err)
 
 	assert.Equal(t, map[string]differ.ResourceDiff{

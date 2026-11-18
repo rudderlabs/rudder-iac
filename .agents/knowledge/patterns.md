@@ -299,3 +299,7 @@
 - The preview reads the remote transformation link as Import does and shows a disconnect (`<id> (remote id) => <nil>`) or a new link; when both sides name one, the URN cannot be matched to the remote ID at plan time, so no line is shown.
 - A failed preview GET fails the plan with the destination URN named (dry run and apply alike), rather than adopting a destination whose changes were not shown.
 - Secret variable collisions are checked across every imported entity in `importer.checkVariableOwners`, before any file is written: all providers name variables with `secret.VariableName(id, path...)`, so a destination and an account both imported as `pg` share `PG_PASSWORD`. The destination-only check was removed in favour of it.
+
+## rudder-iac#1041 — Import Preview Compares Transformation Links By Remote ID
+<!-- pr:1041 -->
+- `ImportPreviewer.PreviewImports` takes the stored state, so the destination preview resolves the spec's transformation reference on a copy (`state.DereferenceByReflection`) before the apply does, and compares remote IDs exactly as `syncTransformationLink` will: a disconnect, a new link and a switch (`trf-OLD (remote id) => trf-NEW (transformation:x)`) each show a line, an unchanged link shows none, and a transformation created in the same apply (no ID yet) shows `<urn> (created in this apply)`.

@@ -9,6 +9,8 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 )
@@ -20,10 +22,12 @@ import (
 // spec leaves out, empty or not, shows as removed.
 //
 // Import also reconciles the transformation link: it disconnects a remote link
-// the spec leaves out and connects one the spec names. Those show as a
-// Transformation line. When both sides name one, the spec's URN cannot be
-// matched to the remote ID before the apply resolves it, so no line is shown.
-func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResource, remoteID string) (map[string]differ.PropertyDiff, bool, error) {
+// the spec leaves out, connects one the spec names, and switches one to
+// another. Each shows as a Transformation line; a link the spec names that is
+// already the remote one shows none. The spec's reference is resolved from st
+// as the apply resolves it; a transformation the same apply creates has no ID
+// yet, and is a change by construction.
+func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResource, remoteID string, st *state.State) (map[string]differ.PropertyDiff, bool, error) {
 	remote, err := h.client.Destinations.Get(ctx, remoteID)
 	if err != nil {
 		return nil, false, fmt.Errorf("getting destination: %w", err)
@@ -66,12 +70,8 @@ func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResour
 	}
 	diffs, secretOnly := differ.CompareData(source, target)
 
-	switch {
-	case remoteTransformationID != "" && data.Transformation == nil:
-		diffs["Transformation"] = differ.PropertyDiff{Property: "Transformation", SourceValue: remoteTransformationID + " (remote id)"}
-		secretOnly = false
-	case remoteTransformationID == "" && data.Transformation != nil:
-		diffs["Transformation"] = differ.PropertyDiff{Property: "Transformation", TargetValue: data.Transformation}
+	if line, changed := transformationChange(remoteTransformationID, data.Transformation, st); changed {
+		diffs["Transformation"] = line
 		secretOnly = false
 	}
 
@@ -217,4 +217,43 @@ func plural(n int, word string) string {
 		return word
 	}
 	return word + "s"
+}
+
+// transformationChange compares the remote transformation link with the one the
+// spec names, as Import's syncTransformationLink will: by remote ID.
+func transformationChange(remoteID string, ref *resources.PropertyRef, st *state.State) (differ.PropertyDiff, bool) {
+	line := differ.PropertyDiff{Property: "Transformation"}
+	if remoteID != "" {
+		line.SourceValue = remoteID + " (remote id)"
+	}
+	if ref == nil {
+		return line, remoteID != ""
+	}
+
+	wantedID, resolved := resolvedTransformationID(ref, st)
+	switch {
+	case !resolved:
+		line.TargetValue = ref.URN + " (created in this apply)"
+	case wantedID == remoteID:
+		return line, false
+	default:
+		line.TargetValue = wantedID + " (" + ref.URN + ")"
+	}
+	return line, true
+}
+
+// resolvedTransformationID resolves a copy of ref against st, leaving the
+// plan's reference untouched for the apply to resolve.
+func resolvedTransformationID(ref *resources.PropertyRef, st *state.State) (string, bool) {
+	if ref.IsResolved {
+		return ref.Value, ref.Value != ""
+	}
+	if st == nil || st.GetResource(ref.URN) == nil {
+		return "", false
+	}
+	resolved := *ref
+	if err := state.DereferenceByReflection(&resolved, st); err != nil || !resolved.IsResolved {
+		return "", false
+	}
+	return resolved.Value, resolved.Value != ""
 }
