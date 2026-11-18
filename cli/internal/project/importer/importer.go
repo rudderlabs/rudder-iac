@@ -117,10 +117,7 @@ func WorkspaceImport(
 
 	// Checked before anything is written, so a refused import leaves no specs
 	// behind referencing a variable that would fill two secrets.
-	if err := checkVariableOwners(entities); err != nil {
-		return err
-	}
-	if err := checkExistingVariableOwners(project.Location(), entities); err != nil {
+	if err := checkVariableOwners(project.Location(), entities); err != nil {
 		return err
 	}
 

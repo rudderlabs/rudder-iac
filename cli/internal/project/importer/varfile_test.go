@@ -104,30 +104,26 @@ func readVarFile(t *testing.T, path string) map[string]any {
 	return vars
 }
 
-// TestScaffoldSecretsVarFile_RefusesSharedVariables pins that two generated
+// TestCheckVariableOwners_RefusesNewResourcesSharingAVariable pins that two generated
 // files never share a secret variable. Names come from the resource id and key
 // path joined with "_", so a destination and an account both imported as "pg"
 // with a password both reference PG_PASSWORD, and one entry would fill both.
-func TestScaffoldSecretsVarFile_RefusesSharedVariables(t *testing.T) {
-	dir := t.TempDir()
-
-	_, err := scaffoldSecretsVarFile(t.Context(), dir, []writer.FormattableEntity{
+func TestCheckVariableOwners_RefusesNewResourcesSharingAVariable(t *testing.T) {
+	err := checkVariableOwners("", []writer.FormattableEntity{
 		{Content: map[string]any{"password": "{{ .PG_PASSWORD }}"}, RelativePath: "destinations/pg.yaml"},
 		{Content: map[string]any{"password": "{{ .PG_PASSWORD }}"}, RelativePath: "accounts/pg.yaml"},
 		{Content: map[string]any{"token": "{{ .OTHER_TOKEN }}", "again": "{{ .OTHER_TOKEN }}"}, RelativePath: "destinations/other.yaml"},
 	})
-	require.EqualError(t, err, "imported specs would share secret variables: PG_PASSWORD (in destinations/pg.yaml and accounts/pg.yaml); "+
+	require.EqualError(t, err, "imported specs would share secret variables: PG_PASSWORD (in accounts/pg.yaml and destinations/pg.yaml); "+
 		"the names come from each resource's id, so rename one of the resources whose ids collide and import again")
-	_, statErr := os.Stat(filepath.Join(dir, SecretsVarFileName))
-	assert.True(t, os.IsNotExist(statErr), "no var file is written for a refused import")
 }
 
-// TestScaffoldSecretsVarFile_IgnoresSharedReferencesInRawCode pins that raw code
+// TestCheckVariableOwners_IgnoresSharedReferencesInRawCode pins that raw code
 // files, which are loaded verbatim rather than variable-substituted, never
 // count as sharing a secret variable: two transformation scripts may hold the
 // same literal "{{ .NAME }}".
-func TestScaffoldSecretsVarFile_IgnoresSharedReferencesInRawCode(t *testing.T) {
-	_, err := scaffoldSecretsVarFile(t.Context(), t.TempDir(), []writer.FormattableEntity{
+func TestCheckVariableOwners_IgnoresSharedReferencesInRawCode(t *testing.T) {
+	err := checkVariableOwners("", []writer.FormattableEntity{
 		{Content: "export function transformEvent(e) { return '{{ .NAME }}' }", RelativePath: "transformations/a.js"},
 		{Content: "def transformEvent(e): return '{{ .NAME }}'", RelativePath: "transformations/b.py"},
 	})

@@ -52,9 +52,6 @@ const varFileHeader = `# Variables referenced by the imported specs. Fill in eve
 // scaffoldSecretsVarFile writes a fill-in-the-blanks var file for every
 // variable referenced by the generated entities.
 func scaffoldSecretsVarFile(ctx context.Context, baseDir string, entities []writer.FormattableEntity) (string, error) {
-	if err := checkVariableOwners(entities); err != nil {
-		return "", err
-	}
 	names := collectVariableNames(entities)
 	if len(names) == 0 {
 		return "", nil
@@ -145,34 +142,79 @@ func collectVariableNames(entities []writer.FormattableEntity) []string {
 	return names
 }
 
-// checkVariableOwners refuses an import where two generated files reference
-// the same variable. Each provider names its secret variables from the
-// resource id and key path joined with "_" (secret.VariableName), so two
-// different secrets can share a name: destination "hook" with key
-// bearer_token and destination "hook-bearer" with key token, or a destination
-// and an account both imported as "pg" with a password. One var file entry
-// would then fill both.
+// checkVariableOwners refuses an import in which one secret variable would
+// stand for two resources' secrets. Every provider names a secret variable from
+// the resource id and key path joined with "_" (secret.VariableName), so two
+// different secrets can share a name: destination "hook" with key bearer_token
+// and destination "hook-bearer" with key token, or a destination and an
+// account both imported as "pg" with a password. A slice-by-slice adoption
+// imports into a project that already holds earlier slices, so the specs
+// already under location count as well as the new entities. One var file entry
+// would otherwise fill both. Specs already in the project that share a
+// variable among themselves are left alone.
 //
-// Only specs count: a raw code file, such as a transformation's script, is
-// loaded verbatim rather than variable-substituted, so a "{{ .NAME }}" in it is
-// code and two scripts may hold the same one.
-func checkVariableOwners(entities []writer.FormattableEntity) error {
-	owners := map[string]string{}
-	var clashes []string
+// A variable's owner is the resource that references it: kind and spec id for
+// a spec, its file otherwise. A resource reusing its own variable, such as a
+// re-import of the same secret, is not a collision. Only specs count: raw code
+// files, such as a transformation's script, are loaded verbatim rather than
+// variable-substituted, and the project's specs are read as written, before
+// substitution.
+func checkVariableOwners(location string, entities []writer.FormattableEntity) error {
+	type use struct {
+		owner, file string
+		isNew       bool
+	}
+	uses := map[string][]use{}
+	record := func(owner, file string, content any, isNew bool) {
+		found := make(map[string]struct{})
+		extractVariableNames(content, found)
+		for name := range found {
+			uses[name] = append(uses[name], use{owner: owner, file: file, isNew: isNew})
+		}
+	}
+
+	if location != "" {
+		raw, err := (&loader.Loader{}).Load(location)
+		if err != nil {
+			return fmt.Errorf("reading project specs for secret variables: %w", err)
+		}
+		for path, rawSpec := range raw {
+			spec, err := rawSpec.Parse()
+			if err != nil || spec == nil {
+				continue // loading the project reports it
+			}
+			rel, err := filepath.Rel(location, path)
+			if err != nil {
+				rel = path
+			}
+			record(specOwner(spec, rel), rel, spec, false)
+		}
+	}
 	for _, entity := range entities {
 		if !isSubstitutedSpec(entity.Content) {
 			continue
 		}
-		found := make(map[string]struct{})
-		extractVariableNames(entity.Content, found)
-		for name := range found {
-			other, taken := owners[name]
-			if !taken {
-				owners[name] = entity.RelativePath
+		owner := entity.RelativePath
+		if spec, ok := entity.Content.(*specs.Spec); ok && spec != nil {
+			owner = specOwner(spec, entity.RelativePath)
+		}
+		record(owner, entity.RelativePath, entity.Content, true)
+	}
+
+	// Only a clash the import introduces counts: specs already in the project
+	// may share a variable on purpose, and that is the user's to keep.
+	var clashes []string
+	for name, all := range uses {
+	clash:
+		for _, added := range all {
+			if !added.isNew {
 				continue
 			}
-			if other != entity.RelativePath {
-				clashes = append(clashes, fmt.Sprintf("%s (in %s and %s)", name, other, entity.RelativePath))
+			for _, other := range all {
+				if other.owner != added.owner {
+					clashes = append(clashes, fmt.Sprintf("%s (in %s and %s)", name, other.file, added.file))
+					break clash
+				}
 			}
 		}
 	}
@@ -182,6 +224,15 @@ func checkVariableOwners(entities []writer.FormattableEntity) error {
 	sort.Strings(clashes)
 	return fmt.Errorf("imported specs would share secret variables: %s; the names come from each resource's id, so rename one of the resources whose ids collide and import again",
 		strings.Join(clashes, ", "))
+}
+
+// specOwner names the resource a spec declares: kind and spec id, or the file
+// when the spec has no id.
+func specOwner(spec *specs.Spec, file string) string {
+	if id, ok := spec.Spec["id"].(string); ok && id != "" {
+		return spec.Kind + "/" + id
+	}
+	return file
 }
 
 // isSubstitutedSpec reports whether content is a spec the loader runs

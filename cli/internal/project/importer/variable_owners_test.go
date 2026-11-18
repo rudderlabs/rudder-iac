@@ -27,11 +27,11 @@ func newSpecEntity(kind, rel string, spec map[string]any) writer.FormattableEnti
 	}
 }
 
-// TestCheckExistingVariableOwners_RefusesAVariableAnExistingSpecUses pins the
+// TestCheckVariableOwners_RefusesAVariableAnExistingSpecUses pins the
 // slice-by-slice case: the project already manages account "pg", whose
 // password fills PG_PASSWORD, and a newly imported destination "pg" would be
 // handed the same variable for its own password.
-func TestCheckExistingVariableOwners_RefusesAVariableAnExistingSpecUses(t *testing.T) {
+func TestCheckVariableOwners_RefusesAVariableAnExistingSpecUses(t *testing.T) {
 	dir := t.TempDir()
 	writeProjectFile(t, dir, "accounts/pg.yaml", `version: rudder/v1
 kind: account
@@ -46,9 +46,9 @@ spec:
 	err := importInto(t, dir, newSpecEntity("destination", "destinations/pg.yaml", map[string]any{
 		"id": "pg", "config": map[string]any{"password": "{{ .PG_PASSWORD }}"},
 	}))
-	require.EqualError(t, err, "imported specs would share secret variables with specs already in the project: "+
-		"PG_PASSWORD (in accounts/pg.yaml and new destinations/pg.yaml); "+
-		"the names come from each resource's id, so rename the new or the existing resource and import again")
+	require.EqualError(t, err, "imported specs would share secret variables: "+
+		"PG_PASSWORD (in accounts/pg.yaml and destinations/pg.yaml); "+
+		"the names come from each resource's id, so rename one of the resources whose ids collide and import again")
 	_, statErr := os.Stat(filepath.Join(dir, ImportedDir))
 	assert.True(t, os.IsNotExist(statErr), "a refused import writes nothing")
 }
@@ -61,10 +61,10 @@ func importInto(t *testing.T, dir string, entities ...writer.FormattableEntity) 
 		&stubImportProvider{importable: importableCollection(), entities: entities}, ImportOptions{})
 }
 
-// TestCheckExistingVariableOwners_AllowsTheSameSecretAgain pins that the same
+// TestCheckVariableOwners_AllowsTheSameSecretAgain pins that the same
 // variable filling the same spec key — same kind, spec id and key path — is the
 // same secret, not a collision. Raw code and non-spec files are not read.
-func TestCheckExistingVariableOwners_AllowsTheSameSecretAgain(t *testing.T) {
+func TestCheckVariableOwners_AllowsTheSameSecretAgain(t *testing.T) {
 	dir := t.TempDir()
 	writeProjectFile(t, dir, "destinations/hook.yaml", `version: rudder/v1
 kind: destination
@@ -86,4 +86,25 @@ spec:
 			"id": "other", "config": map[string]any{"token": "{{ .OTHER }}"},
 		}),
 	))
+}
+
+// TestCheckVariableOwners_LeavesExistingSharedVariablesAlone pins that only a
+// clash the import introduces counts: two specs already in the project may
+// share a variable on purpose, and a new import that does not touch it runs.
+func TestCheckVariableOwners_LeavesExistingSharedVariablesAlone(t *testing.T) {
+	dir := t.TempDir()
+	for _, id := range []string{"one", "two"} {
+		writeProjectFile(t, dir, "destinations/"+id+".yaml", `version: rudder/v1
+kind: destination
+metadata:
+  name: destination
+spec:
+  id: `+id+`
+  config:
+    api_key: '{{ .SHARED_API_KEY }}'
+`)
+	}
+	assert.NoError(t, importInto(t, dir, newSpecEntity("destination", "destinations/three.yaml", map[string]any{
+		"id": "three", "config": map[string]any{"api_key": "{{ .THREE_API_KEY }}"},
+	})))
 }
