@@ -16,6 +16,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -452,6 +453,24 @@ func (p *CompositeProvider) CheckPlan(ctx context.Context, plan *planner.Plan, s
 		}
 	}
 	return nil
+}
+
+// PreviewImports gathers each child provider's import preview into one map.
+// Every importable URN belongs to one provider, so the results never overlap.
+func (p *CompositeProvider) PreviewImports(ctx context.Context, plan *planner.Plan, st *state.State) (map[string]differ.ResourceDiff, error) {
+	result := map[string]differ.ResourceDiff{}
+	for _, name := range p.Order {
+		previewer, ok := p.Providers[name].(ImportPreviewer)
+		if !ok {
+			continue
+		}
+		diffs, err := previewer.PreviewImports(ctx, plan, st)
+		if err != nil {
+			return nil, fmt.Errorf("previewing imports for provider %s: %w", name, err)
+		}
+		maps.Copy(result, diffs)
+	}
+	return result, nil
 }
 
 // SyntacticRules returns all syntactic rules from all providers implementing RuleProvider.

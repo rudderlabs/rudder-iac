@@ -223,3 +223,16 @@ func keyPositions(t *testing.T, data []byte) map[string][2]int {
 	walk(document.Content[0], "")
 	return positions
 }
+
+func TestReplacedReferencesIn(t *testing.T) {
+	data := []byte("a: {{ .ONE }}\nb: 'x-{{ .TWO }}-{{ .ONE }}'\nc: \"\\x7B{ .THREE }}\"\n")
+	replaced := ReplaceReferences(data)
+
+	var doc map[string]string
+	require.NoError(t, yaml.Unmarshal(replaced.Data, &doc))
+
+	assert.Equal(t, []Reference{{Name: "ONE", Text: "{{ .ONE }}"}}, replaced.ReferencesIn(doc["a"]))
+	assert.Equal(t, []Reference{{Name: "TWO", Text: "{{ .TWO }}"}, {Name: "ONE", Text: "{{ .ONE }}"}}, replaced.ReferencesIn(doc["b"]))
+	assert.Equal(t, "{{ .THREE }}", doc["c"], "the escape decodes to a reference-shaped literal")
+	assert.Empty(t, replaced.ReferencesIn(doc["c"]), "substitution never sees it, so it is no reference")
+}

@@ -115,6 +115,12 @@ func WorkspaceImport(
 		return nil
 	}
 
+	// Checked before anything is written, so a refused import leaves no specs
+	// behind referencing a variable that would fill two secrets.
+	if err := checkVariableOwners(project.Location(), entities); err != nil {
+		return err
+	}
+
 	formatters := formatter.Setup(formatter.DefaultYAML, formatter.DefaultText)
 
 	location := project.Location()
