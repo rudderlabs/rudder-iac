@@ -1,7 +1,13 @@
 package source_test
 
 import (
+	"bytes"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,7 +19,109 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
+
+func TestFormatForExport_MissingTrackingPlan(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	require.NoError(t, err)
+	logPath := filepath.Join(homeDir, ".rudder", "cli.log")
+	before, err := os.Stat(logPath)
+	require.NoError(t, err)
+
+	remoteSource := &sourceClient.EventStreamSource{
+		ID: "remote-source", Name: "Zoopla App Dev", Type: "javascript", Enabled: true,
+		WorkspaceID: "workspace", TrackingPlan: &sourceClient.TrackingPlan{ID: "missing-tp"},
+	}
+	importable := resources.NewRemoteResources()
+	importable.Set(source.ResourceType, map[string]*resources.RemoteResource{
+		remoteSource.ID: {ID: remoteSource.ID, ExternalID: "zoopla-app-dev", Data: remoteSource},
+	})
+	refResolver := &resolver.ImportRefResolver{
+		Importable: importable, Remote: resources.NewRemoteResources(), Graph: resources.NewGraph(),
+	}
+
+	var output bytes.Buffer
+	ui.SetWriter(&output)
+	defer ui.RestoreWriter()
+	entities, _, err := source.NewHandler(source.NewMockSourceClient(), importDir).FormatForExport(importable, &mockNamer{}, refResolver)
+	require.NoError(t, err)
+	require.Len(t, entities, 1)
+	spec, ok := entities[0].Content.(*specs.Spec)
+	require.True(t, ok)
+	assert.Equal(t, map[string]any{
+		"id": "zoopla-app-dev", "name": "Zoopla App Dev", "type": "javascript", "enabled": true,
+	}, spec.Spec)
+
+	// The package logger writes to a shared append-only file; restrict the check to this call.
+	var logBytes []byte
+	require.Eventually(t, func() bool {
+		logBytes, err = os.ReadFile(logPath)
+		return err == nil && len(logBytes) > int(before.Size())
+	}, time.Second, time.Millisecond*10)
+	warning := string(logBytes[before.Size():])
+	assert.Equal(t, 1, strings.Count(warning, "level=WARN"), "unexpected log: %s", warning)
+	assert.Contains(t, warning, "Zoopla App Dev")
+	assert.Contains(t, warning, "remote-source")
+	assert.Contains(t, warning, "missing-tp")
+	assert.Contains(t, warning, "governance was not imported")
+	assert.Contains(t, warning, "remains unmanaged")
+	assert.Equal(t, 1, strings.Count(output.String(), "Warning:"))
+	assert.Contains(t, output.String(), "Zoopla App Dev")
+	assert.Contains(t, output.String(), "remote-source")
+	assert.Contains(t, output.String(), "missing-tp")
+	assert.Contains(t, output.String(), "governance was not imported")
+	assert.Contains(t, output.String(), "will not appear in later plans")
+}
+
+func TestFormatForExport_MergeMatchedMissingTrackingPlanWarns(t *testing.T) {
+	remoteSource := &sourceClient.EventStreamSource{
+		ID: "remote-source", Name: "Zoopla App Dev", WorkspaceID: "workspace",
+		TrackingPlan: &sourceClient.TrackingPlan{ID: "missing-tp"},
+	}
+	importable := resources.NewRemoteResources()
+	importable.Set(source.ResourceType, map[string]*resources.RemoteResource{
+		remoteSource.ID: {
+			ID: remoteSource.ID, ExternalID: "local-source", Data: remoteSource,
+			MatchedWith: resources.NewResource("local-source", source.ResourceType, resources.ResourceData{}, nil),
+		},
+	})
+	refResolver := &resolver.ImportRefResolver{
+		Importable: importable, Remote: resources.NewRemoteResources(), Graph: resources.NewGraph(),
+	}
+	var output bytes.Buffer
+	ui.SetWriter(&output)
+	defer ui.RestoreWriter()
+
+	entities, entries, err := source.NewHandler(nil, importDir).FormatForExport(importable, &mockNamer{}, refResolver)
+	require.NoError(t, err)
+	assert.Empty(t, entities)
+	require.Len(t, entries, 1)
+	assert.Equal(t, "event-stream-source:local-source", entries[0].URN)
+	assert.Equal(t, 1, strings.Count(output.String(), "Warning:"))
+	assert.Contains(t, output.String(), "Zoopla App Dev")
+	assert.Contains(t, output.String(), "remote-source")
+	assert.Contains(t, output.String(), "missing-tp")
+	assert.Contains(t, output.String(), "governance was not imported")
+}
+
+func TestFormatForExport_OtherTrackingPlanResolutionError(t *testing.T) {
+	importable := resources.NewRemoteResources()
+	importable.Set(source.ResourceType, map[string]*resources.RemoteResource{
+		"remote-source": {
+			ID: "remote-source", ExternalID: "local-source",
+			Data: &sourceClient.EventStreamSource{
+				ID: "remote-source", Name: "Source", Type: "javascript", WorkspaceID: "workspace",
+				TrackingPlan: &sourceClient.TrackingPlan{ID: "remote-tp"},
+			},
+		},
+	})
+	entities, _, err := source.NewHandler(nil, importDir).FormatForExport(importable, &mockNamer{}, &mockResolver{resolveFunc: func(string, string) (string, error) {
+		return "", fmt.Errorf("resource not present in resources graph")
+	}})
+	require.ErrorContains(t, err, "resolving tracking plan reference: resource not present in resources graph")
+	assert.Nil(t, entities)
+}
 
 // TestFormatForExport_TrackingPlanReferences tests the bug fix for RUD-2580
 // where importing event-stream sources fails if the source references a tracking plan

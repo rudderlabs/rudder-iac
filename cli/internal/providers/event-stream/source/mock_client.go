@@ -17,6 +17,7 @@ type MockSourceClient struct {
 	updateTPConnectionCalled bool
 	setExternalIDCalled      bool
 	getSourcesCalls          []sourceClient.ListSourcesOptions
+	trackingPlanCalls        []string
 	getSourcesFunc           func(ctx context.Context) ([]sourceClient.EventStreamSource, error)
 	deleteErr                error
 }
@@ -67,11 +68,13 @@ func (m *MockSourceClient) GetSources(ctx context.Context, opts ...sourceClient.
 
 func (m *MockSourceClient) LinkTP(ctx context.Context, trackingPlanID string, sourceID string, req *trackingplanClient.ConnectionConfig) error {
 	m.linkTPCalled = true
+	m.trackingPlanCalls = append(m.trackingPlanCalls, "link:"+trackingPlanID)
 	return nil
 }
 
 func (m *MockSourceClient) UnlinkTP(ctx context.Context, trackingPlanID string, sourceID string) error {
 	m.unlinkTPCalled = true
+	m.trackingPlanCalls = append(m.trackingPlanCalls, "unlink:"+trackingPlanID)
 	return nil
 }
 
@@ -111,6 +114,10 @@ func (m *MockSourceClient) GetSourcesCalled() bool {
 
 func (m *MockSourceClient) GetSourcesCalls() []sourceClient.ListSourcesOptions {
 	return m.getSourcesCalls
+}
+
+func (m *MockSourceClient) TrackingPlanCalls() []string {
+	return m.trackingPlanCalls
 }
 
 func (m *MockSourceClient) LinkTPCalled() bool {

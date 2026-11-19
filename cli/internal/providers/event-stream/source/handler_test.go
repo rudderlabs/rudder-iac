@@ -21,7 +21,163 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream/source"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 )
+
+func TestUnmanagedTrackingPlanDoesNotCausePlanDrift(t *testing.T) {
+	linkedSource := sourceClient.EventStreamSource{
+		ID: "remote-source", ExternalID: "local-source", Name: "Imported Source",
+		Type: "javascript", Enabled: true, TrackingPlan: &sourceClient.TrackingPlan{ID: "missing-tp"},
+	}
+	collection := resources.NewRemoteResources()
+	collection.Set(source.ResourceType, map[string]*resources.RemoteResource{
+		linkedSource.ID: {ID: linkedSource.ID, ExternalID: linkedSource.ExternalID, Data: linkedSource},
+	})
+	remoteState, err := source.NewHandler(nil, importDir).MapRemoteToState(collection)
+	require.NoError(t, err)
+	expected := &state.ResourceState{
+		ID: linkedSource.ExternalID, Type: source.ResourceType,
+		Input:  resources.ResourceData{"name": linkedSource.Name, "type": linkedSource.Type, "enabled": linkedSource.Enabled},
+		Output: resources.ResourceData{"id": linkedSource.ID},
+	}
+	assert.Equal(t, expected, remoteState.GetResource("event-stream-source:local-source"))
+
+	target := resources.NewGraph()
+	target.AddResource(resources.NewResource(linkedSource.ExternalID, source.ResourceType, expected.Input, nil))
+	diff := differ.ComputeDiff(syncer.StateToGraph(remoteState), target, differ.DiffOptions{})
+	assert.Equal(t, []string{"event-stream-source:local-source"}, diff.UnmodifiedResources)
+	assert.Empty(t, diff.UpdatedResources)
+}
+
+func TestImportPreservesUnmanagedTrackingPlan(t *testing.T) {
+	mockClient := source.NewMockSourceClient()
+	mockClient.SetGetSourcesFunc(func(context.Context) ([]sourceClient.EventStreamSource, error) {
+		return []sourceClient.EventStreamSource{{
+			ID: "remote-source", Name: "Imported Source", Type: "javascript", Enabled: true,
+			TrackingPlan: &sourceClient.TrackingPlan{ID: "missing-tp", Config: &sourceClient.TrackingPlanConfig{}},
+		}}, nil
+	})
+	handler := source.NewHandler(mockClient, importDir)
+	data := resources.ResourceData{"name": "Imported Source", "type": "javascript", "enabled": true}
+	result, err := handler.Import(context.Background(), "local-source", data, "remote-source")
+	require.NoError(t, err)
+	assert.Equal(t, &resources.ResourceData{"id": "remote-source"}, result)
+	assert.False(t, mockClient.UnlinkTPCalled())
+	assert.True(t, mockClient.SetExternalIDCalled())
+}
+
+func TestUpdateSourcePreservesUnmanagedTrackingPlan(t *testing.T) {
+	mockClient := source.NewMockSourceClient()
+	handler := source.NewHandler(mockClient, importDir)
+	current := resources.ResourceData{
+		"id": "remote-source", "name": "Old Name", "type": "javascript", "enabled": true,
+	}
+	desired := resources.ResourceData{"name": "New Name", "type": "javascript", "enabled": true}
+	result, err := handler.Update(context.Background(), "local-source", desired, current)
+	require.NoError(t, err)
+	assert.Equal(t, &resources.ResourceData{"id": "remote-source"}, result)
+	assert.True(t, mockClient.UpdateCalled())
+	assert.False(t, mockClient.UnlinkTPCalled())
+}
+
+func TestImportExplicitlyRemovesExistingTrackingPlan(t *testing.T) {
+	mockClient := source.NewMockSourceClient()
+	mockClient.SetGetSourcesFunc(func(context.Context) ([]sourceClient.EventStreamSource, error) {
+		return []sourceClient.EventStreamSource{{
+			ID: "remote-source", Name: "Imported Source", Type: "javascript", Enabled: true,
+			TrackingPlan: &sourceClient.TrackingPlan{ID: "old-tp", Config: &sourceClient.TrackingPlanConfig{}},
+		}}, nil
+	})
+	handler := source.NewHandler(mockClient, importDir)
+	data := resources.ResourceData{
+		"name": "Imported Source", "type": "javascript", "enabled": true,
+		"tracking_plan": "new-tp", "tracking_plan_config": map[string]interface{}{},
+	}
+	_, err := handler.Import(context.Background(), "local-source", data, "remote-source")
+	require.NoError(t, err)
+	assert.True(t, mockClient.UnlinkTPCalled())
+	assert.True(t, mockClient.LinkTPCalled())
+}
+
+func TestUpdateExplicitGovernanceReplacesUnmanagedTrackingPlan(t *testing.T) {
+	mockClient := source.NewMockSourceClient()
+	mockClient.SetGetSourcesFunc(func(context.Context) ([]sourceClient.EventStreamSource, error) {
+		return []sourceClient.EventStreamSource{{
+			ID: "remote-source", TrackingPlan: &sourceClient.TrackingPlan{
+				ID: "missing-tp", Config: &sourceClient.TrackingPlanConfig{},
+			},
+		}}, nil
+	})
+	current := resources.ResourceData{
+		"id": "remote-source", "name": "Source", "type": "javascript", "enabled": true,
+	}
+	desired := resources.ResourceData{
+		"name": "Source", "type": "javascript", "enabled": true,
+		"tracking_plan": "managed-tp", "tracking_plan_config": map[string]interface{}{},
+	}
+	_, err := source.NewHandler(mockClient, importDir).Update(context.Background(), "local-source", desired, current)
+	require.NoError(t, err)
+	assert.True(t, mockClient.UnlinkTPCalled())
+	assert.True(t, mockClient.LinkTPCalled())
+	assert.Equal(t, []string{"unlink:missing-tp", "link:managed-tp"}, mockClient.TrackingPlanCalls())
+}
+
+func TestUpdateExplicitGovernanceUpdatesExistingUnmanagedPlanConfig(t *testing.T) {
+	mockClient := source.NewMockSourceClient()
+	mockClient.SetGetSourcesFunc(func(context.Context) ([]sourceClient.EventStreamSource, error) {
+		return []sourceClient.EventStreamSource{{
+			ID: "remote-source", TrackingPlan: &sourceClient.TrackingPlan{ID: "managed-tp", Config: &sourceClient.TrackingPlanConfig{}},
+		}}, nil
+	})
+	current := resources.ResourceData{"id": "remote-source", "name": "Source", "type": "javascript", "enabled": true}
+	desired := resources.ResourceData{
+		"name": "Source", "type": "javascript", "enabled": true,
+		"tracking_plan": "managed-tp", "tracking_plan_config": map[string]interface{}{
+			"track": map[string]interface{}{"drop_unplanned_events": true},
+		},
+	}
+	_, err := source.NewHandler(mockClient, importDir).Update(context.Background(), "local-source", desired, current)
+	require.NoError(t, err)
+	assert.True(t, mockClient.UpdateTPConnectionCalled())
+	assert.False(t, mockClient.UnlinkTPCalled())
+	assert.False(t, mockClient.LinkTPCalled())
+}
+
+func TestUpdateExplicitGovernanceFailsIfSourceCannotBeRead(t *testing.T) {
+	mockClient := source.NewMockSourceClient()
+	current := resources.ResourceData{
+		"id": "remote-source", "name": "Source", "type": "javascript", "enabled": true,
+	}
+	desired := resources.ResourceData{
+		"name": "Source", "type": "javascript", "enabled": true,
+		"tracking_plan": "managed-tp", "tracking_plan_config": map[string]interface{}{},
+	}
+	_, err := source.NewHandler(mockClient, importDir).Update(context.Background(), "local-source", desired, current)
+	require.ErrorContains(t, err, "event stream source with ID remote-source not found")
+	assert.False(t, mockClient.LinkTPCalled())
+}
+
+func TestMapRemoteToStateManagedTrackingPlanStillDiffs(t *testing.T) {
+	linkedSource := sourceClient.EventStreamSource{
+		ID: "remote-source", ExternalID: "local-source", Name: "Source", Type: "javascript", Enabled: true,
+		TrackingPlan: &sourceClient.TrackingPlan{ID: "managed-tp", Config: &sourceClient.TrackingPlanConfig{}},
+	}
+	collection := resources.NewRemoteResources()
+	collection.Set(source.ResourceType, map[string]*resources.RemoteResource{
+		linkedSource.ID: {ID: linkedSource.ID, ExternalID: linkedSource.ExternalID, Data: linkedSource},
+	})
+	collection.Set(types.TrackingPlanResourceType, map[string]*resources.RemoteResource{
+		"managed-tp": {ID: "managed-tp", ExternalID: "local-tp"},
+	})
+	remoteState, err := source.NewHandler(nil, importDir).MapRemoteToState(collection)
+	require.NoError(t, err)
+	target := resources.NewGraph()
+	target.AddResource(resources.NewResource(linkedSource.ExternalID, source.ResourceType,
+		resources.ResourceData{"name": linkedSource.Name, "type": linkedSource.Type, "enabled": linkedSource.Enabled}, nil))
+	diff := differ.ComputeDiff(syncer.StateToGraph(remoteState), target, differ.DiffOptions{})
+	assert.Contains(t, diff.UpdatedResources["event-stream-source:local-source"].Diffs, source.TrackingPlanKey)
+}
 
 // Helper function to convert boolean to pointer
 func boolPtr(b bool) *bool {
@@ -976,6 +1132,9 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
 				mockClient := source.NewMockSourceClient()
+				mockClient.SetGetSourcesFunc(func(context.Context) ([]sourceClient.EventStreamSource, error) {
+					return []sourceClient.EventStreamSource{{ID: "remote123"}}, nil
+				})
 				handler := source.NewHandler(mockClient, importDir)
 
 				result, err := handler.Update(context.Background(), "test-source", tc.data, tc.state)
