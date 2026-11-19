@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0](https://github.com/rudderlabs/rudder-iac/compare/v1.2.0...v1.3.0) (2026-11-19)
+
+
+### Features
+
+* **destination:** onboard the three customer-requested vdm-next audiences ([#1026](https://github.com/rudderlabs/rudder-iac/issues/1026)) ([903bee8](https://github.com/rudderlabs/rudder-iac/commit/903bee816e22c8b280690dee9f63294a0796e56f))
+* **destination:** preview import changes, reference required secrets, imply cloud warehouse mode ([#1041](https://github.com/rudderlabs/rudder-iac/issues/1041)) ([19afcdc](https://github.com/rudderlabs/rudder-iac/commit/19afcdc50ee407af8417da30a78468e5f5d6cebf))
+
+
+### Bug Fixes
+
+* **retl:** keep constants off a PUT that must not carry them ([#1029](https://github.com/rudderlabs/rudder-iac/issues/1029)) ([827b846](https://github.com/rudderlabs/rudder-iac/commit/827b8463896668f4b2f40dac5a7595e42bd9c8fa))
+
 ## [1.2.0](https://github.com/rudderlabs/rudder-iac/compare/v1.1.0...v1.2.0) (2026-11-17)
 
 
