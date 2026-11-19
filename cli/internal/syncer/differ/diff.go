@@ -19,6 +19,10 @@ type Diff struct {
 	NewResources []string
 	// ImportableResources contains URNs of resources that will be imported (exist in target but not in source, and have ImportMetadata)
 	ImportableResources []string
+	// ImportableDiffs holds, per importable URN, the changes adopting it writes
+	// to the remote resource. The differ cannot see an importable resource's
+	// remote side, so a provider fills this in (see provider.ImportPreviewer).
+	ImportableDiffs map[string]ResourceDiff
 	// UpdatedResources contains URNs of resources that exist in both graphs but have different data
 	UpdatedResources map[string]ResourceDiff
 	// RemovedResources contains URNs of resources that exist in source but not in target

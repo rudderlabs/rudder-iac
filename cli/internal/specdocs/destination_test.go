@@ -456,6 +456,14 @@ func TestConsentBlockWrittenFromTheDocumentValidates(t *testing.T) {
 				field := f.(map[string]any)
 				fields[field["key"].(string)] = field
 			}
+			// Almost every destination declares a consent surface upstream,
+			// but not all: iterable_audience scopes only connectionMode to its
+			// one source type, so it models no consent_management key and has
+			// no block for this test to write.
+			if _, ok := fields[item+".provider"]; !ok {
+				t.Skipf("%s declares no consent surface", registered.Type)
+			}
+
 			var (
 				provider = fields[item+".provider"]
 				strategy = fields[item+".resolution_strategy"]
