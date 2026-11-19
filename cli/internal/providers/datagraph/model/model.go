@@ -22,13 +22,10 @@ type ModelResource struct {
 	// Event model fields
 	Timestamp string `mapstructure:"timestamp"`
 
-	// Sparse per-column metadata overrides extracted from the yaml model spec.
-	// Stored as []map[string]any (not []ColumnMetadataYAML) so the syncer's
-	// mapstructure-based diff handles slice equality via reflect.DeepEqual
-	// instead of the unsupported `!=` on typed slices. Each entry has shape
-	// {"name": <columnName>, "display_name": <displayName>}; the handler maps
-	// it back into datagraph.ColumnMetadataEntry before calling the API.
-	Columns []map[string]any `mapstructure:"columns,omitempty"`
+	// Nil means columns are not managed; an explicit empty slice clears overrides.
+	// omitzero omits nil in the diff but retains an explicit empty slice.
+	// Map entries let the syncer compare columns with the remote resource.
+	Columns []map[string]any `mapstructure:"columns,omitzero"`
 }
 
 // ModelState represents the output state from the remote system

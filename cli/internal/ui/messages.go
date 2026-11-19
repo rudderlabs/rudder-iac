@@ -33,6 +33,11 @@ func PrintWarning(message string) {
 	fmt.Fprintln(uiWriter, Warning(message))
 }
 
+// PrintDiagnosticWarning keeps request diagnostics separate from command output.
+func PrintDiagnosticWarning(message string) {
+	fmt.Fprintln(uiErrWriter, Warning(message))
+}
+
 // PrintDeprecationWarning prints a multi-line deprecation message to stdout with surrounding blank lines.
 func PrintDeprecationWarning(message string) {
 	fmt.Fprintln(uiWriter, "")

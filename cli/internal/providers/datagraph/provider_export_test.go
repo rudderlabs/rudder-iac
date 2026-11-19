@@ -2,8 +2,10 @@ package datagraph_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
+	"github.com/go-viper/mapstructure/v2"
 	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
@@ -15,6 +17,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 // buildRemoteResources is a helper to build a RemoteResources collection for FormatForExport tests
@@ -34,6 +37,43 @@ func buildRemoteResources(
 		collection.Set(relationshipHandler.HandlerMetadata.ResourceType, relationships)
 	}
 	return collection
+}
+
+func TestLoadSpec_ExplicitEmptyColumnsParticipateInDiff(t *testing.T) {
+	p := datagraph.NewProvider(&testutils.MockDataGraphClient{}, nil)
+	s := &specs.Spec{Version: specs.SpecVersionV1, Kind: "data-graph", Spec: map[string]any{
+		"id": "my-dg", "account_id": "account-1", "models": []map[string]any{{
+			"id": "user", "display_name": "User", "type": "entity", "table": "users", "primary_id": "id", "columns": []any{},
+		}},
+	}}
+	require.NoError(t, p.LoadSpec("data-graph.yaml", s))
+	graph, err := p.ResourceGraph()
+	require.NoError(t, err)
+	r, ok := graph.GetResource("data-graph-model:user")
+	require.True(t, ok)
+	var local map[string]any
+	require.NoError(t, mapstructure.Decode(r.RawData(), &local))
+	assert.Contains(t, local, "columns")
+}
+
+func TestFormatForExport_UnreadColumnMetadataOmitsColumns(t *testing.T) {
+	p := datagraph.NewProvider(&testutils.MockDataGraphClient{}, nil)
+	importable := buildRemoteResources(
+		map[string]*resources.RemoteResource{"dg-1": {ID: "dg-1", ExternalID: "my-dg", Data: &dgModel.RemoteDataGraph{DataGraph: &dgClient.DataGraph{ID: "dg-1", WorkspaceID: "ws-1", AccountID: "account-1"}}}},
+		map[string]*resources.RemoteResource{"em-1": {ID: "em-1", ExternalID: "user", Data: &dgModel.RemoteModel{Model: &dgClient.Model{ID: "em-1", Name: "User", Type: "entity", TableRef: "users", PrimaryID: "id", DataGraphID: "dg-1"}}}}, nil,
+	)
+	entities, _, err := p.FormatForExport(importable, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, entities, 1)
+	spec, ok := entities[0].Content.(*specs.Spec)
+	require.True(t, ok)
+	models, ok := spec.Spec["models"].([]dgModel.ModelSpec)
+	require.True(t, ok)
+	require.Len(t, models, 1)
+	assert.Nil(t, models[0].Columns)
+	var output strings.Builder
+	require.NoError(t, yaml.NewEncoder(&output).Encode(spec))
+	assert.NotContains(t, output.String(), "columns:")
 }
 
 func TestFormatForExport_FullCompositeExport(t *testing.T) {

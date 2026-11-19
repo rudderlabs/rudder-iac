@@ -23,9 +23,8 @@ type ModelSpec struct {
 	Description   string             `json:"description,omitempty" yaml:"description,omitempty" mapstructure:"description"`
 	Relationships []RelationshipSpec `json:"relationships,omitempty" yaml:"relationships,omitempty" mapstructure:"relationships" validate:"omitempty,dive"`
 
-	// Optional per-column metadata overrides. Sparse: only columns the user
-	// wants to override appear. Cross-field constraints (trimmed, no control
-	// characters, in-model uniqueness) are enforced by the spec validator.
+	// Omission leaves column metadata unmanaged; an explicit empty list clears it.
+	// Cross-field constraints are enforced by the spec validator.
 	Columns []ColumnMetadataYAML `json:"columns,omitempty" yaml:"columns,omitempty" mapstructure:"columns" validate:"omitempty,dive"`
 
 	// Entity model fields (only used when Type == "entity")

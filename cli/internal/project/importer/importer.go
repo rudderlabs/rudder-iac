@@ -16,6 +16,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/handlers/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
@@ -57,7 +58,11 @@ func WorkspaceImport(
 	p ImportProvider,
 	opts ImportOptions) error {
 
-	remoteCollection, err := p.LoadResourcesFromRemote(ctx)
+	// Import is read-only at this stage; unread column metadata must not look
+	// like an empty remote columns list in the subsequent sync guard.
+	unreadColumns := make(map[string]struct{})
+	loadCtx := model.WithImportColumnMetadataFallback(ctx, func(urn string) { unreadColumns[urn] = struct{}{} })
+	remoteCollection, err := p.LoadResourcesFromRemote(loadCtx)
 	if err != nil {
 		return fmt.Errorf("loading remote resources: %w", err)
 	}
@@ -74,6 +79,7 @@ func WorkspaceImport(
 	}
 
 	diff := differ.ComputeDiff(sourceGraph, targetGraph, differ.DiffOptions{})
+	ignoreUnreadModelColumns(diff, unreadColumns)
 	if err := checkSyncStatus(diff, opts.Merge); err != nil {
 		return err
 	}
@@ -161,6 +167,31 @@ func WorkspaceImport(
 	}
 
 	return nil
+}
+
+// ignoreUnreadModelColumns removes only the unverified property from import's
+// sync guard; other model changes and every other resource still block import.
+func ignoreUnreadModelColumns(diff *differ.Diff, unread map[string]struct{}) {
+	for urn := range unread {
+		updated, ok := diff.UpdatedResources[urn]
+		if !ok {
+			continue
+		}
+		delete(updated.Diffs, "columns")
+		if len(updated.Diffs) == 0 {
+			delete(diff.UpdatedResources, urn)
+			continue
+		}
+		// ComputeDiff's SecretOnly was calculated before removing columns.
+		updated.SecretOnly = true
+		for _, property := range updated.Diffs {
+			if !property.SecretOnly {
+				updated.SecretOnly = false
+				break
+			}
+		}
+		diff.UpdatedResources[urn] = updated
+	}
 }
 
 // checkSyncStatus guards the import against a diverged project. Without merge,

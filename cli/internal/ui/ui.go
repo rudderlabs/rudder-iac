@@ -32,3 +32,10 @@ func SetWriter(w io.Writer) {
 func RestoreWriter() {
 	uiWriter = originalWriter
 }
+
+// SetErrorWriter sets the diagnostic writer for tests.
+func SetErrorWriter(w io.Writer) func() {
+	previous := uiErrWriter
+	uiErrWriter = w
+	return func() { uiErrWriter = previous }
+}
