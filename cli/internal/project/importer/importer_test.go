@@ -7,11 +7,16 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
+	dgClient "github.com/rudderlabs/rudder-iac/api/client/datagraph"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
+	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
@@ -21,6 +26,83 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
+
+func TestWorkspaceImport_UnreadManagedModelColumnsDoNotBlockImportPreflight(t *testing.T) {
+	metadataErr := &client.APIError{HTTPStatusCode: 503, Message: "column service unavailable"}
+	mockClient := &testutils.MockDataGraphClient{
+		ListDataGraphsFunc: func(_ context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			if !*req.HasExternalID {
+				return &dgClient.ListDataGraphsResponse{}, nil
+			}
+			return &dgClient.ListDataGraphsResponse{Data: []dgClient.DataGraph{{ID: "dg-remote", ExternalID: "my-dg", AccountID: "account-1"}}}, nil
+		},
+		ListModelsFunc: func(_ context.Context, req *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error) {
+			if !*req.HasExternalID {
+				return &dgClient.ListModelsResponse{}, nil
+			}
+			return &dgClient.ListModelsResponse{Data: []dgClient.Model{{ID: "model-remote", ExternalID: "user", DataGraphID: "dg-remote", Name: "User", Type: "entity", TableRef: "users", PrimaryID: "id"}}}, nil
+		},
+		ListColumnMetadataFunc: func(context.Context, string, string) (*dgClient.ColumnMetadataListResponse, error) {
+			return nil, metadataErr
+		},
+	}
+	provider := datagraph.NewProvider(mockClient, nil)
+	local := &specs.Spec{Version: specs.SpecVersionV1, Kind: "data-graph", Spec: map[string]any{
+		"id": "my-dg", "account_id": "account-1", "models": []map[string]any{{
+			"id": "user", "display_name": "User", "type": "entity", "table": "users", "primary_id": "id",
+			"columns": []map[string]any{{"name": "id", "display_name": "User ID"}},
+		}},
+	}}
+	require.NoError(t, provider.LoadSpec("data-graph.yaml", local))
+	graph, err := provider.ResourceGraph()
+	require.NoError(t, err)
+
+	// A no-drift import gets through the sync guard and loads importables.
+	err = WorkspaceImport(context.Background(), &stubProject{location: t.TempDir(), graph: graph}, provider, ImportOptions{})
+	require.NoError(t, err)
+
+	// A different field on the same model must still prevent import.
+	modelResource, ok := graph.GetResource("data-graph-model:user")
+	require.True(t, ok)
+	modelResource.RawData().(*dgModel.ModelResource).Table = "other_users"
+	err = WorkspaceImport(context.Background(), &stubProject{location: t.TempDir(), graph: graph}, provider, ImportOptions{})
+	assert.ErrorIs(t, err, ErrProjectNotSynced)
+}
+
+func TestIgnoreUnreadModelColumnsPreservesOtherDrift(t *testing.T) {
+	diff := &differ.Diff{UpdatedResources: map[string]differ.ResourceDiff{
+		"data-graph-model:user": {URN: "data-graph-model:user", Diffs: map[string]differ.PropertyDiff{
+			"columns": {Property: "columns"},
+			"table":   {Property: "table"},
+		}},
+		"data-graph-model:other": {URN: "data-graph-model:other", Diffs: map[string]differ.PropertyDiff{
+			"columns": {Property: "columns"},
+		}},
+	}}
+
+	ignoreUnreadModelColumns(diff, map[string]struct{}{"data-graph-model:user": {}})
+	assert.Equal(t, map[string]differ.ResourceDiff{
+		"data-graph-model:user": {URN: "data-graph-model:user", Diffs: map[string]differ.PropertyDiff{
+			"table": {Property: "table"},
+		}},
+		"data-graph-model:other": {URN: "data-graph-model:other", Diffs: map[string]differ.PropertyDiff{
+			"columns": {Property: "columns"},
+		}},
+	}, diff.UpdatedResources)
+	assert.ErrorIs(t, checkSyncStatus(diff, false), ErrProjectNotSynced)
+}
+
+func TestIgnoreUnreadModelColumnsAllowsOnlyUnreadDiff(t *testing.T) {
+	diff := &differ.Diff{UpdatedResources: map[string]differ.ResourceDiff{
+		"data-graph-model:user": {URN: "data-graph-model:user", Diffs: map[string]differ.PropertyDiff{
+			"columns": {Property: "columns"},
+		}},
+	}}
+
+	ignoreUnreadModelColumns(diff, map[string]struct{}{"data-graph-model:user": {}})
+	assert.Empty(t, diff.UpdatedResources)
+	assert.NoError(t, checkSyncStatus(diff, false))
+}
 
 func TestCheckSyncStatus(t *testing.T) {
 	t.Parallel()

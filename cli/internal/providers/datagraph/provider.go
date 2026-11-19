@@ -242,10 +242,9 @@ func (p *Provider) extractModelResource(dataGraphID string, spec *dgModel.ModelS
 	return resource, nil
 }
 
-// columnsFromSpec lowers the typed yaml column entries into the resource's
-// map-shaped slice so the syncer's mapstructure diff can compare slices via
-// reflect.DeepEqual. Returns nil for an empty input to preserve no-op semantics
-// in the diff (an empty resource map key is treated as missing).
+// columnsFromSpec lowers typed yaml columns into the resource's map-shaped
+// slice. A non-nil empty slice is an explicit instruction to clear metadata;
+// omission stays nil so importing unread metadata cannot delete it.
 //
 // Entries are sorted by name so the local side has the same canonical order
 // as the server's response (which sorts by name in handler.populateColumnMetadata).
@@ -253,7 +252,7 @@ func (p *Provider) extractModelResource(dataGraphID string, spec *dgModel.ModelS
 // alphabetical would surface as a spurious diff against the server's sorted
 // shape, re-issuing BatchUpsertColumnMetadata on every apply.
 func columnsFromSpec(specColumns []dgModel.ColumnMetadataYAML) []map[string]any {
-	if len(specColumns) == 0 {
+	if specColumns == nil {
 		return nil
 	}
 	sorted := make([]dgModel.ColumnMetadataYAML, len(specColumns))

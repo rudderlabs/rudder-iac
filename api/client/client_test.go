@@ -31,6 +31,57 @@ func TestClientURL(t *testing.T) {
 	assert.Equal(t, "https://api.rudderstack.com/path/more", c.URL("/path/more"))
 }
 
+func TestClientDoNonJSONErrorPreservesStatusAndBoundsBody(t *testing.T) {
+	body := "<html>gateway timeout</html>" + string(bytes.Repeat([]byte("x"), 300))
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		ResponseStatus: http.StatusGatewayTimeout,
+		ResponseBody:   body,
+	})
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	data, err := c.Do(context.Background(), http.MethodGet, "path", nil)
+	assert.Nil(t, data)
+	var apiErr *client.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusGatewayTimeout, apiErr.HTTPStatusCode)
+	assert.Contains(t, apiErr.Message, "<html>gateway timeout</html>")
+	assert.LessOrEqual(t, len(apiErr.Message), 230)
+	assert.NotContains(t, apiErr.Message, string(bytes.Repeat([]byte("x"), 300)))
+	assert.Contains(t, err.Error(), "http status code: 504")
+	httpClient.AssertNumberOfCalls()
+}
+
+func TestClientDoMalformedJSONCannotOverrideHTTPStatus(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		ResponseStatus: http.StatusGatewayTimeout,
+		ResponseBody:   `{"HTTPStatusCode":200,"error":42}`,
+	})
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	_, err = c.Do(context.Background(), http.MethodGet, "path", nil)
+	var apiErr *client.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusGatewayTimeout, apiErr.HTTPStatusCode)
+}
+
+func TestClientDoNonJSONErrorEscapesControlCharacters(t *testing.T) {
+	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
+		ResponseStatus: http.StatusBadGateway,
+		ResponseBody:   "<html>\n\x1b[31merror</html>",
+	})
+	c, err := client.New("some-access-token", client.WithHTTPClient(httpClient))
+	require.NoError(t, err)
+
+	_, err = c.Do(context.Background(), http.MethodGet, "path", nil)
+	var apiErr *client.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusBadGateway, apiErr.HTTPStatusCode)
+	assert.Contains(t, apiErr.Message, `\n\x1b`)
+	assert.NotContains(t, apiErr.Message, "\x1b")
+}
+
 func TestClientDoRetriesSafeMethodTransportErrors(t *testing.T) {
 	httpClient := testutils.NewMockHTTPClient(t,
 		testutils.Call{
