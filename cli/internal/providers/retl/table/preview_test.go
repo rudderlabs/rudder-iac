@@ -2,6 +2,7 @@ package table_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,6 +50,7 @@ func TestPreviewQueriesTheTable(t *testing.T) {
 		{"mysql", "mysql", "public", "users", "select * from `public`.`users` limit 10"},
 		{"databricks", "databricks", "public", "users", "select * from `public`.`users` limit 10"},
 		{"bigquery", "bigquery", "public", "users", "select * from `public.users` limit 10"},
+		{"maxcompute", "maxcompute", "analytics", "users", "select * from `analytics`.`users` limit 10"},
 
 		{"double quotes keep case and are doubled", "snowflake", `My"Schema`, "Users Table", `select * from "My""Schema"."Users Table" limit 10`},
 		{"backticks are doubled", "databricks", "raw", "we`ird", "select * from `raw`.`we``ird` limit 10"},
@@ -129,6 +131,25 @@ func TestPreviewRejectsWithoutCallingTheAPI(t *testing.T) {
 		require.EqualError(t, err, "bigquery schema and table names cannot contain a backslash: \"public.users\\\\` union select 1 --\"")
 		assert.Empty(t, store.requests)
 	})
+
+	for name, tableName := range map[string]string{
+		"maxcompute name with a backtick": "users` union select 1 --",
+		"maxcompute name with a dot":      "other.users",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			spec := warehouseSpec()
+			spec.Spec["source_definition"] = "maxcompute"
+			spec.Spec["table"] = tableName
+			store := &previewStore{}
+			h, r := loadResource(t, store, spec)
+
+			_, err := h.Preview(context.Background(), r.ID(), r.Data(), 10)
+
+			require.EqualError(t, err, fmt.Sprintf("maxcompute schema and table names cannot be empty or contain a backtick, a dot or a NUL byte: %q", tableName))
+			assert.Empty(t, store.requests)
+		})
+	}
 
 	t.Run("missing account id", func(t *testing.T) {
 		t.Parallel()

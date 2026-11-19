@@ -55,7 +55,7 @@ func TestTableSpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 		"s3":                s3Spec(),
 		"account reference": referenced,
 	}
-	for _, sd := range []string{"redshift", "snowflake", "bigquery", "mysql", "databricks", "trino"} {
+	for _, sd := range []string{"redshift", "snowflake", "bigquery", "mysql", "databricks", "trino", "maxcompute"} {
 		spec := warehouseSpec()
 		spec.SourceDefinition = sd
 		cases[sd] = spec
@@ -120,7 +120,7 @@ func TestTableSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			},
 			expect: []rules.ValidationResult{{
 				Reference: "/source_definition",
-				Message:   "'source_definition' must be one of [postgres redshift snowflake bigquery mysql databricks trino s3]",
+				Message:   "'source_definition' must be one of [postgres redshift snowflake bigquery mysql databricks trino maxcompute s3]",
 			}},
 		},
 		{

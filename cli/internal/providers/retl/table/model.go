@@ -56,7 +56,7 @@ type TableSpec struct {
 	DisplayName      string `json:"display_name"      mapstructure:"display_name"      validate:"required"`
 	AccountID        string `json:"account_id"        mapstructure:"account_id"        validate:"required_without=Account,excluded_with=Account"`
 	Account          string `json:"account"           mapstructure:"account"           validate:"omitempty,pattern=account_ref"`
-	SourceDefinition string `json:"source_definition" mapstructure:"source_definition" validate:"required,oneof=postgres redshift snowflake bigquery mysql databricks trino s3"`
+	SourceDefinition string `json:"source_definition" mapstructure:"source_definition" validate:"required,oneof=postgres redshift snowflake bigquery mysql databricks trino maxcompute s3"`
 	PrimaryKey       string `json:"primary_key"       mapstructure:"primary_key"       validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`
 	Schema           string `json:"schema"            mapstructure:"schema"            validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`
 	Table            string `json:"table"             mapstructure:"table"             validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`

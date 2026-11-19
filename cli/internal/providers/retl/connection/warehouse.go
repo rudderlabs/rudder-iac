@@ -43,8 +43,8 @@ var warehouseMetadataBySourceDefinition = map[string]WarehouseMetadata{
 	// applies; it supports neither SQL models nor sync settings.
 	"clickhouse": {SyncBehaviours: []string{"upsert", "mirror", "full"}},
 
-	// maxcompute (ACT2-1534) is upsert over SQL models in v1, behind the
-	// enable-maxcompute-retl-source flag; mirror and full come later.
+	// maxcompute (ACT2-1534) is upsert over SQL models and tables in v1,
+	// behind the enable-maxcompute-retl-source flag; mirror and full come later.
 	"maxcompute": {SyncBehaviours: []string{"upsert"}, SupportsSQLModel: true, SupportsSyncSettings: true},
 }
 
