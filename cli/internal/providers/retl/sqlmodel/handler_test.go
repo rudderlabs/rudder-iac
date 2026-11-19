@@ -2075,4 +2075,29 @@ func TestHandler_LoadImportMetadata_Manifest(t *testing.T) {
 		assert.Equal(t, "ws-a", found.ImportMetadata().WorkspaceId)
 		assert.Equal(t, "rem-1", found.ImportMetadata().RemoteId)
 	})
+
+	t.Run("separate handlers do not share import metadata", func(t *testing.T) {
+		first := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
+		second := sqlmodel.NewHandler(&mockRETLClient{}, "retl")
+		for _, h := range []*sqlmodel.Handler{first, second} {
+			require.NoError(t, h.LoadSpec("m.yaml", createTestSpec("shared-id", "M", "d", "SELECT 1")))
+		}
+		urn := resources.URN("shared-id", sqlmodel.ResourceType)
+		require.NoError(t, first.LoadImportMetadata(&specs.WorkspacesImportMetadata{
+			Workspaces: []specs.WorkspaceImportMetadata{{
+				WorkspaceID: "ws-a",
+				Resources:   []specs.ImportIds{{URN: urn, RemoteID: "rem-1"}},
+			}},
+		}))
+		firstResources, err := first.GetResources()
+		require.NoError(t, err)
+		require.Len(t, firstResources, 1)
+		require.NotNil(t, firstResources[0].ImportMetadata())
+		assert.Equal(t, "rem-1", firstResources[0].ImportMetadata().RemoteId)
+
+		secondResources, err := second.GetResources()
+		require.NoError(t, err)
+		require.Len(t, secondResources, 1)
+		assert.Nil(t, secondResources[0].ImportMetadata())
+	})
 }
