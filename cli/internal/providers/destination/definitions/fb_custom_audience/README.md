@@ -100,6 +100,8 @@ Both keys are objects keyed by the local source type — the tokens listed under
 
 Maps each source type you connect to the mode its events reach the destination in. Facebook Custom Audience accepts `cloud` for every source type it supports.
 
+A Reverse ETL connection needs no `warehouse` entry: `cloud` is the only mode a warehouse source runs in, so an absent entry means `cloud`, and `ad_account_id` is still required.
+
 #### `consent_management` — object
 
 Consent provider configuration per source type. The entry shape, accepted providers, and the rules on `resolution_strategy` and `consents` are shared across all destination types — see [Consent management](../common/README.md).

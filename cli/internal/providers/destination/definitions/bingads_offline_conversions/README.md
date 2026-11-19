@@ -85,7 +85,7 @@ Both keys are objects keyed by the local source type — the tokens listed under
 
 Maps each source type you connect to the mode its events reach BingAds Offline Conversions in. BingAds Offline Conversions accepts only `warehouse: cloud`.
 
-- The entry is required to connect a Reverse ETL source — see [Connect a source](#connect-a-source).
+- The entry is optional: `cloud` is the only mode a warehouse source runs in, so a Reverse ETL connection without it runs in `cloud` — see [Connect a source](#connect-a-source).
 
 ```yaml
 connection_mode:
@@ -120,11 +120,7 @@ destination 'bing-offline-conversions-prod' (type 'bingads_offline_conversions')
 source type 'web' is not among supported source types: warehouse
 ```
 
-**The destination config must carry a `connection_mode` entry for `warehouse`.** This lives on the destination spec, not on the connection spec. Without it:
-
-```text
-destination 'bing-offline-conversions-prod' config has no 'connection_mode' entry for source type 'warehouse'
-```
+**The destination config needs no `connection_mode` entry for `warehouse`.** `cloud` is the only mode a warehouse source runs in, so an absent entry means `cloud`. A written entry must be `cloud`.
 
 **The connection needs a sync behaviour that both sides offer, and none is left.** BingAds Offline Conversions accepts only `mirror`, and a spec can carry `mirror` on the visual-mapper-v2 flow alone, which this destination does not run. So the two sides share nothing whatever the connection sets, and every `sync_behaviour` is refused with the same message. One that sets `object` runs object mapping and reports:
 

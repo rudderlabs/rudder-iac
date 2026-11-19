@@ -256,7 +256,7 @@ destination 'fb-pixel-prod' config has no 'connection_mode' entry for source typ
 destination 'fb-pixel-prod' config is missing fields required to connect a 'cloud' source: access_token
 ```
 
-A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it, and `access_token`.
+A Reverse ETL connection reaches this destination as source type `warehouse`. It needs no `connection_mode` entry, since `cloud` is the only mode a warehouse source runs in, but it does need `access_token`.
 
 ## Secrets
 

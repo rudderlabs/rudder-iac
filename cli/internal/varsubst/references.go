@@ -118,6 +118,23 @@ func (r Replaced) HoldsReference(value string) bool {
 	return len(r.References) > 0 && strings.Contains(value, r.prefix)
 }
 
+// ReferencesIn returns the references whose placeholders value holds, in
+// placeholder order. value comes from parsing Data. A literal that only reads
+// like a reference after YAML decoding, such as "\x7B{ .NAME }}", is not one:
+// substitution runs on the bytes as written and never sees it.
+func (r Replaced) ReferencesIn(value string) []Reference {
+	if !r.HoldsReference(value) {
+		return nil
+	}
+	var refs []Reference
+	for i, ref := range r.References {
+		if strings.Contains(value, r.prefix+strconv.Itoa(i)+placeholderSuffix) {
+			refs = append(refs, ref)
+		}
+	}
+	return refs
+}
+
 // Restore swaps each placeholder in text for its reference as written. text
 // comes from Data, such as a value parsed from it or a line of it, and a
 // caller restores it before showing it, since a placeholder means nothing to

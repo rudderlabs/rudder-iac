@@ -325,8 +325,9 @@ func validateDestinationCompatibility(registry *definitions.Registry, entry conn
 }
 
 // validateDestinationConfig runs the destination-side config checks for a
-// warehouse source that the event stream rules share (V-C5, V-C8), plus the
-// object-mapping restriction on hyphenated destination names (V-R10).
+// warehouse source that the event stream rules share (V-C5, and V-C8 unless
+// cloud is the destination's only warehouse mode, when it implies the entry),
+// plus the object-mapping restriction on hyphenated destination names (V-R10).
 func validateDestinationConfig(entry connectionEntry, config map[string]any) []rules.ValidationResult {
 	results := esRules.ValidateDestinationConfig(
 		entry.registered, destinationRef(entry.index), entry.endpoints.destinationID, common.SourceTypeWarehouse, config,

@@ -1385,7 +1385,7 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		assert.Equal(t, "G-123", config["measurement_id"], "non-secret keys are left untouched")
 	})
 
-	t.Run("does not invent secret keys omitted by the API", func(t *testing.T) {
+	t.Run("writes a reference for a required secret the API omits", func(t *testing.T) {
 		h := destination.NewHandler(nil, registry)
 
 		collection := map[string]*destination.RemoteDestination{
@@ -1395,7 +1395,10 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 				Type:      "GA4",
 				Version:   1,
 				IsEnabled: true,
-				// API strips secrets; export must not scaffold placeholders for them.
+				// The API strips this secret from every response. The test
+				// definition requires api_secret, so export scaffolds a reference
+				// for it; an optional one stays out (see
+				// TestHandlerImpl_FormatForExport_RequiredSecretsTheAPIStrips).
 				Config: []byte(`{"measurementId":"G-123"}`),
 			}},
 		}
@@ -1408,7 +1411,7 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		require.True(t, ok)
 		config, ok := spec.Spec["config"].(map[string]any)
 		require.True(t, ok)
-		assert.NotContains(t, config, "api_secret")
+		assert.Equal(t, "{{ .GA4_PRODUCTION_API_SECRET }}", config["api_secret"])
 		assert.Equal(t, "G-123", config["measurement_id"])
 	})
 
@@ -1506,6 +1509,7 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 				Version:   1,
 				IsEnabled: true,
 				Config: []byte(`{
+					"apiSecret": "",
 					"measurementId": "G-123",
 					"blacklistedEvents": [{"eventName": ""}, {"eventName": null}],
 					"advancedOptions": {"provider": "", "categories": [], "overrides": {"enabledFor": null}}
@@ -1536,7 +1540,7 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 				Type:      "GA4",
 				Version:   1,
 				IsEnabled: true,
-				Config:    []byte(`{"blacklistedEvents":[{"eventName":""},{"eventName":"Order Completed"}]}`),
+				Config:    []byte(`{"apiSecret":"","blacklistedEvents":[{"eventName":""},{"eventName":"Order Completed"}]}`),
 			}},
 		}
 

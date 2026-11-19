@@ -107,7 +107,7 @@ Consent provider configuration per source type, keyed by the tokens under [Sourc
 
 #### `connection_mode` — object
 
-Maps each source type you connect to the mode its events reach Google Ads in. This destination accepts `cloud` for every source type it supports.
+Maps each source type you connect to the mode its events reach Google Ads in. This destination accepts `cloud` for every source type it supports. A Reverse ETL connection needs no `warehouse` entry: `cloud` is the only mode a warehouse source runs in, so an absent entry means `cloud`.
 
 ```yaml
 connection_mode:
