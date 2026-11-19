@@ -719,3 +719,24 @@ func SupportsReference(destinationType string) bool {
 	}
 	return false
 }
+
+// IsOAuthDefinition reports whether a definition's credentials are held by
+// RudderStack's auth service rather than by the account row. Exported for the
+// commands that drive the browser authorization handoff, which is the only way
+// such an account can be created.
+func IsOAuthDefinition(accountDefinitionName string) bool {
+	return isOAuthDefinition(accountDefinitionName)
+}
+
+// OAuthDefinitionNames lists every OAuth account definition the CLI knows,
+// sorted, so a command can name the ones it accepts.
+func OAuthDefinitionNames() []string {
+	var names []string
+	for name, def := range registeredAccounts {
+		if def.OAuth {
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+	return names
+}

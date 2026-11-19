@@ -16,6 +16,8 @@ func NewCmdAccounts() *cobra.Command {
 	}
 
 	cmd.AddCommand(newCmdListAccounts())
+	cmd.AddCommand(newCmdCreateAccount())
+	cmd.AddCommand(newCmdReauthorizeAccount())
 
 	return cmd
 }
