@@ -56,8 +56,8 @@ func previewSQL(t TableSpec, limit int) (string, error) {
 		// one), and refuses a dot or a backtick in a schema or table name, as
 		// sqlconnect-go's maxcompute dialect does.
 		for _, name := range []string{t.Schema, t.Table} {
-			if name == "" || strings.ContainsAny(name, "`.\x00") {
-				return "", fmt.Errorf("maxcompute schema and table names cannot be empty or contain a backtick, a dot or a NUL byte: %q", name)
+			if reason := MaxComputeNameError(name); reason != "" {
+				return "", fmt.Errorf("maxcompute schema and table names %s: %q", reason, name)
 			}
 		}
 		relation = "`" + t.Schema + "`.`" + t.Table + "`"

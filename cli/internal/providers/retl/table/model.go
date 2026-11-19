@@ -2,6 +2,7 @@ package table
 
 import (
 	"fmt"
+	"strings"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
@@ -63,6 +64,17 @@ type TableSpec struct {
 	BucketName       string `json:"bucket_name"       mapstructure:"bucket_name"       validate:"required_if=SourceDefinition s3,excluded_unless=SourceDefinition s3"`
 	ObjectPrefix     string `json:"object_prefix"     mapstructure:"object_prefix"     validate:"required_if=SourceDefinition s3,excluded_unless=SourceDefinition s3"`
 	Enabled          bool   `json:"enabled"           mapstructure:"enabled"`
+}
+
+// MaxComputeNameError explains why name cannot be a MaxCompute schema or table
+// name, or returns "" when it can. MaxCompute has no escape inside backticks and
+// refuses a dot or a backtick in a name, as sqlconnect-go's maxcompute dialect
+// does, so such a name could never be quoted. Validation and preview share it.
+func MaxComputeNameError(name string) string {
+	if name == "" || strings.ContainsAny(name, "`.\x00") {
+		return "cannot be empty or contain a backtick, a dot or a NUL byte"
+	}
+	return ""
 }
 
 func (t TableSpec) isS3() bool {

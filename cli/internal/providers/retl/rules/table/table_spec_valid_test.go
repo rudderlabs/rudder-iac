@@ -124,6 +124,29 @@ func TestTableSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 			}},
 		},
 		{
+			name: "maxcompute schema with a dot and table with a backtick",
+			spec: func() table.TableSpec {
+				s := warehouseSpec()
+				s.SourceDefinition = "maxcompute"
+				s.Schema, s.Table = "analytics.raw", "events`x"
+				return s
+			},
+			expect: []rules.ValidationResult{
+				{Reference: "/schema", Message: "'schema' cannot be empty or contain a backtick, a dot or a NUL byte for source_definition maxcompute"},
+				{Reference: "/table", Message: "'table' cannot be empty or contain a backtick, a dot or a NUL byte for source_definition maxcompute"},
+			},
+		},
+		{
+			name: "a dotted table on another warehouse is left to that warehouse",
+			spec: func() table.TableSpec {
+				s := warehouseSpec()
+				s.SourceDefinition = "snowflake"
+				s.Table = "events.raw"
+				return s
+			},
+			expect: nil,
+		},
+		{
 			name: "warehouse without primary key, schema and table",
 			spec: func() table.TableSpec {
 				s := warehouseSpec()
