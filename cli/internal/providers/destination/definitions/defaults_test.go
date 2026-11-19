@@ -271,10 +271,30 @@ func TestRegisterRejectsInvalidDefaults(t *testing.T) {
 			name: "unsupported field kind",
 			newConfig: func() any {
 				return &struct {
-					Events []string `mapstructure:"events" default:"a,b"`
+					Limits map[string]string `mapstructure:"limits" default:"a"`
 				}{}
 			},
-			wantErr: `config key "events": unsupported kind slice for a default tag`,
+			wantErr: `config key "limits": unsupported kind map for a default tag`,
+		},
+		{
+			// A list default carries strings only; anything else would have to
+			// guess at an element encoding.
+			name: "list of non-strings",
+			newConfig: func() any {
+				return &struct {
+					Sizes []int `mapstructure:"sizes" default:"1,2"`
+				}{}
+			},
+			wantErr: `config key "sizes": unsupported list element kind int for a default tag`,
+		},
+		{
+			name: "list default with an empty element",
+			newConfig: func() any {
+				return &struct {
+					Events []string `mapstructure:"events" default:"a,,b"`
+				}{}
+			},
+			wantErr: `config key "events": invalid list default "a,,b": empty element`,
 		},
 	}
 
@@ -292,6 +312,31 @@ func TestRegisterRejectsInvalidDefaults(t *testing.T) {
 			assert.Contains(t, err.Error(), tc.wantErr)
 		})
 	}
+}
+
+// A list default is kept as []any so it compares equal to the same JSON array
+// decoded from an API response, which is what lets a spec that omits the key
+// converge instead of diffing on every apply.
+func TestStringListDefaultApplies(t *testing.T) {
+	t.Parallel()
+
+	def := GA4TestDefinition()
+	def.ConnectionRequiredKeys = nil
+	def.SecretKeys = nil
+	def.NewConfig = func() any {
+		return &struct {
+			Schema []string `mapstructure:"schema" default:"EMAIL, PHONE"`
+		}{}
+	}
+
+	registered, err := newRegisteredDefinition(def)
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]any{"schema": []any{"EMAIL", "PHONE"}}, registered.ApplyDefaults(map[string]any{}))
+	assert.Equal(t,
+		[]any{"MADID"},
+		registered.ApplyDefaults(map[string]any{"schema": []any{"MADID"}})["schema"],
+	)
 }
 
 func TestRegisterAllowsDefaultOnConditionallyRequiredField(t *testing.T) {
