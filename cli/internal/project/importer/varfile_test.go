@@ -5,28 +5,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
-func specEntity(spec map[string]any) writer.FormattableEntity {
-	return writer.FormattableEntity{
-		Content: &specs.Spec{
-			Version:  specs.SpecVersionV1,
-			Kind:     "books",
-			Metadata: map[string]any{"name": "books"},
-			Spec:     spec,
-		},
-		RelativePath: "books/books.yaml",
-	}
-}
-
 func TestCollectVariableNames(t *testing.T) {
 	entities := []writer.FormattableEntity{
-		specEntity(map[string]any{
+		newSpecEntity("books", "books/books.yaml", map[string]any{
 			"books": []any{
 				map[string]any{"id": "a", "accessKey": "{{ .B_ACCESS_KEY }}"},
 				map[string]any{"id": "b", "nested": map[string]any{"token": "{{ .A_TOKEN }}"}},
@@ -48,7 +35,7 @@ func TestScaffoldSecretsVarFile(t *testing.T) {
 	dir := t.TempDir()
 
 	entities := []writer.FormattableEntity{
-		specEntity(map[string]any{"accessKey": "{{ .BOOKS_ACCESS_KEY }}"}),
+		newSpecEntity("books", "books/books.yaml", map[string]any{"accessKey": "{{ .BOOKS_ACCESS_KEY }}"}),
 	}
 
 	path, err := scaffoldSecretsVarFile(t.Context(), dir, entities)
@@ -76,7 +63,7 @@ func TestScaffoldSecretsVarFile_ExistingFileErrors(t *testing.T) {
 	require.NoError(t, os.WriteFile(existing, []byte("BOOKS_ACCESS_KEY: \"filled-in\"\n"), 0600))
 
 	entities := []writer.FormattableEntity{
-		specEntity(map[string]any{"accessKey": "{{ .BOOKS_ACCESS_KEY }}"}),
+		newSpecEntity("books", "books/books.yaml", map[string]any{"accessKey": "{{ .BOOKS_ACCESS_KEY }}"}),
 	}
 
 	_, err := scaffoldSecretsVarFile(t.Context(), dir, entities)
@@ -88,7 +75,7 @@ func TestScaffoldSecretsVarFile_NoVariables(t *testing.T) {
 	dir := t.TempDir()
 
 	path, err := scaffoldSecretsVarFile(t.Context(), dir, []writer.FormattableEntity{
-		specEntity(map[string]any{"plain": "value"}),
+		newSpecEntity("books", "books/books.yaml", map[string]any{"plain": "value"}),
 	})
 	require.NoError(t, err)
 	assert.Empty(t, path)
@@ -114,7 +101,7 @@ func TestCheckVariableOwners_RefusesNewResourcesSharingAVariable(t *testing.T) {
 		{Content: map[string]any{"password": "{{ .PG_PASSWORD }}"}, RelativePath: "accounts/pg.yaml"},
 		{Content: map[string]any{"token": "{{ .OTHER_TOKEN }}"}, RelativePath: "destinations/other.yaml"},
 	})
-	require.EqualError(t, err, "imported specs would share secret variables: PG_PASSWORD (in accounts/pg.yaml and destinations/pg.yaml); "+
+	require.EqualError(t, err, "imported specs would share secret variables: PG_PASSWORD (in imported/accounts/pg.yaml and imported/destinations/pg.yaml); "+
 		"the names come from each resource's id, so rename one of the resources whose ids collide and import again")
 }
 

@@ -211,6 +211,9 @@ func checkVariableOwners(location string, entities []writer.FormattableEntity) e
 		if !isSubstitutedSpec(entity.Content) {
 			continue
 		}
+		// Named from the project root, as the existing specs are, since that is
+		// where the import writes it.
+		newFile := filepath.Join(ImportedDir, entity.RelativePath)
 		id, content := entity.RelativePath, entity.Content
 		if spec, ok := entity.Content.(*specs.Spec); ok && spec != nil {
 			id = specOwner(spec, entity.RelativePath)
@@ -218,7 +221,7 @@ func checkVariableOwners(location string, entities []writer.FormattableEntity) e
 		}
 		walkStrings(content, "", func(keyPath, value string) {
 			for _, name := range varsubst.ExtractVariableNames([]byte(value)) {
-				uses[name] = append(uses[name], use{owner: id + ":" + keyPath, file: entity.RelativePath, isNew: true})
+				uses[name] = append(uses[name], use{owner: id + ":" + keyPath, file: newFile, isNew: true})
 			}
 		})
 	}

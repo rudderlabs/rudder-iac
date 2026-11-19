@@ -261,17 +261,6 @@ func removesSecret(source, target any) bool {
 				return true
 			}
 		}
-	case []map[string]any:
-		targetList, _ := target.([]map[string]any)
-		for i, item := range typed {
-			var targetItem any
-			if i < len(targetList) {
-				targetItem = targetList[i]
-			}
-			if removesSecret(item, targetItem) {
-				return true
-			}
-		}
 	}
 	return false
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
@@ -155,15 +154,8 @@ func TestProvider_PreviewImports_TransformationLink(t *testing.T) {
 	assert.Equal(t, differ.PropertyDiff{Property: "Transformation", TargetValue: "trf-NEW (transformation:new-one)"},
 		line(previewOneWithState(t, testRegistry(t), body, "", spec(unresolved()), st)), "a new link")
 
-	// A link to a transformation the same apply creates is refused by
-	// CheckPlan before any preview is shown.
-	created := &planner.Plan{Operations: []*planner.Operation{
-		{Type: planner.Create, Resource: resources.NewResource("clean", "transformation", resources.ResourceData{}, nil)},
-		{Type: planner.Import, Resource: resources.NewResource("hook", destination.DestinationResourceType, resources.ResourceData{}, nil,
-			resources.WithRawData(spec(&resources.PropertyRef{URN: "transformation:clean"})), resources.WithResourceImportMetadata("dst-1", "ws-1"))},
-	}}
-	assert.ErrorContains(t, destination.NewProvider(nil, testRegistry(t)).CheckPlan(context.Background(), created, state.EmptyState()),
-		"cannot link a destination to a transformation created in the same apply")
+	// A link to a transformation the same apply creates never reaches the
+	// preview: CheckPlan refuses it first (TestCheckPlanRefusesLinkToTransformationCreatedInSameApply).
 
 	assert.Empty(t, previewOneWithState(t, testRegistry(t), body, "trf-NEW", spec(unresolved()), st), "the link already in place is no change")
 
@@ -199,9 +191,14 @@ func TestProvider_PreviewImports_RemovedSecretIsAChange(t *testing.T) {
 			Config: map[string]any{"address": "redis:6379", "database": "1", "secure": false, "cluster_mode": false, "skip_verify": false, "use_json_module": false},
 		})
 
-	require.Contains(t, diffs, "destination:r")
-	assert.False(t, diffs["destination:r"].SecretOnly, "a removed secret is a change, not a re-application")
-	assert.False(t, diffs["destination:r"].Diffs["Config"].SecretOnly)
+	remote := map[string]any{"address": "redis:6379", "database": "1", "secure": false, "cluster_mode": false, "skip_verify": false, "use_json_module": false, "password": ""}
+	assert.Equal(t, map[string]differ.ResourceDiff{"destination:r": {URN: "destination:r", Diffs: map[string]differ.PropertyDiff{
+		"Config": {
+			Property:    "Config",
+			SourceValue: secret.WrapUnknownSecrets(remote, []string{"password"}),
+			TargetValue: map[string]any{"address": "redis:6379", "database": "1", "secure": false, "cluster_mode": false, "skip_verify": false, "use_json_module": false},
+		},
+	}}}, diffs, "a removed secret is a change, not a re-application")
 }
 
 // TestProvider_PreviewImports_RemovalsUnderOmittedParents pins that a parent
@@ -226,13 +223,32 @@ func TestProvider_PreviewImports_RemovalsUnderOmittedParents(t *testing.T) {
 		},
 	})
 
-	require.Contains(t, diffs, "destination:hook")
-	assert.Equal(t, map[string]any{
+	removed := func(path, summary string) differ.PropertyDiff {
+		return differ.PropertyDiff{Property: "Config (API keys the import removes)." + path, SourceValue: summary}
+	}
+	expected := map[string]differ.PropertyDiff{
+		"Config": {
+			Property: "Config",
+			SourceValue: secret.WrapUnknownSecrets(map[string]any{
+				"webhook_url": "https://example.com/hook", "webhook_method": "POST",
+				"headers":            []any{map[string]any{"from": "A", "to": "a"}, map[string]any{"from": "B", "to": "b"}},
+				"consent_management": map[string]any{"web": []any{map[string]any{"provider": "custom", "resolution_strategy": "and", "consents": []any{"c1"}}}},
+			}, []string{"headers.to"}),
+			TargetValue: map[string]any{
+				"webhook_url": "https://example.com/hook", "webhook_method": "POST",
+				"headers": []any{map[string]any{"from": "A", "to": "a"}},
+			},
+		},
+	}
+	for path, summary := range map[string]string{
 		"consentManagement.amp":  "(list, 1 item)",
 		"headers[1].description": "(value)",
 		"legacyNull":             "(null)",
 		"legacyOther":            "(value)",
-	}, removedFields(diffs["destination:hook"]))
+	} {
+		expected[removed(path, summary).Property] = removed(path, summary)
+	}
+	assert.Equal(t, map[string]differ.ResourceDiff{"destination:hook": {URN: "destination:hook", Diffs: expected}}, diffs)
 }
 
 // TestProvider_PreviewImports_SkipsBackendDerivedKeys pins that a key the
@@ -258,9 +274,14 @@ func TestProvider_PreviewImports_SkipsBackendDerivedKeys(t *testing.T) {
 	diffs := previewOne(t, registry, `{"destination":{"id":"dst-1","name":"Amp","type":"AM","version":1,"enabled":true,"config":{
 		"apiKey":"k","residencyServer":"standard","connectionMode":{"web":"cloud"},"useNativeSDK":{"web":false}}}}`, "",
 		spec(secret.WrapKnownSecrets(map[string]any{"api_key": "k", "residency_server": "standard", "connection_mode": map[string]any{"web": "cloud"}}, []string{"api_key"})))
-	require.Contains(t, diffs, "destination:amp")
-	assert.True(t, diffs["destination:amp"].SecretOnly)
-	assert.Empty(t, removedFields(diffs["destination:amp"]))
+	assert.Equal(t, map[string]differ.ResourceDiff{"destination:amp": {URN: "destination:amp", SecretOnly: true, Diffs: map[string]differ.PropertyDiff{
+		"Config": {
+			Property:    "Config",
+			SourceValue: secret.WrapUnknownSecrets(map[string]any{"api_key": "k", "residency_server": "standard", "connection_mode": map[string]any{"web": "cloud"}}, []string{"api_key"}),
+			TargetValue: secret.WrapKnownSecrets(map[string]any{"api_key": "k", "residency_server": "standard", "connection_mode": map[string]any{"web": "cloud"}}, []string{"api_key"}),
+			SecretOnly:  true,
+		},
+	}}}, diffs, "the import only re-applies the secret, with no removal line")
 }
 
 // TestProvider_PreviewImports_ReadErrors pins that the preview fails, naming
@@ -302,19 +323,6 @@ func TestProvider_PreviewImports_ReadErrors(t *testing.T) {
 	err = run(t, "/v2/destinations/dst-1/transformation")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "previewing import of destination:hook: getting destination transformation")
-}
-
-// removedFields collects the preview's "API keys the import removes" lines as
-// path -> summary.
-func removedFields(r differ.ResourceDiff) map[string]any {
-	const prefix = "Config (API keys the import removes)."
-	out := map[string]any{}
-	for name, diff := range r.Diffs {
-		if path, ok := strings.CutPrefix(name, prefix); ok {
-			out[path] = diff.SourceValue
-		}
-	}
-	return out
 }
 
 // TestProvider_PreviewImports_ListsUnderivableNativeSDK pins that a

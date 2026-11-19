@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,7 +47,7 @@ spec:
 		"id": "pg", "config": map[string]any{"password": "{{ .PG_PASSWORD }}"},
 	}))
 	require.EqualError(t, err, "imported specs would share secret variables: "+
-		"PG_PASSWORD (in accounts/pg.yaml and destinations/pg.yaml); "+
+		"PG_PASSWORD (in accounts/pg.yaml and imported/destinations/pg.yaml); "+
 		"the names come from each resource's id, so rename one of the resources whose ids collide and import again")
 	_, statErr := os.Stat(filepath.Join(dir, ImportedDir))
 	assert.True(t, os.IsNotExist(statErr), "a refused import writes nothing")
@@ -129,7 +129,7 @@ func TestCheckVariableOwners_ReadsReferencesAsSubstitutionDoes(t *testing.T) {
 	for _, line := range []string{"password: {{ .PG_PASSWORD }}", `password: "{{ .PG_PASSWORD }}"`, "password: '{{ .PG_PASSWORD }}'"} {
 		dir := t.TempDir()
 		existingAccount(t, dir, line)
-		assert.ErrorContains(t, importInto(t, dir, newPGDestination()), "PG_PASSWORD (in accounts/pg.yaml and destinations/pg.yaml)", line)
+		assert.ErrorContains(t, importInto(t, dir, newPGDestination()), "PG_PASSWORD (in accounts/pg.yaml and imported/destinations/pg.yaml)", line)
 	}
 
 	dir := t.TempDir()
@@ -169,6 +169,6 @@ func TestCheckVariableOwners_CountsReferencesAnywhereInTheDocument(t *testing.T)
 	} {
 		dir := t.TempDir()
 		writeProjectFile(t, dir, "accounts/pg.yaml", content)
-		assert.ErrorContains(t, importInto(t, dir, newPGDestination()), "PG_PASSWORD (in accounts/pg.yaml and destinations/pg.yaml)", name)
+		assert.ErrorContains(t, importInto(t, dir, newPGDestination()), "PG_PASSWORD (in accounts/pg.yaml and imported/destinations/pg.yaml)", name)
 	}
 }

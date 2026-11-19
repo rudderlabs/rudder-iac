@@ -13,6 +13,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -101,7 +102,7 @@ func TestImportPreviewShowsWhatTheAdoptChanges(t *testing.T) {
 	// dropped their specs; keep only this destination's entry, as a user who
 	// adopts one slice would.
 	varFile := filepath.Join(importedDir, importer.SecretsVarFileName)
-	writeVarFile(t, varFile, map[string]string{reference[1]: importPreviewFillValue})
+	require.NoError(t, os.WriteFile(varFile, []byte(fmt.Sprintf("%s: '%s'\n", reference[1], importPreviewFillValue)), 0o600))
 
 	out, err = executor.Execute(cliBinPath, "validate", "-l", projectDir, "--var-file", varFile)
 	require.NoError(t, err, "the imported spec must validate once the var file is filled in: %s", out)
@@ -121,7 +122,7 @@ func TestImportPreviewShowsWhatTheAdoptChanges(t *testing.T) {
 	removed := removedConfigKeys(t, before.Config, after.Config)
 	require.NotEmpty(t, removed, "the seeded empty values are expected to be dropped by the adopt")
 	for _, key := range removed {
-		assert.True(t, strings.Contains(plan, key) || strings.Contains(plan, camelToSnake(key)),
+		assert.True(t, strings.Contains(plan, key) || strings.Contains(plan, utils.ToSnakeCase(key)),
 			"the dry run must name %q, which the adopt removed; dry run was:\n%s", key, plan)
 	}
 
@@ -129,17 +130,6 @@ func TestImportPreviewShowsWhatTheAdoptChanges(t *testing.T) {
 	require.NoError(t, err, "dry run after apply failed: %s", afterPlan)
 	assert.NotContains(t, string(afterPlan), "Importable resources")
 	assert.NotContains(t, string(afterPlan), "Updated resources")
-}
-
-// writeVarFile replaces a var file with exactly the given entries.
-func writeVarFile(t *testing.T, path string, values map[string]string) {
-	t.Helper()
-
-	var b strings.Builder
-	for key, value := range values {
-		fmt.Fprintf(&b, "%s: '%s'\n", key, value)
-	}
-	require.NoError(t, os.WriteFile(path, []byte(b.String()), 0o600))
 }
 
 // removedConfigKeys returns the top-level keys of before that after lacks.
@@ -156,19 +146,4 @@ func removedConfigKeys(t *testing.T, before, after json.RawMessage) []string {
 		}
 	}
 	return removed
-}
-
-// camelToSnake spells an API config key the way local config does.
-func camelToSnake(key string) string {
-	var b strings.Builder
-	for i, r := range key {
-		if r >= 'A' && r <= 'Z' {
-			if i > 0 {
-				b.WriteByte('_')
-			}
-			r += 'a' - 'A'
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
 }
