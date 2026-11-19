@@ -86,3 +86,27 @@ func TestSync_ImportPreviewFailureStopsBeforeAnyChange(t *testing.T) {
 		})
 	}
 }
+
+type refusingPreviewingProvider struct {
+	previewingProvider
+}
+
+func (p *refusingPreviewingProvider) CheckPlan(context.Context, *planner.Plan, *state.State) error {
+	return errors.New("refused")
+}
+
+// A plan the provider refuses stops before the preview reads anything, so the
+// refusal is what the user sees and no remote read is spent on a plan that
+// will not run.
+func TestSync_PlanCheckerRunsBeforeImportPreview(t *testing.T) {
+	p := &refusingPreviewingProvider{previewingProvider{mockRawProvider: mockRawProvider{initialState: state.EmptyState()}}}
+	target := resources.NewGraph()
+	target.AddResource(resources.NewResource("p", "mock-parent", resources.ResourceData{"name": "p"}, nil,
+		resources.WithResourceImportMetadata("remote-p", mockWorkspace().ID)))
+
+	s, err := syncer.New(p, mockWorkspace(), syncer.WithReporter(testutils.NewMockReporter()), syncer.WithDryRun(true))
+	require.NoError(t, err)
+
+	assert.EqualError(t, s.Sync(context.Background(), target), "refused")
+	assert.Empty(t, p.previewed, "the preview must not run for a refused plan")
+}
