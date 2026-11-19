@@ -2,6 +2,7 @@ package source
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -11,6 +12,7 @@ import (
 	sourceClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/source"
 	trackingplanClient "github.com/rudderlabs/rudder-iac/api/client/event-stream/tracking-plan-connection"
 	"github.com/rudderlabs/rudder-iac/cli/internal/lister"
+	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -21,8 +23,11 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/samber/lo"
 )
+
+var log = logger.New("event-stream-source")
 
 type Handler struct {
 	resources map[string]*sourceResource
@@ -339,6 +344,35 @@ func (h *Handler) updateTrackingPlanConnection(ctx context.Context, remoteID str
 
 	currentTrackingPlanID, currentHasTP := state[TrackingPlanIDKey].(string)
 	newTrackingPlanID, newHasTP := data[TrackingPlanKey].(string)
+	if !currentHasTP && newHasTP {
+		// An unmanaged link is excluded from comparison state, but an explicit
+		// governance change must replace the real remote link if one exists.
+		sources, err := h.client.GetSources(ctx)
+		if err != nil {
+			return fmt.Errorf("getting event stream sources for tracking plan update: %w", err)
+		}
+		found := false
+		for _, source := range sources {
+			if source.ID != remoteID {
+				continue
+			}
+			found = true
+			if source.TrackingPlan != nil {
+				currentTrackingPlanID = source.TrackingPlan.ID
+				currentHasTP = true
+				if currentTrackingPlanID == newTrackingPlanID {
+					state[TrackingPlanConfigKey] = map[string]interface{}{}
+					if source.TrackingPlan.Config != nil {
+						state[TrackingPlanConfigKey] = mapRemoteTPConfigToState(source.TrackingPlan.Config)
+					}
+				}
+			}
+			break
+		}
+		if !found {
+			return fmt.Errorf("event stream source with ID %s not found", remoteID)
+		}
+	}
 
 	switch {
 	case !currentHasTP && newHasTP:
@@ -455,13 +489,12 @@ func (p *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 		var trackingPlanURN *string
 		if source.TrackingPlan != nil {
 			tpURN, err := collection.GetURNByID(types.TrackingPlanResourceType, source.TrackingPlan.ID)
-			if err == resources.ErrRemoteResourceExternalIdNotFound {
-				// ErrRemoteResourceExternalIdNotFound would happen if the source was created via CLI
-				// but the tracking plan was created and linked via the UI/API
-				trackingPlanURN = nil
-			} else if err != nil {
+			if err != nil && !errors.Is(err, resources.ErrRemoteResourceExternalIdNotFound) && !errors.Is(err, resources.ErrRemoteResourceNotFound) {
 				return nil, fmt.Errorf("get urn by id: %w", err)
-			} else {
+			}
+			// Links to plans outside the managed collection cannot be represented
+			// in a local spec and must not produce a removal diff.
+			if err == nil {
 				trackingPlanURN = &tpURN
 			}
 		}
@@ -545,8 +578,9 @@ func (h *Handler) Import(ctx context.Context, id string, data resources.Resource
 		SourceDefinitionKey: existingSource.Type,
 	}
 
-	// If there's a tracking plan on the existing source, include it in state
-	if existingSource.TrackingPlan != nil {
+	// Import without governance leaves an unexported link unmanaged; only an
+	// explicit desired plan should reconcile the existing connection.
+	if existingSource.TrackingPlan != nil && data[TrackingPlanKey] != nil {
 		existingState[TrackingPlanIDKey] = existingSource.TrackingPlan.ID
 		existingState[TrackingPlanConfigKey] = mapRemoteTPConfigToState(existingSource.TrackingPlan.Config)
 	}
@@ -619,8 +653,12 @@ func (h *Handler) FormatForExport(
 		})
 
 		// Matched sources (import --merge) adopt an existing local spec:
-		// manifest entry only — no spec file is written for them.
+		// manifest entry only — no spec file is written for them. Still
+		// report links that cannot be expressed in the local spec.
 		if source.MatchedWith != nil {
+			if _, err := resolveTrackingPlanReference(data, inputResolver); err != nil {
+				return nil, nil, err
+			}
 			continue
 		}
 
@@ -652,7 +690,7 @@ func (p *Handler) toImportSpec(
 	source *sourceClient.EventStreamSource,
 	externalID string,
 	workspaceMetadata specs.WorkspaceImportMetadata,
-	resolver resolver.ReferenceResolver,
+	inputResolver resolver.ReferenceResolver,
 ) (*specs.Spec, error) {
 	metadata := specs.Metadata{
 		Name: MetadataName,
@@ -673,22 +711,16 @@ func (p *Handler) toImportSpec(
 		EnabledKey:          source.Enabled,
 	}
 
-	if source.TrackingPlan != nil {
-		tpRef, err := resolver.ResolveToReference(
-			types.TrackingPlanResourceType,
-			source.TrackingPlan.ID,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("resolving tracking plan reference: %w", err)
-		}
-
-		validations := map[string]any{
-			TrackingPlanRefYAMLKey:    tpRef,
-			TrackingPlanConfigYAMLKey: toTrackingPlanConfigImportSpec(source.TrackingPlan.Config),
-		}
-
+	tpRef, err := resolveTrackingPlanReference(source, inputResolver)
+	if err != nil {
+		return nil, err
+	}
+	if tpRef != "" {
 		specMap[GovernanceYAMLKey] = map[string]any{
-			ValidationsYAMLKey: validations,
+			ValidationsYAMLKey: map[string]any{
+				TrackingPlanRefYAMLKey:    tpRef,
+				TrackingPlanConfigYAMLKey: toTrackingPlanConfigImportSpec(source.TrackingPlan.Config),
+			},
 		}
 	}
 
@@ -698,6 +730,27 @@ func (p *Handler) toImportSpec(
 		Metadata: metadataMap,
 		Spec:     specMap,
 	}, nil
+}
+
+func resolveTrackingPlanReference(source *sourceClient.EventStreamSource, inputResolver resolver.ReferenceResolver) (string, error) {
+	if source.TrackingPlan == nil {
+		return "", nil
+	}
+	ref, err := inputResolver.ResolveToReference(types.TrackingPlanResourceType, source.TrackingPlan.ID)
+	if errors.Is(err, resolver.ErrResourceNotInCollection) {
+		warnUnmanagedTrackingPlan(source)
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("resolving tracking plan reference: %w", err)
+	}
+	return ref, nil
+}
+
+func warnUnmanagedTrackingPlan(source *sourceClient.EventStreamSource) {
+	message := fmt.Sprintf("source %q (ID %s) links to tracking plan %s: governance was not imported; the existing link remains unmanaged and will not appear in later plans unless you explicitly configure governance", source.Name, source.ID, source.TrackingPlan.ID)
+	log.Warn(message)
+	ui.PrintWarning(message)
 }
 
 func (srcResource *sourceResource) addImportMetadata(s *specs.Spec) error {
