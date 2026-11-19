@@ -170,6 +170,7 @@ var trackedCommands = []string{
 	"transformations show-default-events",
 	"transformations test",
 	"typer generate",
+	"typer snapshot",
 	"validate",
 	"workspace accounts list",
 	"workspace event-stream-sources list",
