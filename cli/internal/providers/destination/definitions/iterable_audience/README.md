@@ -55,7 +55,7 @@ Iterable settings from before account linking. `rudder_account_id` supplies them
 
 #### `connection_mode` — object
 
-Maps each source type you connect to the mode its events reach Iterable in. Iterable Audience accepts only `warehouse: cloud`.
+Maps each source type you connect to the mode its events reach Iterable in. Iterable Audience accepts only `warehouse: cloud`, and the entry is optional: an absent entry means `cloud`.
 
 ```yaml
 connection_mode:

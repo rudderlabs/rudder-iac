@@ -53,6 +53,9 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, []string{"audience_id"}, registered.ConnectionRequiredKeys("cloud", "cloud"))
 	assert.Equal(t, []string{"ad_account_id"}, registered.ConnectionRequiredKeys("warehouse", "cloud"))
 	assert.Nil(t, registered.ConnectionRequiredKeys("warehouse", "device"))
+	// A Reverse ETL connection with no connection_mode entry runs in the
+	// implied cloud mode, so ad_account_id is still required for it.
+	assert.Equal(t, []string{"ad_account_id"}, registered.ConnectionRequiredKeys("warehouse", registered.ConnectMode("warehouse", map[string]any{})))
 
 	assert.Equal(t, []string{"mirror"}, registered.SyncBehaviours())
 	assert.False(t, registered.SupportsVisualMapper())
