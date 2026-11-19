@@ -7,6 +7,7 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	catalogrules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -77,10 +78,10 @@ rules:
 var validateTrackingPlanSpec = func(
 	Kind string,
 	Version string,
-	Metadata map[string]any,
+	metadata map[string]any,
 	Spec localcatalog.TrackingPlan,
 ) []rules.ValidationResult {
-	return validateTrackingPlanSpecWithEventRuleIncludes(Kind, Version, Metadata, Spec, false)
+	return validateTrackingPlanSpecWithEventRuleIncludes(Kind, Version, metadata, Spec, false)
 }
 
 func validateTrackingPlanSpecWithEventRuleIncludes(
@@ -105,6 +106,9 @@ func validateTrackingPlanSpecWithEventRuleIncludes(
 	}
 
 	results := funcs.ParseValidationErrors(validationErrors, reflect.TypeOf(spec))
+	if catalogrules.LegacyTrackingPlanName(spec.Name) {
+		results = withoutDisplayNamePatternError(results)
+	}
 
 	// validate the rules on the trackingplan spec
 	results = append(results, validateRules(spec.Rules, eventRuleIncludesEnabled)...)
@@ -115,10 +119,10 @@ func validateTrackingPlanSpecWithEventRuleIncludes(
 var validateTrackingPlanSpecV1 = func(
 	_ string,
 	_ string,
-	_ map[string]any,
+	metadata map[string]any,
 	spec localcatalog.TrackingPlanV1,
 ) []rules.ValidationResult {
-	return validateTrackingPlanSpecV1WithEventRuleIncludes("", "", nil, spec, false)
+	return validateTrackingPlanSpecV1WithEventRuleIncludes("", "", metadata, spec, false)
 }
 
 func validateTrackingPlanSpecV1WithEventRuleIncludes(
@@ -139,9 +143,26 @@ func validateTrackingPlanSpecV1WithEventRuleIncludes(
 	}
 
 	results := funcs.ParseValidationErrors(validationErrors, nil)
+	if catalogrules.LegacyTrackingPlanName(spec.Name) {
+		results = withoutDisplayNamePatternError(results)
+	}
 	results = append(results, validateRulesV1(spec.Rules)...)
 
 	return results
+}
+
+// Syntax cannot see central import manifests. Postpone only the shared
+// display_name pattern error for an otherwise-valid ampersand name; semantic
+// validation requires an active-workspace import identity in the graph, and
+// CheckPlan verifies that identity against the remote plan before apply.
+func withoutDisplayNamePatternError(results []rules.ValidationResult) []rules.ValidationResult {
+	filtered := results[:0]
+	for _, result := range results {
+		if result.Reference != "/display_name" {
+			filtered = append(filtered, result)
+		}
+	}
+	return filtered
 }
 
 func validateRules(tpRules []*localcatalog.TPRule, eventRuleIncludesEnabled bool) []rules.ValidationResult {

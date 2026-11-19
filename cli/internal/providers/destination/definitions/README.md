@@ -192,7 +192,7 @@ config:
 
 Naming a source type the destination doesn't support fails validation, and so does a mode that source type doesn't support on this destination.
 
-An entry is required for every event stream source type you connect; a `warehouse` source needs none. Without one, `validate` reports:
+For an event stream source type that supports `cloud`, an omitted entry implies `cloud` (including when that source type also offers `device` or `hybrid`). A cloud-only `warehouse` source also needs no entry. Device-only source types still require an explicit mode. Without one, `validate` reports:
 
 ```text
 destination '<id>' config has no 'connection_mode' entry for source type '<source_type>'

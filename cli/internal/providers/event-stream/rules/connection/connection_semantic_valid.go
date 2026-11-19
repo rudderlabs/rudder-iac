@@ -304,14 +304,11 @@ func ValidateDestinationConfig(
 			),
 		})
 	}
-	// A source type with an implied mode needs no entry: today that is a
-	// warehouse source on a definition whose only warehouse mode is cloud. The
-	// backend runs such a destination without connectionMode.warehouse, and the
-	// dashboard leaves it out on older ones, so demanding it fails specs
-	// imported from them over a field that changes nothing. A written entry is
-	// still checked by the destination's own config rule. A definition that
-	// offers a warehouse source a second mode implies none, so this check
-	// applies to it again (see RegisteredDefinition.ImpliedConnectionMode).
+	// A cloud-capable event source needs no entry: upstream processes an
+	// omitted connectionMode in cloud mode even if device is also offered.
+	// Device-only types cannot omit it. Warehouse omission still requires
+	// cloud to be its sole mode. Explicit invalid entries remain the
+	// destination config rule's concern (see ImpliedConnectionMode).
 	if registered.ImpliedConnectionMode(sourceType) != "" {
 		return results
 	}
@@ -402,19 +399,10 @@ func missingRequiredConfigKeys(
 	return missing
 }
 
-// connectTimeRequiredKeys returns the keys the definition requires for a source
-// of this type to connect, in the mode the destination spec declares for it.
-// Only the spec can say for an event stream source: ConnectionModes lists the
-// modes a destination supports, not the one a connection runs in, so inferring
-// from a source type that offers exactly one would tie this check's coverage
-// to definition metadata — a destination gaining a mode would switch it off
-// silently. The warehouse exception fails closed the same way: it holds only
-// while cloud is the single warehouse mode.
-//
-// An undeclared mode reads as the implied one, which only a warehouse source on
-// a cloud-only definition has (see RegisteredDefinition.ConnectMode); without
-// one it reads as "", which no definition can list as a mode, so the lookup
-// misses and this source type requires nothing.
+// connectTimeRequiredKeys uses the declared mode or, when absent, cloud for
+// cloud-capable event sources and cloud-only warehouse sources. Device-only
+// omission yields no mode; V-C8 reports the missing entry. An explicit invalid
+// mode stays invalid and never falls back to cloud.
 func connectTimeRequiredKeys(
 	registered *definitions.RegisteredDefinition,
 	sourceType string,

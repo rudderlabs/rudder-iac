@@ -1,4 +1,11 @@
 rule_id: "datacatalog/tracking-plans/spec-syntax-valid"
+# Tracking plan display_name uses the shared catalog display_name pattern:
+# new names cannot contain '&' (the /v2/catalog/tracking-plans API rejects it).
+# Syntax defers only an otherwise valid legacy '&' name because central import
+# manifests are not visible until graph validation. Semantic validation requires
+# a declared identity in the active workspace, and CheckPlan verifies the remote
+# plan/name before any apply mutation.
+# A legacy name cannot be renamed or sent through a plan update API call.
 match_behavior:
   # Legacy spec versions (rudder/0.1 and rudder/v0.1) use kind "tp" and share the same
   # TrackingPlan spec shape.

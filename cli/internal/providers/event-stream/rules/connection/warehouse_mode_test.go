@@ -40,10 +40,8 @@ func TestValidateDestinationConfig_WarehouseEntry(t *testing.T) {
 		Reference: "/ref",
 		Message:   "destination 'dest' config is missing fields required to connect a 'warehouse' source: auth_token",
 	}}, ValidateDestinationConfig(cloudOnly, "/ref", "dest", common.SourceTypeWarehouse, map[string]any{}))
-	assert.Equal(t, []rules.ValidationResult{{
-		Reference: "/ref",
-		Message:   "destination 'dest' config has no 'connection_mode' entry for source type 'web'",
-	}}, ValidateDestinationConfig(cloudOnly, "/ref", "dest", "web", map[string]any{}), "event stream source types still need their entry")
+	assert.Empty(t, ValidateDestinationConfig(cloudOnly, "/ref", "dest", "web", map[string]any{}),
+		"a cloud-capable event stream source may omit its mode")
 
 	twoModes := register(t, "two-modes", []string{"cloud", "device"}, nil)
 	assert.Equal(t, []rules.ValidationResult{{

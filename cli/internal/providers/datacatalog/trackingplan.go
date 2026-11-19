@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	impProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/importremote/provider"
+	catalogrules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -20,8 +21,10 @@ type TrackingPlanEntityProvider struct {
 }
 
 type TrackingPlanProvider struct {
-	client catalog.DataCatalog
-	log    *logger.Logger
+	client      catalog.DataCatalog
+	log         *logger.Logger
+	workspaceID string
+	importedIDs map[string]string // local ID -> declared remote ID in active workspace
 }
 
 const (
@@ -57,6 +60,9 @@ func (p *TrackingPlanProvider) Create(ctx context.Context, ID string, input reso
 
 	args := state.TrackingPlanArgs{}
 	args.FromResourceData(input)
+	if !catalogrules.ValidTrackingPlanName(args.Name) {
+		return nil, fmt.Errorf("creating tracking plan: invalid display_name %q (the catalog API rejects it)", args.Name)
+	}
 
 	created, err := p.client.CreateTrackingPlan(ctx, catalog.TrackingPlanCreate{
 		Name:        args.Name,
@@ -98,6 +104,11 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 
 	toArgs := state.TrackingPlanArgs{}
 	toArgs.FromResourceData(input)
+	if !catalogrules.ValidTrackingPlanName(toArgs.Name) {
+		if err := p.verifyLegacyUpdate(ctx, ID, toArgs, prevState); err != nil {
+			return nil, err
+		}
+	}
 
 	var (
 		err error
@@ -152,6 +163,35 @@ func (p *TrackingPlanProvider) Update(ctx context.Context, ID string, input reso
 	return &resourceData, nil
 }
 
+// verifyLegacyUpdate allows only event changes on a declared, already-managed
+// legacy plan. Its name must never be sent to UpdateTrackingPlan.
+func (p *TrackingPlanProvider) verifyLegacyUpdate(ctx context.Context, ID string, toArgs state.TrackingPlanArgs, prevState state.TrackingPlanState) error {
+	if toArgs.Name != prevState.Name || toArgs.Name != prevState.TrackingPlanArgs.Name || toArgs.Description != prevState.TrackingPlanArgs.Description || toArgs.Description != prevState.Description || prevState.WorkspaceID != p.workspaceID {
+		return fmt.Errorf("updating tracking plan: invalid or unverified legacy display_name %q (the catalog API rejects it)", toArgs.Name)
+	}
+	return p.verifyLegacyIdentity(ctx, ID, prevState.ID, toArgs.Name, true, nil)
+}
+
+// verifyLegacyIdentity protects both preflight and direct lifecycle callers.
+// Import passes its already-fetched plan to avoid a redundant GET; updates
+// fetch again at write time so a remote rename cannot slip past preflight.
+func (p *TrackingPlanProvider) verifyLegacyIdentity(ctx context.Context, localID, remoteID, name string, managed bool, remote *catalog.TrackingPlanWithIdentifiers) error {
+	if !catalogrules.LegacyTrackingPlanName(name) || remoteID == "" || p.workspaceID == "" || p.importedIDs[localID] != remoteID {
+		return fmt.Errorf("legacy display_name %q requires a declared import for this workspace", name)
+	}
+	if remote == nil {
+		var err error
+		remote, err = p.client.GetTrackingPlanWithIdentifiers(ctx, remoteID, false)
+		if err != nil {
+			return fmt.Errorf("verifying legacy tracking plan name: %w", err)
+		}
+	}
+	if remote == nil || remote.ID != remoteID || remote.Name != name || remote.WorkspaceID != p.workspaceID || managed && remote.ExternalID != localID || !managed && remote.ExternalID != "" && remote.ExternalID != localID {
+		return fmt.Errorf("legacy display_name %q does not match the existing remote plan in workspace %q", name, p.workspaceID)
+	}
+	return nil
+}
+
 func (p *TrackingPlanProvider) Delete(ctx context.Context, ID string, state resources.ResourceData) error {
 	p.log.Debug("deleting tracking plan", "id", ID)
 
@@ -169,17 +209,36 @@ func (p *TrackingPlanProvider) Import(ctx context.Context, ID string, data resou
 	if err != nil {
 		return nil, fmt.Errorf("getting tracking plan from upstream: %w", err)
 	}
+	if trackingPlan == nil || trackingPlan.ID != remoteId {
+		return nil, fmt.Errorf("importing tracking plan: remote plan %q was not found", remoteId)
+	}
 
 	toArgs := state.TrackingPlanArgs{}
 	toArgs.FromResourceData(data)
+	if !catalogrules.ValidTrackingPlanName(toArgs.Name) {
+		// Import is the only way to adopt an already-existing ampersand name;
+		// it must exactly match the fetched plan, never be sent in an API write.
+		if err := p.verifyLegacyIdentity(ctx, ID, remoteId, toArgs.Name, false, trackingPlan); err != nil {
+			return nil, fmt.Errorf("importing tracking plan: invalid or unverified legacy display_name %q: %w", toArgs.Name, err)
+		}
+	}
 
 	changed, diffed := toArgs.DiffUpstream(trackingPlan)
 	if changed {
 		p.log.Debug("tracking plan has differences, updating", "id", ID, "remoteId", remoteId)
 
-		_, err = p.client.UpdateTrackingPlan(ctx, remoteId, toArgs.Name, toArgs.Description)
-		if err != nil {
-			return nil, fmt.Errorf("updating tracking plan during import: %w", err)
+		remoteDescription := ""
+		if trackingPlan.Description != nil {
+			remoteDescription = *trackingPlan.Description
+		}
+		if toArgs.Name != trackingPlan.Name || toArgs.Description != remoteDescription {
+			if !catalogrules.ValidTrackingPlanName(toArgs.Name) {
+				return nil, fmt.Errorf("importing tracking plan: cannot update a legacy display_name %q via the catalog API", toArgs.Name)
+			}
+			_, err = p.client.UpdateTrackingPlan(ctx, remoteId, toArgs.Name, toArgs.Description)
+			if err != nil {
+				return nil, fmt.Errorf("updating tracking plan during import: %w", err)
+			}
 		}
 
 		for _, deleted := range diffed.Deleted {

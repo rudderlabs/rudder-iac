@@ -78,4 +78,14 @@ type RemoteConnection struct {
 	WorkspaceID           string
 	SourceExternalID      string
 	DestinationExternalID string
+	// SourceType is the source definition type read during LoadImportable.
+	// Destinations use it to select connect-time secrets even when the source
+	// itself is already managed (and absent from the importable collection).
+	SourceType string
+}
+
+// ImportLink exposes the endpoints and source type to the destination exporter
+// without making destination import the event-stream connection package.
+func (c *RemoteConnection) ImportLink() (sourceID, sourceExternalID, destinationID, destinationExternalID, sourceType string) {
+	return c.SourceID, c.SourceExternalID, c.DestinationID, c.DestinationExternalID, c.SourceType
 }

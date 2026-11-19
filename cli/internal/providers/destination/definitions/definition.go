@@ -233,35 +233,33 @@ func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, err
 	return append([]string(nil), modes...), nil
 }
 
-// ImpliedConnectionMode returns the mode a source type connects in when the
-// config declares none, or "" when there is none to imply. Only a warehouse
-// source has one: cloud, and only while cloud is the single warehouse mode the
-// definition offers (true of every destination upstream today). The day a
-// definition offers a warehouse source a second mode, nothing is implied and a
-// warehouse connection must declare its mode like any other.
+// ImpliedConnectionMode returns cloud when the config omits a mode for a
+// source type that supports cloud delivery. An event stream source may offer
+// other modes too: absent connectionMode is processed in cloud mode upstream,
+// whereas a device-only source cannot be processed without an explicit mode.
+// Keep the warehouse exception narrow: its implicit mode requires cloud to be
+// its only offered mode (true of every warehouse definition upstream today).
 func (d *RegisteredDefinition) ImpliedConnectionMode(sourceType string) string {
-	if sourceType != common.SourceTypeWarehouse {
-		return ""
-	}
 	modes, err := d.ConnectionModes(sourceType)
-	if err != nil || !slices.Equal(modes, []string{warehouseImpliedMode}) {
+	if err != nil || !slices.Contains(modes, "cloud") {
 		return ""
 	}
-	return warehouseImpliedMode
+	if sourceType == common.SourceTypeWarehouse && !slices.Equal(modes, []string{"cloud"}) {
+		return ""
+	}
+	return "cloud"
 }
 
-// ConnectMode returns the mode a source of sourceType connects in: the one
-// config declares under connection_mode, else the implied one (see
-// ImpliedConnectionMode), else "".
+// ConnectMode returns an explicitly declared mode (even an invalid empty
+// value, which validation rejects), or the implied mode only when absent.
 func (d *RegisteredDefinition) ConnectMode(sourceType string, config map[string]any) string {
 	block, _ := config["connection_mode"].(map[string]any)
-	if mode, _ := block[sourceType].(string); mode != "" {
+	if raw, present := block[sourceType]; present {
+		mode, _ := raw.(string)
 		return mode
 	}
 	return d.ImpliedConnectionMode(sourceType)
 }
-
-const warehouseImpliedMode = "cloud"
 
 // ConnectionRequiredKeys returns the keys the given source type must carry to
 // connect in the given mode. A nil result means the pair requires none.

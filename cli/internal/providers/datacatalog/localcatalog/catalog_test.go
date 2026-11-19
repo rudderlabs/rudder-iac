@@ -9,6 +9,42 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestOfflineInlineImportRequiresUniqueWorkspace(t *testing.T) {
+	const urn = "tracking-plan:plan"
+	for _, tc := range []struct {
+		name   string
+		ids    []string
+		active string
+		want   string
+	}{
+		{name: "unique offline", ids: []string{"ws-a"}, want: "ws-a"},
+		{name: "duplicate same workspace", ids: []string{"ws-a", "ws-a"}, want: "ws-a"},
+		{name: "ambiguous offline", ids: []string{"ws-a", "ws-b"}},
+		{name: "active selects workspace", ids: []string{"ws-a", "ws-b"}, active: "ws-a", want: "ws-a"},
+		{name: "active wrong workspace", ids: []string{"ws-a"}, active: "ws-b"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dc := New()
+			dc.SetWorkspaceID(tc.active)
+			workspaces := make([]specs.WorkspaceImportMetadata, 0, len(tc.ids))
+			for _, id := range tc.ids {
+				workspaces = append(workspaces, specs.WorkspaceImportMetadata{WorkspaceID: id, Resources: []specs.ImportIds{{URN: urn, RemoteID: "remote-" + id}}})
+			}
+			metadata, err := (&specs.Metadata{Import: &specs.WorkspacesImportMetadata{Workspaces: workspaces}}).ToMap()
+			require.NoError(t, err)
+			require.NoError(t, addImportMetadata(&specs.Spec{Kind: KindTrackingPlansV1, Metadata: metadata}, dc))
+			mapping := dc.ImportMetadata[urn]
+			if tc.want == "" {
+				assert.Nil(t, mapping)
+			} else {
+				require.NotNil(t, mapping)
+				assert.Equal(t, tc.want, mapping.WorkspaceID)
+				assert.Equal(t, "remote-"+tc.want, mapping.RemoteID)
+			}
+		})
+	}
+}
+
 func TestExtractCatalogEntity(t *testing.T) {
 	emptyCatalog := DataCatalog{
 		Events:         []EventV1{},
