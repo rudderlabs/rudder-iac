@@ -104,3 +104,8 @@
 - Appending explicit null-detection errors directly to decoded model, consent, and connection validation results caused duplicate errors for required null fields: decoding turns null into a Go zero value, so both validators report the same path.
 - Keep the explicit null error authoritative by filtering later validation errors at that null path and its descendants, while retaining unrelated errors so one validation pass still reports all independent problems.
 - The semantic pull-request workflow applies single-commit validation: when a PR has exactly one non-merge commit, the PR title must exactly match that commit's subject. A mismatch is metadata-only; align the PR title and rerun the workflow rather than changing source.
+
+## DEX-1150 — Summary Wait Deadline Timing
+
+- `cli/internal/devlisten/api/summary.go` created the `context.WithTimeout` before recording the start time used for `waitedMs`, so `TestSummaryWait/times_out_with_the_counts_so_far` measured 48 ms for a 50 ms deadline and failed its `>=50` assertion.
+- Record the start time before creating the timeout context, so elapsed time covers the entire deadline interval; retain the timing assertion to catch regressions.
