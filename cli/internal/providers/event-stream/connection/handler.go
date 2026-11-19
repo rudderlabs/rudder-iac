@@ -458,6 +458,7 @@ func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*res
 				WorkspaceID:           src.WorkspaceID,
 				SourceExternalID:      src.ExternalID,
 				DestinationExternalID: dst.ExternalID,
+				SourceType:            src.Type,
 			},
 		}
 	}

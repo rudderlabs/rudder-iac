@@ -198,9 +198,6 @@ func importResolver(t *testing.T, importable *resources.RemoteResources, importe
 
 // Import writes the account in a form that loads back and, once apply has
 // adopted the model (and the account, when imported with it), plans no change.
-//
-// Not parallel: LoadSpec records the exported spec's import metadata in a
-// package-level map.
 func TestExportAccountRoundTrip(t *testing.T) {
 	cases := []struct {
 		name             string

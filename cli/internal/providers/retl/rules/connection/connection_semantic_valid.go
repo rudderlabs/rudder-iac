@@ -2,6 +2,7 @@ package connection
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -33,10 +34,10 @@ func NewConnectionSemanticValidRule(registry *definitions.Registry) rules.Rule {
 		rules.Error,
 		"retl connection endpoints must exist in the project and form a valid, compatible topology",
 		rules.Examples{},
-		prules.NewSemanticPatternValidator(
+		prules.NewContextSemanticPatternValidator(
 			prules.V1VersionPatterns(retlConnection.ResourceKind),
-			func(_ string, _ string, _ map[string]any, spec retlConnection.ConnectionsSpec, graph *resources.Graph) []rules.ValidationResult {
-				return validateConnectionsSemantic(registry, spec, graph)
+			func(spec retlConnection.ConnectionsSpec, ctx *rules.ValidationContext) []rules.ValidationResult {
+				return validateConnectionsSemanticForWorkspace(registry, spec, ctx.Graph, ctx.WorkspaceID)
 			},
 		),
 	)
@@ -63,6 +64,10 @@ func validateConnectionsSemantic(
 	spec retlConnection.ConnectionsSpec,
 	graph *resources.Graph,
 ) []rules.ValidationResult {
+	return validateConnectionsSemanticForWorkspace(registry, spec, graph, "")
+}
+
+func validateConnectionsSemanticForWorkspace(registry *definitions.Registry, spec retlConnection.ConnectionsSpec, graph *resources.Graph, workspaceID string) []rules.ValidationResult {
 	edges := esRules.ProjectConnectionEdges(graph)
 
 	var results []rules.ValidationResult
@@ -83,7 +88,7 @@ func validateConnectionsSemantic(
 
 		pair := esRules.ConnectionEdge{SourceURN: endpoints.sourceURN, DestinationURN: endpoints.destinationURN}
 		results = append(results, esRules.ValidatePairUniqueness(edges, pair, connectionRef(index))...)
-		results = append(results, validateDestinationSources(edges, index, endpoints)...)
+		results = append(results, validateDestinationSources(graph, edges, index, endpoints, workspaceID)...)
 
 		entry := connectionEntry{index: index, endpoints: endpoints, config: c.Config}
 		results = append(results, validateDestinationCompatibility(registry, entry)...)
@@ -220,35 +225,69 @@ func validateEndpointsExist(index int, endpoints connectionEndpoints) []rules.Va
 	return results
 }
 
-// validateDestinationSources enforces the two rules about who else may feed a
-// destination: an event stream source may not share it (V-E1), and neither may
-// a second rETL source (V-R1). Both are enforced in the webapp only, so the CLI
-// is the last line of defense. The Customer.io audience exception to V-R1 is
-// out of this release: that flow is rejected outright.
-func validateDestinationSources(edges []esRules.ConnectionEdge, index int, endpoints connectionEndpoints) []rules.ValidationResult {
+// validateDestinationSources retains V-E1 for every event-stream edge, while
+// V-R1 refuses a newly declared or mixed fan-in. A separate warning rule
+// reports groups whose every connection imports its own distinct remote row
+// in the active workspace. The Customer.io audience exception is out of this release.
+func validateDestinationSources(graph *resources.Graph, edges []esRules.ConnectionEdge, index int, endpoints connectionEndpoints, workspaceID string) []rules.ValidationResult {
 	esSourcePrefix := esSource.ResourceType + ":"
-
+	retlSources := make(map[string]bool)
 	var results []rules.ValidationResult
 	for _, e := range edges {
 		if e.DestinationURN != endpoints.destinationURN {
 			continue
 		}
 		_, foreignID, _ := strings.Cut(e.SourceURN, ":")
-
-		switch {
-		case strings.HasPrefix(e.SourceURN, esSourcePrefix):
+		if strings.HasPrefix(e.SourceURN, esSourcePrefix) {
 			results = append(results, result(destinationRef(index), fmt.Sprintf(
 				"destination '%s' is also connected to event stream source '%s' in this project; a destination cannot receive from both event stream and rETL sources",
 				endpoints.destinationID, foreignID,
 			)))
-		case e.SourceURN != endpoints.sourceURN:
+		} else if strings.HasPrefix(e.SourceURN, "retl-") && e.SourceURN != endpoints.sourceURN {
+			retlSources[foreignID] = true
+		}
+	}
+	if len(retlSources) == 0 {
+		return results
+	}
+
+	inherited := destinationFanIn(graph, endpoints, workspaceID)
+	if !inherited {
+		for _, foreignID := range slices.Sorted(maps.Keys(retlSources)) {
 			results = append(results, result(destinationRef(index), fmt.Sprintf(
-				"destination '%s' is also connected to rETL source '%s' in this project; a destination can only receive from one rETL source",
-				endpoints.destinationID, foreignID,
+				"destination '%s' is also connected to rETL source '%s' in this project; a destination can only receive from one rETL source", endpoints.destinationID, foreignID,
 			)))
 		}
 	}
 	return results
+}
+
+// destinationFanIn classifies the whole destination group, not just this
+// entry's pair. Graph metadata already merges inline imports and the central
+// manifest scoped to the active workspace before semantic validation.
+func destinationFanIn(graph *resources.Graph, endpoints connectionEndpoints, workspaceID string) bool {
+	sources := make(map[string]bool)
+	importIDs := make(map[string]bool)
+	inherited := workspaceID != ""
+	for _, conn := range graph.ResourcesByType(retlConnection.ResourceType) {
+		dst, dstOK := conn.Data()[retlConnection.DestinationKey].(*resources.PropertyRef)
+		if !dstOK || dst == nil || dst.URN != endpoints.destinationURN {
+			continue
+		}
+		src, srcOK := conn.Data()[retlConnection.SourceKey].(*resources.PropertyRef)
+		if !srcOK || src == nil {
+			inherited = false
+			continue
+		}
+		sources[src.URN] = true
+		metadata := conn.ImportMetadata()
+		if metadata == nil || metadata.RemoteId == "" || metadata.WorkspaceId != workspaceID || importIDs[metadata.RemoteId] {
+			inherited = false
+			continue
+		}
+		importIDs[metadata.RemoteId] = true
+	}
+	return len(sources) > 1 && inherited
 }
 
 // validateDestinationCompatibility runs the checks that need the destination

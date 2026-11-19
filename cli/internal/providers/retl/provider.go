@@ -126,6 +126,21 @@ func New(client retlClient.RETLStore, opts ...Option) *Provider {
 	return p
 }
 
+// SetWorkspaceID scopes connection import metadata to the active workspace.
+// Project.Load calls this before loading specs or broadcasting the manifest.
+func (p *Provider) SetWorkspaceID(id string) {
+	if ch, ok := p.handlers[connection.ResourceType].(*connection.Handler); ok {
+		ch.SetWorkspaceID(id)
+	}
+}
+
+// SetValidationWorkspaceID narrows graph imports only during offline validation.
+func (p *Provider) SetValidationWorkspaceID(id string) {
+	if ch, ok := p.handlers[connection.ResourceType].(*connection.Handler); ok {
+		ch.SetValidationWorkspaceID(id)
+	}
+}
+
 // LoadImportManifest fans the active workspace's manifest out to every registered
 // handler so URN → remote-ID mappings from a central import-manifest file
 // populate the same import-metadata map that inline metadata.import does.
@@ -233,6 +248,11 @@ func (p *Provider) CheckPlan(ctx context.Context, plan *planner.Plan, st *state.
 	if err := connection.CheckImmutableChanges(plan.Diff); err != nil {
 		return err
 	}
+	if ch, ok := p.handlers[connection.ResourceType].(*connection.Handler); ok {
+		if err := ch.CheckFanIn(ctx, plan, st); err != nil {
+			return err
+		}
+	}
 	if th, ok := p.handlers[table.ResourceType].(*table.Handler); ok {
 		return th.CheckPlan(ctx, plan.Diff, st)
 	}
@@ -256,6 +276,7 @@ func (p *Provider) SemanticRules() []rules.Rule {
 	if _, ok := p.handlers[connection.ResourceType]; ok {
 		semantic = append(semantic,
 			connectionRules.NewConnectionSemanticValidRule(p.destinationRegistry),
+			connectionRules.NewInheritedFanInRule(),
 			connectionRules.NewConnectionEnabledEndpointsRule(),
 		)
 	}

@@ -54,6 +54,7 @@ type DataCatalog struct {
 	Categories     []CategoryV1                         `json:"categories"`
 	ImportMetadata map[string]*WorkspaceRemoteIDMapping `json:"importMetadata"`
 	ReferenceMap   map[string]string                    `json:"-"` // Maps URN references to original path-based references
+	workspaceID    string
 }
 
 func (dc *DataCatalog) Property(id string) *PropertyV1 {
@@ -404,7 +405,22 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 			return fmt.Errorf("unknown kind: %s", s.Kind)
 		}
 
+		// Without an active workspace, a spec can supply import identities only
+		// when all its inline mappings agree on one nonempty workspace.
+		inlineWorkspaceID := dc.workspaceID
+		if inlineWorkspaceID == "" && len(metadata.Import.Workspaces) > 0 {
+			inlineWorkspaceID = metadata.Import.Workspaces[0].WorkspaceID
+			for _, ws := range metadata.Import.Workspaces[1:] {
+				if ws.WorkspaceID != inlineWorkspaceID {
+					inlineWorkspaceID = ""
+					break
+				}
+			}
+		}
 		lo.ForEach(metadata.Import.Workspaces, func(workspace specs.WorkspaceImportMetadata, _ int) {
+			if inlineWorkspaceID == "" || workspace.WorkspaceID != inlineWorkspaceID {
+				return
+			}
 			// For each resource within the workspace, load the import metadata
 			// which will be used during the creation of resourceGraph
 			lo.ForEach(workspace.Resources, func(resource specs.ImportIds, _ int) {
@@ -424,6 +440,11 @@ func addImportMetadata(s *specs.Spec, dc *DataCatalog) error {
 	}
 
 	return nil
+}
+
+// SetWorkspaceID selects the workspace whose inline imports are loaded.
+func (dc *DataCatalog) SetWorkspaceID(id string) {
+	dc.workspaceID = id
 }
 
 // LoadImportManifest merges the active workspace's import metadata into the

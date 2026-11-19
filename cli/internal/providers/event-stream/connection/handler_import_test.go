@@ -60,7 +60,7 @@ func TestLoadImportable(t *testing.T) {
 		}
 		mock.SetGetSourcesFunc(func(_ context.Context) ([]sourceClient.EventStreamSource, error) {
 			return []sourceClient.EventStreamSource{
-				{ID: "src-remote-1", Name: "Android App", WorkspaceID: "workspace-123", ExternalID: "android"},
+				{ID: "src-remote-1", Name: "Android App", Type: "android", WorkspaceID: "workspace-123", ExternalID: "android"},
 			}, nil
 		})
 		h := NewHandler(mock, "event-stream")
@@ -83,6 +83,7 @@ func TestLoadImportable(t *testing.T) {
 				WorkspaceID:           "workspace-123",
 				SourceExternalID:      "android",
 				DestinationExternalID: "s3",
+				SourceType:            "android",
 			},
 		}, remotes["conn-remote-1"])
 	})

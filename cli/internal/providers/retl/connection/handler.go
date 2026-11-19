@@ -38,10 +38,13 @@ const listPageSize = 100
 // delete-then-create replacement, and an immutable config change rejected with
 // the remedy rather than silently not applied.
 type Handler struct {
-	client     retlClient.RETLStore
-	registry   *definitions.Registry
-	resources  map[string]*connectionResource
-	importFile string
+	client                retlClient.RETLStore
+	registry              *definitions.Registry
+	resources             map[string]*connectionResource
+	importFile            string
+	workspaceID           string
+	validationWorkspaceID string
+	validationScoped      bool
 
 	// The endpoint catalogs, fetched once and shared by every operation that
 	// judges a remote row. The syncer runs one Import per connection, possibly
@@ -64,6 +67,19 @@ func (h *Handler) EnableSourceKinds(resourceTypes ...string) {
 	for _, rt := range resourceTypes {
 		h.enabledSourceTypes[rt] = true
 	}
+}
+
+// SetWorkspaceID selects the workspace whose import identities enter the graph.
+func (h *Handler) SetWorkspaceID(id string) {
+	h.workspaceID = id
+	h.validationScoped = false
+}
+
+// SetValidationWorkspaceID narrows graph imports without changing the active
+// workspace used for plan checks.
+func (h *Handler) SetValidationWorkspaceID(id string) {
+	h.validationWorkspaceID = id
+	h.validationScoped = true
 }
 
 func (h *Handler) sourceKindEnabled(sk SourceKind) bool {
@@ -129,7 +145,7 @@ func (h *Handler) LoadSpec(_ string, s *specs.Spec) error {
 		if err != nil {
 			return err
 		}
-		if err := resource.addImportMetadata(s); err != nil {
+		if err := resource.addImportMetadata(s, h.workspaceID); err != nil {
 			return fmt.Errorf("loading import metadata: %w", err)
 		}
 		h.resources[entry.LocalID] = resource
@@ -183,7 +199,8 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 			resources.WithResourceFileMetadata(fmt.Sprintf("#%s:%s", ResourceKind, c.LocalID)),
 		}
 		urn := resources.URN(c.LocalID, ResourceType)
-		if importMetadata, ok := c.ImportMetadata[urn]; ok {
+		if importMetadata, ok := c.ImportMetadata[urn]; ok && (h.workspaceID == "" || importMetadata.WorkspaceID == h.workspaceID) &&
+			(!h.validationScoped || h.validationWorkspaceID != "" && importMetadata.WorkspaceID == h.validationWorkspaceID) {
 			opts = []resources.ResourceOpts{
 				resources.WithResourceImportMetadata(importMetadata.RemoteID, importMetadata.WorkspaceID),
 			}
@@ -193,7 +210,7 @@ func (h *Handler) GetResources() ([]*resources.Resource, error) {
 	return result, nil
 }
 
-func (c *connectionResource) addImportMetadata(s *specs.Spec) error {
+func (c *connectionResource) addImportMetadata(s *specs.Spec, workspaceID string) error {
 	metadata, err := s.CommonMetadata()
 	if err != nil {
 		return err
@@ -201,12 +218,30 @@ func (c *connectionResource) addImportMetadata(s *specs.Spec) error {
 	if metadata.Import == nil {
 		return nil
 	}
-	c.applyImportManifest(metadata.Import)
+	if workspaceID == "" {
+		if len(metadata.Import.Workspaces) == 0 {
+			return nil
+		}
+		workspaceID = metadata.Import.Workspaces[0].WorkspaceID
+		for _, ws := range metadata.Import.Workspaces[1:] {
+			if ws.WorkspaceID != workspaceID {
+				workspaceID = ""
+				break
+			}
+		}
+		if workspaceID == "" {
+			return nil
+		}
+	}
+	c.applyImportManifest(metadata.Import, workspaceID)
 	return nil
 }
 
-func (c *connectionResource) applyImportManifest(m *specs.WorkspacesImportMetadata) {
+func (c *connectionResource) applyImportManifest(m *specs.WorkspacesImportMetadata, workspaceID string) {
 	for _, workspace := range m.Workspaces {
+		if workspaceID != "" && workspace.WorkspaceID != workspaceID {
+			continue
+		}
 		for _, resource := range workspace.Resources {
 			// Support both the URN field (new) and the LocalID field (legacy).
 			urn := resource.URN
@@ -228,7 +263,7 @@ func (h *Handler) LoadImportMetadata(m *specs.WorkspacesImportMetadata) error {
 		return nil
 	}
 	for _, c := range h.resources {
-		c.applyImportManifest(m)
+		c.applyImportManifest(m, h.workspaceID)
 	}
 	return nil
 }
@@ -296,6 +331,19 @@ func (h *Handler) Update(ctx context.Context, id string, data resources.Resource
 		}
 		if err := h.assertCreatable(ctx, request); err != nil {
 			return nil, fmt.Errorf("connection %q: %w", id, err)
+		}
+		// Guard the delete even when Update is invoked without Provider.CheckPlan
+		// (or another actor changes the destination after preflight).
+		rows, err := h.listAll(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("connection %q: checking destination before replacement: %w", id, err)
+		}
+		for _, row := range rows {
+			// Even a row from the same source occupies the intended pair;
+			// deleting ours cannot make the backend accept another one.
+			if row.DestinationID == request.DestinationID && row.ID != remoteID {
+				return nil, fmt.Errorf("connection %q: destination %q already has rETL connection %q from source %q; refusing to delete the existing connection for an occupied-pair or fan-in replacement", id, request.DestinationID, row.ID, row.SourceID)
+			}
 		}
 		log.Warn("replacing rETL connection after an endpoint change",
 			"connection", id, "connectionId", remoteID)

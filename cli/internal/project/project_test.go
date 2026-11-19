@@ -16,6 +16,10 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	provrules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
@@ -81,6 +85,22 @@ func (m *mockConsumerProvider) LoadImportManifest(manifest *specs.WorkspaceImpor
 	return nil
 }
 
+type scopedConsumerProvider struct {
+	*mockConsumerProvider
+	workspaceID string
+}
+
+func (m *scopedConsumerProvider) SetWorkspaceID(id string) { m.workspaceID = id }
+
+func TestProject_SetsWorkspaceIDOnProvider(t *testing.T) {
+	consumer := &scopedConsumerProvider{mockConsumerProvider: &mockConsumerProvider{MockProvider: testutils.NewMockProvider(nil, nil)}}
+	proj := project.New(consumer, project.WithWorkspaceID("ws-a"), project.WithLoader(&MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) {
+		return map[string]*specs.RawSpec{}, nil
+	}}))
+	require.NoError(t, proj.Load("test_dir"))
+	assert.Equal(t, "ws-a", consumer.workspaceID)
+}
+
 func TestProject_BroadcastsImportManifest(t *testing.T) {
 	enableImportMerge(t)
 
@@ -121,6 +141,98 @@ func TestProject_BroadcastsImportManifest(t *testing.T) {
 		WorkspaceID: "ws-a",
 		Resources:   []specs.ImportIds{{URN: "event:login", RemoteID: "rem-1"}},
 	}, consumer.gotManifest)
+}
+
+// Exercise real catalog graph construction and semantic name validation without
+// a resolved workspace or a network client. The active-workspace cases must not
+// change when offline inference is available.
+func TestProject_OfflineTrackingPlanImportIdentity(t *testing.T) {
+	enableImportMerge(t)
+	const tp = "version: rudder/v1\nkind: tracking-plan\nmetadata:\n  name: plan\n%s\nspec:\n  id: plan\n  display_name: 'Sales & Marketing'\n  rules: []\n"
+	const manifest = "version: rudder/v1\nkind: import-manifest\nmetadata:\n  name: imports\nspec:\n  workspaces:\n%s"
+	inline := func(ids ...string) string {
+		var blocks strings.Builder
+		for _, id := range ids {
+			fmt.Fprintf(&blocks, "    - workspace_id: %s\n      resources:\n        - urn: tracking-plan:plan\n          remote_id: remote-%s\n", id, id)
+		}
+		return "  import:\n    workspaces:\n  " + strings.TrimSuffix(strings.ReplaceAll(blocks.String(), "\n", "\n  "), "  ")
+	}
+	central := func(ids ...string) string {
+		var blocks strings.Builder
+		for _, id := range ids {
+			fmt.Fprintf(&blocks, "    - workspace_id: %s\n      resources:\n        - urn: tracking-plan:plan\n          remote_id: remote-%s\n", id, id)
+		}
+		return fmt.Sprintf(manifest, blocks.String())
+	}
+	for _, tc := range []struct {
+		name, inline, central, active, wantWorkspace string
+	}{
+		{name: "central unique", central: central("ws-a"), wantWorkspace: "ws-a"},
+		{name: "inline unique", inline: inline("ws-a"), wantWorkspace: "ws-a"},
+		{name: "inline ambiguous", inline: inline("ws-a", "ws-b")},
+		{name: "central ambiguous", central: central("ws-a", "ws-b")},
+		{name: "central and inline disagree", inline: inline("ws-b"), central: central("ws-a")},
+		{name: "same workspace central and inline", inline: inline("ws-a"), central: central("ws-a"), wantWorkspace: "ws-a"},
+		{name: "active selects first", inline: inline("ws-a", "ws-b"), active: "ws-a", wantWorkspace: "ws-a"},
+		{name: "active wrong ID", inline: inline("ws-a"), central: central("ws-a"), active: "ws-other"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := map[string]*specs.RawSpec{"plan.yaml": {Data: []byte(fmt.Sprintf(tp, tc.inline))}}
+			if tc.central != "" {
+				raw["manifest.yaml"] = &specs.RawSpec{Data: []byte(tc.central)}
+			}
+			catalogProvider := datacatalog.New(nil)
+			var out bytes.Buffer
+			proj := project.New(catalogProvider, project.WithWorkspaceID(tc.active),
+				project.WithLoader(&MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) { return raw, nil }}),
+				project.WithRenderer(renderer.NewTextRenderer(&out)))
+			err := proj.Load("offline")
+			if tc.wantWorkspace == "" {
+				require.ErrorContains(t, err, "semantic validation failed", out.String())
+				assert.Contains(t, out.String(), "ampersands require a tracking plan import identity")
+			} else {
+				require.NoError(t, err, out.String())
+			}
+			graph, graphErr := proj.ResourceGraph()
+			require.NoError(t, graphErr)
+			resource, ok := graph.GetResource(resources.URN("plan", types.TrackingPlanResourceType))
+			require.True(t, ok)
+			if tc.wantWorkspace == "" {
+				assert.Nil(t, resource.ImportMetadata())
+			} else {
+				require.NotNil(t, resource.ImportMetadata())
+				assert.Equal(t, tc.wantWorkspace, resource.ImportMetadata().WorkspaceId)
+				assert.Equal(t, "remote-"+tc.wantWorkspace, resource.ImportMetadata().RemoteId)
+			}
+		})
+	}
+}
+
+func TestProject_OfflineCompositeScopesRealProviders(t *testing.T) {
+	enableImportMerge(t)
+	catalogProvider := datacatalog.New(nil)
+	retlProvider := retl.New(nil, retl.WithConnectionSupport(definitions.NewRegistry()))
+	composite, err := provider.NewCompositeProvider(map[string]provider.Provider{
+		"catalog": catalogProvider, "retl": retlProvider,
+	})
+	require.NoError(t, err)
+	const plan = "version: rudder/v1\nkind: tracking-plan\nmetadata:\n  name: plan\n  import:\n    workspaces:\n      - workspace_id: ws-a\n        resources:\n          - urn: tracking-plan:plan\n            remote_id: tp-remote\nspec:\n  id: plan\n  display_name: 'Sales & Marketing'\n  rules: []\n"
+	const connectionSpec = "version: rudder/v1\nkind: retl-connections\nmetadata:\n  name: connections\n  import:\n    workspaces:\n      - workspace_id: ws-b\n        resources:\n          - urn: retl-connection:conn\n            remote_id: conn-remote\nspec:\n  connections:\n    - id: conn\n      source: '#retl-source-sql-model:src'\n      destination: '#destination:dst'\n      config:\n        sync_behaviour: upsert\n        schedule:\n          type: basic\n          every_minutes: 30\n        identifiers:\n          - from: id\n            to: id\n"
+	raw := map[string]*specs.RawSpec{"plan.yaml": {Data: []byte(plan)}, "connection.yaml": {Data: []byte(connectionSpec)}}
+	var out bytes.Buffer
+	proj := project.New(composite, project.WithLoader(&MockLoader{LoadFunc: func(string) (map[string]*specs.RawSpec, error) { return raw, nil }}),
+		project.WithRenderer(renderer.NewTextRenderer(&out)))
+	// The unrelated rETL workspace makes the project ambiguous: neither
+	// provider may attach its otherwise unique inline import.
+	require.ErrorContains(t, proj.Load("offline"), "semantic validation failed", out.String())
+	assert.Contains(t, out.String(), "ampersands require a tracking plan import identity")
+	graph, err := proj.ResourceGraph()
+	require.NoError(t, err)
+	for _, urn := range []string{"tracking-plan:plan", "retl-connection:conn"} {
+		resource, ok := graph.GetResource(urn)
+		require.True(t, ok, urn, out.String())
+		assert.Nil(t, resource.ImportMetadata(), urn)
+	}
 }
 
 func TestNewProject_Load_Error(t *testing.T) {

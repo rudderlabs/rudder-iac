@@ -14,7 +14,7 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	dcdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
-	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
+	catalogrules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	categoryRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/category"
 	customtypeRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/customtype"
 	eventRules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/event"
@@ -23,6 +23,8 @@ import (
 	pstate "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/state"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	rstate "github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
@@ -38,6 +40,11 @@ type Provider struct {
 	client        catalog.DataCatalog
 	dc            *localcatalog.DataCatalog
 	providerStore map[string]entityProvider
+	workspaceID   string
+	// Offline validation can suppress imports when the project declares more
+	// than one workspace, even if an individual spec has a unique inline ID.
+	validationWorkspaceID string
+	validationScoped      bool
 }
 
 func New(client catalog.DataCatalog) *Provider {
@@ -65,6 +72,25 @@ func (p *Provider) LoadSpec(path string, s *specs.Spec) error {
 
 func (p *Provider) LoadLegacySpec(path string, s *specs.Spec) error {
 	return p.dc.LoadLegacySpec(path, s)
+}
+
+// SetWorkspaceID scopes inline and central import identities to the active
+// workspace. Project.Load calls this before loading resource specs. An unresolved
+// workspace cannot grandfather a legacy tracking-plan name.
+func (p *Provider) SetWorkspaceID(id string) {
+	p.workspaceID = id
+	p.validationScoped = false
+	p.dc.SetWorkspaceID(id)
+	if tp, ok := p.providerStore[types.TrackingPlanResourceType].(*TrackingPlanEntityProvider); ok {
+		tp.TrackingPlanProvider.workspaceID = id
+	}
+}
+
+// SetValidationWorkspaceID narrows graph metadata for offline validation only.
+// It never changes the active workspace used by CheckPlan or writes.
+func (p *Provider) SetValidationWorkspaceID(id string) {
+	p.validationWorkspaceID = id
+	p.validationScoped = true
 }
 
 // LoadImportManifest delegates the active workspace's manifest to the local
@@ -127,7 +153,79 @@ func (p *Provider) ResourceGraph() (*resources.Graph, error) {
 		return nil, fmt.Errorf("inflating refs: %w", err)
 	}
 
-	return createResourceGraph(p.dc)
+	graph, err := p.createResourceGraph()
+	if err != nil {
+		return nil, err
+	}
+	// Capture only declarations actually attached to the active workspace.
+	if tp, ok := p.providerStore[types.TrackingPlanResourceType].(*TrackingPlanEntityProvider); ok {
+		ids := make(map[string]string)
+		for _, resource := range graph.ResourcesByType(types.TrackingPlanResourceType) {
+			if meta := resource.ImportMetadata(); meta != nil && p.workspaceID != "" && meta.WorkspaceId == p.workspaceID && meta.RemoteId != "" {
+				ids[resource.ID()] = meta.RemoteId
+			}
+		}
+		tp.TrackingPlanProvider.importedIDs = ids
+	}
+	return graph, nil
+}
+
+// CheckPlan verifies legacy tracking plan names against the declared import
+// identity and the live catalog before the first apply mutation. Managed
+// updates additionally require unchanged name and description in prior state.
+func (p *Provider) CheckPlan(ctx context.Context, plan *planner.Plan, st *rstate.State) error {
+	if plan == nil {
+		return nil
+	}
+	for _, op := range plan.Operations {
+		if op == nil || op.Resource == nil || op.Resource.Type() != types.TrackingPlanResourceType || op.Type == planner.Delete {
+			continue
+		}
+		name, _ := op.Resource.Data()["name"].(string)
+		if catalogrules.ValidTrackingPlanName(name) {
+			continue
+		}
+		if !catalogrules.LegacyTrackingPlanName(name) {
+			return fmt.Errorf("tracking plan %s: invalid display_name %q (the catalog API rejects it)", op.Resource.URN(), name)
+		}
+		meta := op.Resource.ImportMetadata()
+		declared := p.dc.ImportMetadata[op.Resource.URN()]
+		if (op.Type != planner.Import && op.Type != planner.Update) || meta == nil || meta.RemoteId == "" || meta.WorkspaceId == "" || p.workspaceID == "" || meta.WorkspaceId != p.workspaceID || declared == nil || declared.WorkspaceID != meta.WorkspaceId || declared.RemoteID != meta.RemoteId {
+			return fmt.Errorf("tracking plan %s: display_name %q contains '&' and requires a declared import for this workspace", op.Resource.URN(), name)
+		}
+		if op.Type == planner.Update {
+			var previous *rstate.ResourceState
+			if st != nil {
+				previous = st.GetResource(op.Resource.URN())
+			}
+			if previous == nil || previous.ID != op.Resource.ID() || previous.Type != types.TrackingPlanResourceType {
+				return fmt.Errorf("tracking plan %s: legacy display_name %q requires prior managed state", op.Resource.URN(), name)
+			}
+			prior := previous.Data()
+			priorArgs, ok := prior["trackingPlanArgs"].(map[string]any)
+			if !ok {
+				return fmt.Errorf("tracking plan %s: legacy display_name %q requires prior managed tracking plan state", op.Resource.URN(), name)
+			}
+			prevID, _ := prior["id"].(string)
+			prevWorkspace, _ := prior["workspaceId"].(string)
+			prevName, _ := prior["name"].(string)
+			prevDescription, _ := prior["description"].(string)
+			prevArgsName, _ := priorArgs["name"].(string)
+			prevArgsDescription, _ := priorArgs["description"].(string)
+			description, _ := op.Resource.Data()["description"].(string)
+			if prevID != meta.RemoteId || prevWorkspace != p.workspaceID || prevName != name || prevArgsName != name || prevArgsDescription != description || prevDescription != description {
+				return fmt.Errorf("tracking plan %s: legacy display_name %q cannot be renamed or have its description changed", op.Resource.URN(), name)
+			}
+		}
+		tp, ok := p.providerStore[types.TrackingPlanResourceType].(*TrackingPlanEntityProvider)
+		if !ok {
+			return fmt.Errorf("tracking plan %s: tracking plan provider is missing", op.Resource.URN())
+		}
+		if err := tp.TrackingPlanProvider.verifyLegacyIdentity(ctx, op.Resource.ID(), meta.RemoteId, name, op.Type == planner.Update, nil); err != nil {
+			return fmt.Errorf("verifying tracking plan %s: %w", op.Resource.URN(), err)
+		}
+	}
+	return nil
 }
 
 func (p *Provider) List(ctx context.Context, resourceType string, filters lister.Filters) ([]resources.ResourceData, error) {
@@ -169,7 +267,8 @@ func (p *Provider) listTrackingPlans(ctx context.Context) ([]resources.ResourceD
 	return result, nil
 }
 
-func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, error) {
+func (p *Provider) createResourceGraph() (*resources.Graph, error) {
+	catalog := p.dc
 	graph := resources.NewGraph()
 
 	// First, pre-calculate all URNs to use for references
@@ -195,7 +294,8 @@ func createResourceGraph(catalog *localcatalog.DataCatalog) (*resources.Graph, e
 
 	getResourceImportMetadata := func(id, resourceType string) resources.ResourceOpts {
 		metadata, ok := catalog.ImportMetadata[resources.URN(id, resourceType)]
-		if !ok {
+		if !ok || metadata == nil || p.workspaceID != "" && metadata.WorkspaceID != p.workspaceID ||
+			p.validationScoped && (p.validationWorkspaceID == "" || metadata.WorkspaceID != p.validationWorkspaceID) {
 			return nil
 		}
 		return resources.WithResourceImportMetadata(metadata.RemoteID, metadata.WorkspaceID)

@@ -15,6 +15,7 @@ var validateTrackingPlanSemanticV1 = func(_ string, _ string, _ map[string]any, 
 	results = append(results, validateTrackingPlanVariantsV1(spec, graph)...)
 	results = append(results, validatePropertyNestingV1(spec, graph)...)
 	results = append(results, validateTrackingPlanNameUniquenessV1(spec, graph)...)
+	results = append(results, validateTrackingPlanImportName(spec.Name, spec.LocalID, graph)...)
 	results = append(results, validateDuplicateEventsV1(spec)...)
 	results = append(results, validateDuplicatePropertiesV1(spec)...)
 

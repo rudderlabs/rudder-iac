@@ -7,6 +7,7 @@ import (
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
+	catalogrules "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules/variant"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -37,6 +38,7 @@ func validateTrackingPlanSemanticWithEventRuleIncludes(
 	results = append(results, validateTrackingPlanVariants(spec, graph)...)
 	results = append(results, validatePropertyNestingV0(spec, graph)...)
 	results = append(results, validateTrackingPlanNameUniquenessV0(spec, graph)...)
+	results = append(results, validateTrackingPlanImportName(spec.Name, spec.LocalID, graph)...)
 	results = append(results, validateDuplicateEventsV0(spec, graph, eventRuleIncludesEnabled)...)
 	results = append(results, validateDuplicatePropertiesV0(spec)...)
 
@@ -205,6 +207,22 @@ func validateTrackingPlanNameUniquenessV0(spec localcatalog.TrackingPlan, graph 
 	}
 
 	return nil
+}
+
+// An ampersand is grandfathered only for an import in this workspace. Remote
+// name and workspace are checked by CheckPlan before any apply mutations.
+func validateTrackingPlanImportName(name, localID string, graph *resources.Graph) []rules.ValidationResult {
+	if !catalogrules.LegacyTrackingPlanName(name) {
+		return nil
+	}
+	resource, ok := graph.GetResource(resources.URN(localID, types.TrackingPlanResourceType))
+	if ok && resource.ImportMetadata() != nil && resource.ImportMetadata().RemoteId != "" && resource.ImportMetadata().WorkspaceId != "" {
+		return nil
+	}
+	return []rules.ValidationResult{{
+		Reference: "/display_name",
+		Message:   "ampersands require a tracking plan import identity in the active workspace",
+	}}
 }
 
 func trackingPlanDisplayNameCountMap(graph *resources.Graph) map[string]int {

@@ -171,6 +171,28 @@ func TestTypedRule_Validate_ReferencePrefixing(t *testing.T) {
 	}
 }
 
+func TestContextSemanticPatternValidator(t *testing.T) {
+	ctx := createMockContext("testKind", "v1", map[string]any{"field1": "value"})
+	ctx.WorkspaceID = "ws-1"
+	rule := NewTypedRule("test-context", rules.Warning, "context-aware", rules.Examples{},
+		NewContextSemanticPatternValidator(
+			[]rules.MatchPattern{rules.MatchKind("testKind")},
+			func(spec testSpec, validation *rules.ValidationContext) []rules.ValidationResult {
+				return []rules.ValidationResult{{Reference: "/field1", Message: validation.WorkspaceID + ":" + spec.Field1}}
+			},
+		),
+	)
+	assert.Equal(t, []rules.ValidationResult{{Reference: "/spec/field1", Message: "ws-1:value"}}, rule.Validate(ctx))
+	ctx.Kind = "other"
+	assert.Empty(t, rule.Validate(ctx))
+	ctx.Kind = "testKind"
+	ctx.Spec = map[string]any{"field2": "not-an-int"}
+	results := rule.Validate(ctx)
+	assert.Len(t, results, 1)
+	assert.Equal(t, "/spec", results[0].Reference)
+	assert.Contains(t, results[0].Message, "failed to unmarshal spec")
+}
+
 func TestTypedRule_Validate_MarshalError(t *testing.T) {
 	t.Parallel()
 

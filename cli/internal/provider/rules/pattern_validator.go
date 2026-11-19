@@ -71,6 +71,17 @@ func NewSemanticPatternValidator[T any](
 	patterns []rules.MatchPattern,
 	fn func(Kind string, Version string, Metadata map[string]any, Spec T, Graph *resources.Graph) []rules.ValidationResult,
 ) PatternValidator {
+	return NewContextSemanticPatternValidator(patterns, func(spec T, ctx *rules.ValidationContext) []rules.ValidationResult {
+		return fn(ctx.Kind, ctx.Version, ctx.Metadata, spec, ctx.Graph)
+	})
+}
+
+// NewContextSemanticPatternValidator creates a typed semantic validator with
+// access to the full validation context (including its active workspace).
+func NewContextSemanticPatternValidator[T any](
+	patterns []rules.MatchPattern,
+	fn func(Spec T, Context *rules.ValidationContext) []rules.ValidationResult,
+) PatternValidator {
 	return PatternValidator{
 		patterns: patterns,
 		validate: func(ctx *rules.ValidationContext) []rules.ValidationResult {
@@ -78,8 +89,7 @@ func NewSemanticPatternValidator[T any](
 			if err != nil {
 				return err
 			}
-
-			results := fn(ctx.Kind, ctx.Version, ctx.Metadata, spec, ctx.Graph)
+			results := fn(spec, ctx)
 			prefixReferences(results)
 			return results
 		},
