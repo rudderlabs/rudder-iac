@@ -154,7 +154,8 @@ func TestTrackWire(t *testing.T) {
 		name  string
 		call  func() error
 		want  string
-		err   error                // the call must return exactly this error
+		err   error                // the call must return an error equal to this one
+		same  error                // the call must return this very error, such as an SDK sentinel
 		errIs error                // the call must return an error wrapping this one
 		props analytics.Properties // when set, the Config.Callback message must hold exactly these properties
 	}{
@@ -351,7 +352,7 @@ func TestTrackWire(t *testing.T) {
 		{
 			name: "a closed client returns the SDK's ErrClosed",
 			call: func() error { return examples.New(closed).TrackSomeEmptyTrackEvent(id) },
-			err:  analytics.ErrClosed,
+			same: analytics.ErrClosed,
 		},
 		{
 			name: "a self-containing map is invalid",
@@ -424,6 +425,8 @@ func TestTrackWire(t *testing.T) {
 			switch {
 			case tt.err != nil:
 				assert.Equal(t, tt.err, errs[i])
+			case tt.same != nil:
+				assert.Same(t, tt.same, errs[i])
 			case tt.errIs != nil:
 				assert.ErrorIs(t, errs[i], tt.errIs)
 			default:
