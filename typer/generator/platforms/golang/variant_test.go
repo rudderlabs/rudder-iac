@@ -236,6 +236,19 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			wantErr: `naming property "$$" of CustomTypeMeta: name "$$" has no letters or digits to build a Go identifier from`,
 		},
 		{
+			// Every branch merges the base, which warns once.
+			name:         "a base enum leaving out values",
+			plan:         variantPlan(plan.Property{Types: onlyString, Config: &plan.PropertyConfig{Enum: []any{"a", "b", 1}}}, discriminate([]any{"a"}, []any{"b"})),
+			wantWarnings: []string{`leaving out the enum values [1] of property "kind" (string) of track event "Some Event": its declared types do not allow them`},
+		},
+		{
+			name: "a case enum leaving out values",
+			plan: variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+				"meta": object(map[string]plan.PropertySchema{"x": {Property: plan.Property{Name: "x", Types: onlyString, Config: &plan.PropertyConfig{Enum: []any{"q", 2}}}}}),
+			}})),
+			wantWarnings: []string{`leaving out the enum values [2] of property "meta.x" (string) of case ["a"] of the variants of track event "Some Event": its declared types do not allow them`},
+		},
+		{
 			name:         "an open case under a closed base",
 			plan:         variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{AdditionalProperties: true})),
 			wantWarnings: []string{`generating case ["a"] of the variants of track event "Some Event" closed: its base schema does not allow additional properties`},

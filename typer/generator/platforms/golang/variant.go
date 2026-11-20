@@ -198,7 +198,19 @@ func (res *resolver) branch(s, b *plan.ObjectSchema, label, where string) (*obje
 		merged.Properties[key] = ps
 	}
 	// The base's properties resolved already, so an error names the branch.
-	return res.schema(&merged, label, "")
+	out, err := res.schema(&merged, label, "")
+	if err != nil {
+		return nil, err
+	}
+	// The base warned about its own properties, whose definitions the merge keeps.
+	var own []ruleField
+	for _, f := range out.fields {
+		if _, ok := s.Properties[f.wireKey]; !ok {
+			own = append(own, f)
+		}
+	}
+	warnDropped(own, label+" of the variants of "+where, "")
+	return out, nil
 }
 
 // sameDefinition reports whether a, the base's property, and b, the branch's,

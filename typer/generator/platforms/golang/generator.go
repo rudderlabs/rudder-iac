@@ -232,11 +232,15 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, []*customType, error) {
 			continue
 		}
 
-		var err error
-		if r.schema, err = res.schema(&r.rule.Schema, fmt.Sprintf("track event %q", event.Name), ""); err != nil {
+		var (
+			where = fmt.Sprintf("track event %q", event.Name)
+			err   error
+		)
+		if r.schema, err = res.schema(&r.rule.Schema, where, ""); err != nil {
 			return nil, nil, err
 		}
-		if r.variant, err = res.variant(&r.rule.Schema, r.schema, r.rule.Variants, fmt.Sprintf("track event %q", event.Name)); err != nil {
+		warnDropped(r.schema.fields, where, "")
+		if r.variant, err = res.variant(&r.rule.Schema, r.schema, r.rule.Variants, where); err != nil {
 			return nil, nil, err
 		}
 		rules = append(rules, r)
@@ -280,9 +284,6 @@ func (res *resolver) schema(s *plan.ObjectSchema, where, path string) (*objectSc
 		if f.enum, err = resolveEnum(p); err != nil {
 			return nil, fmt.Errorf("mapping property %q of %s: %w", name, where, err)
 		}
-		if f.enum != nil && len(f.enum.dropped) > 0 {
-			core.Warn(fmt.Sprintf("leaving out the enum values %s of property %q (%s) of %s: its declared types do not allow them", jsonText(f.enum.dropped), name, declaredTypes(p), where))
-		}
 		// The enum beats the declared types, object included.
 		if f.enum == nil && declares(p.Types, plan.PrimitiveTypeObject) && isStruct(ps.Schema) {
 			if f.nested, err = res.schema(ps.Schema, where, name+"."); err != nil {
@@ -292,6 +293,21 @@ func (res *resolver) schema(s *plan.ObjectSchema, where, path string) (*objectSc
 		out.fields = append(out.fields, f)
 	}
 	return out, nil
+}
+
+// warnDropped warns about the enum values that fields, at path within where,
+// and the fields they hoist leave out because their declared types do not
+// allow them.
+func warnDropped(fields []ruleField, where, path string) {
+	for _, f := range fields {
+		name := path + f.wireKey
+		if f.enum != nil && len(f.enum.dropped) > 0 {
+			core.Warn(fmt.Sprintf("leaving out the enum values %s of property %q (%s) of %s: its declared types do not allow them", jsonText(f.enum.dropped), name, declaredTypes(f.ps.Property), where))
+		}
+		if f.nested != nil {
+			warnDropped(f.nested.fields, where, name+".")
+		}
+	}
 }
 
 // resolveCustomTypes resolves the custom types p references.
@@ -329,6 +345,7 @@ func (res *resolver) customType(ct *plan.CustomType) (*customType, error) {
 		if c.schema, err = res.schema(s, where, ""); err != nil {
 			return nil, err
 		}
+		warnDropped(c.schema.fields, where, "")
 		if c.variant, err = res.variant(s, c.schema, ct.Variants, where); err != nil {
 			return nil, err
 		}
