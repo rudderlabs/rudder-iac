@@ -80,29 +80,51 @@ type callerStruct struct {
 	hidden int
 }
 
+type callerNode struct{ Next *callerNode }
+
+// callerFields promotes Tags from an embedded pointer to an unexported type,
+// as encoding/json does.
 type (
-	callerNode   struct{ Next *callerNode }
-	callerHolder struct{ Payload testPayload }
+	callerFields struct {
+		Items  []string
+		Labels map[string]int
+		*embeddedFields
+	}
+	embeddedFields struct{ Tags []string }
+	// An empty json.RawMessage fails to encode, but omitempty leaves it out.
+	callerOmitted struct {
+		Items  []string        `json:",omitzero"`
+		Labels map[string]int  `json:",omitzero"`
+		Done   func()          `json:",omitzero"`
+		Raw    json.RawMessage `json:",omitempty"`
+	}
+	// encoding/json skips the fields promoted from an embedded struct tagged
+	// "-", so a function there is never encoded.
+	callerIgnored struct {
+		Name        string
+		callerHooks `json:"-"`
+	}
+	callerHooks struct{ OnSend func() }
 )
-
-// callerFields holds the field shapes the nil rule treats differently. Its
-// embedded struct has an unexported type, so encoding/json promotes its
-// exported fields.
-type callerFields struct {
-	Items  []string
-	Labels map[string]int
-	Bytes  []byte
-	ByID   map[int]string
-	Ptr    *int
-	embeddedFields
-}
-
-type embeddedFields struct{ Tags []string }
 
 type (
 	callerEmbedded    struct{ embeddedPayload }
 	callerEmbeddedPtr struct{ *embeddedPayload }
 	embeddedPayload   struct{ Payload testPayload }
+	// reflect.VisibleFields hides a promoted field by its Go name, but
+	// encoding/json encodes it when its JSON name differs: here both Payload
+	// fields of callerSameName, and the embedded one of callerShadowed.
+	callerSameName struct {
+		embeddedPayload
+		otherPayload
+	}
+	otherPayload struct {
+		Payload testPayload `json:"other"`
+	}
+	callerShadowed struct {
+		embeddedPayload
+		Payload int `json:"other"`
+	}
 )
 
 // ptrText and ptrJSON marshal through pointer receivers, which encoding/json
@@ -117,6 +139,13 @@ type (
 func (s *ptrText) MarshalText() ([]byte, error) { return []byte(strings.ToUpper(string(*s))), nil }
 func (*ptrJSON) MarshalJSON() ([]byte, error)   { return []byte(`"from MarshalJSON"`), nil }
 
+// ptrJSONText has a pointer-receiver MarshalJSON and a value MarshalText.
+// encoding/json prefers the first on an addressable value.
+type ptrJSONText string
+
+func (*ptrJSONText) MarshalJSON() ([]byte, error) { return []byte(`"from MarshalJSON"`), nil }
+func (ptrJSONText) MarshalText() ([]byte, error)  { return []byte("from MarshalText"), nil }
+
 // upperText is encoded by its MarshalText, which differs from its value.
 type upperText string
 
@@ -130,9 +159,26 @@ type failingMarshaler struct{}
 
 func (failingMarshaler) MarshalJSON() ([]byte, error) { return nil, testMarshalError{} }
 
-// nest wraps leaf in n slices.
-func nest(n int, leaf any) any {
-	v := leaf
+// Embedding a generated type gives a caller's struct its toMap or wireValue,
+// but encoding/json encodes it by the caller's own MarshalJSON, or else by
+// the promoted one, which starts a new walk.
+type (
+	callerObject struct {
+		testObject
+		Note string
+	}
+	callerUnion struct {
+		testUnion
+		Note string
+	}
+	callerPayload struct{ testPayload }
+)
+
+func (c callerObject) MarshalJSON() ([]byte, error) { return json.Marshal(c.Note) }
+func (c callerUnion) MarshalJSON() ([]byte, error)  { return json.Marshal(c.Note) }
+
+// nest wraps v in n slices.
+func nest(n int, v any) any {
 	for range n {
 		v = []any{v}
 	}
@@ -150,20 +196,26 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		cyclicKeyed  = testPayload{AdditionalProperties: map[string]any{}}
 		cyclicEmbed  = testPayload{AdditionalProperties: map[string]any{}}
 		cyclicEmbedP = testPayload{AdditionalProperties: map[string]any{}}
+		cyclicSame   = testPayload{AdditionalProperties: map[string]any{}}
+		cyclicShadow = testPayload{AdditionalProperties: map[string]any{}}
+		cyclicCaller = testPayload{AdditionalProperties: map[string]any{}}
 	)
 	cyclicMap["self"] = cyclicMap
 	cyclicObj.AdditionalProperties["self"] = cyclicObj
 	cyclicNode.Next = cyclicNode
-	cyclicHolder.AdditionalProperties["holder"] = callerHolder{Payload: cyclicHolder}
+	cyclicHolder.AdditionalProperties["holder"] = embeddedPayload{Payload: cyclicHolder}
 	cyclicKeyed.AdditionalProperties["byID"] = map[int]testPayload{1: cyclicKeyed}
 	cyclicEmbed.AdditionalProperties["embedded"] = callerEmbedded{embeddedPayload{Payload: cyclicEmbed}}
 	cyclicEmbedP.AdditionalProperties["embedded"] = callerEmbeddedPtr{&embeddedPayload{Payload: cyclicEmbedP}}
+	cyclicSame.AdditionalProperties["same"] = callerSameName{otherPayload: otherPayload{Payload: cyclicSame}}
+	cyclicShadow.AdditionalProperties["shadowed"] = callerShadowed{embeddedPayload: embeddedPayload{Payload: cyclicShadow}}
+	cyclicCaller.AdditionalProperties["caller"] = callerPayload{cyclicCaller}
 
 	tests := []struct {
 		name    string
 		in      any
 		want    map[string]any
-		wantErr error
+		wantErr bool
 		wantAs  any // a pointer errors.As must fill from the error chain
 	}{
 		{
@@ -205,6 +257,11 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			},
 		},
 		{
+			name: "arrays are walked like slices",
+			in:   map[string]any{"ints": [2]int{1, 2}, "nils": [1][]string{nil}},
+			want: map[string]any{"ints": []any{int64(1), int64(2)}, "nils": []any{[]any{}}},
+		},
+		{
 			name: "nil slices and maps in AdditionalProperties become [] and {}",
 			in:   testObject{Name: "a", AdditionalProperties: map[string]any{"list": []string(nil), "deep": map[string]any{"m": map[string]bool(nil)}}},
 			want: map[string]any{"name": "a", "tags": []any{}, "list": []any{}, "deep": map[string]any{"m": map[string]any{}}},
@@ -225,7 +282,7 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		{
 			name:    "wireValue error",
 			in:      map[string]any{"union": testUnion{}},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name: "variant items",
@@ -235,12 +292,17 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		{
 			name:    "nil variant item",
 			in:      map[string]any{"items": []testVariant{nil}},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "typed-nil variant item",
 			in:      map[string]any{"items": []testVariant{(*testCase)(nil)}},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
+		},
+		{
+			name:    "nil variant array item",
+			in:      map[string]any{"items": [1]testVariant{nil}},
+			wantErr: true,
 		},
 		{
 			name: "[]byte becomes base64, a nil one null",
@@ -254,8 +316,8 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		},
 		{
 			name: "json.Number",
-			in:   map[string]any{"n": json.Number("12.50")},
-			want: map[string]any{"n": json.Number("12.50")},
+			in:   map[string]any{"n": json.Number("12.50"), "list": []json.Number{"1"}},
+			want: map[string]any{"n": json.Number("12.50"), "list": []any{json.Number("1")}},
 		},
 		{
 			name: "caller marshalers go through encoding/json",
@@ -268,43 +330,72 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			want: map[string]any{"s": map[string]any{"Count": json.Number("3"), "Price": json.Number("1.5")}},
 		},
 		{
-			name: "nil slices and maps inside caller data become [] and {}, except []byte and non-string keys",
-			in:   map[string]any{"s": &callerFields{}, "byID": map[int][]string{1: nil}},
+			name: "nil slices and maps inside caller structs and non-string-key maps are null, as in encoding/json",
+			in:   map[string]any{"s": callerFields{embeddedFields: &embeddedFields{}}, "byID": map[int][]string{1: nil}},
 			want: map[string]any{
-				"s":    map[string]any{"Items": []any{}, "Labels": map[string]any{}, "Bytes": nil, "ByID": nil, "Ptr": nil, "Tags": []any{}},
-				"byID": map[string]any{"1": []any{}},
+				"s":    map[string]any{"Items": nil, "Labels": nil, "Tags": nil},
+				"byID": map[string]any{"1": nil},
 			},
 		},
 		{
+			name: "fields behind a nil embedded pointer are skipped, as in encoding/json",
+			in:   map[string]any{"s": callerFields{Items: []string{"a"}}},
+			want: map[string]any{"s": map[string]any{"Items": []any{"a"}, "Labels": nil}},
+		},
+		{
+			name: "caller struct fields that omitzero or omitempty leave out are omitted, as in encoding/json",
+			in:   map[string]any{"s": callerOmitted{Raw: json.RawMessage{}}},
+			want: map[string]any{"s": map[string]any{}},
+		},
+		{
+			name: "fields promoted from an embedded struct tagged \"-\" are skipped, as in encoding/json",
+			in:   map[string]any{"s": callerIgnored{Name: "a", callerHooks: callerHooks{OnSend: func() {}}}},
+			want: map[string]any{"s": map[string]any{"Name": "a"}},
+		},
+		{
 			name: "pointer-receiver marshalers apply only to addressable values, as in encoding/json",
-			in:   map[string]any{"slice": []ptrText{"a"}, "map": map[string]ptrText{"k": "a"}, "pointer": &callerPtrJSON{}, "value": callerPtrJSON{}},
-			want: map[string]any{
-				"slice":   []any{"A"},
-				"map":     map[string]any{"k": "a"},
-				"pointer": map[string]any{"J": "from MarshalJSON"},
-				"value":   map[string]any{"J": map[string]any{"N": json.Number("0")}},
+			in: map[string]any{
+				"slice":        []ptrText{"a"},
+				"map":          map[string]ptrText{"k": "a"},
+				"pointer":      &callerPtrJSON{},
+				"value":        callerPtrJSON{},
+				"jsonTextList": []ptrJSONText{"a"},
+				"jsonTextMap":  map[string]ptrJSONText{"k": "a"},
 			},
+			want: map[string]any{
+				"slice":        []any{"A"},
+				"map":          map[string]any{"k": "a"},
+				"pointer":      map[string]any{"J": "from MarshalJSON"},
+				"value":        map[string]any{"J": map[string]any{"N": json.Number("0")}},
+				"jsonTextList": []any{"from MarshalJSON"},
+				"jsonTextMap":  map[string]any{"k": "from MarshalText"},
+			},
+		},
+		{
+			name: "caller structs that embed a generated type use their own MarshalJSON, as in encoding/json",
+			in:   map[string]any{"object": callerObject{testObject{Name: "a"}, "keep me"}, "union": callerUnion{testUnion{set: true}, "keep me"}},
+			want: map[string]any{"object": "keep me", "union": "keep me"},
 		},
 		{
 			name:    "caller MarshalJSON error",
 			in:      map[string]any{"m": failingMarshaler{}},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 			wantAs:  new(testMarshalError),
 		},
 		{
 			name:    "map that contains itself",
 			in:      cyclicMap,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "AdditionalProperties that contain their object",
 			in:      cyclicObj,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "caller struct that contains itself",
 			in:      map[string]any{"node": cyclicNode},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			// encoding/json cannot see these cycles, because each MarshalJSON
@@ -312,22 +403,37 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			// map can.
 			name:    "generated value that contains itself through a caller struct",
 			in:      cyclicHolder,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
+		},
+		{
+			name:    "generated value that contains itself through a caller struct that embeds it",
+			in:      cyclicCaller,
+			wantErr: true,
 		},
 		{
 			name:    "generated value that contains itself through a non-string-key map",
 			in:      cyclicKeyed,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "generated value that contains itself through an embedded struct of an unexported type",
 			in:      cyclicEmbed,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
 		{
 			name:    "generated value that contains itself through an embedded pointer to an unexported type",
 			in:      cyclicEmbedP,
-			wantErr: ErrInvalidValue,
+			wantErr: true,
+		},
+		{
+			name:    "generated value that contains itself through one of two embedded fields with the same Go name",
+			in:      cyclicSame,
+			wantErr: true,
+		},
+		{
+			name:    "generated value that contains itself through an embedded field a shallower one shadows by Go name",
+			in:      cyclicShadow,
+			wantErr: true,
 		},
 		{
 			// Each level is a slice and the interface holding it: 499 levels
@@ -340,25 +446,23 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			// The pointer to the leaf is one level more.
 			name:    "nesting past the depth bound",
 			in:      map[string]any{"v": nest(499, &leaf)},
-			wantErr: ErrInvalidValue,
+			wantErr: true,
 		},
-		{name: "NaN", in: map[string]any{"f": math.NaN()}, wantErr: ErrInvalidValue},
-		{name: "+Inf", in: map[string]any{"f": math.Inf(1)}, wantErr: ErrInvalidValue},
-		{name: "-Inf float32", in: map[string]any{"f": float32(math.Inf(-1))}, wantErr: ErrInvalidValue},
-		{name: "channel", in: map[string]any{"c": make(chan int)}, wantErr: ErrInvalidValue},
-		{name: "function", in: map[string]any{"f": func() {}}, wantErr: ErrInvalidValue},
-		{name: "complex number", in: map[string]any{"c": complex(1, 2)}, wantErr: ErrInvalidValue},
+		{name: "NaN", in: map[string]any{"f": math.NaN()}, wantErr: true},
+		{name: "+Inf", in: map[string]any{"f": math.Inf(1)}, wantErr: true},
+		{name: "-Inf float32", in: map[string]any{"f": float32(math.Inf(-1))}, wantErr: true},
+		{name: "channel", in: map[string]any{"c": make(chan int)}, wantErr: true},
+		{name: "function", in: map[string]any{"f": func() {}}, wantErr: true},
+		{name: "complex number", in: map[string]any{"c": complex(1, 2)}, wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := snapshot(tt.in)
 			b, marshalErr := marshal(tt.in)
-			if tt.wantErr != nil {
+			if tt.wantErr {
 				assert.ErrorIs(t, err, ErrInvalidValue)
-				assert.ErrorIs(t, err, tt.wantErr)
 				assert.ErrorIs(t, marshalErr, ErrInvalidValue)
-				assert.ErrorIs(t, marshalErr, tt.wantErr)
 				if tt.wantAs != nil {
 					assert.ErrorAs(t, err, tt.wantAs)
 					assert.ErrorAs(t, marshalErr, tt.wantAs)
@@ -451,17 +555,17 @@ func TestAnalyticsContext(t *testing.T) {
 		Traits: analytics.Traits{"email": "caller@example.com", "name": "Caller"},
 	}
 
-	got := callOptions{context: &caller}.analyticsContext(analytics.Traits{"email": "typed@example.com"})
+	got := callOptions{context: &caller}.analyticsContext()
 
 	assert.Equal(t, &analytics.Context{
 		Locale: "en-US",
 		Extra:  map[string]any{"custom": 1, "ruddertyper": rudderTyperContext()},
-		Traits: analytics.Traits{"email": "typed@example.com", "name": "Caller"},
+		Traits: analytics.Traits{"email": "caller@example.com", "name": "Caller"},
 	}, got)
 	assert.Equal(t, analytics.Context{
 		Locale: "en-US",
 		Extra:  map[string]any{"ruddertyper": "overwritten", "custom": 1},
 		Traits: analytics.Traits{"email": "caller@example.com", "name": "Caller"},
 	}, caller)
-	assert.Equal(t, &analytics.Context{Extra: map[string]any{"ruddertyper": rudderTyperContext()}}, callOptions{}.analyticsContext(nil))
+	assert.Equal(t, &analytics.Context{Extra: map[string]any{"ruddertyper": rudderTyperContext()}}, callOptions{}.analyticsContext())
 }

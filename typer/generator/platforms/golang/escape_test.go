@@ -27,6 +27,9 @@ func TestComment(t *testing.T) {
 		{"NUL is removed", "nul\x00byte", "// nulbyte"},
 		{"byte order mark is removed", "\xef\xbb\xbfbom", "// bom"},
 		{"invalid UTF-8 is replaced", "bad\xffbyte", "// bad\xef\xbf\xbdbyte"},
+		{"build constraint", "+build ignore", `// \+build ignore`},
+		{"indented build constraint", "note\n  +build linux", "// note\n// \\  +build linux"},
+		{"word starting with +build", "+building blocks", "// +building blocks"},
 	}
 
 	for _, tt := range tests {

@@ -11,6 +11,10 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
+    "useNativeSDK": {
+      "web": false,
+      "androidKotlin": false
+    },
     "dataCenter": "US-01",
     "enableSubscriptionGroupInGroupCall": false,
     "enableNestedArrayOperations": false,

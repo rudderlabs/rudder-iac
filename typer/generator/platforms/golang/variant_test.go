@@ -68,6 +68,10 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			v.Cases[0].Schema = schema
 			return v
 		}
+		withDefault = func(v plan.Variant, schema plan.ObjectSchema) plan.Variant {
+			v.DefaultSchema = &schema
+			return v
+		}
 		redefine = func(p plan.Property) plan.ObjectSchema {
 			p.Name = "kind"
 			return plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"kind": {Property: p}}}
@@ -79,10 +83,16 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			p.Rules[0].Schema.Properties["meta"] = object(map[string]plan.PropertySchema{"a": {Property: plan.Property{Name: "a", Types: onlyString}}})
 			return p
 		}
+		// wordless is an object property without words. It is hoisted, so no
+		// Property{Name} type names it, and it fails where a struct names its field.
+		wordless = plan.PropertySchema{
+			Property: plan.Property{Name: "$$", Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+			Schema:   &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"a": {Property: plan.Property{Name: "a", Types: onlyString}}}},
+		}
 		defaultConflict = variantPlan(typed(onlyString...), discriminate([]any{"a"}))
 		variantType     = plan.CustomType{Name: "meta", Type: plan.PrimitiveTypeObject, Variants: []plan.Variant{discriminate([]any{"a"})}, Schema: &plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
-				"$$":   {Property: plan.Property{Name: "$$", Types: onlyString}},
+				"$$":   wordless,
 				"kind": {Property: plan.Property{Name: "kind", Types: onlyString}, Required: true},
 			},
 		}}
@@ -210,16 +220,20 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			wantErr: `mapping the variants of track event "Some Event": found 2 variants entries; a rule or custom type may have one`,
 		},
 		{
-			name: "a case property without words",
-			plan: variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
-				"$$": {Property: plan.Property{Name: "$$", Types: onlyString}},
-			}})),
-			wantErr: `naming property "$$" of case ["a"] of the variants of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
+			name:    "a case property without words",
+			plan:    variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"$$": wordless}})),
+			wantErr: `naming property "$$" of TrackSomeEventPropertiesCaseA: name "$$" has no letters or digits to build a Go identifier from`,
 		},
 		{
+			name:    "a default schema property without words",
+			plan:    variantPlan(typed(onlyString...), withDefault(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"$$": wordless}})),
+			wantErr: `naming property "$$" of TrackSomeEventPropertiesDefault: name "$$" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			// Every struct implementing the interface shares what the base hoists.
 			name:    "a variant custom type's base property without words",
 			plan:    trackPlan(plan.Property{Name: "meta", Types: []plan.PropertyType{variantType}}),
-			wantErr: `naming property "$$" of custom type "meta": name "$$" has no letters or digits to build a Go identifier from`,
+			wantErr: `naming property "$$" of CustomTypeMeta: name "$$" has no letters or digits to build a Go identifier from`,
 		},
 		{
 			name:         "an open case under a closed base",
