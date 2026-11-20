@@ -113,7 +113,7 @@ func decode(r io.Reader, v any) error {
 func TestTrackSmoke(t *testing.T) {
 	wire, succeeded := capture(t, func(client analytics.Client) {
 		require.NoError(t, examples.New(client).TrackSomeTrackEvent(
-			examples.Identity{UserID: "user-123"},
+			examples.Identity{UserID: "user-123", AnonymousID: "anon-123"},
 			examples.TrackSomeTrackEventProperties{SomeString: "hello", SomeInteger: 42, SomeBoolean: examples.Ptr(true)},
 		))
 	})
@@ -123,6 +123,7 @@ func TestTrackSmoke(t *testing.T) {
 		"type": "track",
 		"event": "Some Track Event",
 		"userId": "user-123",
+		"anonymousId": "anon-123",
 		"properties": {"someString": "hello", "someInteger": 42, "someBoolean": true},
 		"context": {
 			"ruddertyper": {
