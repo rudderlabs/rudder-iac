@@ -16,6 +16,9 @@ func clearCIEnv(t *testing.T) {
 	for _, ci := range ciPlatforms {
 		t.Setenv(ci.envVar, "")
 	}
+	for _, also := range ciAlsoRequires {
+		t.Setenv(also, "")
+	}
 }
 
 func TestGetCIExecutionContext(t *testing.T) {
@@ -54,9 +57,14 @@ func TestGetCIExecutionContext(t *testing.T) {
 			want: map[string]interface{}{"ci_platform": "gitlab-ci"},
 		},
 		{
-			name: "Jenkins sets a URL, not a flag",
-			env:  map[string]string{"JENKINS_URL": "https://jenkins.example.com/"},
+			name: "a Jenkins job sets a URL and a build id",
+			env:  map[string]string{"JENKINS_URL": "https://jenkins.example.com/", "BUILD_ID": "42"},
 			want: map[string]interface{}{"ci_platform": "jenkins"},
+		},
+		{
+			name: "JENKINS_URL from a shell profile is not a job",
+			env:  map[string]string{"JENKINS_URL": "https://jenkins.example.com/"},
+			want: map[string]interface{}{},
 		},
 		{
 			name: "CI alone is not taken as a CI service",

@@ -44,10 +44,18 @@ var ciPlatforms = []struct{ envVar, platform string }{
 	{"DRONE", "drone"},
 }
 
+// ciAlsoRequires names a second variable a job sets, for a service whose first
+// one can also sit in a shell profile. JENKINS_URL does, on a machine that
+// talks to Jenkins; BUILD_ID is set only inside a job.
+var ciAlsoRequires = map[string]string{"JENKINS_URL": "BUILD_ID"}
+
 // detectCIPlatform returns the CI service the CLI runs in, or "" outside CI.
 func detectCIPlatform() string {
 	for _, ci := range ciPlatforms {
-		if os.Getenv(ci.envVar) != "" {
+		if os.Getenv(ci.envVar) == "" {
+			continue
+		}
+		if also, ok := ciAlsoRequires[ci.envVar]; !ok || os.Getenv(also) != "" {
 			return ci.platform
 		}
 	}
