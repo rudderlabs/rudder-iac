@@ -129,15 +129,27 @@ func wire(rv reflect.Value, depth int) (any, error) {
 		// as a slice element, and they include T's own.
 		v = rv.Addr().Interface()
 	}
+	// A caller's struct that embeds a generated type has its toMap or
+	// wireValue too, but encoding/json encodes it by the caller's own
+	// MarshalJSON, if it has one. Walking the hook's result first still stops
+	// a cycle through the generated part.
 	switch v := v.(type) {
 	case wireObject:
-		return wire(reflect.ValueOf(v.toMap()), depth)
+		w, err := wire(reflect.ValueOf(v.toMap()), depth)
+		if err != nil || !embeds(v) {
+			return w, err
+		}
+		return encode(v)
 	case wireValuer:
 		x, err := v.wireValue()
 		if err != nil {
 			return nil, err
 		}
-		return wire(reflect.ValueOf(x), depth)
+		w, err := wire(reflect.ValueOf(x), depth)
+		if err != nil || !embeds(v) {
+			return w, err
+		}
+		return encode(v)
 	case json.Number, json.Marshaler, encoding.TextMarshaler:
 		return encode(v)
 	}
@@ -265,6 +277,22 @@ func encode(v any) (any, error) {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidValue, err)
 	}
 	return x, nil
+}
+
+// embeds reports whether v is a struct, or points to one, with an embedded
+// field. Generated types embed nothing, so a v with toMap or wireValue that
+// embeds is a caller's struct.
+func embeds(v any) bool {
+	t := reflect.TypeOf(v)
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	for i := 0; t.Kind() == reflect.Struct && i < t.NumField(); i++ {
+		if t.Field(i).Anonymous {
+			return true
+		}
+	}
+	return false
 }
 
 // isNil reports whether v is nil or a nil pointer stored in an interface.

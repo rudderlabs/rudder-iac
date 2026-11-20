@@ -162,6 +162,24 @@ type failingMarshaler struct{}
 
 func (failingMarshaler) MarshalJSON() ([]byte, error) { return nil, testMarshalError{} }
 
+// Embedding a generated type gives a caller's struct its toMap or wireValue,
+// but encoding/json encodes it by the caller's own MarshalJSON, or else by
+// the promoted one, which starts a new walk.
+type (
+	callerObject struct {
+		testObject
+		Note string
+	}
+	callerUnion struct {
+		testUnion
+		Note string
+	}
+	callerPayload struct{ testPayload }
+)
+
+func (c callerObject) MarshalJSON() ([]byte, error) { return json.Marshal(c.Note) }
+func (c callerUnion) MarshalJSON() ([]byte, error)  { return json.Marshal(c.Note) }
+
 // nest wraps leaf in n slices.
 func nest(n int, leaf any) any {
 	v := leaf
@@ -184,6 +202,7 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		cyclicEmbedP = testPayload{AdditionalProperties: map[string]any{}}
 		cyclicSame   = testPayload{AdditionalProperties: map[string]any{}}
 		cyclicShadow = testPayload{AdditionalProperties: map[string]any{}}
+		cyclicCaller = testPayload{AdditionalProperties: map[string]any{}}
 	)
 	cyclicMap["self"] = cyclicMap
 	cyclicObj.AdditionalProperties["self"] = cyclicObj
@@ -194,6 +213,7 @@ func TestSnapshotAndMarshal(t *testing.T) {
 	cyclicEmbedP.AdditionalProperties["embedded"] = callerEmbeddedPtr{&embeddedPayload{Payload: cyclicEmbedP}}
 	cyclicSame.AdditionalProperties["same"] = callerSameName{otherPayload: otherPayload{Payload: cyclicSame}}
 	cyclicShadow.AdditionalProperties["shadowed"] = callerShadowed{embeddedPayload: embeddedPayload{Payload: cyclicShadow}}
+	cyclicCaller.AdditionalProperties["caller"] = callerPayload{cyclicCaller}
 
 	tests := []struct {
 		name    string
@@ -356,6 +376,11 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			},
 		},
 		{
+			name: "caller structs that embed a generated type use their own MarshalJSON, as in encoding/json",
+			in:   map[string]any{"object": callerObject{testObject{Name: "a"}, "keep me"}, "union": callerUnion{testUnion{set: true}, "keep me"}},
+			want: map[string]any{"object": "keep me", "union": "keep me"},
+		},
+		{
 			name:    "caller MarshalJSON error",
 			in:      map[string]any{"m": failingMarshaler{}},
 			wantErr: true,
@@ -382,6 +407,11 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			// map can.
 			name:    "generated value that contains itself through a caller struct",
 			in:      cyclicHolder,
+			wantErr: true,
+		},
+		{
+			name:    "generated value that contains itself through a caller struct that embeds it",
+			in:      cyclicCaller,
 			wantErr: true,
 		},
 		{
