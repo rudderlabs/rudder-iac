@@ -203,6 +203,10 @@ type PlanChecker interface {
 // own diff lacks, for the plan to show before anything runs. A URN may be left
 // out when there is nothing to add. st is the stored state, read to resolve
 // references the plan has not resolved yet and the remote an update replaces.
+//
+// An error fails the whole plan. Return one only for an import: an update's
+// lines only add to a change the plan already shows, so a provider that can't
+// compute them logs a warning and leaves the URN out.
 type ImportPreviewer interface {
 	PreviewImports(ctx context.Context, plan *planner.Plan, st *state.State) (map[string]differ.ResourceDiff, error)
 }

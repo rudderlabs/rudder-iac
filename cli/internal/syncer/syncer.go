@@ -147,9 +147,10 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 		}
 	}
 
-	// A preview that cannot be read fails the plan, dry run and apply alike:
-	// writing over a resource whose changes could not be shown is what the
-	// preview exists to prevent. The error names the resource.
+	// A preview error fails the plan, dry run and apply alike: adopting a
+	// resource whose changes could not be shown is what the preview exists to
+	// prevent. The error names the resource. See provider.ImportPreviewer for
+	// why an update's preview never returns one.
 	if previewer, ok := s.provider.(provider.ImportPreviewer); ok {
 		diffs, err := previewer.PreviewImports(ctx, plan, state)
 		if err != nil {

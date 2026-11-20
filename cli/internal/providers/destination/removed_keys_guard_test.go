@@ -61,3 +61,46 @@ func TestRemovedAPIKeys_NoneRightAfterACLIWrite(t *testing.T) {
 		})
 	}
 }
+
+// TestEveryRegisteredTypeHasAnUpdateFixture keeps a definition from skipping the
+// guard above. A type with no update fixture has no snapshot to check, so a key the
+// backend stamps on write would show as a removal on every plan for it.
+func TestEveryRegisteredTypeHasAnUpdateFixture(t *testing.T) {
+	t.Parallel()
+
+	// Unverified types with no fixture yet. Its snapshot needs a live e2e run, so a
+	// type leaves this list when its fixture lands.
+	knownWithoutFixture := map[string]bool{
+		"bingads_offline_conversions":        true,
+		"fb_custom_audience":                 true,
+		"google_adwords_offline_conversions": true,
+		"google_adwords_remarketing_lists":   true,
+		"iterable_audience":                  true,
+		"linkedin_ads":                       true,
+	}
+
+	fixtures, err := filepath.Glob("../../../tests/testdata/destinations/update/*.yaml")
+	require.NoError(t, err)
+	covered := map[string]bool{}
+	for _, fixture := range fixtures {
+		raw, err := os.ReadFile(fixture)
+		require.NoError(t, err)
+		var document struct {
+			Spec struct {
+				Type string `yaml:"type"`
+			} `yaml:"spec"`
+		}
+		require.NoError(t, yaml.Unmarshal(raw, &document))
+		covered[document.Spec.Type] = true
+	}
+
+	registry, err := builtin.NewRegistry(true)
+	require.NoError(t, err)
+	for _, registered := range registry.Definitions() {
+		if knownWithoutFixture[registered.Type] {
+			assert.False(t, covered[registered.Type], "%s now has an update fixture: remove it from knownWithoutFixture", registered.Type)
+			continue
+		}
+		assert.True(t, covered[registered.Type], "%s has no fixture in tests/testdata/destinations/update, so TestRemovedAPIKeys_NoneRightAfterACLIWrite never checks it", registered.Type)
+	}
+}

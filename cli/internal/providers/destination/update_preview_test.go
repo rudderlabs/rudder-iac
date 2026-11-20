@@ -89,6 +89,22 @@ func TestProvider_PreviewImports_UpdateRemovals(t *testing.T) {
 		assert.Empty(t, preview(t, state.EmptyState()))
 	})
 
+	t.Run("a preview that fails is skipped, not returned", func(t *testing.T) {
+		t.Parallel()
+		// ExtractResourcesFromSpec refuses an unknown version, so the spec is
+		// copied by hand. Without the version error this remote would give lines.
+		unknown := *spec
+		unknown.DefinitionVersion = 99
+		plan := &planner.Plan{Operations: []*planner.Operation{{Type: planner.Update, Resource: resources.NewResource(
+			"hook", destination.DestinationResourceType, resources.ResourceData{}, nil, resources.WithRawData(&unknown),
+		)}}}
+		st := stored(t, `{"webhookUrl":"https://example.com/hook","consentManagement":{"amp":[]}}`)
+
+		diffs, err := destination.NewProvider(nil, registry).PreviewImports(context.Background(), plan, st)
+		require.NoError(t, err)
+		assert.Empty(t, diffs)
+	})
+
 	t.Run("nothing when the spec changes the type", func(t *testing.T) {
 		t.Parallel()
 		// Update refuses a type change; converting the remote with the spec's
