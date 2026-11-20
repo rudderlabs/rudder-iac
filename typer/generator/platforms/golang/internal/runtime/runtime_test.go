@@ -94,10 +94,12 @@ type (
 		*embeddedFields
 	}
 	embeddedFields struct{ Tags []string }
-	callerOmitZero struct {
-		Items  []string       `json:",omitzero"`
-		Labels map[string]int `json:",omitzero"`
-		Done   func()         `json:",omitzero"`
+	// An empty json.RawMessage fails to encode, but omitempty leaves it out.
+	callerOmitted struct {
+		Items  []string        `json:",omitzero"`
+		Labels map[string]int  `json:",omitzero"`
+		Done   func()          `json:",omitzero"`
+		Raw    json.RawMessage `json:",omitempty"`
 	}
 	// encoding/json skips the fields promoted from an embedded struct tagged
 	// "-", so a function there is never encoded.
@@ -112,6 +114,20 @@ type (
 	callerEmbedded    struct{ embeddedPayload }
 	callerEmbeddedPtr struct{ *embeddedPayload }
 	embeddedPayload   struct{ Payload testPayload }
+	// reflect.VisibleFields hides a promoted field by its Go name, but
+	// encoding/json encodes it when its JSON name differs: here both Payload
+	// fields of callerSameName, and the embedded one of callerShadowed.
+	callerSameName struct {
+		embeddedPayload
+		otherPayload
+	}
+	otherPayload struct {
+		Payload testPayload `json:"other"`
+	}
+	callerShadowed struct {
+		embeddedPayload
+		Payload int `json:"other"`
+	}
 )
 
 // ptrText and ptrJSON marshal through pointer receivers, which encoding/json
@@ -159,6 +175,8 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		cyclicKeyed  = testPayload{AdditionalProperties: map[string]any{}}
 		cyclicEmbed  = testPayload{AdditionalProperties: map[string]any{}}
 		cyclicEmbedP = testPayload{AdditionalProperties: map[string]any{}}
+		cyclicSame   = testPayload{AdditionalProperties: map[string]any{}}
+		cyclicShadow = testPayload{AdditionalProperties: map[string]any{}}
 	)
 	cyclicMap["self"] = cyclicMap
 	cyclicObj.AdditionalProperties["self"] = cyclicObj
@@ -167,6 +185,8 @@ func TestSnapshotAndMarshal(t *testing.T) {
 	cyclicKeyed.AdditionalProperties["byID"] = map[int]testPayload{1: cyclicKeyed}
 	cyclicEmbed.AdditionalProperties["embedded"] = callerEmbedded{embeddedPayload{Payload: cyclicEmbed}}
 	cyclicEmbedP.AdditionalProperties["embedded"] = callerEmbeddedPtr{&embeddedPayload{Payload: cyclicEmbedP}}
+	cyclicSame.AdditionalProperties["same"] = callerSameName{otherPayload: otherPayload{Payload: cyclicSame}}
+	cyclicShadow.AdditionalProperties["shadowed"] = callerShadowed{embeddedPayload: embeddedPayload{Payload: cyclicShadow}}
 
 	tests := []struct {
 		name    string
@@ -285,8 +305,13 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			},
 		},
 		{
-			name: "caller struct fields tagged omitzero are omitted when nil, as in encoding/json",
-			in:   map[string]any{"s": callerOmitZero{}},
+			name: "fields behind a nil embedded pointer are skipped, as in encoding/json",
+			in:   map[string]any{"s": callerFields{Items: []string{"a"}}},
+			want: map[string]any{"s": map[string]any{"Items": []any{"a"}, "Labels": nil}},
+		},
+		{
+			name: "caller struct fields that omitzero or omitempty leave out are omitted, as in encoding/json",
+			in:   map[string]any{"s": callerOmitted{Raw: json.RawMessage{}}},
 			want: map[string]any{"s": map[string]any{}},
 		},
 		{
@@ -346,6 +371,16 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		{
 			name:    "generated value that contains itself through an embedded pointer to an unexported type",
 			in:      cyclicEmbedP,
+			wantErr: true,
+		},
+		{
+			name:    "generated value that contains itself through one of two embedded fields with the same Go name",
+			in:      cyclicSame,
+			wantErr: true,
+		},
+		{
+			name:    "generated value that contains itself through an embedded field a shallower one shadows by Go name",
+			in:      cyclicShadow,
 			wantErr: true,
 		},
 		{
