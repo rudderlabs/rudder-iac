@@ -3,6 +3,8 @@ package apply
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -11,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/spf13/cobra"
@@ -32,6 +35,8 @@ func NewCmdApply() *cobra.Command {
 		dryRun    bool
 		confirm   bool
 		varFiles  []string
+		noDelete  bool
+		providers []string
 	)
 
 	cmd := &cobra.Command{
@@ -41,13 +46,30 @@ func NewCmdApply() *cobra.Command {
 			Applies the project configuration changes to the RudderStack workspace associated with your access token.
 			This includes creating, updating, or deleting resources based on
 			the differences between local configuration and the workspace resources.
+
+			Use --no-delete to skip deletion of resources that are no longer in the local configuration.
+			Use --provider to apply changes only for specific providers (e.g., retl, eventstream, datacatalog).
 		`),
 		Example: heredoc.Doc(`
 			$ rudder-cli apply --location </path/to/dir or file>
 			$ rudder-cli apply --location </path/to/dir or file> --dry-run
 			$ rudder-cli apply --location </path/to/dir or file> --confirm=false
+			$ rudder-cli apply --no-delete
+			$ rudder-cli apply --provider retl --provider eventstream
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) (err error) {
+			cfg := config.GetConfig()
+
+			// Check if experimental flag is enabled for non-default options
+			if !cfg.ExperimentalFlags.ApplyOptions {
+				if noDelete {
+					return fmt.Errorf("--no-delete flag requires experimental feature 'applyOptions' to be enabled. Run: rudder-cli experimental enable applyOptions")
+				}
+				if len(providers) > 0 {
+					return fmt.Errorf("--provider flag requires experimental feature 'applyOptions' to be enabled. Run: rudder-cli experimental enable applyOptions")
+				}
+			}
+
 			deps, err = app.NewDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
@@ -80,7 +102,7 @@ func NewCmdApply() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			applyLog.Debug("apply", "location", location, "dryRun", dryRun, "confirm", confirm)
+			applyLog.Debug("apply", "location", location, "dryRun", dryRun, "confirm", confirm, "noDelete", noDelete, "providers", providers)
 			applyLog.Debug("identifying changes for the upstream catalog")
 
 			defer func() {
@@ -88,6 +110,8 @@ func NewCmdApply() *cobra.Command {
 					{K: "location", V: location},
 					{K: "dryRun", V: dryRun},
 					{K: "confirm", V: confirm},
+					{K: "noDelete", V: noDelete},
+					{K: "providers", V: strings.Join(providers, ",")},
 				}...)
 			}()
 
@@ -102,6 +126,29 @@ func NewCmdApply() *cobra.Command {
 				syncer.WithAskConfirmation(confirm),
 				syncer.WithReporter(app.SyncReporter()),
 				syncer.WithConcurrency(config.GetConfig().Concurrency.Syncer),
+				syncer.WithSkipDeletes(noDelete),
+			}
+
+			// Filter by provider if specified
+			if len(providers) > 0 {
+				cp, ok := deps.CompositeProvider().(*provider.CompositeProvider)
+				if !ok {
+					return fmt.Errorf("provider filtering requires composite provider")
+				}
+
+				// Validate provider names
+				validNames := cp.ProviderNames()
+				for _, name := range providers {
+					if !slices.Contains(validNames, name) {
+						return fmt.Errorf("unknown provider: %s (valid providers: %s)", name, strings.Join(validNames, ", "))
+					}
+				}
+
+				resourceTypes, err := cp.ResourceTypesForProviders(providers)
+				if err != nil {
+					return fmt.Errorf("getting resource types for providers: %w", err)
+				}
+				options = append(options, syncer.WithResourceTypes(resourceTypes))
 			}
 
 			// Create syncer to handle the changes
@@ -130,6 +177,8 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes without applying them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
+	cmd.Flags().BoolVar(&noDelete, "no-delete", false, "Skip deletion of resources")
+	cmd.Flags().StringArrayVar(&providers, "provider", nil, "Only apply changes for specified providers (can be repeated)")
 
 	return cmd
 }
