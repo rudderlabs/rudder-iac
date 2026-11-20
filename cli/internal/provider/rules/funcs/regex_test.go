@@ -116,6 +116,24 @@ func TestNewPatternWithReject(t *testing.T) {
 	assert.False(t, registry.match("test_new_pattern_with_reject_id", "ftp://example.com"))
 }
 
+func TestLookupPattern(t *testing.T) {
+	t.Parallel()
+
+	NewPattern("test_lookup_plain", `^[a-z]{0,10}$`, "must be short lowercase")
+	NewPatternWithReject("test_lookup_reject", `^https?://`, `^http://localhost`, "must be a public url")
+
+	plain, ok := LookupPattern("test_lookup_plain")
+	require.True(t, ok)
+	assert.Equal(t, PatternInfo{Regex: `^[a-z]{0,10}$`, Message: "must be short lowercase"}, plain)
+
+	withReject, ok := LookupPattern("test_lookup_reject")
+	require.True(t, ok)
+	assert.Equal(t, PatternInfo{Regex: `^https?://`, Reject: `^http://localhost`, Message: "must be a public url"}, withReject)
+
+	_, ok = LookupPattern("test_lookup_missing")
+	assert.False(t, ok)
+}
+
 func TestGetPatternErrorMessage(t *testing.T) {
 	t.Parallel()
 

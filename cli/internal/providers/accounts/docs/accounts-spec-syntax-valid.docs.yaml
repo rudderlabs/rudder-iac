@@ -1,0 +1,72 @@
+rule_id: "accounts/spec-syntax-valid"
+match_behavior:
+  - applies_to:
+      - kind: "account"
+        version: "rudder/v1"
+    valid:
+      - example_id: "account-v1-snowflake-key-pair-valid"
+        title: "Valid Snowflake key-pair account"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: account
+            metadata:
+              name: snf
+            spec:
+              id: snf
+              name: Snowflake
+              account_definition_name: SOURCE_SNOWFLAKE
+              config:
+                account: xy12345.us-east-1
+                dbname: ANALYTICS
+                warehouse: COMPUTE_WH
+                user: RUDDER
+                authenticationType: keyPair
+                privateKey: "{{ .SNF_PRIVATEKEY }}"
+    invalid:
+      - example_id: "account-v1-missing-id"
+        title: "Account spec without an id"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: account
+            metadata:
+              name: snf
+            spec:
+              name: Snowflake
+              account_definition_name: SOURCE_POSTGRES
+              config:
+                host: db.example.com
+                dbname: app
+                user: rudder
+                port: 5432
+                sslMode: require
+                password: "{{ .PG_PASSWORD }}"
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/id"
+            severity: "error"
+            message_contains: "'id' is required"
+      - example_id: "account-v1-missing-required-config"
+        title: "Postgres account without its host"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: account
+            metadata:
+              name: pg
+            spec:
+              id: pg
+              name: Postgres
+              account_definition_name: SOURCE_POSTGRES
+              config:
+                dbname: app
+                user: rudder
+                port: 5432
+                sslMode: require
+                password: "{{ .PG_PASSWORD }}"
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/config/host"
+            severity: "error"
+            message_contains: "'host' is required for SOURCE_POSTGRES accounts"

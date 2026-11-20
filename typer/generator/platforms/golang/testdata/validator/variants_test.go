@@ -17,7 +17,7 @@ func TestVariantsWire(t *testing.T) {
 		id    = examples.Identity{UserID: "user-123"}
 		refID = ruddertyper.Identity{UserID: "user-123"}
 
-		// Shared sub-values and one valid payload per event; each row changes
+		// Shared sub-values and one valid payload per event; most rows change
 		// one field of a copy.
 		profile     = ruddertyper.CustomTypeUserProfile{Email: "a@b.c", FirstName: "Ann"}
 		mobile      = ruddertyper.TrackEventWithVariantsPropertiesCaseMobile{Profile: profile}
@@ -187,11 +187,11 @@ func TestVariantsWire(t *testing.T) {
 			name: "default: Event With Variants Default sends the enum value it holds",
 			call: func() error {
 				return ref.TrackEventWithVariants(refID, ruddertyper.TrackEventWithVariantsPropertiesDefault{
-					DeviceType: ruddertyper.PropertyDeviceTypeTablet, Profile: profile, UntypedField: 1,
+					DeviceType: ruddertyper.PropertyDeviceTypeTablet, Profile: profile, UntypedField: map[string]any{"custom": "data", "count": 42},
 				})
 			},
 			want: trackJSON(refMeta, "Event With Variants",
-				`{"device_type": "tablet", "profile": {"email": "a@b.c", "first_name": "Ann"}, "untyped_field": 1}`),
+				`{"device_type": "tablet", "profile": {"email": "a@b.c", "first_name": "Ann"}, "untyped_field": {"custom": "data", "count": 42}}`),
 		},
 		{
 			name: "default: release Default holding null sends null",
@@ -201,6 +201,26 @@ func TestVariantsWire(t *testing.T) {
 				return ex.TrackSomeVariantEvent(id, p)
 			},
 			want: someVariantSent(`, "releases": [{"stage": null}]`),
+		},
+		{
+			name: "default: feature_config Default sends the union's string member it holds",
+			call: func() error {
+				p := signedUp
+				p.FeatureConfig = ruddertyper.CustomTypeFeatureConfigDefault{FeatureFlag: ruddertyper.NewPropertyFeatureFlagString("alpha")}
+				return ref.TrackUserSignedUp(refID, p)
+			},
+			want: signedUpSent(`, "feature_config": {"feature_flag": "alpha"}`),
+		},
+		{
+			name: "default: page_context Default inside the event Default sends the string it holds",
+			call: func() error {
+				return ref.TrackEventWithVariants(refID, ruddertyper.TrackEventWithVariantsPropertiesDefault{
+					DeviceType: ruddertyper.PropertyDeviceTypeTablet, Profile: profile,
+					PageContext: ruddertyper.CustomTypePageContextDefault{PageType: "settings", PageData: map[string]any{"theme": "dark", "language": "en"}},
+				})
+			},
+			want: trackJSON(refMeta, "Event With Variants",
+				`{"device_type": "tablet", "profile": {"email": "a@b.c", "first_name": "Ann"}, "page_context": {"page_type": "settings", "page_data": {"theme": "dark", "language": "en"}}}`),
 		},
 		{
 			name: "absent: shipping Absent sends no discriminator key",
@@ -284,7 +304,7 @@ func TestVariantsWire(t *testing.T) {
 			want: mobileSent(`, "page_context": {"page_type": "search", "query": "q"}`),
 		},
 		{
-			name: "open: an open case passes undeclared AdditionalProperties keys, not declared ones or the discriminator",
+			name: "open: an open case passes undeclared AdditionalProperties keys, not declared ones or its discriminator kind",
 			call: func() error {
 				return ex.TrackSomeOpenVariantEvent(id, examples.TrackSomeOpenVariantEventPropertiesCaseOnLine{
 					URL:                  "u",
@@ -294,7 +314,7 @@ func TestVariantsWire(t *testing.T) {
 			want: trackJSON(exMeta, "Some Open Variant Event", `{"kind": "on-line", "url": "u", "coupon": "SAVE"}`),
 		},
 		{
-			name: "open: an open Default passes undeclared AdditionalProperties keys, not declared ones or the discriminator",
+			name: "open: an open Default passes undeclared AdditionalProperties keys, not declared ones or its discriminator kind",
 			call: func() error {
 				return ex.TrackSomeOpenVariantEvent(id, examples.TrackSomeOpenVariantEventPropertiesDefault{
 					Kind:                 "retail",
@@ -323,22 +343,15 @@ func TestVariantsWire(t *testing.T) {
 }
 
 func TestVariantsDiscriminator(t *testing.T) {
-	// Discriminator() is never sent on its own, so its values are compared
-	// directly. methodOK packs an optional discriminator's (value, ok) results
-	// into one value, so each pair is compared whole in a single assert.
+	// Only the values no wire row checks: Express's toMap writes a literal,
+	// Absent sends none, and no row sends the other three. Every other case's
+	// toMap writes Discriminator(), so its wire row checks it. methodOK packs
+	// an optional discriminator's (value, ok) into one value, so each pair is
+	// compared whole in a single assert.
 	methodOK := func(v examples.PropertyMethod, ok bool) []any { return []any{v, ok} }
-	assert.Equal(t, ruddertyper.PropertyDeviceTypeMobile, ruddertyper.TrackEventWithVariantsPropertiesCaseMobile{}.Discriminator())
-	assert.Equal(t, ruddertyper.PropertyDeviceTypeDesktop, ruddertyper.TrackEventWithVariantsPropertiesCaseDesktop{}.Discriminator())
-	assert.Equal(t, "search", ruddertyper.CustomTypePageContextCaseSearch{}.Discriminator())
-	assert.Equal(t, "product", ruddertyper.CustomTypePageContextCaseProduct{}.Discriminator())
-	assert.Equal(t, "home", ruddertyper.CustomTypePageContextCaseHome{}.Discriminator())
-	assert.Equal(t, true, ruddertyper.CustomTypeUserAccessCaseTrue{}.Discriminator())
-	assert.Equal(t, false, ruddertyper.CustomTypeUserAccessCaseFalse{}.Discriminator())
-	assert.Equal(t, ruddertyper.NewPropertyFeatureFlagBoolean(true), ruddertyper.CustomTypeFeatureConfigCaseTrue{}.Discriminator())
-	assert.Equal(t, ruddertyper.NewPropertyFeatureFlagBoolean(false), ruddertyper.CustomTypeFeatureConfigCaseFalse{}.Discriminator())
-	assert.Equal(t, ruddertyper.NewPropertyFeatureFlagString("beta"), ruddertyper.CustomTypeFeatureConfigCaseBeta{}.Discriminator())
-	assert.Equal(t, examples.NewNullable(examples.PropertyStageValueDraft), examples.CustomTypeReleaseCaseDraft{}.Discriminator())
-	assert.Equal(t, examples.NewNullable(examples.PropertyStageValueLive), examples.CustomTypeReleaseCaseLive{}.Discriminator())
 	assert.Equal(t, methodOK("express", true), methodOK(examples.CustomTypeShippingCaseExpress{}.Discriminator()))
 	assert.Equal(t, methodOK("", false), methodOK(examples.CustomTypeShippingAbsent{}.Discriminator()))
+	assert.Equal(t, methodOK("ground", true), methodOK(examples.CustomTypeShippingDefault{Method: "ground"}.Discriminator()))
+	assert.Equal(t, "on_line", examples.TrackSomeOpenVariantEventPropertiesCaseOnLine1{}.Discriminator())
+	assert.Equal(t, "case_2_b", examples.CustomTypeSomeVariantTypeCaseCase2B{}.Discriminator())
 }

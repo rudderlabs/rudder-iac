@@ -19,6 +19,7 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -32,6 +33,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // googlePubSubConfig is the local YAML config model. Field set mirrors
@@ -69,11 +71,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "googlepubsub",
-		APIType:    "GOOGLEPUBSUB",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"credentials"},
+		Type:        "googlepubsub",
+		DisplayName: "Google Cloud Pub/Sub",
+		APIType:     "GOOGLEPUBSUB",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"credentials"},
 		NewConfig: func() any {
 			return &googlePubSubConfig{}
 		},

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"maps"
 	"math/big"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -18,10 +17,11 @@ import (
 // schema, and each branch merged with it.
 type variantSchema struct {
 	// key is the discriminator's wire key.
-	key      string
-	optional bool
-	domain   matchDomain
-	base     *objectSchema
+	key    string
+	domain matchDomain
+	base   *objectSchema
+	// matched holds the Go literals of the match values.
+	matched map[string]bool
 	// absent is set when the discriminator is optional.
 	absent *objectSchema
 	cases  []variantCase
@@ -40,10 +40,10 @@ type variantCase struct {
 	schema     *objectSchema
 }
 
-// schemas are the base schema and the merged branches, whose fields need
-// property types.
+// schemas are the merged branches, whose fields need property types, as the
+// base schema's do.
 func (v *variantSchema) schemas() []*objectSchema {
-	out := []*objectSchema{v.base}
+	var out []*objectSchema
 	for _, c := range v.cases {
 		out = append(out, c.schema)
 	}
@@ -127,8 +127,8 @@ func (res *resolver) mergeVariant(s *plan.ObjectSchema, base *objectSchema, vari
 	}
 
 	var (
-		v       = &variantSchema{key: vr.Discriminator, optional: !disc.Required, domain: d, base: base}
 		matched = map[string]bool{}
+		v       = &variantSchema{key: vr.Discriminator, domain: d, base: base, matched: matched}
 	)
 	for i := range vr.Cases {
 		var (
@@ -166,7 +166,7 @@ func (res *resolver) mergeVariant(s *plan.ObjectSchema, base *objectSchema, vari
 		i := slices.IndexFunc(v.dflt.fields, func(f ruleField) bool { return f.wireKey == v.key })
 		v.dflt.fields[i].ps.Required = true
 	}
-	if v.optional {
+	if !disc.Required {
 		v.absent = &objectSchema{open: base.open, declared: base.declared, fields: withoutField(base.fields, v.key)}
 	}
 	return v, nil
@@ -197,11 +197,27 @@ func (res *resolver) branch(s, b *plan.ObjectSchema, label, where string) (*obje
 		}
 		merged.Properties[key] = ps
 	}
-	return res.schema(&merged, where, "")
+	// The base's properties resolved already, so an error names the branch.
+	out, err := res.schema(&merged, label, "")
+	if err != nil {
+		return nil, err
+	}
+	// The base warned about its own properties, whose definitions the merge keeps.
+	var own []ruleField
+	for _, f := range out.fields {
+		if _, ok := s.Properties[f.wireKey]; !ok {
+			own = append(own, f)
+		}
+	}
+	warnDropped(own, label+" of the variants of "+where, "")
+	return out, nil
 }
 
-// sameDefinition reports whether a and b agree in everything but required:
-// types, item types, enum values and nested schema. An invalid enum is an
+// sameDefinition reports whether a, the base's property, and b, the branch's,
+// agree in everything but required: types, item types, enum values and nested
+// schema, whose properties are compared the same way. A branch that declares
+// no nested schema keeps the base's: the local provider gives a case property
+// an empty open one, since only rules carry nesting. An invalid enum is an
 // error, because the merge keeps only one definition and would drop it.
 func sameDefinition(a, b plan.PropertySchema) (bool, error) {
 	ea, err := resolveEnum(a.Property)
@@ -212,27 +228,24 @@ func sameDefinition(a, b plan.PropertySchema) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return typeSignature(a.Property, ea) == typeSignature(b.Property, eb) && reflect.DeepEqual(a.Schema, b.Schema), nil
-}
-
-// validateVariantNames checks the names in the case and default schemas of
-// variants, which belong to where, as validateSchemaNames does in a base
-// schema.
-func validateVariantNames(variants []plan.Variant, where string) error {
-	for _, vr := range variants {
-		for _, vc := range vr.Cases {
-			if err := validateSchemaNames(vc.Schema, fmt.Sprintf("case %s of the variants of %s", jsonText(vc.Match), where)); err != nil {
-				return err
-			}
+	switch {
+	case typeSignature(a.Property, ea) != typeSignature(b.Property, eb):
+		return false, nil
+	case !isStruct(b.Schema):
+		return true, nil
+	case !isStruct(a.Schema) || a.Schema.AdditionalProperties != b.Schema.AdditionalProperties || len(a.Schema.Properties) != len(b.Schema.Properties):
+		return false, nil
+	}
+	for _, key := range slices.Sorted(maps.Keys(a.Schema.Properties)) {
+		pb, ok := b.Schema.Properties[key]
+		if !ok || pb.Required != a.Schema.Properties[key].Required {
+			return false, nil
 		}
-		if vr.DefaultSchema == nil {
-			continue
-		}
-		if err := validateSchemaNames(*vr.DefaultSchema, "the default schema of the variants of "+where); err != nil {
-			return err
+		if same, err := sameDefinition(a.Schema.Properties[key], pb); err != nil || !same {
+			return false, err
 		}
 	}
-	return nil
+	return true, nil
 }
 
 func withoutField(fields []ruleField, key string) []ruleField {
@@ -275,11 +288,12 @@ func isVariant(p plan.Property) bool {
 
 // addVariant adds the interface name of v, then the structs implementing it,
 // each followed by the types it hoists: the structs the base schema hoists,
-// Absent, the cases in match order, and Default. lead starts the interface's
-// doc comment; a payload interface, whose payload is Properties or Traits,
-// also lists To{payload}.
+// Absent, the cases in match order, and Default. A case with several match
+// values hoists its own types after its first struct. lead starts the
+// interface's doc comment; a payload interface, whose payload is Properties
+// or Traits, also lists To{payload}.
 func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, lead, description string, v *variantSchema, payload string) (*GoVariant, error) {
-	iface := &GoVariant{Name: name, Key: v.key, Payload: payload}
+	iface := &GoVariant{Name: name, Key: v.key, Noun: payload}
 	ctx.add(GoDecl{Variant: iface})
 
 	// Every branch holds the base's fields, so all share what the base hoists.
@@ -292,20 +306,10 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 		if err != nil {
 			return nil, fmt.Errorf("naming property %q of %s: %w", f.wireKey, name, err)
 		}
-		first := len(*ctx.out)
-		if hoisted[f.wireKey], err = addNested(ctx, registry, propertyTypes, name, field, f); err != nil {
+		// Not name.Field: the interface has no fields.
+		in := "the " + field + " field of each struct implementing " + name
+		if hoisted[f.wireKey], err = addNested(ctx, registry, propertyTypes, name, field, in, f); err != nil {
 			return nil, err
-		}
-		// addNested documents the type as the one in name.Field, a field the
-		// interface does not have.
-		in := strings.NewReplacer(" in "+name+"."+field, " in the "+field+" field of each struct implementing "+name)
-		for _, d := range (*ctx.out)[first:] {
-			if d.Union != nil {
-				d.Union.Doc = in.Replace(d.Union.Doc)
-			}
-			if d.Struct != nil {
-				d.Struct.Doc = in.Replace(d.Struct.Doc)
-			}
 		}
 	}
 	var (
@@ -318,13 +322,14 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	)
 	iface.Result = typ
 	iface.DiscriminatorDoc = fmt.Sprintf("Discriminator returns the value of %s.", strconv.Quote(v.key))
-	if v.optional {
+	if v.absent != nil {
 		okSuffix, qualifier = ", true", "the optional "
 		iface.Result = "(value " + typ + ", ok bool)"
 		iface.DiscriminatorDoc = fmt.Sprintf("Discriminator returns the value of %s; ok is false when it is absent.", strconv.Quote(v.key))
 	}
 
-	addImplementation := func(id, suffix string, s *objectSchema) (*GoStruct, error) {
+	// shared maps a wire key of s to the type already hoisted for it.
+	addImplementation := func(id, suffix string, s *objectSchema, shared map[string]string) (*GoStruct, error) {
 		structName, err := registry.RegisterName(id, packageScope, name+suffix)
 		if err != nil {
 			return nil, fmt.Errorf("registering %s%s: %w", name, suffix, err)
@@ -334,7 +339,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 			return nil, fmt.Errorf("reserving Discriminator in %s: %w", structName, err)
 		}
 		for i := range s.fields {
-			s.fields[i].hoisted = hoisted[s.fields[i].wireKey]
+			s.fields[i].hoisted = shared[s.fields[i].wireKey]
 		}
 		st, err := addStruct(ctx, registry, propertyTypes, structName, "", s, payload)
 		if err != nil {
@@ -346,7 +351,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	}
 
 	if v.absent != nil {
-		st, err := addImplementation("absent:"+name, "Absent", v.absent)
+		st, err := addImplementation("absent:"+name, "Absent", v.absent, hoisted)
 		if err != nil {
 			return nil, err
 		}
@@ -355,10 +360,27 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 		st.Returns = "value, false"
 	}
 
+	// The structs of one case share its schema, so they also share what the
+	// first of them hoists.
+	caseHoisted := map[*plan.VariantCase]map[string]string{}
 	for _, c := range v.cases {
-		st, err := addImplementation("case:"+name+":"+c.text, "Case"+c.name, c.schema)
+		shared, seen := caseHoisted[c.vc]
+		if !seen {
+			shared = hoisted
+		}
+		st, err := addImplementation("case:"+name+":"+c.text, "Case"+c.name, c.schema, shared)
 		if err != nil {
 			return nil, err
+		}
+		if !seen {
+			shared = maps.Clone(hoisted)
+			for i, f := range c.schema.fields {
+				if f.nested != nil && f.hoisted == "" {
+					// An optional field's type points to the hoisted one.
+					shared[f.wireKey] = strings.TrimPrefix(st.Fields[i].Type, "*")
+				}
+			}
+			caseHoisted[c.vc] = shared
 		}
 		doc := fmt.Sprintf("%s is the case where %s is %s.", st.Name, v.key, c.text)
 		if c.vc.DisplayName != "" {
@@ -379,7 +401,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 				st.DiscriminatorDoc = "Discriminator returns " + value + "."
 			}
 			st.Returns, st.Sends = value+okSuffix, "v.Discriminator()"
-			if v.optional {
+			if v.absent != nil {
 				// Discriminator also returns ok, so toMap writes the value itself.
 				st.Sends = value
 			}
@@ -387,7 +409,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	}
 
 	if v.dflt != nil {
-		st, err := addImplementation("default:"+name, "Default", v.dflt)
+		st, err := addImplementation("default:"+name, "Default", v.dflt, hoisted)
 		if err != nil {
 			return nil, err
 		}
@@ -410,12 +432,8 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 // enum values no case matches, or any value but the matches, and null when
 // the discriminator is nullable.
 func defaultDocs(decls map[string]GoDecl, typ string, v *variantSchema, name, defaultName string) (doc, note string) {
-	matched := map[string]bool{}
-	for _, c := range v.cases {
-		matched[c.text] = true
-	}
-	if v.domain.enum == nil && !v.domain.exhausts(matched) {
-		texts := slices.Sorted(maps.Keys(matched))
+	if v.domain.enum == nil && !v.domain.exhausts(v.matched) {
+		texts := slices.Sorted(maps.Keys(v.matched))
 		doc = fmt.Sprintf("%s is the default case of %s, for any %s other than %s", defaultName, name, v.key, joinList(texts, "and"))
 		note = "not " + joinList(texts, "or")
 		if v.domain.nullable {
@@ -428,7 +446,7 @@ func defaultDocs(decls map[string]GoDecl, typ string, v *variantSchema, name, de
 	var rest []string
 	if v.domain.enum != nil {
 		for _, e := range v.domain.enum.values {
-			if !matched[e.Text] {
+			if !v.matched[e.Text] {
 				value, _ := spell(decls, typ, nil, e.Text)
 				rest = append(rest, value)
 			}

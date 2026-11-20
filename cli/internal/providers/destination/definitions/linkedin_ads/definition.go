@@ -18,6 +18,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -31,6 +32,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // oneTrustCookieCategories and ketchConsentPurposes are deliberately absent:
@@ -73,11 +75,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "linkedin_ads",
-		APIType:    "LINKEDIN_ADS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{},
+		Type:        "linkedin_ads",
+		DisplayName: "Linkedin Ads",
+		APIType:     "LINKEDIN_ADS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{},
 		NewConfig: func() any {
 			return &linkedinAdsConfig{}
 		},

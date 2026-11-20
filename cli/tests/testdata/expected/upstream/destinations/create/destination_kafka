@@ -21,7 +21,7 @@
     "topic": "rudder-cli-e2e",
     "useSASL": true,
     "useSSH": false,
-    "username": "rudder_cli_e2e"
+    "username": "rudderCliE2eKafkaUser"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

@@ -12,11 +12,17 @@ import (
 	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang/testdata/validator/ruddertyper"
 )
 
-// messageJSON is the whole typ message of a call for user-123 whose context
-// holds only ruddertyper, with fields, the message's other keys, appended
-// after userId.
+// messageJSON is the whole typ message of a call by user-123 and anon-1 whose
+// context holds only ruddertyper. fields, the message's other keys, follow
+// anonymousId, so a non-empty fields starts with ", ".
 func messageJSON(meta, typ, fields string) string {
-	return fmt.Sprintf(`{"type": %q, "channel": "server", "userId": "user-123"%s, "context": {"ruddertyper": %s}}`, typ, fields, meta)
+	return fmt.Sprintf(`{"type": %q, "channel": "server", "userId": "user-123", "anonymousId": "anon-1"%s, "context": {"ruddertyper": %s}}`, typ, fields, meta)
+}
+
+// contextTraitsJSON is messageJSON whose context also holds traits, a JSON
+// object, as context.traits.
+func contextTraitsJSON(meta, typ, fields, traits string) string {
+	return fmt.Sprintf(`{"type": %q, "channel": "server", "userId": "user-123", "anonymousId": "anon-1"%s, "context": {"traits": %s, "ruddertyper": %s}}`, typ, fields, traits, meta)
 }
 
 // Each row's name starts with the golden whose wrapper it calls.
@@ -26,10 +32,10 @@ func TestNonTrackWire(t *testing.T) {
 		ref        *ruddertyper.RudderTyperAnalytics
 		sections   *identitysections.RudderTyperAnalytics
 		empty      *emptyidentity.RudderTyperAnalytics
-		id         = examples.Identity{UserID: "user-123"}
-		refID      = ruddertyper.Identity{UserID: "user-123"}
-		sectionsID = identitysections.Identity{UserID: "user-123"}
-		emptyID    = emptyidentity.Identity{UserID: "user-123"}
+		id         = examples.Identity{UserID: "user-123", AnonymousID: "anon-1"}
+		refID      = ruddertyper.Identity{UserID: "user-123", AnonymousID: "anon-1"}
+		sectionsID = identitysections.Identity{UserID: "user-123", AnonymousID: "anon-1"}
+		emptyID    = emptyidentity.Identity{UserID: "user-123", AnonymousID: "anon-1"}
 	)
 
 	rows := []wireRow{
@@ -46,8 +52,7 @@ func TestNonTrackWire(t *testing.T) {
 				return sections.Identify(sectionsID, &identitysections.IdentifyTraits{Email: "new@b.c"},
 					identitysections.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"email": "old@b.c", "plan": "free"}}))
 			},
-			want: `{"type": "identify", "channel": "server", "userId": "user-123",
-				"context": {"traits": {"email": "new@b.c", "plan": "free"}, "ruddertyper": ` + sectionsMeta + `}}`,
+			want: contextTraitsJSON(sectionsMeta, "identify", "", `{"email": "new@b.c", "plan": "free"}`),
 		},
 		{
 			name: "identitysections: group on traits sends the message's traits",
@@ -59,27 +64,24 @@ func TestNonTrackWire(t *testing.T) {
 		{
 			name: "ruddertyper: group on context.traits sends the message's traits and leaves the caller's context.traits untouched",
 			call: func() error {
-				return ref.Group(refID, "g1", &ruddertyper.GroupTraits{Active: true},
+				return ref.Group(refID, "g1", &ruddertyper.GroupTraits{Active: true, Status: ruddertyper.Ptr(ruddertyper.CustomTypeStatusActive)},
 					ruddertyper.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"active": false, "plan": "pro"}}))
 			},
-			want: `{"type": "group", "channel": "server", "userId": "user-123", "groupId": "g1", "traits": {"active": true},
-				"context": {"traits": {"active": false, "plan": "pro"}, "ruddertyper": ` + refMeta + `}}`,
+			want: contextTraitsJSON(refMeta, "group", `, "groupId": "g1", "traits": {"active": true, "status": "active"}`, `{"active": false, "plan": "pro"}`),
 		},
 		{
 			name: "emptyidentity: the empty identify sends no traits and leaves the caller's context.traits untouched",
 			call: func() error {
 				return empty.Identify(emptyID, emptyidentity.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"plan": "pro"}}))
 			},
-			want: `{"type": "identify", "channel": "server", "userId": "user-123",
-				"context": {"traits": {"plan": "pro"}, "ruddertyper": ` + emptyIdentityMeta + `}}`,
+			want: contextTraitsJSON(emptyIdentityMeta, "identify", "", `{"plan": "pro"}`),
 		},
 		{
 			name: "emptyidentity: the empty group sends no traits and leaves the caller's context.traits untouched",
 			call: func() error {
 				return empty.Group(emptyID, "g1", emptyidentity.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"plan": "pro"}}))
 			},
-			want: `{"type": "group", "channel": "server", "userId": "user-123", "groupId": "g1",
-				"context": {"traits": {"plan": "pro"}, "ruddertyper": ` + emptyIdentityMeta + `}}`,
+			want: contextTraitsJSON(emptyIdentityMeta, "group", `, "groupId": "g1"`, `{"plan": "pro"}`),
 		},
 		{
 			name: "examples: page sends a non-empty name as the top-level name",
@@ -90,6 +92,28 @@ func TestNonTrackWire(t *testing.T) {
 			name: "examples: screen sends a non-empty name as the top-level name",
 			call: func() error { return ex.Screen(id, "Product Detail", &examples.ScreenProperties{ProductID: "p1"}) },
 			want: messageJSON(exMeta, "screen", `, "name": "Product Detail", "properties": {"productId": "p1"}`),
+		},
+		{
+			name: "ruddertyper: identify on traits sends the message's traits",
+			call: func() error {
+				return ref.Identify(refID, &ruddertyper.IdentifyTraits{Email: "a@b.c", Active: ruddertyper.Ptr(true)})
+			},
+			want: messageJSON(refMeta, "identify", `, "traits": {"email": "a@b.c", "active": true}`),
+		},
+		{
+			name: "ruddertyper: page sends a nested custom type under the plan's keys",
+			call: func() error {
+				return ref.Page(refID, "Dashboard", &ruddertyper.PageProperties{Profile: ruddertyper.CustomTypeUserProfile{
+					Email: "a@b.c", FirstName: "Alice", LastName: ruddertyper.Ptr("Johnson"),
+				}})
+			},
+			want: messageJSON(refMeta, "page", `, "name": "Dashboard",
+				"properties": {"profile": {"email": "a@b.c", "first_name": "Alice", "last_name": "Johnson"}}`),
+		},
+		{
+			name: "ruddertyper: screen with an empty non-nil payload sends no properties",
+			call: func() error { return ref.Screen(refID, "Settings", &ruddertyper.ScreenProperties{}) },
+			want: messageJSON(refMeta, "screen", `, "name": "Settings"`),
 		},
 		{
 			name: "examples: page with an empty name and a nil payload sends no name or properties",
@@ -171,6 +195,13 @@ func TestNonTrackWire(t *testing.T) {
 			name: "examples: WithCategory never replaces a case's fixed discriminator, so a different value returns ErrCategoryConflict",
 			call: func() error {
 				return ex.PageCategoryVariant(id, "", examples.PageCategoryVariantPropertiesCaseNews{Headline: "h"}, examples.WithCategory("sports"))
+			},
+			errIs: examples.ErrCategoryConflict,
+		},
+		{
+			name: "examples: WithCategory on the Absent case of a declared category discriminator returns ErrCategoryConflict",
+			call: func() error {
+				return ex.PageCategoryVariant(id, "", examples.PageCategoryVariantPropertiesAbsent{}, examples.WithCategory("news"))
 			},
 			errIs: examples.ErrCategoryConflict,
 		},
@@ -283,8 +314,7 @@ func TestNonTrackWire(t *testing.T) {
 			call: func() error {
 				return ex.Identify2(id, examples.IdentifyVariantTraitsCaseBusiness{CompanyName: "Acme"})
 			},
-			want: `{"type": "identify", "channel": "server", "userId": "user-123",
-				"context": {"traits": {"accountType": "business", "companyName": "Acme"}, "ruddertyper": ` + exMeta + `}}`,
+			want: contextTraitsJSON(exMeta, "identify", "", `{"accountType": "business", "companyName": "Acme"}`),
 		},
 		{
 			name: "examples: a group variant case on context.traits sends the message's traits",

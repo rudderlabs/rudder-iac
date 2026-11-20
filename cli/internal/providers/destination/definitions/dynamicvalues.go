@@ -3,7 +3,6 @@ package definitions
 import (
 	"reflect"
 	"regexp"
-	"strings"
 
 	"github.com/go-playground/validator/v10"
 
@@ -45,6 +44,17 @@ func IsTemplateConfigValue(value string) bool {
 	return uiTemplateValueRegex.MatchString(value)
 }
 
+// TemplateFallback returns the fallback of a value in the RudderStack UI
+// template syntax `{{ path || fallback }}`: the text after the last "||", as
+// written, spaces included. ok is false when value does not use that syntax.
+func TemplateFallback(value string) (fallback string, ok bool) {
+	match := uiTemplateValueRegex.FindStringSubmatch(value)
+	if match == nil {
+		return "", false
+	}
+	return match[1], true
+}
+
 func configValidateFuncs() []rules.CustomValidateFunc {
 	return []rules.CustomValidateFunc{
 		{
@@ -79,17 +89,20 @@ func dynamicOrPattern(fl validator.FieldLevel) bool {
 	return funcs.MatchPattern(fl.Param(), value)
 }
 
+// dynamicOrOneOf accepts a dynamic config value, otherwise defers to the
+// members as oneof does: "" passes only when listed, so an optional key needs
+// omitempty, as it does with oneof.
 func dynamicOrOneOf(fl validator.FieldLevel) bool {
 	value, ok := stringFieldValue(fl)
-	if !ok || value == "" {
-		return true
+	if !ok {
+		return false
 	}
 
 	if IsDynamicConfigValue(value) {
 		return true
 	}
 
-	for _, option := range strings.Fields(fl.Param()) {
+	for _, option := range funcs.OneOfMembers(fl.Param()) {
 		if value == option {
 			return true
 		}

@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -131,6 +132,63 @@ func connectionCollection(remotes ...*resources.RemoteResource) *resources.Remot
 	}
 	collection.Set(ResourceType, resourceMap)
 	return collection
+}
+
+// TestRemoteMirrorRowClearsSpecSyntax covers the import hazard #1009 left
+// behind, and is deliberately narrower than its subject suggests. It runs the
+// conversions a remote row passes through on its way into a spec —
+// configFromRemote, configToMap, then the struct-tag step rules.ValidateStruct
+// applies — not FormatForExport.
+//
+// An audience connection on a vdm-next destination carries a destinationConfig,
+// which the spec has no field for, so configFromRemote refuses the row and the
+// import skips it (TestConfigFromRemoteRefusesUnrepresentableShapes). It never
+// reaches a spec. What does reach one is a mirror row without a destination
+// config, in either generic shape, and #1009 made the spec it generated fail at
+// the syntax step on a field the backend will not let anyone change.
+//
+// Mirror clears the syntax step again, which is all this test claims. It is not
+// a clean round trip: V-R2 still refuses mirror on both of these flows, so such
+// a connection keeps failing `validate`, with the flow named rather than the
+// enum (TestConnectionSemanticValid_SourceCapability pins both messages). The
+// dead end closes only once a destination declaring supportsVisualMapperV2 is
+// registered and the spec can carry its destination config (DEX-875).
+func TestRemoteMirrorRowClearsSpecSyntax(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]func(*retlClient.RETLConnection){
+		"json mapper":    func(*retlClient.RETLConnection) {},
+		"object mapping": func(conn *retlClient.RETLConnection) { conn.Object = "Audience" },
+	}
+
+	for name, shape := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			row := remoteRow("conn-mirror", "", "src-1", "dst-1")
+			row.SyncBehaviour = retlClient.SyncBehaviourMirror
+			shape(&row)
+
+			config, err := configFromRemote(&row)
+			require.NoError(t, err, "a mirror row without a destination config is representable")
+			require.Equal(t, "mirror", config.SyncBehaviour)
+
+			exported, err := configToMap(config)
+			require.NoError(t, err)
+
+			spec, err := decode(t, map[string]any{ConnectionsKey: []any{map[string]any{
+				"id":          "users-to-webhook",
+				"source":      "#retl-source-sql-model:users",
+				"destination": "#destination:webhook",
+				"config":      exported,
+			}}})
+			require.NoError(t, err)
+
+			results, err := rules.ValidateStruct(spec, "")
+			require.NoError(t, err)
+			assert.Empty(t, results)
+		})
+	}
 }
 
 func TestFormatForExport(t *testing.T) {
