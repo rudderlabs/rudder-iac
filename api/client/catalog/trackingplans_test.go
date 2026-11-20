@@ -196,27 +196,16 @@ func TestUpdateTrackingPlanEvents(t *testing.T) {
 }
 
 // Numbers stay json.Number, so enum values that one float64 cannot tell apart
-// keep their exact value.
-func TestGetTrackingPlanEventSchemaKeepsNumbersExact(t *testing.T) {
-	httpClient := testutils.NewMockHTTPClient(t, testutils.Call{
-		Validate: func(req *http.Request) bool {
-			return assert.Equal(t, "/v2/catalog/tracking-plans/tp-123/events/ev-123", req.URL.Path)
-		},
-		ResponseStatus: 200,
-		ResponseBody:   `{"rules": {"properties": {"id": {"enum": [9007199254740992, 9007199254740993]}}}}`,
-	})
-	apiClient, err := client.New("test-token", client.WithHTTPClient(httpClient))
-	require.NoError(t, err)
-	dataCatalog, err := catalog.NewRudderDataCatalog(apiClient)
-	require.NoError(t, err)
+// keep their exact value. The schema is decoded inside TrackingPlanWithSchemas,
+// as the pinned-version endpoint and snapshots decode it.
+func TestTrackingPlanEventSchemaKeepsNumbersExact(t *testing.T) {
+	var tp catalog.TrackingPlanWithSchemas
+	require.NoError(t, json.Unmarshal([]byte(`{"events": [{"rules": {"properties": {"id": {"enum": [9007199254740992, 9007199254740993]}}}}]}`), &tp))
 
-	schema, err := dataCatalog.GetTrackingPlanEventSchema(context.Background(), "tp-123", "ev-123")
-	require.NoError(t, err)
-
+	require.Len(t, tp.Events, 1)
 	assert.Equal(t, map[string]any{
 		"id": map[string]any{"enum": []any{json.Number("9007199254740992"), json.Number("9007199254740993")}},
-	}, schema.Rules.Properties)
-	httpClient.AssertNumberOfCalls()
+	}, tp.Events[0].Rules.Properties)
 }
 
 // Helper function to generate event IDs

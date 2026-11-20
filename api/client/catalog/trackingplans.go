@@ -128,6 +128,16 @@ type TrackingPlanEventSchema struct {
 	} `json:"rules"`
 }
 
+// UnmarshalJSON keeps the numbers in the rules as json.Number, on every path
+// that decodes an event schema: as float64, enum values such as
+// 9007199254740992 and 9007199254740993 would become the same number.
+func (s *TrackingPlanEventSchema) UnmarshalJSON(data []byte) error {
+	type plain TrackingPlanEventSchema
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	return dec.Decode((*plain)(s))
+}
+
 const (
 	IdentitySectionProperties    = "properties"
 	IdentitySectionTraits        = "traits"
@@ -527,14 +537,8 @@ func (c *RudderDataCatalog) GetTrackingPlanEventSchema(ctx context.Context, id s
 		return nil, fmt.Errorf("executing http request: %w", err)
 	}
 
-	// Numbers stay json.Number: as float64, enum values such as
-	// 9007199254740992 and 9007199254740993 would become the same number.
-	var (
-		schema TrackingPlanEventSchema
-		dec    = json.NewDecoder(bytes.NewReader(resp))
-	)
-	dec.UseNumber()
-	if err := dec.Decode(&schema); err != nil {
+	schema := TrackingPlanEventSchema{}
+	if err := json.NewDecoder(bytes.NewReader(resp)).Decode(&schema); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
 	}
 
