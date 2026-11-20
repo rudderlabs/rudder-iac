@@ -67,10 +67,8 @@ func TestPropertyTypeOrder(t *testing.T) {
 		rule("C Event", property("amount", "described later", plan.PrimitiveTypeNumber)),
 	}}
 
-	rules, err := trackRules(p)
-	require.NoError(t, err)
 	ctx := &GoContext{}
-	_, err = addPropertyTypes(ctx, rules, core.NewNameRegistry(core.DefaultCollisionHandler))
+	_, err := addPropertyTypes(ctx, trackRules(p), core.NewNameRegistry(core.DefaultCollisionHandler))
 	require.NoError(t, err)
 
 	// Ordered by name, then signature ("number" < "string"); one type per

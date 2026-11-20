@@ -13,9 +13,10 @@ import (
 )
 
 // rawAccountSecret is the literal BigQuery credentials value supplied via the var
-// file. It must never surface in CLI output — the secret is write-only and the API
-// never returns it.
-const rawAccountSecret = "dummy-bq-service-account-key-12345"
+// file: a service account key shaped like a downloaded key file, which the
+// accounts provider requires. It must never surface in CLI output — the secret is
+// write-only and the API never returns it.
+const rawAccountSecret = `{"type":"service_account","project_id":"rudder-cli-e2e","private_key_id":"dummy-bq-key-id-12345","private_key":"-----BEGIN PRIVATE KEY-----\nZHVtbXk=\n-----END PRIVATE KEY-----\n","client_email":"dummy@rudder-cli-e2e.iam.gserviceaccount.com"}`
 
 // accountExternalIDs are the accounts the fixtures manage, one per supported
 // warehouse definition. Each has a testdata/expected/upstream/accounts/<dir>/<id>.json
@@ -25,8 +26,13 @@ var accountExternalIDs = []string{"prod-bq", "prod-pg", "prod-sf"}
 // fixtureAccountSecrets is every secret value in credentials.vars.yaml. Snowflake
 // carries more than one, so the leak assertion has to cover the whole set. These
 // are fixture placeholders, not credentials -- hence the gitleaks exemption.
+//
+// rawAccountSecret holds quotes and \n escapes, so a leak into JSON or quoted
+// YAML shows up escaped and never matches it; the escape-free key id catches
+// those leaks.
 var fixtureAccountSecrets = []string{
 	rawAccountSecret,
+	"dummy-bq-key-id-12345",
 	"dummy-pg-password-12345",
 	"dummy-sf-key-12345",
 	"dummy-sf-phrase-12345", //gitleaks:allow

@@ -155,6 +155,18 @@ func TestFacebookConversionsConfigValidation(t *testing.T) {
 		}
 	})
 
+	t.Run("empty mapped event target", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"dataset_id":   "dataset-1",
+			"access_token": "access-token-1",
+			"events_to_events": []any{
+				map[string]any{"from": "Signed Up", "to": ""},
+			},
+		})
+		assert.Empty(t, errors)
+	})
+
 	t.Run("invalid mapped event target", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{

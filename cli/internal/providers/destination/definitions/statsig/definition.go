@@ -19,6 +19,7 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -32,6 +33,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // statsigConfig is the local YAML config model. Field set mirrors
@@ -54,11 +56,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "statsig",
-		APIType:    "STATSIG",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"secret_key"},
+		Type:        "statsig",
+		DisplayName: "Statsig",
+		APIType:     "STATSIG",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"secret_key"},
 		NewConfig: func() any {
 			return &statsigConfig{}
 		},
