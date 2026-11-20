@@ -43,7 +43,7 @@ func (r *recorder) Success(msg analytics.Message) {
 }
 
 func (r *recorder) Failure(msg analytics.Message, err error) {
-	r.t.Errorf("SDK failed to send %#v: %v", msg, err)
+	assert.NoError(r.t, err, "SDK failed to send %#v", msg)
 }
 
 // capture runs send against a real SDK client and returns the messages of the
