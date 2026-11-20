@@ -8,6 +8,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -40,7 +41,7 @@ func TestDestinationSpecMapstructureDecode(t *testing.T) {
 		DisplayName:       "Production GA4",
 		Type:              "GA4",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Transformation:    "#transformation:my-transform",
 		Config: map[string]any{
 			"api_secret":     "secret",
@@ -61,7 +62,7 @@ func TestDestinationSpecMapstructureDecodeDefinitionVersionAsInt(t *testing.T) {
 
 	var spec DestinationSpec
 	require.NoError(t, mapstructure.Decode(raw, &spec))
-	assert.Equal(t, int64(2), spec.DefinitionVersion)
+	assert.Equal(t, lo.ToPtr[int64](2), spec.DefinitionVersion)
 }
 
 func TestParseTransformationRef(t *testing.T) {
