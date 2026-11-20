@@ -9,6 +9,8 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // GoOptions contains Go-specific generation options.
@@ -65,6 +67,10 @@ func validateOutputFileName(name string) error {
 		return errors.New("must be a file name, not a path")
 	case strings.HasPrefix(name, "_"), strings.HasPrefix(name, "."):
 		return errors.New("go build ignores files starting with _ or .")
+	// cmd/go's SafeArg: a leading ASCII symbol could read as a flag or a
+	// response file, so go build refuses the file as an input.
+	case name[0] < utf8.RuneSelf && !unicode.IsLetter(rune(name[0])) && !unicode.IsDigit(rune(name[0])):
+		return errors.New("go build rejects file names starting with an ASCII symbol")
 	}
 
 	// Under an OS and architecture that do not exist, go/build accepts only

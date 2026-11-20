@@ -95,6 +95,18 @@ func TestOptionsValidate(t *testing.T) {
 			golang.GoOptions{PackageName: "ruddertyper", OutputFileName: ".ruddertyper.go"},
 			`validating outputFileName ".ruddertyper.go": go build ignores files starting with _ or .`,
 		},
+		{"file name starting with a digit", golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "1events.go"}, ""},
+		{"file name starting with a non-ASCII letter", golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "éventos.go"}, ""},
+		{
+			"leading at sign",
+			golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "@events.go"},
+			`validating outputFileName "@events.go": go build rejects file names starting with an ASCII symbol`,
+		},
+		{
+			"leading dash",
+			golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "-events.go"},
+			`validating outputFileName "-events.go": go build rejects file names starting with an ASCII symbol`,
+		},
 		{
 			"GOOS suffix",
 			golang.GoOptions{PackageName: "ruddertyper", OutputFileName: "ruddertyper_linux.go"},
