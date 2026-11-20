@@ -667,12 +667,13 @@ func walkFields(rv reflect.Value, depth int) error {
 		}
 		var err error
 		switch s := reflect.Indirect(fv); {
-		case f.IsExported() && (!f.Anonymous || s.Kind() != reflect.Struct || tag != "" && tag[0] != ','):
-			_, err = wire(fv, depth)
-		case f.Anonymous && s.Kind() == reflect.Struct:
-			// Counted as a level: an embedded pointer can lead back to its
-			// own struct.
+		case f.Anonymous && s.Kind() == reflect.Struct && (!f.IsExported() || tag == "" || tag[0] == ','):
+			// encoding/json promotes the fields of an embedded struct with no
+			// JSON name, and an unexported one cannot reach wire. Counted as
+			// a level: an embedded pointer can lead back to its own struct.
 			err = walkFields(s, depth+1)
+		case f.IsExported():
+			_, err = wire(fv, depth)
 		}
 		if err != nil {
 			return err
