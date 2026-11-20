@@ -190,6 +190,24 @@ func TestGenerateReservesSkippedDeclaredKeys(t *testing.T) {
 	assert.Equal(t, []string{`skipping property "kind" (string) of track event "Some Event": Go generation does not support enums yet`}, *warnings)
 }
 
+// A field may not share a name with a method of its struct, so a property
+// named after one takes a suffix.
+func TestGenerateReservesPayloadMethodNames(t *testing.T) {
+	p := &plan.TrackingPlan{Rules: []plan.EventRule{{
+		Event:   plan.Event{EventType: plan.EventTypeTrack, Name: "Some Event"},
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+			"marshalJSON": {Property: plan.Property{Name: "marshalJSON", Types: []plan.PropertyType{plan.PrimitiveTypeString}}},
+		}},
+	}}}
+
+	files, err := (&golang.Generator{}).Generate(p, core.GenerateOptions{}, nil)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+
+	assert.Contains(t, files[0].Content, "\tMarshalJSON1 *PropertyMarshalJSON // optional\n")
+}
+
 func captureWarnings(t *testing.T) *[]string {
 	t.Helper()
 	var warnings []string
