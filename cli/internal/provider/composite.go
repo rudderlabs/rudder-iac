@@ -441,7 +441,7 @@ func (p *CompositeProvider) PreviewImports(ctx context.Context, plan *planner.Pl
 		}
 		diffs, err := previewer.PreviewImports(ctx, plan, st)
 		if err != nil {
-			return nil, fmt.Errorf("previewing imports for provider %s: %w", name, err)
+			return nil, fmt.Errorf("previewing changes for provider %s: %w", name, err)
 		}
 		maps.Copy(result, diffs)
 	}

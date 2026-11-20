@@ -130,6 +130,30 @@ func TestImportPreviewShowsWhatTheAdoptChanges(t *testing.T) {
 	require.NoError(t, err, "dry run after apply failed: %s", afterPlan)
 	assert.NotContains(t, string(afterPlan), "Importable resources")
 	assert.NotContains(t, string(afterPlan), "Updated resources")
+
+	// A managed update replaces the whole config too: a key the definition
+	// doesn't model, written by the dashboard after the adopt, is named in the
+	// dry run and then removed. The legacy block is one the seed proved the API
+	// stores and returns.
+	managed, err := apiClient.Destinations.Get(ctx, seeded.ID)
+	require.NoError(t, err)
+	var config map[string]any
+	require.NoError(t, json.Unmarshal(managed.Config, &config))
+	config["oneTrustCookieCategories"] = map[string]any{}
+	managed.Config, err = json.Marshal(config)
+	require.NoError(t, err)
+	_, err = apiClient.Destinations.Update(ctx, managed)
+	require.NoError(t, err, "adding a key the definition doesn't model failed")
+
+	updatePlan, err := executor.Execute(cliBinPath, "apply", "-l", projectDir, "--var-file", varFile, "--dry-run", "--confirm=false")
+	require.NoError(t, err, "dry run after the dashboard edit failed: %s", updatePlan)
+	assert.Contains(t, string(updatePlan), "Config (API keys the update removes).oneTrustCookieCategories")
+
+	out, err = executor.Execute(cliBinPath, "apply", "-l", projectDir, "--var-file", varFile, "--confirm=false")
+	require.NoError(t, err, "apply after the dashboard edit failed: %s", out)
+	updated, err := apiClient.Destinations.Get(ctx, seeded.ID)
+	require.NoError(t, err)
+	assert.NotContains(t, string(updated.Config), "oneTrustCookieCategories", "the update must remove the key its dry run named")
 }
 
 // removedConfigKeys returns the top-level keys of before that after lacks.
