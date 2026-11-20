@@ -19,6 +19,11 @@ This file captures repository-specific rules used during implementation and revi
 - Use `testify` (`assert`/`require`) consistently.
 - Prefer struct-level equality assertions over field-by-field assertions when reasonable.
 - Add/update E2E tests in `cli/tests/` when apply-cycle behavior is affected.
+- Call `t.Parallel()` in tests and subtests, except where the test uses `t.Setenv`/`t.Chdir` (Go panics on the combination) or drives the live workspace in `cli/tests/`.
+- `require` for gates (`NoError`, `Len`, setup); `assert` for the verifications that follow.
+- Helpers take `testing.TB`, call `t.Helper()` first, and fail via `require` instead of returning errors; use `t.TempDir()` and `t.Cleanup()` for teardown.
+- Name subtests as short sentences with spaces, matching the existing suite: `"skips connections whose endpoint cannot be resolved"`.
+- Large expected outputs live under `testdata/`; regenerate typer fixtures with `make typer-<lang>-update-testdata` and E2E snapshots per `cli/tests/README.md`.
 
 ## Error Handling
 
