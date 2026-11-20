@@ -78,9 +78,10 @@ func capture(t *testing.T, send func(analytics.Client)) ([]map[string]any, []ana
 }
 
 // assertMessage compares got whole with wantJSON, a JSON object. The SDK-filled
-// messageId, originalTimestamp, sentAt, anonymousId, channel and context.library
-// are ignored unless wantJSON asserts them, so WithMessageID and WithTimestamp
-// stay testable.
+// messageId, originalTimestamp, sentAt, anonymousId and channel are ignored
+// unless wantJSON asserts them, so WithMessageID and WithTimestamp stay
+// testable. context.library is always ignored: the SDK overwrites it on every
+// message.
 func assertMessage(t *testing.T, wantJSON string, got map[string]any) {
 	t.Helper()
 	var want map[string]any
@@ -92,9 +93,7 @@ func assertMessage(t *testing.T, wantJSON string, got map[string]any) {
 			delete(got, key)
 		}
 	}
-	wantContext, _ := want["context"].(map[string]any)
-	_, wantLibrary := wantContext["library"]
-	if gotContext, ok := got["context"].(map[string]any); ok && !wantLibrary {
+	if gotContext, ok := got["context"].(map[string]any); ok {
 		gotContext = maps.Clone(gotContext)
 		delete(gotContext, "library")
 		got["context"] = gotContext
