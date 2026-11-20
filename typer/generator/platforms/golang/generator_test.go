@@ -43,7 +43,6 @@ var referenceWarnings = []string{
 	`skipping property "multi_type_array" (array of integer|string) of track event "User Signed Up": Go generation does not support array item types yet`,
 	`skipping property "multi_type_field" (boolean|integer|string) of track event "User Signed Up": Go generation does not support multi-type properties yet`,
 	`skipping property "multi_type_with_null" (integer|null|string) of track event "User Signed Up": Go generation does not support multi-type properties yet`,
-	`skipping property "nested_empty_object" (object) of track event "User Signed Up": Go generation does not support nested object schemas yet`,
 	`skipping property "nested_empty_object_no_additional_props" (object) of track event "User Signed Up": Go generation does not support nested object schemas yet`,
 	`skipping property "null_field" (null) of track event "User Signed Up": Go generation does not support the null type yet`,
 	`skipping property "number_or_null" (null|number) of track event "User Signed Up": Go generation does not support multi-type properties yet`,
@@ -191,6 +190,24 @@ func TestGenerateReservesSkippedDeclaredKeys(t *testing.T) {
 
 	assert.Contains(t, files[0].Content, "\tm := withAdditional(v.AdditionalProperties, \"kind\", \"name\")\n")
 	assert.Equal(t, []string{`skipping property "kind" (string) of track event "Some Event": Go generation does not support enums yet`}, *warnings)
+}
+
+// A field may not share a name with a method of its struct, so a property
+// named after one takes a suffix.
+func TestGenerateReservesPayloadMethodNames(t *testing.T) {
+	p := &plan.TrackingPlan{Rules: []plan.EventRule{{
+		Event:   plan.Event{EventType: plan.EventTypeTrack, Name: "Some Event"},
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+			"marshalJSON": {Property: plan.Property{Name: "marshalJSON", Types: []plan.PropertyType{plan.PrimitiveTypeString}}},
+		}},
+	}}}
+
+	files, err := (&golang.Generator{}).Generate(p, core.GenerateOptions{}, nil)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+
+	assert.Contains(t, files[0].Content, "\tMarshalJSON1 *PropertyMarshalJSON // optional\n")
 }
 
 func captureWarnings(t *testing.T) *[]string {

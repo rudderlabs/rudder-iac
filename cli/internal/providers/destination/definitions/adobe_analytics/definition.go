@@ -46,6 +46,7 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -59,6 +60,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type mappingEntry struct {
@@ -76,7 +78,7 @@ type delimitedMappingEntry struct {
 
 type eventToTypeEntry struct {
 	From string `mapstructure:"from" validate:"required,pattern=single_line_100"`
-	To   string `mapstructure:"to" validate:"omitempty,oneof=initHeartbeat heartbeatPlaybackStarted heartbeatPlaybackPaused heartbeatPlaybackResumed heartbeatPlaybackCompleted heartbeatPlaybackInterrupted heartbeatContentStarted heartbeatContentComplete heartbeatAdBreakStarted heartbeatAdBreakCompleted heartbeatAdStarted heartbeatAdCompleted heartbeatAdSkipped heartbeatSeekStarted heartbeatSeekCompleted heartbeatBufferStarted heartbeatBufferCompleted heartbeatQualityUpdated heartbeatUpdatePlayhead"`
+	To   string `mapstructure:"to" validate:"omitempty,oneof='' initHeartbeat heartbeatPlaybackStarted heartbeatPlaybackPaused heartbeatPlaybackResumed heartbeatPlaybackCompleted heartbeatPlaybackInterrupted heartbeatContentStarted heartbeatContentComplete heartbeatAdBreakStarted heartbeatAdBreakCompleted heartbeatAdStarted heartbeatAdCompleted heartbeatAdSkipped heartbeatSeekStarted heartbeatSeekCompleted heartbeatBufferStarted heartbeatBufferCompleted heartbeatQualityUpdated heartbeatUpdatePlayhead"`
 }
 
 type eventFiltering struct {
@@ -200,10 +202,16 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "adobe_analytics",
-		APIType:    "ADOBE_ANALYTICS",
-		Version:    1,
-		Properties: properties,
+		Type:        "adobe_analytics",
+		DisplayName: "Adobe Analytics",
+		APIType:     "ADOBE_ANALYTICS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys: []string{
+			"heartbeat_tracking_server_url",
+			"marketing_cloud_org_id",
+			"tracking_server_url",
+		},
 		NewConfig: func() any {
 			return &adobeAnalyticsConfig{}
 		},

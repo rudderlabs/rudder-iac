@@ -26,6 +26,10 @@
       "ios": "device",
       "cloud": "cloud"
     },
+    "useNativeSDK": {
+      "android": false,
+      "ios": true
+    },
     "partnerParamsKeys": [
       {
         "from": "userId",

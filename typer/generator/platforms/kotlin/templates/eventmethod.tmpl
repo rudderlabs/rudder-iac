@@ -1,0 +1,20 @@
+{{/* Pieces shared by the RudderAnalytics and RudderTyper clients, so the two can't drift apart. */}}
+{{ define "methoddoc" }}
+    /**
+     * {{ escapeComment .Comment }}
+     *
+     * Event:
+{{- if .EventName }}
+     *   Name: "{{ .EventName }}"
+{{- end }}
+{{- if .IdentitySection }}
+     *   Identity Section: "{{ .IdentitySection }}"
+{{- end }}
+{{- if .MethodArguments }}
+     *
+{{- range .MethodArguments }}
+     * @param {{ .Name }}{{- if .Comment }} {{ escapeComment .Comment }}{{- end }}
+{{- end }}
+{{- end }}{{ end }}
+
+{{ define "methodargs" }}{{- range $i, $arg := .MethodArguments -}}{{- if $i }}, {{ end -}}{{- .Name }}: {{ .Type }}{{- if .Nullable }}?{{ end }}{{- if .IsLiteralDefault }} = {{ formatLiteral .Default }}{{- else if .Default }} = {{ .Default }}{{- end }}{{- end }}{{ end }}

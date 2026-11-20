@@ -11,6 +11,9 @@
     "connectionMode": {
       "web": "device"
     },
+    "useNativeSDK": {
+      "web": true
+    },
     "eventFilteringOption": "whitelistedEvents",
     "isSPA": true,
     "libraryTolerance": "2000",

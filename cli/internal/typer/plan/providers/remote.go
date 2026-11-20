@@ -8,14 +8,9 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 )
 
-// NewRemoteCatalogPlanProvider builds a plan provider that fetches the tracking
-// plan from the remote workspace by ID, initialising the data catalog API client
-// from the configured credentials.
-func NewRemoteCatalogPlanProvider(trackingPlanID string) (*JSONSchemaPlanProvider, error) {
-	if trackingPlanID == "" {
-		return nil, fmt.Errorf("tracking-plan-id is required")
-	}
-
+// NewRemoteCatalogStore initialises the data catalog API client from the
+// configured credentials.
+func NewRemoteCatalogStore() (catalog.TrackingPlanStore, error) {
 	deps, err := app.NewDeps()
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize dependencies: %w", err)
@@ -29,5 +24,21 @@ func NewRemoteCatalogPlanProvider(trackingPlanID string) (*JSONSchemaPlanProvide
 		return nil, fmt.Errorf("failed to initialize data catalog client: %w", err)
 	}
 
-	return NewJSONSchemaPlanProvider(trackingPlanID, dataCatalogClient), nil
+	return dataCatalogClient, nil
+}
+
+// NewRemoteCatalogPlanProvider builds a plan provider that fetches the tracking
+// plan from the remote workspace by ID, at the given version or the latest one
+// when version is zero.
+func NewRemoteCatalogPlanProvider(trackingPlanID string, version int) (*JSONSchemaPlanProvider, error) {
+	if trackingPlanID == "" {
+		return nil, fmt.Errorf("tracking-plan-id is required")
+	}
+
+	store, err := NewRemoteCatalogStore()
+	if err != nil {
+		return nil, err
+	}
+
+	return NewJSONSchemaPlanProvider(trackingPlanID, store).WithVersion(version), nil
 }

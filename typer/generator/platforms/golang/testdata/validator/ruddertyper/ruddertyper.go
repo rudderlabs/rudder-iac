@@ -129,6 +129,11 @@ type PropertyArrayOfAny = []any
 // Property with mixed unicode: café, naïve, 日本語
 type PropertyMixedUnicode = string
 
+// PropertyNestedEmptyObject represents the property "nested_empty_object".
+//
+// Nested property with empty object allowing additional properties
+type PropertyNestedEmptyObject = map[string]any
+
 // PropertyObjectProperty represents the property "object_property".
 //
 // An object field with no defined structure
@@ -242,13 +247,14 @@ func (v TrackProductPremiumClickedProperties) MarshalJSON() ([]byte, error) {
 
 // TrackUserSignedUpProperties holds the properties of "User Signed Up".
 type TrackUserSignedUpProperties struct {
-	ArrayOfAny     PropertyArrayOfAny     // optional
-	MixedUnicode   *PropertyMixedUnicode  // optional
-	ObjectProperty PropertyObjectProperty // optional
-	PropertyOfAny  PropertyPropertyOfAny  // optional
-	UntypedArray   PropertyUntypedArray   // optional
-	UntypedField   PropertyUntypedField   // optional
-	X用户名           *Property用户名           // optional
+	ArrayOfAny        PropertyArrayOfAny        // optional
+	MixedUnicode      *PropertyMixedUnicode     // optional
+	NestedEmptyObject PropertyNestedEmptyObject // optional
+	ObjectProperty    PropertyObjectProperty    // optional
+	PropertyOfAny     PropertyPropertyOfAny     // optional
+	UntypedArray      PropertyUntypedArray      // optional
+	UntypedField      PropertyUntypedField      // optional
+	X用户名              *Property用户名              // optional
 }
 
 func (v TrackUserSignedUpProperties) toMap() map[string]any {
@@ -258,6 +264,9 @@ func (v TrackUserSignedUpProperties) toMap() map[string]any {
 	}
 	if v.MixedUnicode != nil {
 		m["mixed_unicode"] = *v.MixedUnicode
+	}
+	if v.NestedEmptyObject != nil {
+		m["nested_empty_object"] = v.NestedEmptyObject
 	}
 	if v.ObjectProperty != nil {
 		m["object_property"] = v.ObjectProperty

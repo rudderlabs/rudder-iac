@@ -88,21 +88,12 @@ func (tb *mainTB) Errorf(format string, args ...any) {
 // attentive_tag/http/rs/salesforce destinations; if its cleanup destroy fails,
 // only s3 is registered on the next run and the residue fails the whole load.
 //
-// rETL kinds: retl-source-table and retl-connections load only behind their
-// own flags, and a destroy cannot see a kind it has not loaded. PR runs are
-// cancelled in-progress by design, so a run killed mid TestRETLConnectionsApply
-// would otherwise leave rows the next run's opening destroy cannot reach —
-// the source then cannot be deleted either while a connection still uses it.
-//
 // Keep this with the tests rather than as CI repository variables, so the
 // requirement travels with the code. Callers still set
-// RUDDERSTACK_CLI_EXPERIMENTAL themselves for their own flags; it is set here
-// too because the rETL flags take effect only under it.
+// RUDDERSTACK_CLI_EXPERIMENTAL themselves for their own flags.
 func allowManagedResidue(t *testing.T) {
 	t.Helper()
 
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
-	t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", "true")
-	t.Setenv("RUDDERSTACK_X_RETL_CONNECTION_SUPPORT", "true")
 }
