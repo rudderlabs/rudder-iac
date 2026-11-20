@@ -771,6 +771,9 @@ func addCustomTypes(ctx *GoContext, customTypes []*customType, propertyTypes map
 		if err != nil {
 			return fmt.Errorf("mapping custom type %q: %w", ct.Name, err)
 		}
+		if e != nil && len(e.dropped) > 0 {
+			core.Warn(fmt.Sprintf("leaving out the enum values %s of custom type %q (%s): its declared types do not allow them", jsonText(e.dropped), ct.Name, declaredTypes(prop)))
+		}
 		if _, err := addPropertyType(ctx, registry, c.name, lead, prop, e); err != nil {
 			return fmt.Errorf("mapping custom type %q: %w", ct.Name, err)
 		}

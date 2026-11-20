@@ -217,16 +217,32 @@ func TestGenerateSkipsUnsupportedFieldsAtEveryLevel(t *testing.T) {
 	}, *warnings)
 }
 
+// Fields at every level and enum custom types warn.
 func TestGenerateWarnsAboutEnumValuesLeftOut(t *testing.T) {
 	warnings := captureWarnings(t)
+	var (
+		config  = &plan.PropertyConfig{Enum: []any{"a", nil, 1.5, 1, 1.5}}
+		integer = []plan.PropertyType{plan.PrimitiveTypeInteger}
+		tier    = plan.CustomType{Name: "tier", Type: plan.PrimitiveTypeInteger, Config: config}
+	)
+	p := golang.TrackPlan(
+		plan.Property{Name: "kind", Types: integer, Config: config},
+		plan.Property{Name: "tier", Types: []plan.PropertyType{tier}},
+	)
+	p.Rules[0].Schema.Properties["context"] = plan.PropertySchema{
+		Property: plan.Property{Name: "context", Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+		Schema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+			"level": {Property: plan.Property{Name: "level", Types: integer, Config: config}},
+		}},
+	}
 
-	_, err := (&golang.Generator{}).Generate(golang.TrackPlan(plan.Property{
-		Name:   "kind",
-		Types:  []plan.PropertyType{plan.PrimitiveTypeInteger},
-		Config: &plan.PropertyConfig{Enum: []any{"a", nil, 1.5, 1, 1.5}},
-	}), core.GenerateOptions{}, nil)
+	_, err := (&golang.Generator{}).Generate(p, core.GenerateOptions{}, nil)
 	require.NoError(t, err)
-	assert.Equal(t, []string{`leaving out the enum values ["a",null,1.5] of property "kind" (integer) of track event "Some Event": its declared types do not allow them`}, *warnings)
+	assert.Equal(t, []string{
+		`leaving out the enum values ["a",null,1.5] of property "context.level" (integer) of track event "Some Event": its declared types do not allow them`,
+		`leaving out the enum values ["a",null,1.5] of property "kind" (integer) of track event "Some Event": its declared types do not allow them`,
+		`leaving out the enum values ["a",null,1.5] of custom type "tier" (integer): its declared types do not allow them`,
+	}, *warnings)
 }
 
 // A field may not share a name with a method of its struct, so a property
