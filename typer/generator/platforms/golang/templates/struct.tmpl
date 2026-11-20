@@ -54,7 +54,7 @@ func (v {{ .Name }}) toMap() map[string]any {
 {{- end }}
 	return m
 }
-{{- with .Payload }}
+{{- with .Noun }}
 
 // To{{ . }} returns a deep copy of the {{ lower . }} as sent on the wire.
 func (v {{ $.Name }}) To{{ . }}() (analytics.{{ . }}, error) {

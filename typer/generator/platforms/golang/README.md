@@ -1,14 +1,15 @@
 # Go Generator
 
-Generates a type-safe Go package for a tracking plan on top of analytics-go. Each bullet links the section of the Go Generation Specification ([main][spec], [appendix][appendix]) it summarizes.
+Generates a type-safe Go package for a tracking plan on top of analytics-go. Each bullet names the sections of the Go Generation Specification it summarizes. The spec's [main][spec] and [appendix][appendix] pages are RudderStack-internal, and each link opens the top of its page.
 
 ## Generating
 
-- `rudder-cli typer generate --platform go --tracking-plan-id <id>` generates from your workspace's tracking plan; add `--local --location <project>` to generate from local specs ([Target Versions][spec]).
+- `rudder-cli typer generate --platform go --tracking-plan-id <id>` generates from your workspace's tracking plan. `rudder-cli typer generate --platform go --local --location <project>` generates from local specs; with `--local`, `--tracking-plan-id` takes the plan's local id and can be left out when the project has one plan ([Target Versions][spec]).
 - `rudder-cli typer options --platform go` lists the options; set one with `--option name=value` ([Generator Options][spec]).
 - The output is one file, `ruddertyper.go` in package `ruddertyper`; the `outputFileName` and `packageName` options rename them ([Generator Options][spec]). `--output` (`-o`) sets its directory, `.` by default: point it at the package's own directory, such as `-o internal/ruddertyper`.
 - Never edit the file; regenerate it after every tracking plan change ([Generated File Structure][spec]).
 - It needs Go 1.21 or later and analytics-go v4.2.2 or later, imported as `analytics "github.com/rudderlabs/analytics-go/v4"` ([Target Versions][spec]).
+- Go fails generation on some plan shapes that other platforms accept, such as one match value in two cases of a variant ([Plan Shapes That Fail Generation][appendix]).
 
 ## Wiring
 
@@ -28,6 +29,7 @@ user := ruddertyper.Identity{UserID: "user-123"}
 
 - Every method takes an `Identity` first. Set `UserID`, `AnonymousID` or both: the SDK keeps no current user and rejects a call that sets neither ([Generated File Structure][spec]).
 - Payloads are generated types. For a struct payload, track takes a value and page, screen, identify and group take a pointer (`nil` sends no payload); variant and open-map payloads are passed as is. An event whose rule allows no properties has no payload parameter ([Event Types][spec]).
+- Generated names come from the plan: `Track{Event}` takes a `Track{Event}Properties`, custom types are `CustomType{Name}` and variant cases `{Type}Case{Match}`. A name already taken gets a numeric suffix, such as `Identify1` for a second identify rule ([Naming Conventions][spec]).
 - Required fields hold values, and optional fields pointers (or `nil`-able slices, maps and interfaces). Set an optional scalar with `Ptr`; integer fields need `ruddertyper.Ptr[int64](2)`, because `Ptr(2)` is an `*int` ([Required and Optional Fields][spec]).
 
 ```go
@@ -40,7 +42,7 @@ props := ruddertyper.TrackSomeTrackEventProperties{
 
 - A property that is one type or `null` is a `Nullable[T]`, whose zero value is `null`. Build a value with `NewNullable[T](v)` and write `T` out: `NewNullable(1)` is a `Nullable[int]`, not a `Nullable[int64]` ([Nullable Types][spec], [Discriminator Values][spec]).
 - Multi-type values come from their `New{Type}{Member}` constructors ([Multi-Type Properties][spec]), and enum values from their typed constants, or for a mixed enum from its value functions ([Enums][spec]).
-- For a variant, pass a case struct (by value, so type switches match); it fixes the discriminator. When generated, the `Default` struct takes any other discriminator value; a boolean or enum discriminator whose cases cover every value gets none ([Variant Rules][spec], [Custom Type with Variants][spec], [Event Rule with Variants][spec]).
+- For a variant, pass a case struct (by value, so type switches match); it fixes the discriminator. When generated, the `Default` struct is meant for values no case matches, but sends whatever value it holds, even a case value or, when unset, the zero value such as `""`; a boolean or enum discriminator whose cases cover every value gets none. An optional discriminator also gets a `{Type}Absent` struct, which sends no discriminator ([Variant Rules][spec], [Custom Type with Variants][spec], [Event Rule with Variants][spec]).
 
 ```go
 err := rt.TrackDeviceEvent(user, ruddertyper.TrackDeviceEventPropertiesCaseMobile{OsVersion: "17.1", AppVersion: "2.0"})
@@ -50,7 +52,7 @@ err = rt.TrackDeviceEvent(user, ruddertyper.TrackDeviceEventPropertiesDefault{De
 // properties: {"deviceType": "tv"}
 ```
 
-- To read a variant, use one `case` per struct: a combined `case A, B:` clause leaves `v` typed as the interface, and these clauses do not match a pointer to a case. `Discriminator()` returns the value without a switch ([Type Narrowing Usage][spec]).
+- To read a variant, use one `case` per struct: a combined `case A, B:` clause leaves `v` typed as the interface. `Discriminator()` returns the value without a switch; for an optional discriminator it returns `(value, ok)`, and `ok` is false only for `Absent` ([Type Narrowing Usage][spec], [Variant Rules][spec]).
 
 ```go
 func handleVariant(data ruddertyper.CustomTypeSomeVariantType) {
@@ -85,13 +87,13 @@ err = rt.Page(
 )
 ```
 
-- `WithCategory` sets `properties.category` on page and screen calls: it must equal a category the payload already holds, or else the schema must be open and not declare `category`. Anything else fails with `ErrCategoryConflict`. An empty string is checked and sent like any other value; leave the option out to send no category ([Call Options][spec], [Page Events][spec]).
+- `WithCategory` sets `properties.category` on page and screen calls (other calls ignore it): it must equal a category the payload already holds, or else the schema must be open and not declare `category`. Anything else fails with `ErrCategoryConflict`. An empty string is checked and sent like any other value; leave the option out to send no category ([Call Options][spec], [Page Events][spec]).
 - External IDs travel in the context: `WithAnalyticsContext(analytics.Context{Extra: map[string]any{"externalId": ...}})` ([Call Options][spec]).
 - Go does not allow single options and an `opts...` slice in one call. Build one slice instead: `append([]ruddertyper.Option{ruddertyper.WithCategory(category)}, opts...)` ([Alternate Invocations (Function Overloads)][spec]).
 
 ## Errors
 
-- Methods return the SDK's errors unchanged, and their own errors wrap three sentinels. Match them with `errors.Is` and `errors.As`, never by the error's type ([Errors][spec]):
+- Methods return the SDK's errors unchanged, and their own errors wrap three sentinels. Match them with `errors.Is` and `errors.As`, never with `==` or a type assertion ([Errors][spec]):
   - `ErrNilPayload`: a nil or typed-nil track variant payload.
   - `ErrInvalidValue`: an unset value that has no valid zero value (see Caveats), or a payload or option value that cannot be sent.
   - `ErrCategoryConflict`: a `WithCategory` the rule does not accept.
@@ -103,7 +105,7 @@ err = rt.Page(
 
 - Go cannot force a field to be set, so an unset required field is sent as its zero value (`""`, `0`, `false`, `[]`). Unions without a `null` member, mixed enums and variants have no valid zero value, so an unset one fails the call with `ErrInvalidValue` ([Required and Optional Fields][spec], [Plan Shapes That Fail Generation][appendix]).
 - To catch unset required fields at lint time, enable the `exhaustruct` linter for the packages that build payloads ([Required and Optional Fields][spec]).
-- Generated code checks shapes, not values: an enum accepts any value of its type, and a variant's `Default` may repeat a case value. Check untrusted input with the enum's `IsValid()` ([Errors][spec], [Enums][spec]).
+- Generated code checks shapes, not values: an enum accepts any value of its type, and so does a variant's `Default` (see Calling). Check untrusted input with the enum's `IsValid()` ([Errors][spec], [Enums][spec]).
 - Identify traits go where the rule's identity section says, `traits` or `context.traits`, while analytics.js always sends them in `context.traits`. Group traits always go to `traits` ([Identity Sections][spec]).
 - Nothing carries over between calls: an event sent after `Identify` has no `context.traits` unless you pass them ([Identify Events][spec]):
 

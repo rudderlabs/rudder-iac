@@ -198,7 +198,7 @@ func TestHoistedNameCollision(t *testing.T) {
 		{Struct: &GoStruct{
 			Name:         "TrackSomeEventProperties",
 			Doc:          "TrackSomeEventProperties holds the properties of \"Some Event\".",
-			Payload:      "Properties",
+			Noun:         "Properties",
 			DeclaredKeys: []string{"foo", "fooBar"},
 			Fields: []GoField{
 				{Name: "Foo", Key: "foo", Type: "*TrackSomeEventPropertiesFoo", Pointer: true},
@@ -232,9 +232,9 @@ func TestHoistedNameCollision(t *testing.T) {
 	}, ctx.Payloads)
 }
 
-// A hoisted property's description documents the field's type: the struct of
-// an object, or the union of object and another type, whose Object struct is
-// only one member and does not repeat it.
+// A hoisted property has no Property type, so each type hoisted for it carries
+// its description: the struct of an object, and both the union of object and
+// another type and that union's Object struct. No golden has a described union.
 func TestHoistedDescription(t *testing.T) {
 	var (
 		leaf = &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"x": {Property: plan.Property{Name: "x", Types: []plan.PropertyType{plan.PrimitiveTypeString}}}}}
@@ -259,7 +259,7 @@ func TestHoistedDescription(t *testing.T) {
 		{Struct: &GoStruct{
 			Name:         "TrackSomeEventProperties",
 			Doc:          "TrackSomeEventProperties holds the properties of \"Some Event\".",
-			Payload:      "Properties",
+			Noun:         "Properties",
 			DeclaredKeys: []string{"bar", "foo"},
 			Fields: []GoField{
 				{Name: "Bar", Key: "bar", Type: "*TrackSomeEventPropertiesBar", Pointer: true},
@@ -279,7 +279,7 @@ func TestHoistedDescription(t *testing.T) {
 		}},
 		{Struct: &GoStruct{
 			Name:         "TrackSomeEventPropertiesBarObject",
-			Doc:          "TrackSomeEventPropertiesBarObject is the object in TrackSomeEventProperties.Bar.",
+			Doc:          "TrackSomeEventPropertiesBarObject is the object in TrackSomeEventProperties.Bar.\n\nthe bar value",
 			DeclaredKeys: []string{"x"},
 			Fields:       x,
 		}},

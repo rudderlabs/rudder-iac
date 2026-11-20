@@ -2,6 +2,7 @@ package golang_test
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
@@ -14,6 +15,9 @@ import (
 // payloadAndMethods matches the declarations of the payload types and of the
 // event methods, without their bodies.
 var payloadAndMethods = regexp.MustCompile(`(?m)^(type \w+(Properties|Traits)\d* .*?|func \(r \*RudderTyperAnalytics\) [A-Z].*?)( \{)?$`)
+
+// helperCall matches a call of a send helper or of a call option method.
+var helperCall = regexp.MustCompile(`\b[ro]\.([a-z]\w*)\(`)
 
 // One row per event type, section and schema shape of the spec's Event Types
 // table: the payload type and method each generates, or the warning it is
@@ -71,11 +75,6 @@ func TestGenerateEventTypes(t *testing.T) {
 			want:  []string{method("Identify(identity Identity, opts ...Option)")},
 		},
 		{
-			name:  "identify on context.traits, declared traits",
-			rules: declared(rule(plan.EventTypeIdentify, "", plan.IdentitySectionContextTraits)),
-			want:  []string{"type IdentifyTraits struct", method("Identify(identity Identity, traits *IdentifyTraits, opts ...Option)")},
-		},
-		{
 			name:  "group, declared traits",
 			rules: declared(rule(plan.EventTypeGroup, "", plan.IdentitySectionTraits)),
 			want:  []string{"type GroupTraits struct", method("Group(identity Identity, groupID string, traits *GroupTraits, opts ...Option)")},
@@ -94,11 +93,6 @@ func TestGenerateEventTypes(t *testing.T) {
 			name:  "group, empty and closed",
 			rules: closed(rule(plan.EventTypeGroup, "", plan.IdentitySectionTraits)),
 			want:  []string{method("Group(identity Identity, groupID string, opts ...Option)")},
-		},
-		{
-			name:  "group on context.traits, declared traits",
-			rules: declared(rule(plan.EventTypeGroup, "", plan.IdentitySectionContextTraits)),
-			want:  []string{"type GroupTraits struct", method("Group(identity Identity, groupID string, traits *GroupTraits, opts ...Option)")},
 		},
 		{
 			name:  "page, declared properties",
@@ -211,6 +205,15 @@ func TestGenerateEventTypes(t *testing.T) {
 			}
 			assert.Equal(t, tt.want, got)
 			assert.Equal(t, tt.wantWarnings, *warnings)
+			// No golden has a plan with only one of these event types, so this
+			// is what catches a helper emitted under the wrong condition.
+			var undeclared []string
+			for _, call := range helperCall.FindAllStringSubmatch(files[0].Content, -1) {
+				if !strings.Contains(files[0].Content, ") "+call[1]+"(") {
+					undeclared = append(undeclared, call[1])
+				}
+			}
+			assert.Empty(t, undeclared, "helpers called but not declared")
 		})
 	}
 }

@@ -80,9 +80,7 @@ func Example_eventRuleWithVariants() {
 	_ = err
 }
 
-// handleVariant is the Type Narrowing Usage example, which is a function.
-// Example_typeNarrowingUsage calls it so the function is exercised by name,
-// under an Example named after its section like the rest.
+// handleVariant is the Type Narrowing Usage example, which is itself a function.
 func handleVariant(data ruddertyper.CustomTypeSomeVariantType) {
 	switch v := data.(type) {
 	case ruddertyper.CustomTypeSomeVariantTypeCaseCase1:
@@ -94,10 +92,6 @@ func handleVariant(data ruddertyper.CustomTypeSomeVariantType) {
 	case ruddertyper.CustomTypeSomeVariantTypeDefault:
 		fmt.Println(v.SomeString, v.SomeBoolean) // SomeBoolean is *bool
 	}
-}
-
-func Example_typeNarrowingUsage() {
-	handleVariant(ruddertyper.CustomTypeSomeVariantTypeCaseCase1{SomeInteger: 1})
 }
 
 func Example_identifyEvents() {

@@ -1,6 +1,7 @@
 package golang
 
 import (
+	"go/build/constraint"
 	"strings"
 	"unicode"
 )
@@ -22,6 +23,11 @@ func commentLines(text string) []string {
 func comment(text string) string {
 	lines := commentLines(text)
 	for i, line := range lines {
+		// go/format moves every "// +build" line to the file header, where it
+		// becomes a build constraint on the generated package.
+		if constraint.IsPlusBuild("// " + line) {
+			line = `\` + line
+		}
 		lines[i] = strings.TrimSuffix("// "+line, " ")
 	}
 	return strings.Join(lines, "\n")

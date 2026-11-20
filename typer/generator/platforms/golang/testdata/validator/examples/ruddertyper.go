@@ -137,6 +137,7 @@ func (Null) wireValue() (any, error) { return nil, nil }
 func (Null) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
 
 // Nullable holds either a value of T or JSON null. The zero value is null.
+// Value is ignored unless Valid is true.
 type Nullable[T any] struct {
 	Value T
 	Valid bool
@@ -731,6 +732,43 @@ type PropertyNumber = float64
 // PropertyObject represents the property "object".
 type PropertyObject = map[string]any
 
+// PropertyObjectOrNull represents the property "objectOrNull".
+type PropertyObjectOrNull = Nullable[map[string]any]
+
+// PropertyObjectOrString represents the property "objectOrString": a string or object.
+// Build it with one of the NewPropertyObjectOrString* functions.
+// Null is not a member, so the zero value cannot be sent.
+type PropertyObjectOrString struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertyObjectOrString
+	value any
+}
+
+// NewPropertyObjectOrStringString returns a string value.
+func NewPropertyObjectOrStringString(v string) PropertyObjectOrString {
+	return PropertyObjectOrString{value: v}
+}
+
+// NewPropertyObjectOrStringObject returns an object value; nil is sent as {}.
+func NewPropertyObjectOrStringObject(v map[string]any) PropertyObjectOrString {
+	return PropertyObjectOrString{value: v}
+}
+
+// Value returns the held value.
+func (u PropertyObjectOrString) Value() any { return u.value }
+
+func (u PropertyObjectOrString) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: PropertyObjectOrString is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u PropertyObjectOrString) MarshalJSON() ([]byte, error) { return marshal(u) }
+
 // PropertyOsVersion represents the property "osVersion".
 type PropertyOsVersion = string
 
@@ -758,7 +796,12 @@ type PropertyShipping = CustomTypeShipping
 // PropertySomeArrayOfMultipleTypesItem is one item of PropertySomeArrayOfMultipleTypes: a string, integer, number or boolean.
 // Build it with one of the NewPropertySomeArrayOfMultipleTypesItem* functions.
 // Null is not a member, so the zero value cannot be sent.
-type PropertySomeArrayOfMultipleTypesItem struct{ value any }
+type PropertySomeArrayOfMultipleTypesItem struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertySomeArrayOfMultipleTypesItem
+	value any
+}
 
 // NewPropertySomeArrayOfMultipleTypesItemString returns a string value.
 func NewPropertySomeArrayOfMultipleTypesItemString(v string) PropertySomeArrayOfMultipleTypesItem {
@@ -813,10 +856,52 @@ type PropertySomeCustomString = CustomTypeSomeStringType
 // some integer property
 type PropertySomeInteger = int64
 
+// PropertySomeMixedArrayOrNullItem is one item of PropertySomeMixedArrayOrNull: a string or integer.
+// Build it with one of the NewPropertySomeMixedArrayOrNullItem* functions.
+// Null is not a member, so the zero value cannot be sent.
+type PropertySomeMixedArrayOrNullItem struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertySomeMixedArrayOrNullItem
+	value any
+}
+
+// NewPropertySomeMixedArrayOrNullItemString returns a string value.
+func NewPropertySomeMixedArrayOrNullItemString(v string) PropertySomeMixedArrayOrNullItem {
+	return PropertySomeMixedArrayOrNullItem{value: v}
+}
+
+// NewPropertySomeMixedArrayOrNullItemInteger returns an integer value.
+func NewPropertySomeMixedArrayOrNullItemInteger(v int64) PropertySomeMixedArrayOrNullItem {
+	return PropertySomeMixedArrayOrNullItem{value: v}
+}
+
+// Value returns the held value.
+func (u PropertySomeMixedArrayOrNullItem) Value() any { return u.value }
+
+func (u PropertySomeMixedArrayOrNullItem) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: PropertySomeMixedArrayOrNullItem is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u PropertySomeMixedArrayOrNullItem) MarshalJSON() ([]byte, error) { return marshal(u) }
+
+// PropertySomeMixedArrayOrNull represents the property "someMixedArrayOrNull".
+type PropertySomeMixedArrayOrNull = Nullable[[]PropertySomeMixedArrayOrNullItem]
+
 // PropertySomeMultiType represents the property "someMultiType": a string, integer, number, boolean, object, array or null.
 // Build it with one of the NewPropertySomeMultiType* functions.
 // Null is a member, so the zero value is null.
-type PropertySomeMultiType struct{ value any }
+type PropertySomeMultiType struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertySomeMultiType
+	value any
+}
 
 // NewPropertySomeMultiTypeString returns a string value.
 func NewPropertySomeMultiTypeString(v string) PropertySomeMultiType {
@@ -945,10 +1030,83 @@ type PropertyStreet = string
 // PropertyString represents the property "string".
 type PropertyString = string
 
+// PropertyStringOrMixedArrayItem is one item of PropertyStringOrMixedArray: a string or integer.
+// Build it with one of the NewPropertyStringOrMixedArrayItem* functions.
+// Null is not a member, so the zero value cannot be sent.
+type PropertyStringOrMixedArrayItem struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertyStringOrMixedArrayItem
+	value any
+}
+
+// NewPropertyStringOrMixedArrayItemString returns a string value.
+func NewPropertyStringOrMixedArrayItemString(v string) PropertyStringOrMixedArrayItem {
+	return PropertyStringOrMixedArrayItem{value: v}
+}
+
+// NewPropertyStringOrMixedArrayItemInteger returns an integer value.
+func NewPropertyStringOrMixedArrayItemInteger(v int64) PropertyStringOrMixedArrayItem {
+	return PropertyStringOrMixedArrayItem{value: v}
+}
+
+// Value returns the held value.
+func (u PropertyStringOrMixedArrayItem) Value() any { return u.value }
+
+func (u PropertyStringOrMixedArrayItem) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: PropertyStringOrMixedArrayItem is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u PropertyStringOrMixedArrayItem) MarshalJSON() ([]byte, error) { return marshal(u) }
+
+// PropertyStringOrMixedArray represents the property "stringOrMixedArray": a string or array.
+// Build it with one of the NewPropertyStringOrMixedArray* functions.
+// Null is not a member, so the zero value cannot be sent.
+type PropertyStringOrMixedArray struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertyStringOrMixedArray
+	value any
+}
+
+// NewPropertyStringOrMixedArrayString returns a string value.
+func NewPropertyStringOrMixedArrayString(v string) PropertyStringOrMixedArray {
+	return PropertyStringOrMixedArray{value: v}
+}
+
+// NewPropertyStringOrMixedArrayArray returns an array value; nil is sent as [].
+func NewPropertyStringOrMixedArrayArray(v []PropertyStringOrMixedArrayItem) PropertyStringOrMixedArray {
+	return PropertyStringOrMixedArray{value: v}
+}
+
+// Value returns the held value.
+func (u PropertyStringOrMixedArray) Value() any { return u.value }
+
+func (u PropertyStringOrMixedArray) wireValue() (any, error) {
+	if u.value == nil {
+		return nil, fmt.Errorf("%w: PropertyStringOrMixedArray is not set", ErrInvalidValue)
+	}
+	return u.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value, because
+// null is not a member.
+func (u PropertyStringOrMixedArray) MarshalJSON() ([]byte, error) { return marshal(u) }
+
 // PropertyStringOrStrings represents the property "stringOrStrings": a string or array.
 // Build it with one of the NewPropertyStringOrStrings* functions.
 // Null is not a member, so the zero value cannot be sent.
-type PropertyStringOrStrings struct{ value any }
+type PropertyStringOrStrings struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertyStringOrStrings
+	value any
+}
 
 // NewPropertyStringOrStringsString returns a string value.
 func NewPropertyStringOrStringsString(v string) PropertyStringOrStrings {
@@ -1242,16 +1400,43 @@ func (v PageProperties) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 
-// PageCategoryVariantProperties holds the properties of the page event "Category Variant", a discriminated union on "category". It is implemented by PageCategoryVariantPropertiesCaseNews and PageCategoryVariantPropertiesDefault.
+// PageCategoryVariantProperties holds the properties of the page event "Category Variant", a discriminated union on the optional "category". It is implemented by PageCategoryVariantPropertiesAbsent, PageCategoryVariantPropertiesCaseNews and PageCategoryVariantPropertiesDefault.
 type PageCategoryVariantProperties interface {
 	json.Marshaler
-	// Discriminator returns the value of "category".
-	Discriminator() PropertyCategory
+	// Discriminator returns the value of "category"; ok is false when it is absent.
+	Discriminator() (value PropertyCategory, ok bool)
 	// ToProperties returns a deep copy of the properties as sent on the wire.
 	ToProperties() (analytics.Properties, error)
 	categoryMode() categoryMode
 	toMap() map[string]any
 	isPageCategoryVariantProperties()
+}
+
+// PageCategoryVariantPropertiesAbsent is the case where "category" is absent. It holds the base properties only.
+type PageCategoryVariantPropertiesAbsent struct{}
+
+func (PageCategoryVariantPropertiesAbsent) isPageCategoryVariantProperties() {}
+
+// Discriminator reports that "category" is absent.
+func (PageCategoryVariantPropertiesAbsent) Discriminator() (value PropertyCategory, ok bool) {
+	return value, false
+}
+
+func (PageCategoryVariantPropertiesAbsent) categoryMode() categoryMode { return categoryDeclared }
+
+func (v PageCategoryVariantPropertiesAbsent) toMap() map[string]any {
+	m := map[string]any{}
+	return m
+}
+
+// ToProperties returns a deep copy of the properties as sent on the wire.
+func (v PageCategoryVariantPropertiesAbsent) ToProperties() (analytics.Properties, error) {
+	return snapshot(v)
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v PageCategoryVariantPropertiesAbsent) MarshalJSON() ([]byte, error) {
+	return marshal(v)
 }
 
 // PageCategoryVariantPropertiesCaseNews is the case where category is "news".
@@ -1262,13 +1447,15 @@ type PageCategoryVariantPropertiesCaseNews struct {
 func (PageCategoryVariantPropertiesCaseNews) isPageCategoryVariantProperties() {}
 
 // Discriminator returns "news".
-func (PageCategoryVariantPropertiesCaseNews) Discriminator() PropertyCategory { return "news" }
+func (PageCategoryVariantPropertiesCaseNews) Discriminator() (value PropertyCategory, ok bool) {
+	return "news", true
+}
 
 func (PageCategoryVariantPropertiesCaseNews) categoryMode() categoryMode { return categoryDeclared }
 
 func (v PageCategoryVariantPropertiesCaseNews) toMap() map[string]any {
 	m := map[string]any{
-		"category": v.Discriminator(),
+		"category": "news",
 		"headline": v.Headline,
 	}
 	return m
@@ -1292,7 +1479,9 @@ type PageCategoryVariantPropertiesDefault struct {
 func (PageCategoryVariantPropertiesDefault) isPageCategoryVariantProperties() {}
 
 // Discriminator returns Category.
-func (v PageCategoryVariantPropertiesDefault) Discriminator() PropertyCategory { return v.Category }
+func (v PageCategoryVariantPropertiesDefault) Discriminator() (value PropertyCategory, ok bool) {
+	return v.Category, true
+}
 
 func (PageCategoryVariantPropertiesDefault) categoryMode() categoryMode { return categoryDeclared }
 
@@ -1851,8 +2040,10 @@ type TrackSomeMultiTypeEventProperties struct {
 	Matrix                   PropertyMatrix                   // required
 	SomeArrayOfMultipleTypes PropertySomeArrayOfMultipleTypes // optional
 	SomeArrayOrNull          *PropertySomeArrayOrNull         // optional
+	SomeMixedArrayOrNull     *PropertySomeMixedArrayOrNull    // optional
 	SomeMultiType            *PropertySomeMultiType           // optional
 	SomeObjectOrNull         PropertySomeObjectOrNull         // required
+	StringOrMixedArray       *PropertyStringOrMixedArray      // optional
 	StringOrStrings          PropertyStringOrStrings          // required
 }
 
@@ -1868,8 +2059,14 @@ func (v TrackSomeMultiTypeEventProperties) toMap() map[string]any {
 	if v.SomeArrayOrNull != nil {
 		m["someArrayOrNull"] = *v.SomeArrayOrNull
 	}
+	if v.SomeMixedArrayOrNull != nil {
+		m["someMixedArrayOrNull"] = *v.SomeMixedArrayOrNull
+	}
 	if v.SomeMultiType != nil {
 		m["someMultiType"] = *v.SomeMultiType
+	}
+	if v.StringOrMixedArray != nil {
+		m["stringOrMixedArray"] = *v.StringOrMixedArray
 	}
 	return m
 }
@@ -1886,11 +2083,13 @@ func (v TrackSomeMultiTypeEventProperties) MarshalJSON() ([]byte, error) {
 
 // TrackSomeNestedObjectEventProperties holds the properties of "Some Nested Object Event".
 type TrackSomeNestedObjectEventProperties struct {
-	Address  *TrackSomeNestedObjectEventPropertiesAddress           // optional
-	Contact  *TrackSomeNestedObjectEventPropertiesContact           // optional
-	Foo      *TrackSomeNestedObjectEventPropertiesFoo               // optional
-	FooBar   *TrackSomeNestedObjectEventPropertiesFooBar            // optional
-	Location Nullable[TrackSomeNestedObjectEventPropertiesLocation] // required
+	Address        *TrackSomeNestedObjectEventPropertiesAddress           // optional
+	Contact        *TrackSomeNestedObjectEventPropertiesContact           // optional
+	Foo            *TrackSomeNestedObjectEventPropertiesFoo               // optional
+	FooBar         *TrackSomeNestedObjectEventPropertiesFooBar            // optional
+	Location       Nullable[TrackSomeNestedObjectEventPropertiesLocation] // required
+	ObjectOrNull   *PropertyObjectOrNull                                  // optional
+	ObjectOrString *PropertyObjectOrString                                // optional
 }
 
 func (v TrackSomeNestedObjectEventProperties) toMap() map[string]any {
@@ -1908,6 +2107,12 @@ func (v TrackSomeNestedObjectEventProperties) toMap() map[string]any {
 	}
 	if v.FooBar != nil {
 		m["fooBar"] = *v.FooBar
+	}
+	if v.ObjectOrNull != nil {
+		m["objectOrNull"] = *v.ObjectOrNull
+	}
+	if v.ObjectOrString != nil {
+		m["objectOrString"] = *v.ObjectOrString
 	}
 	return m
 }
@@ -1942,7 +2147,12 @@ func (v TrackSomeNestedObjectEventPropertiesAddress) MarshalJSON() ([]byte, erro
 // TrackSomeNestedObjectEventPropertiesContact is the value in TrackSomeNestedObjectEventProperties.Contact: a string or object.
 // Build it with one of the NewTrackSomeNestedObjectEventPropertiesContact* functions.
 // Null is not a member, so the zero value cannot be sent.
-type TrackSomeNestedObjectEventPropertiesContact struct{ value any }
+type TrackSomeNestedObjectEventPropertiesContact struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*TrackSomeNestedObjectEventPropertiesContact
+	value any
+}
 
 // NewTrackSomeNestedObjectEventPropertiesContactString returns a string value.
 func NewTrackSomeNestedObjectEventPropertiesContactString(v string) TrackSomeNestedObjectEventPropertiesContact {
@@ -2195,11 +2405,11 @@ func (v TrackSomeOpenVariantEventPropertiesCaseOnLineGeo) MarshalJSON() ([]byte,
 //
 // Sold online.
 type TrackSomeOpenVariantEventPropertiesCaseOnLine1 struct {
-	Discriminator1       *PropertyDiscriminator                             // optional
-	Geo                  *TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo // optional
-	Meta                 *TrackSomeOpenVariantEventPropertiesMeta           // optional
-	URL                  PropertyURL                                        // required
-	AdditionalProperties map[string]any                                     // optional; undeclared keys only
+	Discriminator1       *PropertyDiscriminator                            // optional
+	Geo                  *TrackSomeOpenVariantEventPropertiesCaseOnLineGeo // optional
+	Meta                 *TrackSomeOpenVariantEventPropertiesMeta          // optional
+	URL                  PropertyURL                                       // required
+	AdditionalProperties map[string]any                                    // optional; undeclared keys only
 }
 
 func (TrackSomeOpenVariantEventPropertiesCaseOnLine1) isTrackSomeOpenVariantEventProperties() {}
@@ -2230,23 +2440,6 @@ func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1) ToProperties() (analytic
 
 // MarshalJSON implements json.Marshaler using the tracking plan's keys.
 func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1) MarshalJSON() ([]byte, error) {
-	return marshal(v)
-}
-
-// TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo is the object in TrackSomeOpenVariantEventPropertiesCaseOnLine1.Geo.
-type TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo struct {
-	Lat PropertyLat // required
-}
-
-func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo) toMap() map[string]any {
-	m := map[string]any{
-		"lat": v.Lat,
-	}
-	return m
-}
-
-// MarshalJSON implements json.Marshaler using the tracking plan's keys.
-func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 
@@ -2806,7 +2999,7 @@ func (r *RudderTyperAnalytics) track(identity Identity, event string, properties
 		AnonymousId:       identity.AnonymousID,
 		Event:             event,
 		Properties:        properties,
-		Context:           o.analyticsContext(nil),
+		Context:           o.analyticsContext(),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,
 		MessageId:         o.messageID,
@@ -2814,7 +3007,8 @@ func (r *RudderTyperAnalytics) track(identity Identity, event string, properties
 }
 
 // identify sends traits as the message's traits, or as context.traits when
-// the rule's identity section is context.traits.
+// the rule's identity section is context.traits, where they win over the
+// caller's Context.Traits keys.
 func (r *RudderTyperAnalytics) identify(identity Identity, traits analytics.Traits, inContext bool, opts []Option) error {
 	o, err := applyOptions(opts)
 	if err != nil {
@@ -2823,15 +3017,19 @@ func (r *RudderTyperAnalytics) identify(identity Identity, traits analytics.Trai
 	msg := analytics.Identify{
 		UserId:            identity.UserID,
 		AnonymousId:       identity.AnonymousID,
+		Context:           o.analyticsContext(),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,
 		MessageId:         o.messageID,
 	}
-	if inContext {
-		msg.Context = o.analyticsContext(traits)
-	} else {
-		msg.Context = o.analyticsContext(nil)
+	switch {
+	case !inContext:
 		msg.Traits = traits
+	case len(traits) > 0:
+		merged := make(analytics.Traits, len(msg.Context.Traits)+len(traits))
+		maps.Copy(merged, msg.Context.Traits)
+		maps.Copy(merged, traits)
+		msg.Context.Traits = merged
 	}
 	return r.client.Enqueue(msg)
 }
@@ -2849,7 +3047,7 @@ func (r *RudderTyperAnalytics) page(identity Identity, name string, properties a
 		AnonymousId:       identity.AnonymousID,
 		Name:              name,
 		Properties:        properties,
-		Context:           o.analyticsContext(nil),
+		Context:           o.analyticsContext(),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,
 		MessageId:         o.messageID,
@@ -2869,7 +3067,7 @@ func (r *RudderTyperAnalytics) screen(identity Identity, name string, properties
 		AnonymousId:       identity.AnonymousID,
 		Name:              name,
 		Properties:        properties,
-		Context:           o.analyticsContext(nil),
+		Context:           o.analyticsContext(),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,
 		MessageId:         o.messageID,
@@ -2888,7 +3086,7 @@ func (r *RudderTyperAnalytics) group(identity Identity, groupID string, traits a
 		AnonymousId:       identity.AnonymousID,
 		GroupId:           groupID,
 		Traits:            traits,
-		Context:           o.analyticsContext(nil),
+		Context:           o.analyticsContext(),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,
 		MessageId:         o.messageID,
@@ -2920,35 +3118,34 @@ func applyOptions(opts []Option) (callOptions, error) {
 	}
 	var err error
 	if o.integrations, err = snapshot(o.integrations); err != nil {
-		return o, fmt.Errorf("integrations: %w", err)
+		return o, fmt.Errorf("copying integrations: %w", err)
 	}
 	if _, err := o.timestamp.MarshalJSON(); err != nil {
-		return o, fmt.Errorf("%w: timestamp: %w", ErrInvalidValue, err)
+		return o, fmt.Errorf("checking timestamp: %w: %w", ErrInvalidValue, err)
 	}
 	if o.context == nil {
 		return o, nil
 	}
 	ctx := *o.context
 	if ctx.Extra, err = snapshot(ctx.Extra); err != nil {
-		return o, fmt.Errorf("context.Extra: %w", err)
+		return o, fmt.Errorf("copying context.Extra: %w", err)
 	}
 	if ctx.Traits, err = snapshot(ctx.Traits); err != nil {
-		return o, fmt.Errorf("context.Traits: %w", err)
+		return o, fmt.Errorf("copying context.Traits: %w", err)
 	}
 	ctx.IP = slices.Clone(ctx.IP)
 	fields := ctx
 	fields.Extra, fields.Traits = nil, nil
 	if _, err := json.Marshal(fields); err != nil {
-		return o, fmt.Errorf("%w: context: %w", ErrInvalidValue, err)
+		return o, fmt.Errorf("checking context: %w: %w", ErrInvalidValue, err)
 	}
 	o.context = &ctx
 	return o, nil
 }
 
 // analyticsContext builds a fresh context for the call, because the SDK
-// writes into the context it is given. contextTraits (from a context.traits
-// identify rule) win over caller-supplied Context.Traits keys.
-func (o callOptions) analyticsContext(contextTraits analytics.Traits) *analytics.Context {
+// writes into the context it is given.
+func (o callOptions) analyticsContext() *analytics.Context {
 	var ctx analytics.Context
 	if o.context != nil {
 		ctx = *o.context
@@ -2957,12 +3154,6 @@ func (o callOptions) analyticsContext(contextTraits analytics.Traits) *analytics
 	maps.Copy(extra, ctx.Extra)
 	extra["ruddertyper"] = rudderTyperContext()
 	ctx.Extra = extra
-	if len(contextTraits) > 0 {
-		traits := make(analytics.Traits, len(ctx.Traits)+len(contextTraits))
-		maps.Copy(traits, ctx.Traits)
-		maps.Copy(traits, contextTraits)
-		ctx.Traits = traits
-	}
 	return &ctx
 }
 
@@ -2978,6 +3169,8 @@ type (
 // a value that contains itself reaches it and fails instead of overflowing
 // the stack.
 const maxDepth = 1000
+
+var errTooDeep = fmt.Errorf("%w: value nests more than %d levels deep or contains itself", ErrInvalidValue, maxDepth)
 
 // snapshot converts v into what the SDK receives: new maps and slices holding
 // strings, bools, numbers and nil. The SDK serializes later on another
@@ -3008,7 +3201,7 @@ func marshal(v any) ([]byte, error) {
 // invalid Nullable.
 func wire(rv reflect.Value, depth int) (any, error) {
 	if depth > maxDepth {
-		return nil, tooDeep()
+		return nil, errTooDeep
 	}
 	depth++
 	if !rv.IsValid() {
@@ -3022,20 +3215,35 @@ func wire(rv reflect.Value, depth int) (any, error) {
 		}
 		return nil, nil
 	}
-	switch v := rv.Interface().(type) {
+	v := rv.Interface()
+	if _, ok := v.(json.Number); !ok && rv.CanAddr() {
+		// encoding/json calls the marshalers of *T on an addressable T, such
+		// as a slice element, and they include T's own.
+		v = rv.Addr().Interface()
+	}
+	// A caller's struct that embeds a generated type has its toMap or
+	// wireValue too, but encoding/json encodes it by the caller's own
+	// MarshalJSON, if it has one. Walking the hook's result first still stops
+	// a cycle through the generated part.
+	switch v := v.(type) {
 	case wireObject:
-		return wire(reflect.ValueOf(v.toMap()), depth)
+		w, err := wire(reflect.ValueOf(v.toMap()), depth)
+		if err != nil || !embeds(v) {
+			return w, err
+		}
+		return encode(v)
 	case wireValuer:
 		x, err := v.wireValue()
 		if err != nil {
 			return nil, err
 		}
-		return wire(reflect.ValueOf(x), depth)
+		w, err := wire(reflect.ValueOf(x), depth)
+		if err != nil || !embeds(v) {
+			return w, err
+		}
+		return encode(v)
 	case json.Number, json.Marshaler, encoding.TextMarshaler:
 		return encode(v)
-	}
-	if addrMarshaler(rv) {
-		return encode(rv.Addr().Interface())
 	}
 	switch rv.Kind() {
 	case reflect.Interface, reflect.Pointer:
@@ -3091,155 +3299,61 @@ func wire(rv reflect.Value, depth int) (any, error) {
 }
 
 // foreign converts a caller-defined struct, or a map with non-string keys,
-// with encoding/json, whose rules for them this file does not repeat. It
-// encodes a copy in which nil slices and maps are empty, so the nil rule
-// holds inside them too. Building the copy visits every value encoding/json
-// will reach: a generated value in there is encoded by its own MarshalJSON,
-// which starts a new walk, so only this walk can stop a cycle that runs
-// through it.
+// with encoding/json, whose rules for them this file does not repeat. The
+// values inside are walked first and the result dropped: a generated value
+// in there is encoded by its own MarshalJSON, which starts a new walk, so
+// only this walk can stop a cycle that runs through it.
 func foreign(rv reflect.Value, depth int) (any, error) {
-	c, err := normalize(rv, depth-1) // wire has already counted rv
-	if err != nil {
+	if rv.Kind() == reflect.Map {
+		for it := rv.MapRange(); it.Next(); {
+			if _, err := wire(it.Value(), depth); err != nil {
+				return nil, err
+			}
+		}
+		return encode(rv.Interface())
+	}
+	if err := walkFields(rv, depth); err != nil {
 		return nil, err
 	}
-	// encoding/json calls pointer-receiver marshalers only on addressable
-	// values, so the copy is encoded as addressable as rv is.
-	if rv.Kind() == reflect.Struct && rv.CanAddr() {
-		c = c.Addr()
+	// encoding/json calls pointer-receiver marshalers only on addressable values.
+	if rv.CanAddr() {
+		rv = rv.Addr()
 	}
-	return encode(c.Interface())
+	return encode(rv.Interface())
 }
 
-// normalize returns a copy of rv in which nil slices and maps are empty,
-// except []byte and maps with non-string keys, which encoding/json sends as
-// null. Generated values and marshalers are kept, since they encode
-// themselves; generated values are walked first to catch cycles.
-func normalize(rv reflect.Value, depth int) (reflect.Value, error) {
-	k, t := rv.Kind(), rv.Type()
-	if (k == reflect.Pointer || k == reflect.Interface) && rv.IsNil() {
-		_, err := wire(rv, depth) // rejects a nil variant
-		return rv, err
-	}
-	switch rv.Interface().(type) {
-	case wireObject, wireValuer:
-		_, err := wire(rv, depth)
-		return rv, err
-	case json.Marshaler, encoding.TextMarshaler:
-		return rv, nil
-	}
-	if addrMarshaler(rv) {
-		return rv, nil
-	}
+// walkFields walks every field of struct rv that encoding/json may encode,
+// including those of the structs embedded in it, exported or not. Unlike
+// reflect.VisibleFields, it hides no field for sharing a Go name with
+// another, because encoding/json compares JSON names, so it can walk more
+// than encoding/json encodes but never less. Zero and empty fields hold
+// nothing to walk, and walking them could reject a value that omitzero or
+// omitempty leaves out.
+func walkFields(rv reflect.Value, depth int) error {
 	if depth > maxDepth {
-		return rv, tooDeep()
+		return errTooDeep
 	}
-	depth++
-	switch k {
-	case reflect.Interface:
-		return normalize(rv.Elem(), depth)
-	case reflect.Pointer:
-		e, err := normalize(rv.Elem(), depth)
-		if err != nil {
-			return rv, err
+	for i := 0; i < rv.NumField(); i++ {
+		f, fv := rv.Type().Field(i), rv.Field(i)
+		tag := f.Tag.Get("json")
+		if tag == "-" || fv.IsZero() || (fv.Kind() == reflect.Slice || fv.Kind() == reflect.Map) && fv.Len() == 0 {
+			continue
 		}
-		c := reflect.New(t.Elem())
-		c.Elem().Set(e)
-		return c, nil
-	case reflect.Map:
-		if rv.IsNil() && t.Key().Kind() != reflect.String {
-			return rv, nil
-		}
-		c := reflect.MakeMapWithSize(t, rv.Len())
-		for it := rv.MapRange(); it.Next(); {
-			e, err := normalize(it.Value(), depth)
-			if err != nil {
-				return rv, err
-			}
-			c.SetMapIndex(it.Key(), e)
-		}
-		return c, nil
-	case reflect.Slice, reflect.Array:
-		if k == reflect.Slice && t.Elem().Kind() == reflect.Uint8 {
-			return rv, nil
-		}
-		c := reflect.New(t).Elem()
-		if k == reflect.Slice {
-			c.Set(reflect.MakeSlice(t, rv.Len(), rv.Len()))
-		}
-		for i := 0; i < rv.Len(); i++ {
-			e, err := normalize(rv.Index(i), depth)
-			if err != nil {
-				return rv, err
-			}
-			c.Index(i).Set(e)
-		}
-		return c, nil
-	case reflect.Struct:
-		c := reflect.New(t).Elem()
-		c.Set(rv)
-		return c, normalizeFields(c, rv, depth)
-	}
-	return rv, nil
-}
-
-// normalizeFields normalizes into dst the fields of struct src that
-// encoding/json writes: the exported ones, including those it promotes from
-// an embedded struct of an unexported type. Fields are read from src, so a
-// field is as addressable as encoding/json will find it. dst is invalid
-// behind an embedded pointer to such a struct: the pointer cannot be
-// replaced and what it points to belongs to the caller, so the fields there
-// are only checked.
-func normalizeFields(dst, src reflect.Value, depth int) error {
-	if depth > maxDepth {
-		return tooDeep()
-	}
-	for i := 0; i < src.NumField(); i++ {
-		var (
-			f, fv = src.Type().Field(i), src.Field(i)
-			d     reflect.Value
-			err   error
-		)
-		if dst.IsValid() {
-			d = dst.Field(i)
-		}
-		switch {
-		case f.Tag.Get("json") == "-":
+		var err error
+		switch s := reflect.Indirect(fv); {
+		case f.Anonymous && s.Kind() == reflect.Struct && (!f.IsExported() || tag == "" || tag[0] == ','):
+			// encoding/json promotes the fields of an embedded struct with no
+			// JSON name, and an unexported one cannot reach wire. Counted as
+			// a level: an embedded pointer can lead back to its own struct.
+			err = walkFields(s, depth+1)
 		case f.IsExported():
-			var x reflect.Value
-			if x, err = normalize(fv, depth); err == nil && d.IsValid() {
-				d.Set(x)
-			}
-		case !f.Anonymous:
-		case fv.Kind() == reflect.Struct:
-			err = normalizeFields(d, fv, depth)
-		case fv.Kind() == reflect.Pointer && !fv.IsNil() && fv.Elem().Kind() == reflect.Struct:
-			err = normalizeFields(reflect.Value{}, fv.Elem(), depth+1)
+			_, err = wire(fv, depth)
 		}
 		if err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-// addrMarshaler reports whether encoding/json would call a pointer-receiver
-// MarshalJSON or MarshalText on rv, which it does when rv is addressable,
-// such as a slice element.
-func addrMarshaler(rv reflect.Value) bool {
-	if rv.Kind() == reflect.Pointer || !rv.CanAddr() {
-		return false
-	}
-	switch rv.Addr().Interface().(type) {
-	case json.Marshaler, encoding.TextMarshaler:
-		return true
-	}
-	return false
-}
-
-// tooDeep reports a value that nests more than maxDepth levels deep, which a
-// value that contains itself always does.
-func tooDeep() error {
-	return fmt.Errorf("%w: value nests more than %d levels deep or contains itself", ErrInvalidValue, maxDepth)
 }
 
 // encode converts v through encoding/json, for values whose JSON form only
@@ -3256,6 +3370,22 @@ func encode(v any) (any, error) {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidValue, err)
 	}
 	return x, nil
+}
+
+// embeds reports whether v is a struct, or points to one, with an embedded
+// field. Generated types embed nothing, so a v with toMap or wireValue that
+// embeds is a caller's struct.
+func embeds(v any) bool {
+	t := reflect.TypeOf(v)
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	for i := 0; t.Kind() == reflect.Struct && i < t.NumField(); i++ {
+		if t.Field(i).Anonymous {
+			return true
+		}
+	}
+	return false
 }
 
 // isNil reports whether v is nil or a nil pointer stored in an interface.
@@ -3287,9 +3417,12 @@ func (o callOptions) withCategory(props analytics.Properties, mode categoryMode)
 		if existing == category {
 			return props, nil
 		}
-		return nil, fmt.Errorf("%w: WithCategory(%q) differs from properties.category %v", ErrCategoryConflict, category, existing)
+		return nil, fmt.Errorf("%w: WithCategory(%q) differs from properties.category %#v", ErrCategoryConflict, category, existing)
 	}
-	if mode != categoryOpen {
+	switch mode {
+	case categoryDeclared:
+		return nil, fmt.Errorf("%w: WithCategory(%q) on a payload whose declared category is unset; set it in the payload", ErrCategoryConflict, category)
+	case categoryClosed:
 		return nil, fmt.Errorf("%w: WithCategory(%q) on a payload that does not accept an undeclared category", ErrCategoryConflict, category)
 	}
 	if props == nil {

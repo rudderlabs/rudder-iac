@@ -39,6 +39,7 @@ func NewCmdTest() *cobra.Command {
 		verbose  bool
 		output   string
 		force    bool
+		varFiles []string
 	)
 
 	cmd := &cobra.Command{
@@ -67,6 +68,9 @@ func NewCmdTest() *cobra.Command {
 			# Test from a specific project directory
 			$ rudder-cli transformations test --all -l ./my-project
 
+			# Test with variables from a file
+			$ rudder-cli transformations test --all --var-file prod.vars.yaml
+
 			# Write results to a custom file path
 			$ rudder-cli transformations test --all -o /tmp/results.json
 
@@ -86,8 +90,12 @@ func NewCmdTest() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			// Create project
-			p = deps.NewProject()
+			projectOpts, err := app.NewProjectOptions(varFiles)
+			if err != nil {
+				return err
+			}
+
+			p = deps.NewProject(projectOpts...)
 
 			// Load and validate the project configuration
 			if err := p.Load(location); err != nil {
@@ -96,10 +104,9 @@ func NewCmdTest() *cobra.Command {
 
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var err error
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
-				telemetry.TrackCommand("transformations test", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "location", V: location},
 					{K: "all", V: all},
 					{K: "modified", V: modified},
@@ -165,8 +172,7 @@ func NewCmdTest() *cobra.Command {
 			displayer.Display(results)
 
 			if results.HasFailures() {
-				err = ErrTestsFailed
-				return err
+				return ErrTestsFailed
 			}
 
 			return nil
@@ -174,6 +180,7 @@ func NewCmdTest() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
+	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 	cmd.Flags().BoolVar(&all, "all", false, "Test all transformations in the project")
 	cmd.Flags().BoolVar(&modified, "modified", false, "Test only new or modified transformations")
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed output including diffs for failures")

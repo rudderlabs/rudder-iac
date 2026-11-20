@@ -12,6 +12,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -67,7 +68,7 @@ func TestHandlerImpl_GA4RoundTrip(t *testing.T) {
 		DisplayName:       "Production GA4",
 		Type:              "GA4",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Config:            localConfig,
 	}
 	extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/ga4.yaml", spec)
@@ -130,7 +131,7 @@ func TestHandlerImpl_GA4RoundTripWithTransformationLink(t *testing.T) {
 		ID:                "ga4",
 		DisplayName:       "GA4",
 		Type:              "GA4",
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Transformation:    "#transformation:my-transform",
 		Config:            map[string]any{"api_secret": "s"},
 	})

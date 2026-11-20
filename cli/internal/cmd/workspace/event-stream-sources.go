@@ -25,12 +25,11 @@ func newCmdListEventStreamSources() *cobra.Command {
 		Use:   "list",
 		Short: "List event stream sources in the workspace",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 
-			var err error
 			defer func() {
-				telemetry.TrackCommand("workspace event-stream-sources list", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "json", V: jsonOutput},
 				}...)
 			}()
@@ -46,8 +45,7 @@ func newCmdListEventStreamSources() *cobra.Command {
 			}
 
 			l := lister.New(d.Providers().EventStream, lister.WithFormat(format))
-			err = l.List(cmd.Context(), source.ResourceType, nil)
-			return err
+			return l.List(cmd.Context(), source.ResourceType, nil)
 		},
 	}
 
