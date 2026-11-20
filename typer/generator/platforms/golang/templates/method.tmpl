@@ -3,6 +3,11 @@ func (r *RudderTyperAnalytics) {{ .Name }}(identity Identity{{ with .Payload }},
 {{- if not .Payload }}
 	return r.track(identity, {{ quote .Event }}, nil, opts)
 {{- else }}
+{{- if .Payload.Variant }}
+	if isNil(props) {
+		return fmt.Errorf("%w: {{ .Name }} needs a {{ .Payload.Name }} case", ErrNilPayload)
+	}
+{{- end }}
 	p, err := {{ if .Payload.MapAlias }}snapshot(props){{ else }}props.ToProperties(){{ end }}
 	if err != nil {
 		return err
