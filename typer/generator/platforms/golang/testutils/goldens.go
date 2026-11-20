@@ -6,8 +6,8 @@ import (
 	plantestutils "github.com/rudderlabs/rudder-iac/typer/plan/testutils"
 )
 
-// Golden is a plan whose generated output is committed under
-// testdata/validator, each golden in its own package directory.
+// Golden is a plan whose generated output is committed in the validator
+// module (testdata/validator), each golden in its own package.
 type Golden struct {
 	Plan    func() *plan.TrackingPlan
 	Options golang.GoOptions
