@@ -73,7 +73,9 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 	}
 	var (
 		stringSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
-		customSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.CustomType{Name: "!!!", Type: plan.PrimitiveTypeString}}}}
+		bangs        = plan.CustomType{Name: "!!!", Type: plan.PrimitiveTypeString}
+		customSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{bangs}}}
+		listSchema   = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.CustomType{Name: "list", Type: plan.PrimitiveTypeArray, ItemType: bangs}}}}
 		nestedSchema = plan.PropertySchema{
 			Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
 			Schema:   &plan.ObjectSchema{Properties: property("$$", stringSchema)},
@@ -96,6 +98,11 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 		{
 			"custom type without words",
 			trackEvent("Some Event", property("kind", customSchema)),
+			`naming custom type "!!!": name "!!!" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			"item type of an array custom type without words",
+			trackEvent("Some Event", property("list", listSchema)),
 			`naming custom type "!!!": name "!!!" has no letters or digits to build a Go identifier from`,
 		},
 		{
