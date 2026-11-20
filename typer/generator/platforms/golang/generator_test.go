@@ -39,12 +39,15 @@ func TestGenerateGoldens(t *testing.T) {
 }
 
 func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
-	trackEvent := func(event string, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
+	rule := func(eventType plan.EventType, event string, section plan.IdentitySection, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
 		return &plan.TrackingPlan{Rules: []plan.EventRule{{
-			Event:   plan.Event{EventType: plan.EventTypeTrack, Name: event},
-			Section: plan.IdentitySectionProperties,
+			Event:   plan.Event{EventType: eventType, Name: event},
+			Section: section,
 			Schema:  plan.ObjectSchema{Properties: properties},
 		}}}
+	}
+	trackEvent := func(event string, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
+		return rule(plan.EventTypeTrack, event, plan.IdentitySectionProperties, properties)
 	}
 	property := func(name string, p plan.PropertySchema) map[string]plan.PropertySchema {
 		p.Property.Name = name
@@ -88,6 +91,23 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 			"nested property without words",
 			trackEvent("Some Event", property("context", nestedSchema)),
 			`naming property "$$": name "$$" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			"property without words in an unnamed identify event",
+			rule(plan.EventTypeIdentify, "", plan.IdentitySectionTraits, property("🎯", stringSchema)),
+			`naming property "🎯": name "🎯" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			"wire key without words in an unnamed group event",
+			rule(plan.EventTypeGroup, "", plan.IdentitySectionTraits, map[string]plan.PropertySchema{
+				"🎯": {Property: plan.Property{Name: "target", Types: []plan.PropertyType{plan.PrimitiveTypeString}}},
+			}),
+			`naming property "🎯" of GroupTraits: name "🎯" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			"page event without words",
+			rule(plan.EventTypePage, "🎯", plan.IdentitySectionProperties, nil),
+			`naming page event "🎯": name "🎯" has no letters or digits to build a Go identifier from`,
 		},
 	}
 
@@ -177,10 +197,17 @@ func TestGenerateWarnsAboutEnumValuesLeftOut(t *testing.T) {
 			"level": {Property: plan.Property{Name: "level", Types: integer, Config: config}},
 		}},
 	}
+	// Each rule warns about its own fields, under its own label.
+	p.Rules = append(p.Rules, plan.EventRule{
+		Event:   plan.Event{EventType: plan.EventTypeIdentify},
+		Section: plan.IdentitySectionTraits,
+		Schema:  plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"kind": p.Rules[0].Schema.Properties["kind"]}},
+	})
 
 	_, err := (&golang.Generator{}).Generate(p, core.GenerateOptions{}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, []string{
+		`leaving out the enum values ["a",null,1.5] of property "kind" (integer) of identify event: its declared types do not allow them`,
 		`leaving out the enum values ["a",null,1.5] of property "context.level" (integer) of track event "Some Event": its declared types do not allow them`,
 		`leaving out the enum values ["a",null,1.5] of property "kind" (integer) of track event "Some Event": its declared types do not allow them`,
 		`leaving out the enum values ["a",null,1.5] of custom type "tier" (integer): its declared types do not allow them`,
