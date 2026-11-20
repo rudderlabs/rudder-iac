@@ -42,7 +42,7 @@ type conversionEntry struct {
 
 type eventMapping struct {
 	From string `mapstructure:"from" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	To   string `mapstructure:"to" validate:"omitempty,oneof=Lead PageVisit ViewCategory Signup WatchVideo Checkout Search AddToCart purchase"`
+	To   string `mapstructure:"to" validate:"omitempty,oneof='' Lead PageVisit ViewCategory Signup WatchVideo Checkout Search AddToCart purchase"`
 }
 
 type eventFilteringConfig struct {
@@ -132,11 +132,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "googleads",
-		APIType:    "GOOGLEADS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"conversion_id"},
+		Type:        "googleads",
+		DisplayName: "Google Ads",
+		APIType:     "GOOGLEADS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"conversion_id"},
 		NewConfig: func() any {
 			return &googleAdsConfig{}
 		},

@@ -171,10 +171,22 @@ func toUpdateRequest(data, state resources.ResourceData) (*retlClient.UpdateRETL
 		Identifiers: toAPIMappings(config.Identifiers),
 		Mappings:    lo.ToPtr(toAPIMappings(config.Mappings)),
 	}
-	// Constants are mutable on the JSON mapper flow only; an object mapping PUT
-	// that carries them, an empty list included, is refused as an immutable
-	// field. An object is what tells the two flows apart, here as in the API.
-	if config.Object == nil {
+	// Constants are mutable on the JSON mapper flow alone, and the backend
+	// refuses any value that is not undefined, so an empty list counts:
+	// MUTABLE_UPDATE_FIELDS_BY_FLOW lists constants for that one flow and the
+	// check is `request[key] !== undefined` (config-backend
+	// retl/api-gateway/connection-config/assembler.ts).
+	//
+	// An absent object does not mean the JSON mapper. A visual-mapper-v2
+	// connection carries no object either, so keying off that sent
+	// `"constants": []` on every v2 update and the API answered
+	// 400 validation/immutable-field: constants — every enable, schedule change
+	// and mapping edit. Sending the key only when there are constants to set,
+	// or stored ones to clear, leaves it off the body entirely on the flows
+	// that have no business with it. `*[]Constant` is a pointer so that
+	// clearing serializes as `[]` rather than vanishing through omitempty, and
+	// omitempty does not drop a non-nil pointer to an empty slice.
+	if len(config.Constants) > 0 || len(stored.Constants) > 0 {
 		request.Constants = lo.ToPtr(toAPIConstants(config.Constants))
 	}
 	// Omitting syncSettings keeps whatever the server stored, so dropping

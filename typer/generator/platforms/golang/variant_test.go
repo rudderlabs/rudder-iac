@@ -68,22 +68,35 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			v.Cases[0].Schema = schema
 			return v
 		}
+		withDefault = func(v plan.Variant, schema plan.ObjectSchema) plan.Variant {
+			v.DefaultSchema = &schema
+			return v
+		}
 		redefine = func(p plan.Property) plan.ObjectSchema {
 			p.Name = "kind"
 			return plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"kind": {Property: p}}}
 		}
-		nestedConflict = variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
-			"meta": object(map[string]plan.PropertySchema{"b": {Property: plan.Property{Name: "b", Types: onlyString}}}),
-		}}))
+		// metaCase is a plan whose base holds the object meta {a} and whose case
+		// repeats meta.
+		metaCase = func(meta plan.PropertySchema) *plan.TrackingPlan {
+			p := variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"meta": meta}}))
+			p.Rules[0].Schema.Properties["meta"] = object(map[string]plan.PropertySchema{"a": {Property: plan.Property{Name: "a", Types: onlyString}}})
+			return p
+		}
+		// wordless is an object property without words. It is hoisted, so no
+		// Property{Name} type names it, and it fails where a struct names its field.
+		wordless = plan.PropertySchema{
+			Property: plan.Property{Name: "$$", Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+			Schema:   &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"a": {Property: plan.Property{Name: "a", Types: onlyString}}}},
+		}
 		defaultConflict = variantPlan(typed(onlyString...), discriminate([]any{"a"}))
 		variantType     = plan.CustomType{Name: "meta", Type: plan.PrimitiveTypeObject, Variants: []plan.Variant{discriminate([]any{"a"})}, Schema: &plan.ObjectSchema{
 			Properties: map[string]plan.PropertySchema{
-				"$$":   {Property: plan.Property{Name: "$$", Types: onlyString}},
+				"$$":   wordless,
 				"kind": {Property: plan.Property{Name: "kind", Types: onlyString}, Required: true},
 			},
 		}}
 	)
-	nestedConflict.Rules[0].Schema.Properties["meta"] = object(map[string]plan.PropertySchema{"a": {Property: plan.Property{Name: "a", Types: onlyString}}})
 	defaultConflict.Rules[0].Variants[0].DefaultSchema = &plan.ObjectSchema{Properties: redefine(typed(onlyInteger...)).Properties}
 
 	tests := []struct {
@@ -103,19 +116,48 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			wantErr: `mapping the variants of track event "Some Event": case ["a"]: property "kind" conflicts with its definition in the base schema`,
 		},
 		{
+			name: "a case redefines a base property's item types",
+			plan: variantPlan(
+				plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeArray}, ItemTypes: onlyString},
+				withCase(discriminate([]any{"a"}), redefine(plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeArray}, ItemTypes: onlyInteger})),
+			),
+			wantErr: `mapping the variants of track event "Some Event": case ["a"]: property "kind" conflicts with its definition in the base schema`,
+		},
+		{
 			name:    "a case redefines a base property with an invalid enum",
 			plan:    variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), redefine(plan.Property{Types: onlyString, Config: &plan.PropertyConfig{Enum: []any{}}}))),
 			wantErr: `mapping the variants of track event "Some Event": case ["a"]: mapping property "kind": enum has no values`,
 		},
 		{
 			name:    "a case redefines a base property's nested schema",
-			plan:    nestedConflict,
+			plan:    metaCase(object(map[string]plan.PropertySchema{"b": {Property: plan.Property{Name: "b", Types: onlyString}}})),
 			wantErr: `mapping the variants of track event "Some Event": case ["a"]: property "meta" conflicts with its definition in the base schema`,
+		},
+		{
+			// The local provider builds a case's object property from its bare
+			// definition, which has no nested schema.
+			name: "a case repeats a base object property without its nested schema",
+			plan: metaCase(plan.PropertySchema{
+				Property: plan.Property{Name: "meta", Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+				Required: true,
+				Schema:   &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}, AdditionalProperties: true},
+			}),
+		},
+		{
+			name: "a case repeats a base nested property with another description",
+			plan: metaCase(object(map[string]plan.PropertySchema{"a": {Property: plan.Property{Name: "a", Description: "Another description.", Types: onlyString}}})),
 		},
 		{
 			name:    "the default schema redefines a base property",
 			plan:    defaultConflict,
 			wantErr: `mapping the variants of track event "Some Event": the default schema: property "kind" conflicts with its definition in the base schema`,
+		},
+		{
+			name: "a property only a case declares, with an invalid enum",
+			plan: variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+				"x": {Property: plan.Property{Name: "x", Types: onlyString, Config: &plan.PropertyConfig{Enum: []any{}}}},
+			}})),
+			wantErr: `mapping the variants of track event "Some Event": mapping property "x" of case ["a"]: enum has no values`,
 		},
 		{
 			name:    "a match value in two cases",
@@ -178,16 +220,33 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			wantErr: `mapping the variants of track event "Some Event": found 2 variants entries; a rule or custom type may have one`,
 		},
 		{
-			name: "a case property without words",
-			plan: variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
-				"$$": {Property: plan.Property{Name: "$$", Types: onlyString}},
-			}})),
-			wantErr: `naming property "$$" of case ["a"] of the variants of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
+			name:    "a case property without words",
+			plan:    variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"$$": wordless}})),
+			wantErr: `naming property "$$" of TrackSomeEventPropertiesCaseA: name "$$" has no letters or digits to build a Go identifier from`,
 		},
 		{
+			name:    "a default schema property without words",
+			plan:    variantPlan(typed(onlyString...), withDefault(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"$$": wordless}})),
+			wantErr: `naming property "$$" of TrackSomeEventPropertiesDefault: name "$$" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			// Every struct implementing the interface shares what the base hoists.
 			name:    "a variant custom type's base property without words",
 			plan:    trackPlan(plan.Property{Name: "meta", Types: []plan.PropertyType{variantType}}),
-			wantErr: `naming property "$$" of custom type "meta": name "$$" has no letters or digits to build a Go identifier from`,
+			wantErr: `naming property "$$" of CustomTypeMeta: name "$$" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			// Every branch merges the base, which warns once.
+			name:         "a base enum leaving out values",
+			plan:         variantPlan(plan.Property{Types: onlyString, Config: &plan.PropertyConfig{Enum: []any{"a", "b", 1}}}, discriminate([]any{"a"}, []any{"b"})),
+			wantWarnings: []string{`leaving out the enum values [1] of property "kind" (string) of track event "Some Event": its declared types do not allow them`},
+		},
+		{
+			name: "a case enum leaving out values",
+			plan: variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+				"meta": object(map[string]plan.PropertySchema{"x": {Property: plan.Property{Name: "x", Types: onlyString, Config: &plan.PropertyConfig{Enum: []any{"q", 2}}}}}),
+			}})),
+			wantWarnings: []string{`leaving out the enum values [2] of property "meta.x" (string) of case ["a"] of the variants of track event "Some Event": its declared types do not allow them`},
 		},
 		{
 			name:         "an open case under a closed base",
@@ -263,6 +322,13 @@ func TestGenerateVariantDefault(t *testing.T) {
 			[][]any{{"a"}},
 			[]string{"CaseA", "Default"},
 			"only null",
+		},
+		{
+			"nullable enum with a value left",
+			enumProperty("kind", nullable(plan.PrimitiveTypeString), "draft", "live", nil),
+			[][]any{{"live"}},
+			[]string{"CaseLive", "Default"},
+			"only PropertyKindValueDraft or null",
 		},
 		{
 			"boolean and string union with both booleans matched",
@@ -381,4 +447,42 @@ func TestGenerateVariantDiscriminatorValues(t *testing.T) {
 			assert.Equal(t, tt.want, structs[0].Returns)
 		})
 	}
+}
+
+// The structs of a case with several match values share the types the case
+// hoists, as every branch shares what the base hoists.
+func TestGenerateVariantCaseSharesHoistedTypes(t *testing.T) {
+	p := variantPlan(typed(onlyString...), discriminate([]any{"a", "b"}))
+	p.Rules[0].Variants[0].Cases[0].Schema = plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+		"geo": {
+			Property: plan.Property{Name: "geo", Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+			Schema:   &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"lat": {Property: plan.Property{Name: "lat", Types: onlyNumber}, Required: true}}},
+		},
+	}}
+	ctx, err := newContext(p, "", "ruddertyper")
+	require.NoError(t, err)
+
+	var (
+		structs []string
+		geo     []GoField
+	)
+	for _, d := range ctx.Payloads {
+		if d.Struct == nil {
+			continue
+		}
+		structs = append(structs, d.Struct.Name)
+		for _, f := range d.Struct.Fields {
+			if f.Key == "geo" {
+				geo = append(geo, f)
+			}
+		}
+	}
+	assert.Equal(t, []string{
+		"TrackSomeEventPropertiesCaseA",
+		"TrackSomeEventPropertiesCaseAGeo",
+		"TrackSomeEventPropertiesCaseB",
+		"TrackSomeEventPropertiesDefault",
+	}, structs)
+	field := GoField{Name: "Geo", Key: "geo", Type: "*TrackSomeEventPropertiesCaseAGeo", Pointer: true}
+	assert.Equal(t, []GoField{field, field}, geo)
 }

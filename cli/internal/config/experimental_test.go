@@ -32,11 +32,6 @@ func TestGetEnvironmentVariableName(t *testing.T) {
 			want:     "RUDDERSTACK_X_UNVERIFIED_DESTINATIONS",
 		},
 		{
-			name:     "retlTableSupport",
-			flagName: "retlTableSupport",
-			want:     "RUDDERSTACK_X_RETL_TABLE_SUPPORT",
-		},
-		{
 			name:     "lowercase",
 			flagName: "lowercase",
 			want:     "RUDDERSTACK_X_LOWERCASE",
@@ -94,18 +89,6 @@ func TestIsValidExperimentalFlag_UnverifiedDestinations(t *testing.T) {
 	t.Parallel()
 
 	assert.True(t, IsValidExperimentalFlag("unverifiedDestinations"))
-}
-
-func TestIsValidExperimentalFlag_RetlConnectionSupport(t *testing.T) {
-	t.Parallel()
-
-	assert.True(t, IsValidExperimentalFlag("retlConnectionSupport"))
-}
-
-func TestIsValidExperimentalFlag_RETLTableSupport(t *testing.T) {
-	t.Parallel()
-
-	assert.True(t, IsValidExperimentalFlag("retlTableSupport"))
 }
 
 func TestIsValidExperimentalFlag_DataGraphRemoved(t *testing.T) {
@@ -172,4 +155,11 @@ func TestGetAvailableExperimentalFlags(t *testing.T) {
 
 	assert.Len(t, flags, expType.NumField(),
 		"every ExperimentalConfig field should produce a flag")
+}
+
+func TestIsValidExperimentalFlag_SourcesListen(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsValidExperimentalFlag("sourcesListen"))
+	assert.Equal(t, "RUDDERSTACK_X_SOURCES_LISTEN", GetEnvironmentVariableName("sourcesListen"))
 }

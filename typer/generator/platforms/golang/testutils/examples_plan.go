@@ -103,8 +103,8 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 		// An open base with an open case and an open default schema. Both
 		// match values name the case OnLine, so the second takes a suffix, and
 		// a property named discriminator takes one from the method. Every
-		// branch shares the struct the base hoists for meta, while each case
-		// struct hoists its own for geo.
+		// branch shares the struct the base hoists for meta, and both structs
+		// of the case share the one it hoists for geo.
 		openVariantEvent = track("Some Open Variant Event", "", true, map[string]plan.PropertySchema{
 			"kind":          required(property("kind", "", plan.PrimitiveTypeString)),
 			"discriminator": optional(property("discriminator", "", plan.PrimitiveTypeString)),
@@ -178,7 +178,8 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 			track("$eventWithNameCamelCase$!", "", false, map[string]plan.PropertySchema{
 				"someString": optional(property("someString", "some string property", plan.PrimitiveTypeString)),
 			}),
-			// Property names that are Go keywords or predeclared identifiers.
+			// One property named after each primitive type, plus type: string
+			// and any are predeclared Go identifiers, and type is a keyword.
 			track("Every Primitive Type", "", false, map[string]plan.PropertySchema{
 				"string":  required(property("string", "", plan.PrimitiveTypeString)),
 				"integer": optional(property("integer", "", plan.PrimitiveTypeInteger)),
@@ -209,6 +210,8 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"someArrayOrNull":          optional(items(property("someArrayOrNull", "", plan.PrimitiveTypeArray, plan.PrimitiveTypeNull), plan.PrimitiveTypeString)),
 				"someObjectOrNull":         required(property("someObjectOrNull", "", plan.PrimitiveTypeObject, plan.PrimitiveTypeNull)),
 				"someArrayOfMultipleTypes": optional(items(property("someArrayOfMultipleTypes", "", plan.PrimitiveTypeArray), plan.PrimitiveTypeString, plan.PrimitiveTypeInteger, plan.PrimitiveTypeNumber, plan.PrimitiveTypeBoolean)),
+				"someMixedArrayOrNull":     optional(items(property("someMixedArrayOrNull", "", plan.PrimitiveTypeArray, plan.PrimitiveTypeNull), plan.PrimitiveTypeString, plan.PrimitiveTypeInteger)),
+				"stringOrMixedArray":       optional(items(property("stringOrMixedArray", "", plan.PrimitiveTypeArray, plan.PrimitiveTypeString), plan.PrimitiveTypeString, plan.PrimitiveTypeInteger)),
 				"matrix":                   required(items(property("matrix", "", plan.PrimitiveTypeArray), plan.PrimitiveTypeArray)),
 			}),
 			// Enum shapes the reference plan lacks. statusActive takes the type
@@ -229,8 +232,9 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"userProfile": optional(property("userProfile", "", userProfile)),
 				"grid":        optional(items(property("grid", "", plan.PrimitiveTypeArray), row)),
 				"items":       optional(items(property("items", "", plan.PrimitiveTypeArray), someObjectType)),
-				// Without a nested schema here, address keeps its Property type.
-				"address": optional(property("address", "", object)),
+				// With the empty open schema the providers attach here, address
+				// keeps its Property type.
+				"address": nested(optional(property("address", "", object)), true, nil),
 			}),
 			// Nested object shapes the reference plan lacks. The providers keep
 			// a nested schema only when object is listed first. foo.barBaz and
@@ -245,6 +249,10 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"contact": nested(optional(property("contact", "", object, plan.PrimitiveTypeString)), true, map[string]plan.PropertySchema{
 					"email": required(property("email", "", plan.PrimitiveTypeString)),
 				}),
+				// The providers' empty open schema hoists nothing, so these keep
+				// their Property types.
+				"objectOrNull":   nested(optional(property("objectOrNull", "", object, plan.PrimitiveTypeNull)), true, nil),
+				"objectOrString": nested(optional(property("objectOrString", "", object, plan.PrimitiveTypeString)), true, nil),
 				"foo": nested(optional(property("foo", "", object)), true, map[string]plan.PropertySchema{
 					"barBaz": nested(optional(property("barBaz", "", object)), false, nil),
 				}),

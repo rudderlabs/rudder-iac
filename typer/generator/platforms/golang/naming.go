@@ -55,7 +55,8 @@ func pascalCase(name string) (string, error) {
 // valueName returns a string or boolean enum value's part of its constant
 // name, from the string or "true"/"false": Empty for "", and, for a value
 // without letters or digits, U and the upper-case hex code point of each rune
-// ("🎯" → U1F3AF), as Swift spells it.
+// ("!!!" → U21U21U21). Swift writes one prefix (u212121), which lets "!™" and
+// "℡\"" collide.
 func valueName(s string) string {
 	if s == "" {
 		return "Empty"

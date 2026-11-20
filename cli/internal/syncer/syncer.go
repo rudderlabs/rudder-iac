@@ -137,6 +137,25 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
 
+	// A refused plan stops before the preview reads anything, and its refusal
+	// is the error the user sees.
+	if checker, ok := s.provider.(provider.PlanChecker); ok {
+		if err := checker.CheckPlan(ctx, plan, state); err != nil {
+			return []error{err}
+		}
+	}
+
+	// A preview that cannot be read fails the plan, dry run and apply alike:
+	// adopting a resource whose changes could not be shown is what the preview
+	// exists to prevent. The error names the resource.
+	if previewer, ok := s.provider.(provider.ImportPreviewer); ok && len(plan.Diff.ImportableResources) > 0 {
+		diffs, err := previewer.PreviewImports(ctx, plan, state)
+		if err != nil {
+			return []error{err}
+		}
+		plan.Diff.ImportableDiffs = diffs
+	}
+
 	ui.StopSpinner()
 
 	s.reporter.ReportPlan(plan)

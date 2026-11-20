@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Event capture</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#list">Skip to the list</a>
+<header class="top">
+  <div class="brand">
+    <span id="live-dot" class="dot" aria-hidden="true"></span>
+    <h1>Event capture</h1>
+    <span id="where" class="where mono"></span>
+  </div>
+  <div class="top-actions">
+    <span id="live-text" class="live-text" role="status" aria-live="polite"></span>
+    <button type="button" id="pause" aria-pressed="false">Pause</button>
+    <button type="button" id="export">Export</button>
+    <button type="button" id="help-open" aria-haspopup="dialog">Help</button>
+  </div>
+</header>
+
+<main>
+  <section aria-label="Whole capture" class="overview">
+    <div id="tiles" class="tiles"></div>
+    <div id="notices" class="notices" aria-live="polite"></div>
+    <details id="breakdown" class="breakdown">
+      <summary>Counts by event and by write key</summary>
+      <div class="breakdown-body">
+        <div>
+          <h2>Accepted events by name</h2>
+          <ul id="by-event" class="counts"></ul>
+        </div>
+        <div>
+          <h2>Rejected events by name</h2>
+          <ul id="by-rejected" class="counts"></ul>
+        </div>
+        <div>
+          <h2>By write key</h2>
+          <ul id="by-key" class="counts"></ul>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <div class="tabs" role="tablist" aria-label="What to list">
+    <button type="button" role="tab" id="tab-events" aria-controls="panel" aria-selected="true">Events</button>
+    <button type="button" role="tab" id="tab-requests" aria-controls="panel" aria-selected="false" tabindex="-1">Requests</button>
+  </div>
+
+  <div id="panel" role="tabpanel" aria-labelledby="tab-events" class="panel">
+    <form id="filters" class="filters" autocomplete="off">
+      <div class="row">
+        <label class="grow">
+          <span>Search</span>
+          <input type="search" name="q" placeholder="Names, keys or values" aria-describedby="search-hint">
+        </label>
+        <label class="for-events">
+          <span>Event name</span>
+          <input type="text" name="event" placeholder="Order Completed, Order*">
+        </label>
+        <label>
+          <span>Write keys</span>
+          <input type="text" name="writeKey" placeholder="key1, key2, (none)">
+        </label>
+        <label>
+          <span>Received</span>
+          <select name="since">
+            <option value="">Any time</option>
+            <option value="5m">Last 5 minutes</option>
+            <option value="15m">Last 15 minutes</option>
+            <option value="1h">Last hour</option>
+            <option value="24h">Last 24 hours</option>
+            <option value="custom">After a time or request…</option>
+          </select>
+        </label>
+        <label id="since-custom" hidden>
+          <span>Received after</span>
+          <input type="text" name="sinceAt" placeholder="2026-10-01T10:00:00Z, 30m or 42" aria-describedby="since-hint">
+        </label>
+        <button type="button" id="only-new" title="Hide everything received so far and list only what arrives next">Only new</button>
+      </div>
+
+      <div class="row for-events">
+        <fieldset class="chips">
+          <legend>Type</legend>
+          <label><input type="checkbox" name="type" value="track"> track</label>
+          <label><input type="checkbox" name="type" value="page"> page</label>
+          <label><input type="checkbox" name="type" value="screen"> screen</label>
+          <label><input type="checkbox" name="type" value="identify"> identify</label>
+          <label><input type="checkbox" name="type" value="group"> group</label>
+          <label><input type="checkbox" name="type" value="alias"> alias</label>
+        </fieldset>
+        <label>
+          <span>User ID</span>
+          <input type="text" name="userId">
+        </label>
+        <label>
+          <span>Anonymous ID</span>
+          <input type="text" name="anonymousId">
+        </label>
+      </div>
+
+      <div class="row for-requests" hidden>
+        <label>
+          <span>Kind</span>
+          <select name="kind">
+            <option value="all">All requests</option>
+            <option value="ingestion">Event requests</option>
+            <option value="control">Control requests</option>
+          </select>
+        </label>
+        <label>
+          <span>Status</span>
+          <input type="text" name="statusCode" placeholder="400, 4xx">
+        </label>
+        <label class="check">
+          <input type="checkbox" name="failed" value="true"> Failed only
+        </label>
+        <label>
+          <span>Message ID</span>
+          <input type="text" name="messageId">
+        </label>
+      </div>
+
+      <details class="shape">
+        <summary>Columns</summary>
+        <div class="row">
+          <label>
+            <span>Show</span>
+            <select name="view"></select>
+          </label>
+          <label class="grow">
+            <span>Only these fields</span>
+            <input type="text" name="fields" placeholder="properties, context.page.path">
+          </label>
+        </div>
+      </details>
+      <p id="search-hint" class="hint">Search looks in what is listed. Other filters ask the listener.
+        Separate several values with commas. Type \, for a comma inside a value.</p>
+      <p id="since-hint" class="hint" hidden>Received filters by the time the listener received the request.
+        Received after takes a time, a duration such as 30m, or a request number.</p>
+    </form>
+
+    <p id="filter-error" class="filter-error" role="alert" hidden></p>
+    <p id="count" class="count" aria-live="polite"></p>
+
+    <div class="split">
+      <div class="list-wrap" id="list" tabindex="-1">
+        <table class="list">
+          <caption class="sr-only" id="list-caption">Events, newest first</caption>
+          <thead><tr id="list-head"></tr></thead>
+          <tbody id="list-body"></tbody>
+        </table>
+        <p id="empty" class="empty" hidden></p>
+      </div>
+      <aside id="detail" class="detail" aria-label="Details" tabindex="-1">
+        <p class="placeholder">Select a row to see it in full.</p>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<dialog id="help" aria-labelledby="help-title">
+  <h2 id="help-title">About this page</h2>
+  <p>This page shows what your app sent to the local listener. The listener answers like RudderStack, keeps every
+    request in memory, and loses it all when it stops. Nothing here goes to RudderStack.</p>
+  <h3>Point your app here</h3>
+  <p>Set the SDK's data plane URL to <span id="help-url" class="mono"></span>. Browser SDKs also need the config URL
+    set to the same address; mobile SDKs need the control plane URL. Server SDKs must flush before they exit.</p>
+  <h3>What you see</h3>
+  <ul>
+    <li><strong>Tiles and notices</strong> describe the whole capture, whatever the filters.</li>
+    <li><strong>Events</strong> lists the accepted events exactly as the SDK sent them.</li>
+    <li><strong>Requests</strong> lists every request: refused ones with the reason, and control requests such as
+      the SDK loading its settings or a browser preflight check.</li>
+    <li>Events with no write key show the key as (none). Type (none) in the write key filter to find them.</li>
+    <li>New events appear as they arrive. Pause stops the updates.</li>
+    <li>The filters are part of the page address, so you can share a view.</li>
+  </ul>
+  <h3>Keys</h3>
+  <ul>
+    <li><kbd>/</kbd> moves to the search box. <kbd>Up</kbd> and <kbd>Down</kbd> move through the list.
+      <kbd>Esc</kbd> closes the details.</li>
+  </ul>
+  <p><a href="../v1/guide" download="guide.md">Download the full guide (Markdown)</a></p>
+  <button type="button" id="help-close" autofocus>Close</button>
+</dialog>
+</body>
+</html>

@@ -9,7 +9,7 @@ func (r *RudderTyperAnalytics) track(identity Identity, event string, properties
 		AnonymousId:       identity.AnonymousID,
 		Event:             event,
 		Properties:        properties,
-		Context:           o.analyticsContext(nil),
+		Context:           o.analyticsContext(),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,
 		MessageId:         o.messageID,

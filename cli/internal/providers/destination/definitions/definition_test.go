@@ -71,8 +71,9 @@ func TestNewRegisteredDefinitionMissingNewConfig(t *testing.T) {
 	t.Parallel()
 
 	_, err := newRegisteredDefinition(&DestinationDefinition{
-		Type:    "GA4",
-		Version: 1,
+		Type:        "GA4",
+		DisplayName: "Test",
+		Version:     1,
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "NewConfig is required")
