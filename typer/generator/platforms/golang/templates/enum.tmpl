@@ -1,0 +1,56 @@
+{{ comment .Doc }}
+{{- if .Base }}
+type {{ .Name }} {{ .Base }}
+
+// {{ .ConstDoc }}
+const (
+{{- range .Values }}
+	{{ .Name }} {{ $.Name }} = {{ .Text }}
+{{- end }}
+)
+{{- else }}
+type {{ .Name }} struct{ value any }
+{{- range .Values }}
+
+// {{ .Name }} returns the allowed value {{ .Text }}.
+func {{ .Name }}() {{ $.Name }} { return {{ $.Name }}{value: {{ .Expr }}} }
+{{- end }}
+{{- end }}
+
+// {{ .ValuesFunc }} returns every allowed value, in tracking plan order.
+func {{ .ValuesFunc }}() []{{ .Name }} {
+	return []{{ .Name }}{
+{{- range .Values }}
+		{{ .Name }}{{ if not $.Base }}(){{ end }},
+{{- end }}
+	}
+}
+{{- if .Base }}
+
+// IsValid reports whether v is an allowed value.
+func (v {{ .Name }}) IsValid() bool {
+	switch v {
+	case {{ range $i, $v := .Values }}{{ if $i }},
+		{{ end }}{{ $v.Name }}{{ end }}:
+		return true
+	}
+	return false
+}
+{{- else }}
+
+// Value returns the underlying JSON value.
+func (v {{ .Name }}) Value() any { return v.value }
+
+// IsValid reports whether v is an allowed value. Only the zero value is not.
+func (v {{ .Name }}) IsValid() bool { return v.value != nil }
+
+func (v {{ .Name }}) wireValue() (any, error) {
+	if v.value == nil {
+		return nil, fmt.Errorf("%w: {{ .Name }} is not set", ErrInvalidValue)
+	}
+	return v.value, nil
+}
+
+// MarshalJSON implements json.Marshaler. It fails for the zero value.
+func (v {{ .Name }}) MarshalJSON() ([]byte, error) { return marshal(v) }
+{{- end }}
