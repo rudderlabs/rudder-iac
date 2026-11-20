@@ -77,6 +77,83 @@ func TestStoreEvictsWholeOldestRequests(t *testing.T) {
 	}
 }
 
+// A slow upload is received early and stored late, so the newest evicted
+// record is not always the one received last.
+func TestStoreSnapshotKeepsTheLatestEvictedReceivedTime(t *testing.T) {
+	t.Parallel()
+	t0 := time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
+	s := &Store{maxRequests: 1, maxBytes: maxBytes}
+
+	require.True(t, s.Snapshot(0).EvictedAt.IsZero())
+
+	for _, received := range []time.Duration{2 * time.Second, time.Second, 3 * time.Second} {
+		c := capture("dev", "/v1/track", `{"userId":"u1"}`)
+		c.ReceivedAt = t0.Add(received)
+		s.Capture(c)
+	}
+
+	snap := s.Snapshot(0)
+	require.Equal(t, []uint64{3}, seqs(snap.Records))
+	require.Equal(t, uint64(3), snap.Cursor)
+	require.Equal(t, uint64(2), snap.Stats.EvictedThrough)
+	require.Equal(t, t0.Add(2*time.Second), snap.EvictedAt)
+
+	// A later eviction clears a slot of the shared array, not of the snapshot.
+	s.Capture(capture("dev", "/v1/track", `{"userId":"u1"}`))
+	require.Equal(t, []uint64{3}, seqs(snap.Records))
+	require.Equal(t, uint64(2), snap.Stats.EvictedThrough)
+}
+
+func TestStoreSnapshotIsConsistentDuringCapture(t *testing.T) {
+	t.Parallel()
+	var (
+		s       = NewWithLimits(3, maxBytes)
+		t0      = time.Date(2026, 9, 30, 12, 0, 0, 0, time.UTC)
+		ready   = make(chan struct{})
+		stop    = make(chan struct{})
+		writers sync.WaitGroup
+	)
+	writers.Go(func() {
+		for seq := uint64(1); ; seq++ {
+			select {
+			case <-stop:
+				return
+			default:
+			}
+			c := capture("dev", "/v1/track", `{"userId":"u1"}`)
+			c.ReceivedAt = t0.Add(time.Duration(seq))
+			s.Capture(c)
+			if seq == 4 {
+				close(ready)
+			}
+		}
+	})
+	defer func() {
+		close(stop)
+		writers.Wait()
+	}()
+	<-ready
+
+	for range 2000 {
+		snap := s.Snapshot(0)
+		require.Len(t, snap.Records, 3)
+		require.Equal(t, snap.Records[2].Seq, snap.Cursor, "last record must match the snapshot cursor")
+		require.Equal(t, snap.Stats.EvictedThrough+1, snap.Records[0].Seq, "retained records must follow the eviction boundary")
+		require.Equal(t, snap.Records[0].Seq+1, snap.Records[1].Seq)
+		require.Equal(t, snap.Records[1].Seq+1, snap.Records[2].Seq)
+		bytes := 0
+		for _, rec := range snap.Records {
+			bytes += rec.size
+		}
+		require.Equal(t, Stats{
+			Requests: len(snap.Records), Events: len(snap.Records), Bytes: bytes,
+			Evicted: int(snap.Cursor) - len(snap.Records), EvictedThrough: snap.Cursor - uint64(len(snap.Records)),
+			MaxRequests: 3, MaxBytes: maxBytes,
+		}, snap.Stats)
+		require.Equal(t, t0.Add(time.Duration(snap.Stats.EvictedThrough)), snap.EvictedAt)
+	}
+}
+
 func TestStoreSinceReturnsTheRecordsAfterASeq(t *testing.T) {
 	t.Parallel()
 	s := &Store{maxRequests: 4, maxBytes: maxBytes}

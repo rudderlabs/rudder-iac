@@ -30,6 +30,10 @@ func IsLoopback(bind string) bool {
 	return api.IsLoopback(bind)
 }
 
+// CodeEvicted is the diagnosis code, and the X-Dev-Diagnosis value, of a
+// read whose window lost requests to the store budget.
+const CodeEvicted = api.CodeEvicted
+
 // The read commands check their flags with the rules of the query API, so a
 // bad value fails before any request.
 const MaxLimit = api.MaxLimit

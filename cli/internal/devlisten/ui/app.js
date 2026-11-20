@@ -478,7 +478,7 @@
     if (evicted > 0) {
       dropEvicted(evicted);
       showNotice('evicted', 'warn', `The listener dropped its oldest ${plural(evicted, 'request')} ` +
-        'to stay within its memory limit. The requests list no longer shows them. ' +
+        'to stay within its memory limit. The counts above leave them out. The requests list no longer shows them. ' +
         'The events list keeps the events it already shows until the page reloads.');
     }
     updateCount();
@@ -542,6 +542,8 @@
   function renderDiagnosis(items) {
     $('notices').querySelectorAll('[data-diagnosis]').forEach((n) => n.remove());
     for (const d of items) {
+      // The page shows its own notice for evicted requests.
+      if (d.code === 'events_evicted') continue;
       const [level, text, action] = diagnosisText(d);
       const node = notice(level, text, ACTIONS[action]);
       node.dataset.diagnosis = d.code;

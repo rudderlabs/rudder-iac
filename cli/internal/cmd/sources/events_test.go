@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"encoding/json"
 	"go/build"
 	"net"
 	"net/http"
@@ -396,4 +397,121 @@ func TestReadCommandsTakeTheURLFromTheEnvironment(t *testing.T) {
 
 	require.Equal(t, []string{"/_dev/v1/events"}, env.sent())
 	require.Equal(t, []string{"/_dev/v1/events"}, flag.sent())
+}
+
+// A window that lost requests prints what is left and fails, so a count
+// that came out short never passes. --allow-partial accepts it.
+func TestEventsFailsOnAWindowThatLostRequests(t *testing.T) {
+	t.Parallel()
+	lossy := streamHeader.Clone()
+	lossy.Set("X-Dev-Evicted-Through", "44")
+	lossy.Set("X-Dev-Diagnosis", "events_evicted")
+	evicted := streamHeader.Clone()
+	evicted.Set("X-Dev-Evicted-Through", "44")
+	const message = "requests up to seq 44 were evicted, so this window is incomplete"
+
+	for _, tc := range []struct {
+		name   string
+		args   []string
+		header http.Header
+		stdout string
+		fails  bool
+		stderr string
+	}{
+		{
+			name: "table", args: []string{"--since", "2026-09-30T12:00:00Z"}, header: lossy,
+			stdout: "3 events since 2026-09-30T12:00:00Z\n", fails: true,
+			stderr: "Error: " + message + "; pass --allow-partial to accept it\nNext: rudder-cli sources events --url URL --since 44\n",
+		},
+		{
+			name: "JSON", args: []string{"--json"}, header: lossy,
+			stdout: streamBody, fails: true,
+			stderr: `{"error":{"status":null,"code":"events_evicted","message":"` + message + `; pass --allow-partial to accept it",` +
+				`"param":null,"details":null,"next":"rudder-cli sources events --url URL --since 44 --json"}}` + "\n",
+		},
+		{
+			name: "with --allow-partial", args: []string{"--json", "--allow-partial"}, header: lossy,
+			stdout: streamBody, stderr: "note: " + message + "\n",
+		},
+		{
+			name: "a complete window after an eviction", args: []string{"--json", "--since", "44"}, header: evicted,
+			stdout: streamBody,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rec := newRecorder(t, http.StatusOK, tc.header, streamBody)
+
+			stdout, stderr, err := execute(append([]string{"sources", "events"}, append(tc.args, "--url", rec.srv.URL)...)...)
+
+			if tc.fails {
+				var silent *cmderrors.SilentError
+				require.ErrorAs(t, err, &silent)
+			} else {
+				require.NoError(t, err, stderr)
+			}
+			require.Contains(t, stdout, tc.stdout)
+			require.Equal(t, strings.ReplaceAll(tc.stderr, "URL", rec.srv.URL), stderr)
+		})
+	}
+}
+
+func TestReadFailureNextKeepsEveryOption(t *testing.T) {
+	t.Parallel()
+	header := streamHeader.Clone()
+	header.Set("X-Dev-Diagnosis", "events_evicted")
+	header.Set("X-Dev-Evicted-Through", "44")
+	for _, tc := range []struct {
+		name, extra string
+		args        []string
+	}{
+		{
+			name:  "projection",
+			args:  []string{"--fields", "event", "--fields", "properties.total", "--limit", "2"},
+			extra: " --fields event --fields properties.total --json --limit 2",
+		},
+		{
+			name: "view", args: []string{"--view", "compact"}, extra: " --json",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			rec := newRecorder(t, http.StatusOK, header, streamBody)
+			args := append([]string{"sources", "events"}, tc.args...)
+			args = append(args, "--url", rec.srv.URL, "--since", "5m", "--event", "Order Completed", "--event", "chat*",
+				"--user-id", "user's id", "--anonymous-id", "a 1", "--write-key", "web", "--write-key", "",
+				"--type", "track", "--type", "page", "--json", "--server-id", "9f3ac1d2b7e4c601", "--timeout", "40s")
+
+			_, stderr, err := execute(args...)
+
+			require.Error(t, err)
+			var got struct{ Error struct{ Next string } }
+			require.NoError(t, json.Unmarshal([]byte(stderr), &got))
+			want := "rudder-cli sources events --url " + rec.srv.URL + " --since 44" +
+				" --anonymous-id 'a 1' --event 'Order Completed' --event 'chat*'" + tc.extra +
+				" --server-id 9f3ac1d2b7e4c601 --timeout 40s --type track --type page --user-id 'user'\\''s id'"
+			if tc.name == "view" {
+				want += " --view compact"
+			}
+			want += " --write-key web --write-key ''"
+			require.Equal(t, want, got.Error.Next)
+		})
+	}
+}
+
+func TestLossyJSONStreamWithMoreHasOneJSONError(t *testing.T) {
+	t.Parallel()
+	header := streamHeader.Clone()
+	header.Set("X-Dev-Diagnosis", "events_evicted")
+	header.Set("X-Dev-Evicted-Through", "44")
+	header.Set("X-Dev-Has-More", "true")
+	rec := newRecorder(t, http.StatusOK, header, streamBody)
+
+	stdout, stderr, err := execute("sources", "events", "--url", rec.srv.URL, "--json")
+
+	require.Error(t, err)
+	require.Equal(t, streamBody, stdout)
+	var got struct{ Error struct{ Code string } }
+	require.NoError(t, json.Unmarshal([]byte(stderr), &got))
+	require.Equal(t, "events_evicted", got.Error.Code)
 }
