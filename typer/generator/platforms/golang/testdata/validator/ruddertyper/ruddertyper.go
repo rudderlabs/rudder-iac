@@ -444,26 +444,26 @@ func applyOptions(opts []Option) (callOptions, error) {
 	}
 	var err error
 	if o.integrations, err = snapshot(o.integrations); err != nil {
-		return o, fmt.Errorf("integrations: %w", err)
+		return o, fmt.Errorf("copying integrations: %w", err)
 	}
 	if _, err := o.timestamp.MarshalJSON(); err != nil {
-		return o, fmt.Errorf("%w: timestamp: %w", ErrInvalidValue, err)
+		return o, fmt.Errorf("checking timestamp: %w: %w", ErrInvalidValue, err)
 	}
 	if o.context == nil {
 		return o, nil
 	}
 	ctx := *o.context
 	if ctx.Extra, err = snapshot(ctx.Extra); err != nil {
-		return o, fmt.Errorf("context.Extra: %w", err)
+		return o, fmt.Errorf("copying context.Extra: %w", err)
 	}
 	if ctx.Traits, err = snapshot(ctx.Traits); err != nil {
-		return o, fmt.Errorf("context.Traits: %w", err)
+		return o, fmt.Errorf("copying context.Traits: %w", err)
 	}
 	ctx.IP = slices.Clone(ctx.IP)
 	fields := ctx
 	fields.Extra, fields.Traits = nil, nil
 	if _, err := json.Marshal(fields); err != nil {
-		return o, fmt.Errorf("%w: context: %w", ErrInvalidValue, err)
+		return o, fmt.Errorf("checking context: %w: %w", ErrInvalidValue, err)
 	}
 	o.context = &ctx
 	return o, nil
