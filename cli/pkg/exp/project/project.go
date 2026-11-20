@@ -2,10 +2,13 @@ package project
 
 import (
 	"context"
+	"os"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
+	internalproject "github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
 )
 
 // ReadOnlyGraph provides read-only access to a resource dependency graph.
@@ -26,6 +29,8 @@ type ReadOnlyGraph interface {
 // The location parameter specifies the directory path containing the project YAML specs.
 // Returns a ReadOnlyGraph interface for querying project resources and their dependencies,
 // or an error if the project cannot be loaded or the resource graph cannot be constructed.
+// The diagnostics the load reports, warnings included, are printed on stderr, so stdout
+// stays free for the caller's own output.
 func Load(_ context.Context, location string) (ReadOnlyGraph, error) {
 	config.InitConfig("")
 	deps, err := app.NewDeps()
@@ -38,6 +43,7 @@ func Load(_ context.Context, location string) (ReadOnlyGraph, error) {
 	if err != nil {
 		return nil, err
 	}
+	projectOpts = append(projectOpts, internalproject.WithRenderer(renderer.NewTextRenderer(os.Stderr)))
 
 	p := deps.NewProject(projectOpts...)
 	if err := p.Load(location); err != nil {

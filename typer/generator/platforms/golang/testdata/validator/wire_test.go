@@ -45,7 +45,7 @@ func (r *recorder) Success(msg analytics.Message) {
 }
 
 func (r *recorder) Failure(msg analytics.Message, err error) {
-	r.t.Errorf("SDK failed to send %#v: %v", msg, err)
+	assert.NoError(r.t, err, "SDK failed to send %#v", msg)
 }
 
 // capture runs send against a real SDK client and returns the messages of the
@@ -80,23 +80,22 @@ func capture(t *testing.T, send func(analytics.Client)) ([]map[string]any, []ana
 }
 
 // assertMessage compares got whole with wantJSON, a JSON object. The SDK-filled
-// messageId, originalTimestamp, sentAt, anonymousId and context.library are
-// ignored unless wantJSON asserts them, so WithMessageID and WithTimestamp stay
-// testable.
+// messageId, originalTimestamp, sentAt, anonymousId and channel are ignored
+// unless wantJSON asserts them, so WithMessageID and WithTimestamp stay
+// testable. context.library is always ignored: the SDK overwrites it on every
+// message.
 func assertMessage(t *testing.T, wantJSON string, got map[string]any) {
 	t.Helper()
 	var want map[string]any
 	require.NoError(t, decode(strings.NewReader(wantJSON), &want))
 
 	got = maps.Clone(got)
-	for _, key := range []string{"messageId", "originalTimestamp", "sentAt", "anonymousId"} {
+	for _, key := range []string{"messageId", "originalTimestamp", "sentAt", "anonymousId", "channel"} {
 		if _, ok := want[key]; !ok {
 			delete(got, key)
 		}
 	}
-	wantContext, _ := want["context"].(map[string]any)
-	_, wantLibrary := wantContext["library"]
-	if gotContext, ok := got["context"].(map[string]any); ok && !wantLibrary {
+	if gotContext, ok := got["context"].(map[string]any); ok {
 		gotContext = maps.Clone(gotContext)
 		delete(gotContext, "library")
 		got["context"] = gotContext

@@ -31,6 +31,7 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -44,6 +45,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // redisConfig is the local YAML config model. Field set mirrors
@@ -84,11 +86,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "redis",
-		APIType:    "REDIS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"password", "ca_certificate"},
+		Type:        "redis",
+		DisplayName: "Redis",
+		APIType:     "REDIS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"password", "ca_certificate"},
 		NewConfig: func() any {
 			return &redisConfig{}
 		},

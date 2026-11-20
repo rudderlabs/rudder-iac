@@ -48,6 +48,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -61,6 +62,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // slackConfig is the local YAML config model. Field set mirrors the Terraform
@@ -115,11 +117,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "slack",
-		APIType:    "SLACK",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{},
+		Type:        "slack",
+		DisplayName: "Slack",
+		APIType:     "SLACK",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"webhook_url", "event_channel_settings.webhook"},
 		NewConfig: func() any {
 			return &slackConfig{}
 		},

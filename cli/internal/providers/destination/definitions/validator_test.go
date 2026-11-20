@@ -1,6 +1,7 @@
 package definitions_test
 
 import (
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,8 +23,9 @@ func TestRegisterDefinitionMissingNewConfig(t *testing.T) {
 
 	registry := definitions.NewRegistry()
 	err := registry.Register(&definitions.DestinationDefinition{
-		Type:    "GA4",
-		Version: 1,
+		Type:        "GA4",
+		DisplayName: "Test",
+		Version:     1,
 	})
 	require.Error(t, err)
 }
@@ -83,6 +85,92 @@ func TestValidateConfigNestedEnumField(t *testing.T) {
 	)
 }
 
+func TestValidateConfigRejectsExplicitEmptyEnum(t *testing.T) {
+	t.Parallel()
+
+	registered := registerTestDefinition(t)
+	valid := map[string]any{
+		"api_secret":      "secret",
+		"types_of_client": "gtag",
+		"measurement_id":  "G-123",
+	}
+
+	t.Run("nested enum", func(t *testing.T) {
+		config := maps.Clone(valid)
+		config["nested_block"] = map[string]any{"web": ""}
+
+		errors := registered.ValidateConfig(config)
+
+		require.Len(t, errors, 1)
+		assertConfigError(
+			t,
+			errors,
+			"/nested_block/web",
+			"'web' must be one of [cloud device hybrid] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})",
+		)
+	})
+
+	t.Run("omitted nested enum", func(t *testing.T) {
+		config := maps.Clone(valid)
+		config["nested_block"] = map[string]any{}
+
+		assert.Empty(t, registered.ValidateConfig(config))
+	})
+
+	t.Run("dynamic enum reference", func(t *testing.T) {
+		config := maps.Clone(valid)
+		config["nested_block"] = map[string]any{"web": "{{ .MODE }}"}
+
+		assert.Empty(t, registered.ValidateConfig(config))
+	})
+
+	t.Run("unrelated zero values", func(t *testing.T) {
+		config := maps.Clone(valid)
+		config["debug_mode"] = false
+		config["types_of_client"] = "firebase"
+		config["measurement_id"] = ""
+
+		assert.Empty(t, registered.ValidateConfig(config))
+	})
+
+	t.Run("malformed parent remains a decode error", func(t *testing.T) {
+		config := maps.Clone(valid)
+		config["nested_block"] = "invalid"
+
+		errors := registered.ValidateConfig(config)
+
+		require.Len(t, errors, 1)
+		assert.Contains(t, errors[0].Message, "nested_block")
+	})
+}
+
+func TestValidateConfigRejectsOmittedEnumWithoutOmitempty(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "enums",
+		DisplayName: "Enums",
+		Version:     1,
+		NewConfig: func() any {
+			// Without omitempty, an enum runs on an omitted key once required_if
+			// passes; dynamic_or_oneof rejects it as oneof does.
+			return &struct {
+				Flag    *bool   `mapstructure:"flag"`
+				Static  string  `mapstructure:"static" validate:"required_if=Flag true,oneof=a b"`
+				Dynamic *string `mapstructure:"dynamic" validate:"required_if=Flag true,dynamic_or_oneof=a b"`
+			}{}
+		},
+	}))
+	registered, err := registry.Get("enums", 1)
+	require.NoError(t, err)
+
+	assert.Equal(t, []definitions.ConfigError{
+		{Path: "/static", Message: "'static' must be one of [a b]"},
+		{Path: "/dynamic", Message: "'dynamic' must be one of [a b] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})"},
+	}, registered.ValidateConfig(map[string]any{"flag": false}))
+}
+
 func TestValidateConfigDecodeTypeError(t *testing.T) {
 	t.Parallel()
 
@@ -94,8 +182,7 @@ func TestValidateConfigDecodeTypeError(t *testing.T) {
 		"measurement_id":  "G-123",
 		"debug_mode":      "not-a-boolean",
 	})
-	require.Len(t, errors, 1)
-	assert.Contains(t, errors[0].Message, "debug_mode")
+	assert.Equal(t, []definitions.ConfigError{{Path: "/debug_mode", Message: "'debug_mode' must be a boolean"}}, errors)
 }
 
 func TestValidateConfigRejectsUnsupportedConsentSource(t *testing.T) {
@@ -104,6 +191,7 @@ func TestValidateConfigRejectsUnsupportedConsentSource(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -138,6 +226,7 @@ func TestValidateConfigAppliesCanonicalConsentValidation(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -174,6 +263,7 @@ func TestValidateConfigRejectsMissingConsentProvider(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -210,6 +300,7 @@ func TestValidateConfigReplacesCanonicalConsentValidationForSource(t *testing.T)
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"ios_swift"},
 		ConnectionModes: map[string][]string{
@@ -246,6 +337,7 @@ func TestValidateConfigKeepsCanonicalConsentValidationForSiblingSource(t *testin
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"ios_swift", "web"},
 		ConnectionModes: map[string][]string{
@@ -288,6 +380,7 @@ func TestValidateConfigReportsMalformedConsentValuePath(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -320,6 +413,7 @@ func TestValidateConfigRejectsNullConsentManagement(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -350,6 +444,7 @@ func TestValidateConfigRejectsNullConsentSourceEntries(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -382,6 +477,7 @@ func TestValidateConfigRejectsNullConsentProvider(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -418,6 +514,7 @@ func TestValidateConfigRejectsNullConsentEntry(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -452,6 +549,7 @@ func TestValidateConfigRejectsNullConsents(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -488,6 +586,7 @@ func TestValidateConfigRejectsNullConsentValue(t *testing.T) {
 	registry := definitions.NewRegistry()
 	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
 		Type:        "TEST",
+		DisplayName: "Test",
 		Version:     1,
 		SourceTypes: []string{"web"},
 		ConnectionModes: map[string][]string{
@@ -527,6 +626,239 @@ func registerTestDefinition(t *testing.T) *definitions.RegisteredDefinition {
 	registered, err := registry.Get("GA4", 1)
 	require.NoError(t, err)
 	return registered
+}
+
+// registerShapeTestDefinition registers a config with one field of each value
+// shape: scalar, pointer, object list, string list and the source-type blocks.
+func registerShapeTestDefinition(t *testing.T) *definitions.RegisteredDefinition {
+	t.Helper()
+
+	type mapping struct {
+		From string `mapstructure:"from"`
+		To   string `mapstructure:"to"`
+	}
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(&definitions.DestinationDefinition{
+		Type:        "TEST",
+		DisplayName: "Test",
+		Version:     1,
+		SourceTypes: []string{"web"},
+		ConnectionModes: map[string][]string{
+			"web": {"cloud"},
+		},
+		NewConfig: func() any {
+			return &struct {
+				Name              string                   `mapstructure:"name"`
+				RequiredName      string                   `mapstructure:"required_name" validate:"required"`
+				Enabled           *bool                    `mapstructure:"enabled"`
+				Mappings          []mapping                `mapstructure:"mappings"`
+				Tags              []string                 `mapstructure:"tags"`
+				ConnectionMode    common.ConnectionMode    `mapstructure:"connection_mode"`
+				ConsentManagement common.ConsentManagement `mapstructure:"consent_management"`
+			}{}
+		},
+	}))
+	registered, err := registry.Get("TEST", 1)
+	require.NoError(t, err)
+	return registered
+}
+
+func TestValidateConfigRejectsWrongTypes(t *testing.T) {
+	t.Parallel()
+
+	registered := registerShapeTestDefinition(t)
+
+	for _, tc := range []struct {
+		name   string
+		config map[string]any
+		want   []definitions.ConfigError
+	}{
+		{
+			name:   "string given an integer",
+			config: map[string]any{"required_name": 9092},
+			want:   []definitions.ConfigError{{Path: "/required_name", Message: "'required_name' must be a string"}},
+		},
+		{
+			name:   "boolean given a string",
+			config: map[string]any{"required_name": "valid", "enabled": "false"},
+			want:   []definitions.ConfigError{{Path: "/enabled", Message: "'enabled' must be a boolean"}},
+		},
+		{
+			name:   "list given a string",
+			config: map[string]any{"required_name": "valid", "tags": "a"},
+			want:   []definitions.ConfigError{{Path: "/tags", Message: "'tags' must be an array"}},
+		},
+		{
+			name:   "string list item given an integer",
+			config: map[string]any{"required_name": "valid", "tags": []any{"a", 1}},
+			want:   []definitions.ConfigError{{Path: "/tags/1", Message: "list item must be a string"}},
+		},
+		{
+			name:   "object list item given a string",
+			config: map[string]any{"required_name": "valid", "mappings": []any{"a"}},
+			want:   []definitions.ConfigError{{Path: "/mappings/0", Message: "list item must be an object"}},
+		},
+		{
+			name:   "field inside a list item",
+			config: map[string]any{"required_name": "valid", "mappings": []any{map[string]any{"from": 1, "to": "b"}}},
+			want:   []definitions.ConfigError{{Path: "/mappings/0/from", Message: "'from' must be a string"}},
+		},
+		{
+			name:   "every wrong type reported",
+			config: map[string]any{"required_name": 1, "enabled": "yes", "tags": "a"},
+			want: []definitions.ConfigError{
+				{Path: "/required_name", Message: "'required_name' must be a string"},
+				{Path: "/enabled", Message: "'enabled' must be a boolean"},
+				{Path: "/tags", Message: "'tags' must be an array"},
+			},
+		},
+		{
+			name:   "connection_mode given a string",
+			config: map[string]any{"required_name": "valid", "connection_mode": "cloud"},
+			want:   []definitions.ConfigError{{Path: "/connection_mode", Message: "'connection_mode' must be an object"}},
+		},
+		{
+			name:   "non-string connection mode reported once",
+			config: map[string]any{"required_name": "valid", "connection_mode": map[string]any{"web": true}},
+			want:   []definitions.ConfigError{{Path: "/connection_mode/web", Message: "'web' connection mode must be a string"}},
+		},
+		{
+			name:   "consent_management given a list",
+			config: map[string]any{"required_name": "valid", "consent_management": []any{}},
+			want:   []definitions.ConfigError{{Path: "/consent_management", Message: "'consent_management' must be an object"}},
+		},
+		{
+			name:   "non-list consent entries reported once",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{"web": "a"}},
+			want:   []definitions.ConfigError{{Path: "/consent_management/web", Message: "consent entries must be an array"}},
+		},
+		{
+			name:   "non-object consent entry reported once",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{"web": []any{"a"}}},
+			want:   []definitions.ConfigError{{Path: "/consent_management/web/0", Message: "consent entry must be an object"}},
+		},
+		{
+			name: "non-list consents",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{
+				"web": []any{map[string]any{"provider": "ketch", "consents": "a"}},
+			}},
+			want: []definitions.ConfigError{{Path: "/consent_management/web/0/consents", Message: "'consents' must be an array"}},
+		},
+		{
+			name:   "unsupported consent source type reported over its shape",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{"ios": "a"}},
+			want: []definitions.ConfigError{{
+				Path:    "/consent_management/ios",
+				Message: "source type 'ios' is not supported by destination type 'TEST'; supported source types: web",
+			}},
+		},
+		{
+			name: "dotted consent source type reported over its shape",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{
+				"a.b": []any{map[string]any{"provider": 1}},
+			}},
+			want: []definitions.ConfigError{{
+				Path:    "/consent_management/a.b",
+				Message: "source type 'a.b' is not supported by destination type 'TEST'; supported source types: web",
+			}},
+		},
+		{
+			name:   "dotted connection_mode key keeps its path",
+			config: map[string]any{"required_name": "valid", "connection_mode": map[string]any{"a.b": true}},
+			want:   []definitions.ConfigError{{Path: "/connection_mode/a.b", Message: "'a.b' must be a string"}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.ElementsMatch(t, tc.want, registered.ValidateConfig(tc.config))
+		})
+	}
+}
+
+func TestValidateConfigRejectsNullValues(t *testing.T) {
+	t.Parallel()
+
+	registered := registerShapeTestDefinition(t)
+
+	for _, tc := range []struct {
+		name   string
+		config map[string]any
+		want   []definitions.ConfigError
+	}{
+		{
+			name:   "top-level null",
+			config: map[string]any{"required_name": nil},
+			want:   []definitions.ConfigError{{Path: "/required_name", Message: "'required_name' must not be null; set a value or remove the key"}},
+		},
+		{
+			name:   "null inside a list item",
+			config: map[string]any{"required_name": "valid", "mappings": []any{map[string]any{"from": nil, "to": "some_event"}}},
+			want:   []definitions.ConfigError{{Path: "/mappings/0/from", Message: "'from' must not be null; set a value or remove the key"}},
+		},
+		{
+			name:   "null list item",
+			config: map[string]any{"required_name": "valid", "tags": []any{"a", nil}},
+			want:   []definitions.ConfigError{{Path: "/tags/1", Message: "list item must not be null; remove it"}},
+		},
+		{
+			name: "zero values pass",
+			config: map[string]any{
+				"name":          "",
+				"required_name": "valid",
+				"enabled":       false,
+				"mappings":      []any{map[string]any{"from": "", "to": ""}},
+				"tags":          []any{},
+			},
+		},
+		{
+			name:   "null consent_management reported once",
+			config: map[string]any{"required_name": "valid", "consent_management": nil},
+			want:   []definitions.ConfigError{{Path: "/consent_management", Message: "'consent_management' must be an object"}},
+		},
+		{
+			name: "null resolution_strategy on a non-custom provider",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{
+				"web": []any{map[string]any{"provider": "ketch", "resolution_strategy": nil, "consents": []any{"analytics"}}},
+			}},
+			want: []definitions.ConfigError{{Path: "/consent_management/web/0/resolution_strategy", Message: "'resolution_strategy' must be a string"}},
+		},
+		{
+			name:   "null connection_mode reported once",
+			config: map[string]any{"required_name": "valid", "connection_mode": nil},
+			want:   []definitions.ConfigError{{Path: "/connection_mode", Message: "'connection_mode' must be an object"}},
+		},
+		{
+			name:   "null connection_mode value reported once",
+			config: map[string]any{"required_name": "valid", "connection_mode": map[string]any{"web": nil}},
+			want:   []definitions.ConfigError{{Path: "/connection_mode/web", Message: "'web' connection mode must be a string"}},
+		},
+		{
+			name: "null resolution_strategy on a custom provider reported once",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{
+				"web": []any{map[string]any{"provider": "custom", "resolution_strategy": nil, "consents": []any{"analytics"}}},
+			}},
+			want: []definitions.ConfigError{{Path: "/consent_management/web/0/resolution_strategy", Message: "'resolution_strategy' must be a string"}},
+		},
+		{
+			name: "null provider reported once",
+			config: map[string]any{"required_name": "valid", "consent_management": map[string]any{
+				"web": []any{map[string]any{"provider": nil, "consents": []any{"analytics"}}},
+			}},
+			want: []definitions.ConfigError{{Path: "/consent_management/web/0/provider", Message: "'provider' must be a string"}},
+		},
+		{
+			name:   "null unknown key reported as unknown",
+			config: map[string]any{"required_name": "valid", "nmae": nil},
+			want:   []definitions.ConfigError{{Path: "/nmae", Message: `unknown config field "nmae"`}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.ElementsMatch(t, tc.want, registered.ValidateConfig(tc.config))
+		})
+	}
 }
 
 func assertConfigError(t *testing.T, errors []definitions.ConfigError, path, message string) {

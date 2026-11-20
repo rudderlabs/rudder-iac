@@ -39,6 +39,7 @@ func (k *Generator) Generate(plan *plan.TrackingPlan, options core.GenerateOptio
 		outputFileName = defaults.OutputFileName
 	}
 
+	ctx.Common = kotlinOptions.Emit == EmitCommon
 	ctx.RudderCLIVersion = options.RudderCLIVersion
 	ctx.EventContext = formatEventContext(plan.Metadata, options.RudderCLIVersion)
 	ctx.TrackingPlanName = plan.Name
