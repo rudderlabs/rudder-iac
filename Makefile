@@ -105,7 +105,7 @@ typer-typescript-update-testdata: ## Update test data for TypeScript code genera
 typer-go-validate: ## Validate generated Go code against the RudderStack Go SDK
 	cd typer/generator/platforms/golang/testdata/validator && \
 	  go vet ./... && \
-	  test -z "$$(gofmt -l . | tee /dev/stderr)" && \
+	  test -z "$$("$$(go env GOROOT)/bin/gofmt" -l . | tee /dev/stderr)" && \
 	  go test -race -timeout 30s ./...
 
 .PHONY: typer-swift-validate
