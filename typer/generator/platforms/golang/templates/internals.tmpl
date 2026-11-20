@@ -110,9 +110,12 @@ func (o callOptions) withCategory(props analytics.Properties, mode categoryMode)
 		if existing == category {
 			return props, nil
 		}
-		return nil, fmt.Errorf("%w: WithCategory(%q) differs from properties.category %v", ErrCategoryConflict, category, existing)
+		return nil, fmt.Errorf("%w: WithCategory(%q) differs from properties.category %#v", ErrCategoryConflict, category, existing)
 	}
-	if mode != categoryOpen {
+	switch mode {
+	case categoryDeclared:
+		return nil, fmt.Errorf("%w: WithCategory(%q) on a payload whose declared category is unset; set it in the payload", ErrCategoryConflict, category)
+	case categoryClosed:
 		return nil, fmt.Errorf("%w: WithCategory(%q) on a payload that does not accept an undeclared category", ErrCategoryConflict, category)
 	}
 	if props == nil {
