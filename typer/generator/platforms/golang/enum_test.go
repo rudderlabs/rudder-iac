@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
@@ -80,12 +81,19 @@ func TestResolveEnum(t *testing.T) {
 		{
 			name:     "mixed JSON types: integers that fit are int64, other numbers float64",
 			property: enumProperty("p", nil, "active", 1, true, 2.5, 1e20),
-			want: &effectiveEnum{signature: `["active",1,true,2.5,100000000000000000000]`, values: []GoEnumValue{
+			want: &effectiveEnum{signature: `["active",1,true,2.5,1e+20]`, values: []GoEnumValue{
 				{Name: "Active", Text: `"active"`, Expr: `"active"`},
 				{Name: "1", Text: "1", Expr: "int64(1)"},
 				{Name: "True", Text: "true", Expr: "true"},
 				{Name: "2_5", Text: "2.5", Expr: "2.5"},
-				{Name: "100000000000000000000", Text: "100000000000000000000", Expr: "float64(100000000000000000000)"},
+				{Name: "100000000000000000000", Text: "1e+20", Expr: "float64(1e+20)"},
+			}},
+		},
+		{
+			name:     "integral numbers too large for an integer literal",
+			property: enumProperty("p", onlyNumber, 1e300),
+			want: &effectiveEnum{base: "float64", signature: "[1e+300]", values: []GoEnumValue{
+				{Name: "1" + strings.Repeat("0", 300), Text: "1e+300", Expr: "float64(1e+300)"},
 			}},
 		},
 		{
@@ -110,7 +118,7 @@ func TestResolveEnum(t *testing.T) {
 		{
 			name:     "values the declared types do not allow are left out",
 			property: enumProperty("p", onlyInteger, "a", nil, 1.5, 1, true),
-			want: &effectiveEnum{base: "int64", signature: "[1]", values: []GoEnumValue{
+			want: &effectiveEnum{base: "int64", signature: "[1]", dropped: []any{"a", nil, 1.5, true}, values: []GoEnumValue{
 				{Name: "1", Text: "1", Expr: "int64(1)"},
 			}},
 		},
@@ -294,6 +302,11 @@ func TestGenerateRejectsInvalidEnums(t *testing.T) {
 			name:     "two values one float64 represents",
 			property: enumProperty("kind", onlyNumber, json.Number("9007199254740992"), json.Number("9007199254740993")),
 			wantErr:  `mapping property "kind" of track event "Some Event": enum values 9007199254740992 and 9007199254740993 are the same float64`,
+		},
+		{
+			name:     "zero and a value that rounds to negative zero",
+			property: enumProperty("kind", onlyNumber, 0, json.Number("-1e-400")),
+			wantErr:  `mapping property "kind" of track event "Some Event": enum values 0 and -1e-400 are the same float64`,
 		},
 		{
 			name:     "an int64 and a float64 of a mixed enum written alike",

@@ -198,7 +198,7 @@ func TestHoistedNameCollision(t *testing.T) {
 		{Struct: &GoStruct{
 			Name:         "TrackSomeEventProperties",
 			Doc:          "TrackSomeEventProperties holds the properties of \"Some Event\".",
-			Payload:      "Properties",
+			Noun:         "Properties",
 			DeclaredKeys: []string{"foo", "fooBar"},
 			Fields: []GoField{
 				{Name: "Foo", Key: "foo", Type: "*TrackSomeEventPropertiesFoo", Pointer: true},

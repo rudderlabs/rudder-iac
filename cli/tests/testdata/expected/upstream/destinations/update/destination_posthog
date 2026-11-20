@@ -20,6 +20,9 @@
       "web": "cloud",
       "cloud": "cloud"
     },
+    "useNativeSDK": {
+      "web": false
+    },
     "autocapture": {
       "web": true
     },

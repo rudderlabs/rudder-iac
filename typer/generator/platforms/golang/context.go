@@ -58,9 +58,9 @@ type GoVariant struct {
 	// (value T, ok bool) when the discriminator is optional.
 	Result           string
 	DiscriminatorDoc string
-	// Payload is set on event payload interfaces, which also list
-	// To{Payload}: Properties, or Traits for identify and group.
-	Payload string
+	// Noun is set on event payload interfaces, which also list To{Noun}:
+	// Properties, or Traits for identify and group.
+	Noun string
 	// Category is set on page and screen payload interfaces, which also list
 	// categoryMode.
 	Category bool
@@ -132,10 +132,10 @@ type GoStruct struct {
 	Name     string
 	Doc      string
 	MapAlias bool
-	// Payload is set on event payloads: Properties, or Traits for identify
-	// and group. It names the To{Payload} method of a payload struct and the
+	// Noun is set on event payloads: Properties, or Traits for identify and
+	// group. It names the To{Noun} method of a payload struct and the
 	// analytics map type it returns.
-	Payload string
+	Noun string
 	// Open structs carry undeclared keys in AdditionalProperties.
 	Open bool
 	// DeclaredKeys are the wire keys the schema declares, which

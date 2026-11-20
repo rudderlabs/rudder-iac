@@ -24,17 +24,16 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "intercom", registered.Type)
 	assert.Equal(t, "INTERCOM", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"api_key"}, registered.SecretKeys())
+	assert.Equal(t, []string{"api_key", "app_id", "mobile_api_key_android", "mobile_api_key_ios"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "cloud", "react_native", "flutter", "cordova",
+		"unity", "cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
 	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
 
 	expectedModes := map[string][]string{
 		"android":        {"cloud", "device"},
@@ -47,6 +46,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
+		"warehouse":      {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -70,6 +70,13 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, []string{"app_id"}, registered.ConnectionRequiredKeys("web", "device"))
 	assert.Equal(t, []string{"api_key"}, registered.ConnectionRequiredKeys("web", "cloud"))
 	assert.Nil(t, registered.ConnectionRequiredKeys("android_kotlin", "cloud"), "upstream gap: no entry rather than a guess")
+	assert.Nil(t, registered.ConnectionRequiredKeys("warehouse", "cloud"))
+
+	// db-config.json declares the visual mapper but no syncBehaviours, so the
+	// backend fallback applies.
+	assert.Nil(t, intercom.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.True(t, registered.SupportsVisualMapper())
 
 	byAPI, err := registry.GetByAPIType("INTERCOM", 1)
 	require.NoError(t, err)
@@ -456,6 +463,7 @@ func TestIntercomConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 

@@ -19,7 +19,7 @@ func TestExplainBlockingConnections(t *testing.T) {
 	// One case per service that raises this refusal, spelled as that service
 	// spells it. The three wordings are unrelated strings, so a table built on
 	// one of them leaves the other two paths silently unannotated.
-	t.Run("names both env vars and keeps the backend error", func(t *testing.T) {
+	t.Run("keeps the backend error and names the workspace remedy", func(t *testing.T) {
 		t.Parallel()
 
 		for name, msg := range map[string]string{
@@ -38,7 +38,7 @@ func TestExplainBlockingConnections(t *testing.T) {
 				require.ErrorAs(t, err, &apiErr)
 				assert.Equal(t, backend, apiErr)
 				assert.Contains(t, err.Error(), msg, "the backend's own reason must survive")
-				assert.Contains(t, err.Error(), "RUDDERSTACK_CLI_EXPERIMENTAL=true RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=true")
+				assert.Contains(t, err.Error(), "Delete them in the workspace first")
 			})
 		}
 	})

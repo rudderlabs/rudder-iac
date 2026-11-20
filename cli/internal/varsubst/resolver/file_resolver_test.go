@@ -161,6 +161,13 @@ func TestFileResolver_Resolve(t *testing.T) {
 			wantFound: true,
 		},
 		{
+			name:      "literal block preserves line breaks",
+			content:   "CERTIFICATE: |\n  -----BEGIN CERTIFICATE-----\n  line one\n  line two\n  -----END CERTIFICATE-----\n",
+			lookup:    "CERTIFICATE",
+			wantValue: "-----BEGIN CERTIFICATE-----\nline one\nline two\n-----END CERTIFICATE-----\n",
+			wantFound: true,
+		},
+		{
 			name:      "variable not in file returns not found",
 			content:   "DB_HOST: localhost",
 			lookup:    "MISSING",

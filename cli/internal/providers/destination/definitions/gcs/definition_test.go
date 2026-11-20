@@ -226,9 +226,6 @@ func TestGCSConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 
-	// A non-string value trips both the mapstructure decode error and
-	// validateConnectionMode's own type check, so the same path can be reported
-	// twice. consent_management's shape check has the same pre-existing behavior.
 	t.Run("connection_mode rejects a non-string value", func(t *testing.T) {
 		t.Parallel()
 		errors := registered.ValidateConfig(map[string]any{

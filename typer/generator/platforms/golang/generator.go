@@ -2,7 +2,6 @@ package golang
 
 import (
 	"cmp"
-	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -16,6 +15,16 @@ import (
 // Generator generates a Go package for the RudderStack Go SDK,
 // github.com/rudderlabs/analytics-go/v4.
 type Generator struct{}
+
+// Registry scopes: Go has one namespace per package, methods live on
+// RudderTyperAnalytics, and each struct's fields share a namespace with its
+// methods. Every name derived from the plan starts with a role prefix
+// (Property, Track, ...), so none can equal a runtime name such as New or
+// Identity, and neither scope needs reservations.
+const (
+	packageScope = "package"
+	methodScope  = "methods"
+)
 
 // Generate produces one Go file from a tracking plan.
 func (g *Generator) Generate(p *plan.TrackingPlan, options core.GenerateOptions, platformOptions any) ([]*core.File, error) {
@@ -122,16 +131,6 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 	}
 
 	registry := core.NewNameRegistry(core.DefaultCollisionHandler)
-	for _, name := range runtimeNames {
-		if _, err := registry.RegisterName("runtime:"+name, packageScope, name); err != nil {
-			return nil, fmt.Errorf("reserving %s: %w", name, err)
-		}
-	}
-	// No event may take Alias, so a future alias rule needs no renames.
-	if _, err := registry.RegisterName("reserved:Alias", methodScope, "Alias"); err != nil {
-		return nil, fmt.Errorf("reserving Alias: %w", err)
-	}
-
 	rules, customTypes, err := eventRules(p)
 	if err != nil {
 		return nil, err
@@ -219,28 +218,31 @@ func eventRules(p *plan.TrackingPlan) ([]eventRule, []*customType, error) {
 		rules  []eventRule
 	)
 	for _, r := range all {
-		// Names and cycles are checked first, so a rule left out still fails
-		// generation on a name no Go identifier can carry or on a custom type
-		// that refers to itself.
-		if err := validateNames(r.rule); err != nil {
-			return nil, nil, err
-		}
+		// The resolver relies on the cycle check to end. It runs before the
+		// section check, so a rule left out still fails generation on a custom
+		// type that refers to itself.
 		if err := cycles.rule(r.rule); err != nil {
 			return nil, nil, err
 		}
 
 		event := r.rule.Event
 		if !validSection(r.rule) {
-			core.Warn(sectionWarning(r.rule))
+			// Kotlin's warning, word for word.
+			msg := fmt.Sprintf("invalid section %q for event type %q", r.rule.Section, event.EventType)
+			if event.Name != "" {
+				msg += fmt.Sprintf(" and event name %q", event.Name)
+			}
+			core.Warn(msg)
 			continue
 		}
 		var (
-			where = fmt.Sprintf("%s event %q", event.EventType, event.Name)
+			where = strings.TrimPrefix(eventLabel(event), "the ")
 			err   error
 		)
 		if r.schema, err = res.schema(&r.rule.Schema, where, ""); err != nil {
 			return nil, nil, err
 		}
+		warnDropped(r.schema.fields, where, "")
 		if r.variant, err = res.variant(&r.rule.Schema, r.schema, r.rule.Variants, where); err != nil {
 			return nil, nil, err
 		}
@@ -296,6 +298,21 @@ func (res *resolver) schema(s *plan.ObjectSchema, where, path string) (*objectSc
 	return out, nil
 }
 
+// warnDropped warns about the enum values that fields, at path within where,
+// and the fields they hoist leave out because their declared types do not
+// allow them.
+func warnDropped(fields []ruleField, where, path string) {
+	for _, f := range fields {
+		name := path + f.wireKey
+		if f.enum != nil && len(f.enum.dropped) > 0 {
+			core.Warn(fmt.Sprintf("leaving out the enum values %s of property %q (%s) of %s: its declared types do not allow them", jsonText(f.enum.dropped), name, declaredTypes(f.ps.Property), where))
+		}
+		if f.nested != nil {
+			warnDropped(f.nested.fields, where, name+".")
+		}
+	}
+}
+
 // resolveCustomTypes resolves the custom types p references.
 func (res *resolver) resolveCustomTypes(p plan.Property) error {
 	for _, t := range slices.Concat(p.Types, p.ItemTypes) {
@@ -323,90 +340,25 @@ func (res *resolver) customType(ct *plan.CustomType) (*customType, error) {
 		err error
 	)
 	switch {
-	case len(ct.Variants) > 0:
+	case len(ct.Variants) > 0 || ct.Type == plan.PrimitiveTypeObject && isStruct(ct.Schema):
 		var (
 			where = fmt.Sprintf("custom type %q", ct.Name)
 			s     = cmp.Or(ct.Schema, &plan.ObjectSchema{})
 		)
-		// Names are checked first, as in rules.
-		if err := validateSchemaNames(*s, where); err != nil {
+		if c.schema, err = res.schema(s, where, ""); err != nil {
 			return nil, err
 		}
-		if err := validateVariantNames(ct.Variants, where); err != nil {
-			return nil, err
-		}
-		base, err := res.schema(s, where, "")
-		if err != nil {
-			return nil, err
-		}
-		if c.variant, err = res.variant(s, base, ct.Variants, where); err != nil {
+		warnDropped(c.schema.fields, where, "")
+		if c.variant, err = res.variant(s, c.schema, ct.Variants, where); err != nil {
 			return nil, err
 		}
 	case ct.Type == plan.PrimitiveTypeArray:
 		if err = res.resolveCustomTypes(plan.Property{ItemTypes: []plan.PropertyType{ct.ItemType}}); err != nil {
 			return nil, err
 		}
-	case ct.Type == plan.PrimitiveTypeObject && isStruct(ct.Schema):
-		where := fmt.Sprintf("custom type %q", ct.Name)
-		// Names are checked first, as in rules.
-		if err := validateSchemaNames(*ct.Schema, where); err != nil {
-			return nil, err
-		}
-		if c.schema, err = res.schema(ct.Schema, where, ""); err != nil {
-			return nil, err
-		}
 	}
 	res.customTypes[ct.Name] = c
 	return c, nil
-}
-
-// validateNames rejects a rule whose supplied event, property or custom-type
-// names produce no words. Only a track event must have a name; the other event
-// types are named by their type.
-func validateNames(rule *plan.EventRule) error {
-	event := rule.Event
-	if event.EventType == plan.EventTypeTrack && event.Name == "" {
-		return errors.New("a track event has an empty name")
-	}
-	if event.Name != "" {
-		if _, err := pascalCase(event.Name); err != nil {
-			return fmt.Errorf("naming %s event %q: %w", event.EventType, event.Name, err)
-		}
-	}
-	where := fmt.Sprintf("%s event %q", event.EventType, event.Name)
-	if err := validateSchemaNames(rule.Schema, where); err != nil {
-		return err
-	}
-	return validateVariantNames(rule.Variants, where)
-}
-
-// validateSchemaNames checks the properties of schema, which belongs to where,
-// and of its nested object schemas, and the custom types they reference.
-func validateSchemaNames(schema plan.ObjectSchema, where string) error {
-	for _, wireKey := range slices.Sorted(maps.Keys(schema.Properties)) {
-		ps := schema.Properties[wireKey]
-		for _, name := range []string{wireKey, ps.Property.Name} {
-			if _, err := pascalCase(name); err != nil {
-				return fmt.Errorf("naming property %q of %s: %w", name, where, err)
-			}
-		}
-		for _, t := range slices.Concat(ps.Property.Types, ps.Property.ItemTypes) {
-			ct := plan.AsCustomType(t)
-			if ct == nil {
-				continue
-			}
-			if _, err := pascalCase(ct.Name); err != nil {
-				return fmt.Errorf("naming custom type %q of property %q: %w", ct.Name, wireKey, err)
-			}
-		}
-		if ps.Schema == nil {
-			continue
-		}
-		if err := validateSchemaNames(*ps.Schema, where); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // cycleCheck rejects a custom type that refers to itself, reached through
@@ -852,6 +804,9 @@ func addCustomTypes(ctx *GoContext, customTypes []*customType, propertyTypes map
 		if err != nil {
 			return fmt.Errorf("mapping custom type %q: %w", ct.Name, err)
 		}
+		if e != nil && len(e.dropped) > 0 {
+			core.Warn(fmt.Sprintf("leaving out the enum values %s of custom type %q (%s): its declared types do not allow them", jsonText(e.dropped), ct.Name, declaredTypes(prop)))
+		}
 		if _, err := addPropertyType(ctx, registry, c.name, lead, prop, e); err != nil {
 			return fmt.Errorf("mapping custom type %q: %w", ct.Name, err)
 		}
@@ -872,7 +827,7 @@ func addRule(ctx *GoContext, r eventRule, propertyTypes map[propertyKey]property
 		base    string
 	)
 	// Only a track event must have a name; the type names the others.
-	if event.Name != "" {
+	if event.Name != "" || event.EventType == plan.EventTypeTrack {
 		var err error
 		if base, err = pascalCase(event.Name); err != nil {
 			return fmt.Errorf("naming %s event %q: %w", typ, event.Name, err)
@@ -901,10 +856,10 @@ func addRule(ctx *GoContext, r eventRule, propertyTypes map[propertyKey]property
 	return nil
 }
 
-// addPayload adds the payload type name of a rule, which holds its payload
-// (Properties or Traits), or returns nil when the rule's schema is empty and
-// closed.
-func addPayload(ctx *GoContext, r eventRule, name, payload string, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) (*GoStruct, error) {
+// addPayload adds the payload type requested of a rule, which holds its
+// payload (Properties or Traits), or returns nil when the rule's schema is
+// empty and closed.
+func addPayload(ctx *GoContext, r eventRule, requested, payload string, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) (*GoStruct, error) {
 	var (
 		event  = r.rule.Event
 		schema = r.rule.Schema
@@ -919,7 +874,7 @@ func addPayload(ctx *GoContext, r eventRule, name, payload string, propertyTypes
 		label = strconv.Quote(event.Name)
 	}
 
-	name, err := registry.RegisterName("payload:"+r.key, packageScope, name)
+	name, err := registry.RegisterName("payload:"+r.key, packageScope, requested)
 	if err != nil {
 		return nil, fmt.Errorf("registering the payload of %s event %q: %w", event.EventType, event.Name, err)
 	}
@@ -928,7 +883,7 @@ func addPayload(ctx *GoContext, r eventRule, name, payload string, propertyTypes
 		if err != nil {
 			return nil, err
 		}
-		return &GoStruct{Name: name, Payload: payload, Variant: v}, nil
+		return &GoStruct{Name: name, Noun: payload, Variant: v}, nil
 	}
 	if len(schema.Properties) > 0 {
 		return addStruct(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the %s of %s.", name, noun, label), r.schema, payload)
@@ -937,7 +892,7 @@ func addPayload(ctx *GoContext, r eventRule, name, payload string, propertyTypes
 		Name:     name,
 		Doc:      fmt.Sprintf("%s holds the %s of %s. The tracking plan declares no %s and allows any.", name, noun, label, noun),
 		MapAlias: true,
-		Payload:  payload,
+		Noun:     payload,
 	}
 	ctx.add(GoDecl{Struct: st})
 	return st, nil
@@ -950,7 +905,7 @@ func addPayload(ctx *GoContext, r eventRule, name, payload string, propertyTypes
 // A payload struct, whose payload is Properties or Traits, also has
 // To{payload}.
 func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, doc string, s *objectSchema, payload string) (*GoStruct, error) {
-	st := &GoStruct{Name: name, Doc: doc, Payload: payload, Open: s.open, DeclaredKeys: s.declared}
+	st := &GoStruct{Name: name, Doc: doc, Noun: payload, Open: s.open, DeclaredKeys: s.declared}
 	ctx.add(GoDecl{Struct: st})
 	ctx.UsesWithAdditional = ctx.UsesWithAdditional || s.open
 
@@ -985,7 +940,7 @@ func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[pr
 			f.nested, pt = nil, propertyType{name: f.hoisted}
 		}
 		if f.nested != nil {
-			typ, err := addNested(ctx, registry, propertyTypes, name, field, f)
+			typ, err := addNested(ctx, registry, propertyTypes, name, field, name+"."+field, f)
 			if err != nil {
 				return nil, err
 			}
@@ -1011,26 +966,31 @@ func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[pr
 // member takes the struct {Parent}{Field}Object. Each hoisted name is
 // registered under its parent and wire key, so names that concatenate alike
 // (foo.barBaz and fooBar.baz) take a numeric suffix in registration order.
-func addNested(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, parent, field string, f ruleField) (string, error) {
+// Their docs call the field in, such as parent.Field.
+func addNested(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, parent, field, in string, f ruleField) (string, error) {
 	name, err := registry.RegisterName("nested:"+parent+":"+f.wireKey, packageScope, parent+field)
 	if err != nil {
 		return "", fmt.Errorf("registering the type of %s.%s: %w", parent, field, err)
 	}
 
+	// A hoisted field has no Property{Name} type, so its types carry the
+	// property's description.
 	var (
-		types  = f.ps.Property.Types
-		object = name
+		types       = f.ps.Property.Types
+		description = f.ps.Property.Description
+		object      = name
 	)
 	if isUnion(types) {
 		if object, err = registry.RegisterName("object:"+name, packageScope, name+"Object"); err != nil {
 			return "", fmt.Errorf("registering the object member of %s: %w", name, err)
 		}
-		lead := fmt.Sprintf("%s is the value in %s.%s", name, parent, field)
-		if err := addUnion(ctx, registry, name, lead, "", types, f.ps.Property.ItemTypes, object); err != nil {
+		lead := fmt.Sprintf("%s is the value in %s", name, in)
+		if err := addUnion(ctx, registry, name, lead, description, types, f.ps.Property.ItemTypes, object); err != nil {
 			return "", fmt.Errorf("mapping %s.%s: %w", parent, field, err)
 		}
 	}
-	if _, err := addStruct(ctx, registry, propertyTypes, object, fmt.Sprintf("%s is the object in %s.%s.", object, parent, field), f.nested, ""); err != nil {
+	doc := withDescription(fmt.Sprintf("%s is the object in %s.", object, in), description)
+	if _, err := addStruct(ctx, registry, propertyTypes, object, doc, f.nested, ""); err != nil {
 		return "", err
 	}
 

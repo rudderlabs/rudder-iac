@@ -11,7 +11,7 @@ func (r *RudderTyperAnalytics) {{ lower . }}(identity Identity, name string, pro
 		AnonymousId:       identity.AnonymousID,
 		Name:              name,
 		Properties:        properties,
-		Context:           o.analyticsContext(nil),
+		Context:           o.analyticsContext(),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,
 		MessageId:         o.messageID,

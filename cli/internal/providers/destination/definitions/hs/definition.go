@@ -91,11 +91,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "hs",
-		APIType:    "HS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"access_token", "hub_id"},
+		Type:        "hs",
+		DisplayName: "HubSpot",
+		APIType:     "HS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"access_token", "hub_id"},
 		NewConfig: func() any {
 			return &hsConfig{}
 		},
