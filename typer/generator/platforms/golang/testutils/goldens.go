@@ -28,4 +28,14 @@ var Goldens = []Golden{
 		Options: golang.GoOptions{PackageName: "examples", OutputFileName: "ruddertyper.go"},
 		Path:    "testdata/validator/examples/ruddertyper.go",
 	},
+	{
+		Plan:    plantestutils.GetIdentitySectionsPlan,
+		Options: golang.GoOptions{PackageName: "identitysections", OutputFileName: "ruddertyper.go"},
+		Path:    "testdata/validator/identitysections/ruddertyper.go",
+	},
+	{
+		Plan:    plantestutils.GetEmptyIdentityPlan,
+		Options: golang.GoOptions{PackageName: "emptyidentity", OutputFileName: "ruddertyper.go"},
+		Path:    "testdata/validator/emptyidentity/ruddertyper.go",
+	},
 }

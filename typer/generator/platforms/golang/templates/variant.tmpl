@@ -3,9 +3,12 @@ type {{ .Name }} interface {
 	json.Marshaler
 	{{ comment .DiscriminatorDoc }}
 	Discriminator() {{ .Result }}
-{{- if .Payload }}
-	// ToProperties returns a deep copy of the properties as sent on the wire.
-	ToProperties() (analytics.Properties, error)
+{{- with .Noun }}
+	// To{{ . }} returns a deep copy of the {{ lower . }} as sent on the wire.
+	To{{ . }}() (analytics.{{ . }}, error)
+{{- end }}
+{{- if .Category }}
+	categoryMode() categoryMode
 {{- end }}
 	toMap() map[string]any
 	is{{ .Name }}()

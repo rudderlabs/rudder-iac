@@ -18,21 +18,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The reference plan uses constructs the generator does not support yet; each
-// one it leaves out must be reported.
-var referenceWarnings = []string{
-	`skipping the group rule (section "context.traits"): Go generation does not support group events yet`,
-	`skipping the identify rule (section "traits"): Go generation does not support identify events yet`,
-	`skipping the page rule (section "properties"): Go generation does not support page events yet`,
-	`skipping the screen rule (section "properties"): Go generation does not support screen events yet`,
-}
-
+// Every golden plan is generated whole: a rule left out would be reported.
 func TestGenerateGoldens(t *testing.T) {
-	wantWarnings := map[string][]string{
-		"testdata/validator/ruddertyper/ruddertyper.go": referenceWarnings,
-		"testdata/validator/examples/ruddertyper.go":    nil,
-	}
-
 	for _, golden := range testutils.Goldens {
 		t.Run(golden.Path, func(t *testing.T) {
 			warnings := captureWarnings(t)
@@ -43,7 +30,7 @@ func TestGenerateGoldens(t *testing.T) {
 			want, err := os.ReadFile(golden.Path)
 			require.NoError(t, err)
 			assert.Equal(t, []*core.File{{Path: "ruddertyper.go", Content: string(want)}}, files, "generated content does not match %s; run 'make typer-go-update-testdata' to update the goldens", golden.Path)
-			assert.Equal(t, wantWarnings[golden.Path], *warnings)
+			assert.Empty(t, *warnings)
 			// The runtime package's tests cover the generated runtime only
 			// while it is emitted unchanged.
 			assert.Contains(t, files[0].Content, golang.RuntimeSource)
@@ -52,12 +39,15 @@ func TestGenerateGoldens(t *testing.T) {
 }
 
 func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
-	trackEvent := func(event string, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
+	rule := func(eventType plan.EventType, event string, section plan.IdentitySection, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
 		return &plan.TrackingPlan{Rules: []plan.EventRule{{
-			Event:   plan.Event{EventType: plan.EventTypeTrack, Name: event},
-			Section: plan.IdentitySectionProperties,
+			Event:   plan.Event{EventType: eventType, Name: event},
+			Section: section,
 			Schema:  plan.ObjectSchema{Properties: properties},
 		}}}
+	}
+	trackEvent := func(event string, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
+		return rule(plan.EventTypeTrack, event, plan.IdentitySectionProperties, properties)
 	}
 	property := func(name string, p plan.PropertySchema) map[string]plan.PropertySchema {
 		p.Property.Name = name
@@ -102,6 +92,23 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 			trackEvent("Some Event", property("context", nestedSchema)),
 			`naming property "$$": name "$$" has no letters or digits to build a Go identifier from`,
 		},
+		{
+			"property without words in an unnamed identify event",
+			rule(plan.EventTypeIdentify, "", plan.IdentitySectionTraits, property("🎯", stringSchema)),
+			`naming property "🎯": name "🎯" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			"wire key without words in an unnamed group event",
+			rule(plan.EventTypeGroup, "", plan.IdentitySectionTraits, map[string]plan.PropertySchema{
+				"🎯": {Property: plan.Property{Name: "target", Types: []plan.PropertyType{plan.PrimitiveTypeString}}},
+			}),
+			`naming property "🎯" of GroupTraits: name "🎯" has no letters or digits to build a Go identifier from`,
+		},
+		{
+			"page event without words",
+			rule(plan.EventTypePage, "🎯", plan.IdentitySectionProperties, nil),
+			`naming page event "🎯": name "🎯" has no letters or digits to build a Go identifier from`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -123,6 +130,11 @@ func TestGenerateQuickStart(t *testing.T) {
 	}
 	variantRule := rule("A", map[string]plan.PropertySchema{"name": {Property: stringProperty.Property, Required: true}})
 	variantRule.Variants = []plan.Variant{{Discriminator: "name", Cases: []plan.VariantCase{{Match: []any{"on"}}}}}
+	groupRule := plan.EventRule{
+		Event:   plan.Event{EventType: plan.EventTypeGroup},
+		Section: plan.IdentitySectionTraits,
+		Schema:  plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"name": stringProperty}},
+	}
 
 	tests := []struct {
 		name  string
@@ -143,6 +155,16 @@ func TestGenerateQuickStart(t *testing.T) {
 			"first method when no payload declares a property",
 			[]plan.EventRule{rule("A", nil), rule("B", nil)},
 			"//\terr := rt.TrackA(\n",
+		},
+		{
+			"track payload that declares a property after a group payload that does",
+			[]plan.EventRule{groupRule, rule("B", map[string]plan.PropertySchema{"name": stringProperty})},
+			"//\terr := rt.TrackB(\n",
+		},
+		{
+			"first method without a track payload that declares a property, with its other arguments",
+			[]plan.EventRule{groupRule, rule("A", nil)},
+			"//\terr := rt.Group(\n//\t\truddertyper.Identity{UserID: \"user-123\"},\n//\t\t\"group-123\",\n//\t\t&ruddertyper.GroupTraits{ /* ... */ },\n//\t)\n",
 		},
 	}
 
@@ -175,10 +197,17 @@ func TestGenerateWarnsAboutEnumValuesLeftOut(t *testing.T) {
 			"level": {Property: plan.Property{Name: "level", Types: integer, Config: config}},
 		}},
 	}
+	// Each rule warns about its own fields, under its own label.
+	p.Rules = append(p.Rules, plan.EventRule{
+		Event:   plan.Event{EventType: plan.EventTypeIdentify},
+		Section: plan.IdentitySectionTraits,
+		Schema:  plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"kind": p.Rules[0].Schema.Properties["kind"]}},
+	})
 
 	_, err := (&golang.Generator{}).Generate(p, core.GenerateOptions{}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, []string{
+		`leaving out the enum values ["a",null,1.5] of property "kind" (integer) of identify event: its declared types do not allow them`,
 		`leaving out the enum values ["a",null,1.5] of property "context.level" (integer) of track event "Some Event": its declared types do not allow them`,
 		`leaving out the enum values ["a",null,1.5] of property "kind" (integer) of track event "Some Event": its declared types do not allow them`,
 		`leaving out the enum values ["a",null,1.5] of custom type "tier" (integer): its declared types do not allow them`,
