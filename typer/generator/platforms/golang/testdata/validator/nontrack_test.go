@@ -197,6 +197,13 @@ func TestNonTrackWire(t *testing.T) {
 			errIs: examples.ErrCategoryConflict,
 		},
 		{
+			name: "examples: WithCategory on the Absent case of a declared category discriminator returns ErrCategoryConflict",
+			call: func() error {
+				return ex.PageCategoryVariant(id, "", examples.PageCategoryVariantPropertiesAbsent{}, examples.WithCategory("news"))
+			},
+			errIs: examples.ErrCategoryConflict,
+		},
+		{
 			name: "examples: WithCategory different from an AdditionalProperties category returns ErrCategoryConflict",
 			call: func() error {
 				return ex.Page(id, "", &examples.PageProperties{ProductID: "p1", AdditionalProperties: map[string]any{"category": "deals"}},
