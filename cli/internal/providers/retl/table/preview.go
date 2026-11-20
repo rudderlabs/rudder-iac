@@ -51,6 +51,16 @@ func previewSQL(t TableSpec, limit int) (string, error) {
 		relation = quote(t.Schema, `"`) + "." + quote(t.Table, `"`)
 	case sqlmodel.SourceDefinitionMySQL, sqlmodel.SourceDefinitionDatabricks:
 		relation = quote(t.Schema, "`") + "." + quote(t.Table, "`")
+	case sqlmodel.SourceDefinitionMaxCompute:
+		// MaxCompute has no escape inside backticks (a doubled backtick is not
+		// one), and refuses a dot or a backtick in a schema or table name, as
+		// sqlconnect-go's maxcompute dialect does.
+		for _, name := range []string{t.Schema, t.Table} {
+			if reason := MaxComputeNameError(name); reason != "" {
+				return "", fmt.Errorf("maxcompute schema and table names %s: %q", reason, name)
+			}
+		}
+		relation = "`" + t.Schema + "`.`" + t.Table + "`"
 	case sqlmodel.SourceDefinitionBigQuery:
 		// A backslash would escape the escaping itself and could close the
 		// identifier early. BigQuery dataset and table names cannot contain
