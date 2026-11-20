@@ -186,7 +186,9 @@ func trackRules(p *plan.TrackingPlan) []trackRule {
 func unsupportedReason(ps plan.PropertySchema) string {
 	p := ps.Property
 	switch {
-	case ps.Schema != nil:
+	// Both plan providers give every object property a schema; an open one
+	// that declares no properties is a map[string]any, like no schema.
+	case ps.Schema != nil && (len(ps.Schema.Properties) > 0 || !ps.Schema.AdditionalProperties):
 		return "nested object schemas"
 	case p.Config != nil && len(p.Config.Enum) > 0:
 		return "enums"

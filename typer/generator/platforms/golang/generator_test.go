@@ -43,7 +43,6 @@ var referenceWarnings = []string{
 	`skipping property "multi_type_array" (array of integer|string) of track event "User Signed Up": Go generation does not support array item types yet`,
 	`skipping property "multi_type_field" (boolean|integer|string) of track event "User Signed Up": Go generation does not support multi-type properties yet`,
 	`skipping property "multi_type_with_null" (integer|null|string) of track event "User Signed Up": Go generation does not support multi-type properties yet`,
-	`skipping property "nested_empty_object" (object) of track event "User Signed Up": Go generation does not support nested object schemas yet`,
 	`skipping property "nested_empty_object_no_additional_props" (object) of track event "User Signed Up": Go generation does not support nested object schemas yet`,
 	`skipping property "null_field" (null) of track event "User Signed Up": Go generation does not support the null type yet`,
 	`skipping property "number_or_null" (null|number) of track event "User Signed Up": Go generation does not support multi-type properties yet`,
