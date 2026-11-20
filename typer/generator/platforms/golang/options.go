@@ -49,6 +49,8 @@ func validatePackageName(name string) error {
 		return errors.New("package main is a command and cannot be imported")
 	case name == "init":
 		return errors.New("package init cannot be imported without an alias")
+	case name == "analytics":
+		return errors.New("callers also import the RudderStack Go SDK as analytics")
 	case token.IsKeyword(name):
 		return errors.New("it is a Go keyword")
 	case types.Universe.Lookup(name) != nil:

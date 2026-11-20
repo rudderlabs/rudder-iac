@@ -51,6 +51,11 @@ func TestOptionsValidate(t *testing.T) {
 			`validating packageName "init": package init cannot be imported without an alias`,
 		},
 		{
+			"analytics",
+			golang.GoOptions{PackageName: "analytics", OutputFileName: "ruddertyper.go"},
+			`validating packageName "analytics": callers also import the RudderStack Go SDK as analytics`,
+		},
+		{
 			"keyword",
 			golang.GoOptions{PackageName: "func", OutputFileName: "ruddertyper.go"},
 			`validating packageName "func": it is a Go keyword`,
