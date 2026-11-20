@@ -43,17 +43,28 @@ func NewEventImportProvider(client catalog.DataCatalog, log logger.Logger, impor
 }
 
 func (p *EventImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	return p.load(ctx, false, idNamer)
+}
+
+// LoadManaged loads the managed events keyed by their real externalId.
+func (p *EventImportProvider) LoadManaged(ctx context.Context) (*resources.RemoteResources, error) {
+	return p.load(ctx, true, nil)
+}
+
+// load lists events with or without an externalId. A nil idNamer keeps
+// each one's externalId instead of naming it.
+func (p *EventImportProvider) load(ctx context.Context, managed bool, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable events from remote catalog")
 	collection := resources.NewRemoteResources()
 
-	events, err := p.client.GetEvents(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
+	events, err := p.client.GetEvents(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(managed)})
 	if err != nil {
 		return nil, fmt.Errorf("getting events from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, event := range events {
-		if event.ExternalID != "" {
+		if (event.ExternalID != "") != managed {
 			continue
 		}
 		resourceMap[event.ID] = &resources.RemoteResource{
@@ -94,11 +105,15 @@ func (p *EventImportProvider) idResources(
 			name = data.EventType
 		}
 
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  name,
-			Scope: types.EventResourceType})
-		if err != nil {
-			return fmt.Errorf("generating externalID for event %s: %w", data.Name, err)
+		externalID := data.ExternalID
+		if idNamer != nil {
+			var err error
+			externalID, err = idNamer.Name(namer.ScopeName{
+				Name:  name,
+				Scope: types.EventResourceType})
+			if err != nil {
+				return fmt.Errorf("generating externalID for event %s: %w", data.Name, err)
+			}
 		}
 
 		event.ExternalID = externalID

@@ -125,6 +125,97 @@ func TestFormatForExport_TrackingPlanReferences(t *testing.T) {
 			},
 		},
 		{
+			name: "track config with only drop_unplanned_events",
+			setupImportable: func() *resources.RemoteResources {
+				importable := resources.NewRemoteResources()
+				importableSourceMap := map[string]*resources.RemoteResource{
+					"remote123": {
+						ID:         "remote123",
+						ExternalID: "test-source-1",
+						Reference:  "#event-stream-source:test-source-1",
+						Data: &sourceClient.EventStreamSource{
+							ID:          "remote123",
+							ExternalID:  "test-source-1",
+							Name:        "Test Source 1",
+							Type:        "javascript",
+							Enabled:     true,
+							WorkspaceID: "workspace-123",
+							TrackingPlan: &sourceClient.TrackingPlan{
+								ID: "remote-tp-456",
+								Config: &sourceClient.TrackingPlanConfig{
+									Track: &sourceClient.TrackConfig{
+										DropUnplannedEvents: boolPtr(true),
+									},
+								},
+							},
+						},
+					},
+				}
+				importable.Set(source.ResourceType, importableSourceMap)
+				return importable
+			},
+			setupRemote: func() *resources.RemoteResources {
+				remote := resources.NewRemoteResources()
+				remoteTpMap := map[string]*resources.RemoteResource{
+					"remote-tp-456": {
+						ID:         "remote-tp-456",
+						ExternalID: "existing-tp-456",
+						Reference:  "#tracking-plan:existing-tp-456",
+					},
+				}
+				remote.Set(types.TrackingPlanResourceType, remoteTpMap)
+				return remote
+			},
+			setupGraph: func() *resources.Graph {
+				graph := resources.NewGraph()
+				tpResource := resources.NewResource(
+					"existing-tp-456",
+					types.TrackingPlanResourceType,
+					nil,
+					nil,
+					resources.WithResourceFileMetadata("#tracking-plan:existing-tp-456"),
+				)
+				graph.AddResource(tpResource)
+				return graph
+			},
+			expectedSpec: &specs.Spec{
+				Kind:    "event-stream-source",
+				Version: specs.SpecVersionV1,
+				Spec: map[string]any{
+					"id":      "test-source-1",
+					"name":    "Test Source 1",
+					"type":    "javascript",
+					"enabled": true,
+					"governance": map[string]any{
+						"validations": map[string]any{
+							"tracking_plan": "#tracking-plan:existing-tp-456",
+							"config": map[string]any{
+								"track": map[string]any{
+									"drop_unplanned_events": true,
+								},
+							},
+						},
+					},
+				},
+				Metadata: map[string]any{
+					"name": "event-stream-source",
+					"import": map[string]any{
+						"workspaces": []any{
+							map[string]any{
+								"workspace_id": "workspace-123",
+								"resources": []any{
+									map[string]any{
+										"urn":       "event-stream-source:test-source-1",
+										"remote_id": "remote123",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "source with tracking plan being imported together",
 			setupImportable: func() *resources.RemoteResources {
 				importable := resources.NewRemoteResources()

@@ -68,3 +68,21 @@ func TestBaseHandler_FormatForExport_AllMatchedEmitsEntriesOnly(t *testing.T) {
 		{WorkspaceID: backend.WorkspaceID, URN: "example-writer:tolkien", RemoteID: "remote-1"},
 	}, entries)
 }
+
+func TestBaseHandler_LoadManaged(t *testing.T) {
+	t.Parallel()
+
+	b := backend.NewBackend()
+	managed, err := b.CreateWriter("J.R.R. Tolkien", "tolkien")
+	require.NoError(t, err)
+	_, err = b.CreateWriter("Unmanaged Writer", "")
+	require.NoError(t, err)
+
+	collection, err := writer.NewHandler(b).LoadManaged(t.Context())
+	require.NoError(t, err)
+
+	got := collection.GetAll("example-writer")
+	require.Len(t, got, 1)
+	assert.Equal(t, "tolkien", got[managed.ID].ExternalID)
+	assert.Equal(t, "#writer:tolkien", got[managed.ID].Reference)
+}

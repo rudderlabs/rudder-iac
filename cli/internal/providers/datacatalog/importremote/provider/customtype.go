@@ -42,17 +42,28 @@ func NewCustomTypeImportProvider(client catalog.DataCatalog, log logger.Logger, 
 }
 
 func (p *CustomTypeImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	return p.load(ctx, false, idNamer)
+}
+
+// LoadManaged loads the managed custom types keyed by their real externalId.
+func (p *CustomTypeImportProvider) LoadManaged(ctx context.Context) (*resources.RemoteResources, error) {
+	return p.load(ctx, true, nil)
+}
+
+// load lists custom types with or without an externalId. A nil idNamer keeps
+// each one's externalId instead of naming it.
+func (p *CustomTypeImportProvider) load(ctx context.Context, managed bool, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable custom types from remote catalog")
 	collection := resources.NewRemoteResources()
 
-	customTypes, err := p.client.GetCustomTypes(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
+	customTypes, err := p.client.GetCustomTypes(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(managed)})
 	if err != nil {
 		return nil, fmt.Errorf("getting custom types from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, customType := range customTypes {
-		if customType.ExternalID != "" {
+		if (customType.ExternalID != "") != managed {
 			continue
 		}
 		resourceMap[customType.ID] = &resources.RemoteResource{
@@ -86,11 +97,15 @@ func (p *CustomTypeImportProvider) idResources(
 			return fmt.Errorf("unable to cast remote resource to catalog custom type")
 		}
 
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  data.Name,
-			Scope: types.CustomTypeResourceType})
-		if err != nil {
-			return fmt.Errorf("generating externalID for custom type %s: %w", data.Name, err)
+		externalID := data.ExternalID
+		if idNamer != nil {
+			var err error
+			externalID, err = idNamer.Name(namer.ScopeName{
+				Name:  data.Name,
+				Scope: types.CustomTypeResourceType})
+			if err != nil {
+				return fmt.Errorf("generating externalID for custom type %s: %w", data.Name, err)
+			}
 		}
 
 		customType.ExternalID = externalID
