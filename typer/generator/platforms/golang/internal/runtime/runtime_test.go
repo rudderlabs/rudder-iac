@@ -80,10 +80,7 @@ type callerStruct struct {
 	hidden int
 }
 
-type (
-	callerNode   struct{ Next *callerNode }
-	callerHolder struct{ Payload testPayload }
-)
+type callerNode struct{ Next *callerNode }
 
 // callerFields promotes Tags from an embedded pointer to an unexported type,
 // as encoding/json does.
@@ -180,9 +177,8 @@ type (
 func (c callerObject) MarshalJSON() ([]byte, error) { return json.Marshal(c.Note) }
 func (c callerUnion) MarshalJSON() ([]byte, error)  { return json.Marshal(c.Note) }
 
-// nest wraps leaf in n slices.
-func nest(n int, leaf any) any {
-	v := leaf
+// nest wraps v in n slices.
+func nest(n int, v any) any {
 	for range n {
 		v = []any{v}
 	}
@@ -207,7 +203,7 @@ func TestSnapshotAndMarshal(t *testing.T) {
 	cyclicMap["self"] = cyclicMap
 	cyclicObj.AdditionalProperties["self"] = cyclicObj
 	cyclicNode.Next = cyclicNode
-	cyclicHolder.AdditionalProperties["holder"] = callerHolder{Payload: cyclicHolder}
+	cyclicHolder.AdditionalProperties["holder"] = embeddedPayload{Payload: cyclicHolder}
 	cyclicKeyed.AdditionalProperties["byID"] = map[int]testPayload{1: cyclicKeyed}
 	cyclicEmbed.AdditionalProperties["embedded"] = callerEmbedded{embeddedPayload{Payload: cyclicEmbed}}
 	cyclicEmbedP.AdditionalProperties["embedded"] = callerEmbeddedPtr{&embeddedPayload{Payload: cyclicEmbedP}}

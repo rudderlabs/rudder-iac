@@ -62,20 +62,18 @@ func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
 	integrations["Amplitude"].(map[string]any)["key"] = "changed"
 	integrations["All"] = false
 
-	context := func() *analytics.Context {
-		return &analytics.Context{
-			IP: net.IP{127, 0, 0, 1},
-			Extra: map[string]any{
-				"custom": map[string]any{"k": "v"},
-				"ruddertyper": map[string]any{
-					"platform":            "go",
-					"rudderCLIVersion":    "1.0.0",
-					"trackingPlanId":      "plan_12345",
-					"trackingPlanVersion": 13,
-				},
+	context := &analytics.Context{
+		IP: net.IP{127, 0, 0, 1},
+		Extra: map[string]any{
+			"custom": map[string]any{"k": "v"},
+			"ruddertyper": map[string]any{
+				"platform":            "go",
+				"rudderCLIVersion":    "1.0.0",
+				"trackingPlanId":      "plan_12345",
+				"trackingPlanVersion": 13,
 			},
-			Traits: analytics.Traits{"plan": []any{"pro"}},
-		}
+		},
+		Traits: analytics.Traits{"plan": []any{"pro"}},
 	}
 	assert.Equal(t, []analytics.Message{
 		analytics.Track{
@@ -87,14 +85,14 @@ func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
 				"object_property": map[string]any{"nested": map[string]any{"k": "v"}},
 				"property_of_any": []any{"z"},
 			},
-			Context:      context(),
+			Context:      context,
 			Integrations: analytics.Integrations{"Amplitude": map[string]any{"key": "v"}},
 		},
 		analytics.Track{
 			UserId:       "user-123",
 			Event:        "Empty Event With Additional Props",
 			Properties:   analytics.Properties{"list": []any{"x"}},
-			Context:      context(),
+			Context:      context,
 			Integrations: analytics.Integrations{"Amplitude": map[string]any{"key": "v"}},
 		},
 	}, client.messages)
