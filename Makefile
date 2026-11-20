@@ -38,13 +38,10 @@ RULE_DOCS_OUTPUT_DIR ?= docs/generated
 .PHONY: gen-rule-docs
 # The catalog documents the complete rule set, so generation turns on the
 # experimental features whose rules ship with authored fragments; without them
-# those fragments read as stale. That is also how a plain local run generates
-# the same catalog CI does. Defaulted rather than pinned so CI, which sets them
-# explicitly, still wins.
+# those fragments read as stale. Defaulted rather than pinned so CI, which sets
+# it explicitly, still wins.
 gen-rule-docs: ## Generate the validation rule documentation artifact
 	RUDDERSTACK_CLI_EXPERIMENTAL=$${RUDDERSTACK_CLI_EXPERIMENTAL:-true} \
-	RUDDERSTACK_X_RETL_TABLE_SUPPORT=$${RUDDERSTACK_X_RETL_TABLE_SUPPORT:-true} \
-	RUDDERSTACK_X_RETL_CONNECTION_SUPPORT=$${RUDDERSTACK_X_RETL_CONNECTION_SUPPORT:-true} \
 	$(GO) run ./cli/cmd/gen-rule-docs --output-dir $(RULE_DOCS_OUTPUT_DIR)
 
 .PHONY: test
@@ -54,6 +51,11 @@ test: ## Run all unit tests (excluding e2e)
 .PHONY: test-e2e
 test-e2e: ## Run end-to-end tests
 	@go test --race --covermode=atomic --coverprofile=coverage-e2e.out -timeout 20m ./cli/tests/...  -v
+
+.PHONY: test-e2e-ui
+test-e2e-ui: build ## Run the browser tests of the sources listen review page (needs Node 20+)
+	cd cli/tests/e2e-ui && npm ci && npx playwright install chromium && \
+		RUDDER_CLI_BIN=$(CURDIR)/bin/rudder-cli npx playwright test
 
 .PHONY: test-it
 test-it: ## Run all test, including integration tests

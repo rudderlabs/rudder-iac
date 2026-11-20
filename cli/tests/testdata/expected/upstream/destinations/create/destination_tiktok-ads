@@ -11,6 +11,9 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
+    "useNativeSDK": {
+      "web": false
+    },
     "pixelCode": "C0000000000000000001",
     "version": "v2",
     "hashUserProperties": true,

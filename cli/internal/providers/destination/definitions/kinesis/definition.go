@@ -19,6 +19,7 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -32,6 +33,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // kinesisConfig is the local YAML config model. Field set mirrors the
@@ -68,11 +70,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "kinesis",
-		APIType:    "KINESIS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"access_key_id", "access_key"},
+		Type:        "kinesis",
+		DisplayName: "Amazon Kinesis",
+		APIType:     "KINESIS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"access_key_id", "access_key"},
 		NewConfig: func() any {
 			return &kinesisConfig{}
 		},

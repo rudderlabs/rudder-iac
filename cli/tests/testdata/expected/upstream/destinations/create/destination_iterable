@@ -16,6 +16,9 @@
     "connectionMode": {
       "web": "device"
     },
+    "useNativeSDK": {
+      "web": true
+    },
     "dataCenter": "USDC",
     "displayInterval": {
       "web": "2500"

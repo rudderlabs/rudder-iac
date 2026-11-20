@@ -16,6 +16,16 @@ import (
 // github.com/rudderlabs/analytics-go/v4.
 type Generator struct{}
 
+// Registry scopes: Go has one namespace per package, methods live on
+// RudderTyperAnalytics, and each struct's fields share a namespace with its
+// methods. Every name derived from the plan starts with a role prefix
+// (Property, Track, ...), so none can equal a runtime name such as New or
+// Identity, and neither scope needs reservations.
+const (
+	packageScope = "package"
+	methodScope  = "methods"
+)
+
 // Generate produces one Go file from a tracking plan.
 func (g *Generator) Generate(p *plan.TrackingPlan, options core.GenerateOptions, platformOptions any) ([]*core.File, error) {
 	opts, err := resolveOptions(g.DefaultOptions().(GoOptions), platformOptions)
@@ -72,16 +82,6 @@ type propertyType struct {
 	name    string
 	nilable bool
 }
-
-// Registry scopes: Go has one namespace per package, methods live on
-// RudderTyperAnalytics, and each struct's fields share a namespace with its
-// methods. Every name derived from the plan starts with a role prefix
-// (Property, Track, ...), so none can equal a runtime name such as New or
-// Identity, and neither scope needs reservations.
-const (
-	packageScope = "package"
-	methodScope  = "methods"
-)
 
 func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, error) {
 	ctx := &GoContext{
@@ -177,7 +177,9 @@ func trackRules(p *plan.TrackingPlan) []trackRule {
 func unsupportedReason(ps plan.PropertySchema) string {
 	p := ps.Property
 	switch {
-	case ps.Schema != nil:
+	// Both plan providers give every object property a schema; an open one
+	// that declares no properties is a map[string]any, like no schema.
+	case ps.Schema != nil && (len(ps.Schema.Properties) > 0 || !ps.Schema.AdditionalProperties):
 		return "nested object schemas"
 	case p.Config != nil && len(p.Config.Enum) > 0:
 		return "enums"

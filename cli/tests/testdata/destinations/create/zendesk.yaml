@@ -9,7 +9,7 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    email: rudder-cli-e2e@example.com
+    email: "{{ .ZENDESK_EMAIL }}"
     api_token: "{{ .ZENDESK_API_TOKEN }}"
     domain: rudder-cli-e2e
     source_name: rudder

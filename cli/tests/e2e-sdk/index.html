@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Suggestion widget fixture</title></head>
+<body>
+  <h1>Suggestion widget</h1>
+  <button id="shown">Show suggestions</button>
+  <button id="clicked">Click suggestion</button>
+  <button id="sent">Send suggestion</button>
+  <script>window.__CFG = __CONFIG__;</script>
+  <script type="module">
+    import { RudderAnalytics } from '/sdk.mjs';
+    const { writeKey, dataPlaneUrl, defect, probe } = window.__CFG;
+    const analytics = new RudderAnalytics();
+    analytics.load(writeKey, dataPlaneUrl, { configUrl: dataPlaneUrl, polyfillIfRequired: false });
+
+    if (probe) {
+      analytics.ready(() => analytics.track('SDK Probe', { sdk: 'jsv3', n: 1 }));
+    } else {
+      analytics.page();
+      // The defect a byte check must catch: a number sent as a string.
+      const position = defect === 'wrong-type' ? '2' : 2;
+      document.getElementById('shown').onclick = () =>
+        analytics.track('Suggestion Shown', { surface: 'chat', suggestionCount: 3 });
+      document.getElementById('clicked').onclick = () =>
+        analytics.track('Suggestion Clicked', { surface: 'chat', position });
+      document.getElementById('sent').onclick = () =>
+        analytics.track('Suggestion Sent', { surface: 'chat', position, edited: false });
+    }
+  </script>
+</body>
+</html>

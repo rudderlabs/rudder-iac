@@ -542,26 +542,26 @@ func applyOptions(opts []Option) (callOptions, error) {
 	}
 	var err error
 	if o.integrations, err = snapshot(o.integrations); err != nil {
-		return o, fmt.Errorf("integrations: %w", err)
+		return o, fmt.Errorf("copying integrations: %w", err)
 	}
 	if _, err := o.timestamp.MarshalJSON(); err != nil {
-		return o, fmt.Errorf("%w: timestamp: %w", ErrInvalidValue, err)
+		return o, fmt.Errorf("checking timestamp: %w: %w", ErrInvalidValue, err)
 	}
 	if o.context == nil {
 		return o, nil
 	}
 	ctx := *o.context
 	if ctx.Extra, err = snapshot(ctx.Extra); err != nil {
-		return o, fmt.Errorf("context.Extra: %w", err)
+		return o, fmt.Errorf("copying context.Extra: %w", err)
 	}
 	if ctx.Traits, err = snapshot(ctx.Traits); err != nil {
-		return o, fmt.Errorf("context.Traits: %w", err)
+		return o, fmt.Errorf("copying context.Traits: %w", err)
 	}
 	ctx.IP = slices.Clone(ctx.IP)
 	fields := ctx
 	fields.Extra, fields.Traits = nil, nil
 	if _, err := json.Marshal(fields); err != nil {
-		return o, fmt.Errorf("%w: context: %w", ErrInvalidValue, err)
+		return o, fmt.Errorf("checking context: %w: %w", ErrInvalidValue, err)
 	}
 	o.context = &ctx
 	return o, nil
@@ -594,6 +594,8 @@ type (
 // the stack.
 const maxDepth = 1000
 
+var errTooDeep = fmt.Errorf("%w: value nests more than %d levels deep or contains itself", ErrInvalidValue, maxDepth)
+
 // snapshot converts v into what the SDK receives: new maps and slices holding
 // strings, bools, numbers and nil. The SDK serializes later on another
 // goroutine, so nothing the caller owns may reach it, and converting now
@@ -623,7 +625,7 @@ func marshal(v any) ([]byte, error) {
 // invalid Nullable.
 func wire(rv reflect.Value, depth int) (any, error) {
 	if depth > maxDepth {
-		return nil, fmt.Errorf("%w: value nests more than %d levels deep or contains itself", ErrInvalidValue, maxDepth)
+		return nil, errTooDeep
 	}
 	depth++
 	if !rv.IsValid() {
@@ -637,25 +639,35 @@ func wire(rv reflect.Value, depth int) (any, error) {
 		}
 		return nil, nil
 	}
-	switch v := rv.Interface().(type) {
+	v := rv.Interface()
+	if _, ok := v.(json.Number); !ok && rv.CanAddr() {
+		// encoding/json calls the marshalers of *T on an addressable T, such
+		// as a slice element, and they include T's own.
+		v = rv.Addr().Interface()
+	}
+	// A caller's struct that embeds a generated type has its toMap or
+	// wireValue too, but encoding/json encodes it by the caller's own
+	// MarshalJSON, if it has one. Walking the hook's result first still stops
+	// a cycle through the generated part.
+	switch v := v.(type) {
 	case wireObject:
-		return wire(reflect.ValueOf(v.toMap()), depth)
+		w, err := wire(reflect.ValueOf(v.toMap()), depth)
+		if err != nil || !embeds(v) {
+			return w, err
+		}
+		return encode(v)
 	case wireValuer:
 		x, err := v.wireValue()
 		if err != nil {
 			return nil, err
 		}
-		return wire(reflect.ValueOf(x), depth)
+		w, err := wire(reflect.ValueOf(x), depth)
+		if err != nil || !embeds(v) {
+			return w, err
+		}
+		return encode(v)
 	case json.Number, json.Marshaler, encoding.TextMarshaler:
 		return encode(v)
-	}
-	// encoding/json also calls pointer-receiver marshalers on addressable
-	// values, such as slice elements.
-	if rv.CanAddr() {
-		switch p := rv.Addr().Interface().(type) {
-		case json.Marshaler, encoding.TextMarshaler:
-			return encode(p)
-		}
 	}
 	switch rv.Kind() {
 	case reflect.Interface, reflect.Pointer:
@@ -724,33 +736,48 @@ func foreign(rv reflect.Value, depth int) (any, error) {
 		}
 		return encode(rv.Interface())
 	}
-	// VisibleFields includes the fields encoding/json promotes from embedded
-	// structs, right after the embedded field; those behind a nil embedded
-	// pointer or an embedded field tagged "-" are never encoded. A zero field
-	// holds nothing to walk, and walking it would reject a nil func that
-	// omitzero leaves out.
-	var skip []int
-	for _, f := range reflect.VisibleFields(rv.Type()) {
-		if skip != nil && len(f.Index) > len(skip) && slices.Equal(f.Index[:len(skip)], skip) {
-			continue
-		}
-		if f.Tag.Get("json") == "-" {
-			skip = f.Index
-			continue
-		}
-		fv, err := rv.FieldByIndexErr(f.Index)
-		if err != nil || !f.IsExported() || fv.IsZero() {
-			continue
-		}
-		if _, err := wire(fv, depth); err != nil {
-			return nil, err
-		}
+	if err := walkFields(rv, depth); err != nil {
+		return nil, err
 	}
 	// encoding/json calls pointer-receiver marshalers only on addressable values.
 	if rv.CanAddr() {
 		rv = rv.Addr()
 	}
 	return encode(rv.Interface())
+}
+
+// walkFields walks every field of struct rv that encoding/json may encode,
+// including those of the structs embedded in it, exported or not. Unlike
+// reflect.VisibleFields, it hides no field for sharing a Go name with
+// another, because encoding/json compares JSON names, so it can walk more
+// than encoding/json encodes but never less. Zero and empty fields hold
+// nothing to walk, and walking them could reject a value that omitzero or
+// omitempty leaves out.
+func walkFields(rv reflect.Value, depth int) error {
+	if depth > maxDepth {
+		return errTooDeep
+	}
+	for i := 0; i < rv.NumField(); i++ {
+		f, fv := rv.Type().Field(i), rv.Field(i)
+		tag := f.Tag.Get("json")
+		if tag == "-" || fv.IsZero() || (fv.Kind() == reflect.Slice || fv.Kind() == reflect.Map) && fv.Len() == 0 {
+			continue
+		}
+		var err error
+		switch s := reflect.Indirect(fv); {
+		case f.Anonymous && s.Kind() == reflect.Struct && (!f.IsExported() || tag == "" || tag[0] == ','):
+			// encoding/json promotes the fields of an embedded struct with no
+			// JSON name, and an unexported one cannot reach wire. Counted as
+			// a level: an embedded pointer can lead back to its own struct.
+			err = walkFields(s, depth+1)
+		case f.IsExported():
+			_, err = wire(fv, depth)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // encode converts v through encoding/json, for values whose JSON form only
@@ -767,6 +794,22 @@ func encode(v any) (any, error) {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidValue, err)
 	}
 	return x, nil
+}
+
+// embeds reports whether v is a struct, or points to one, with an embedded
+// field. Generated types embed nothing, so a v with toMap or wireValue that
+// embeds is a caller's struct.
+func embeds(v any) bool {
+	t := reflect.TypeOf(v)
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	for i := 0; t.Kind() == reflect.Struct && i < t.NumField(); i++ {
+		if t.Field(i).Anonymous {
+			return true
+		}
+	}
+	return false
 }
 
 // isNil reports whether v is nil or a nil pointer stored in an interface.
