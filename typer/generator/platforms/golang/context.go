@@ -14,18 +14,25 @@ type GoContext struct {
 	UsesNullable       bool
 	UsesWithAdditional bool
 	// QuickStart is the method the package doc calls; nil when there is none.
-	QuickStart    *GoMethod
-	PropertyTypes []GoPropertyType
-	Payloads      []*GoPayload
+	QuickStart *GoMethod
+	// The type sections, in file order. Each type is followed by the types it
+	// hoists.
+	CustomTypes   []GoDecl
+	PropertyTypes []GoDecl
+	Payloads      []GoDecl
 	Methods       []GoMethod
+	// out is the section that add appends to.
+	out *[]GoDecl
 }
 
-// GoPropertyType is one declaration of the property types section: an alias,
-// a union or an enum.
-type GoPropertyType struct {
-	Alias *GoTypeAlias
-	Union *GoUnion
-	Enum  *GoEnum
+func (ctx *GoContext) add(d GoDecl) { *ctx.out = append(*ctx.out, d) }
+
+// GoDecl is one type declaration: an alias, a union, an enum or a struct.
+type GoDecl struct {
+	Alias  *GoTypeAlias
+	Union  *GoUnion
+	Enum   *GoEnum
+	Struct *GoStruct
 }
 
 // GoTypeAlias is a `type Name = Type` declaration.
@@ -85,12 +92,15 @@ type GoEnumValue struct {
 	Expr string
 }
 
-// GoPayload is an event payload type: a struct, or a map alias for an open
-// rule that declares no properties.
-type GoPayload struct {
+// GoStruct is an object type: an event payload, an object custom type or a
+// hoisted nested object. A payload of an open rule that declares no
+// properties is a map alias instead.
+type GoStruct struct {
 	Name     string
 	Doc      string
 	MapAlias bool
+	// Payload structs also have ToProperties.
+	Payload bool
 	// Open structs carry undeclared keys in AdditionalProperties.
 	Open bool
 	// DeclaredKeys are the wire keys the schema declares, which
@@ -99,7 +109,7 @@ type GoPayload struct {
 	Fields       []GoField
 }
 
-// GoField is a payload struct field, in byte order of its wire key.
+// GoField is a struct field, in byte order of its wire key.
 type GoField struct {
 	Name string
 	// Key is the wire key, exactly as in the tracking plan.
@@ -116,5 +126,5 @@ type GoMethod struct {
 	Doc   string
 	Event string
 	// Payload is nil when the rule's schema is empty and closed.
-	Payload *GoPayload
+	Payload *GoStruct
 }

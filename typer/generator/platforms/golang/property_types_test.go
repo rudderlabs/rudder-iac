@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/typer/generator/core"
 	"github.com/rudderlabs/rudder-iac/typer/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -78,15 +77,12 @@ func TestPropertyTypeOrder(t *testing.T) {
 		rule("C Event", property("amount", "described later", plan.PrimitiveTypeNumber)),
 	}}
 
-	rules, err := trackRules(p)
-	require.NoError(t, err)
-	ctx := &GoContext{}
-	_, err = addPropertyTypes(ctx, rules, core.NewNameRegistry(core.DefaultCollisionHandler))
+	ctx, err := newContext(p, "", "ruddertyper")
 	require.NoError(t, err)
 
 	// Ordered by name, then signature ("number" < "string"); one type per
 	// (name, signature), described by the first rule in rule-key order.
-	assert.Equal(t, []GoPropertyType{
+	assert.Equal(t, []GoDecl{
 		{Alias: &GoTypeAlias{Name: "PropertyAmount", Doc: "PropertyAmount represents the property \"amount\".\n\namount as a number", Type: "float64"}},
 		{Alias: &GoTypeAlias{Name: "PropertyAmount1", Doc: "PropertyAmount1 represents the property \"amount\".\n\namount as text", Type: "string"}},
 		{Alias: &GoTypeAlias{Name: "PropertyUserID", Doc: "PropertyUserID represents the property \"userId\".", Type: "string"}},
@@ -111,13 +107,10 @@ func TestItemUnionNameOrder(t *testing.T) {
 		}},
 	}}}
 
-	rules, err := trackRules(p)
-	require.NoError(t, err)
-	ctx := &GoContext{}
-	_, err = addPropertyTypes(ctx, rules, core.NewNameRegistry(core.DefaultCollisionHandler))
+	ctx, err := newContext(p, "", "ruddertyper")
 	require.NoError(t, err)
 
-	assert.Equal(t, []GoPropertyType{
+	assert.Equal(t, []GoDecl{
 		{Union: &GoUnion{
 			Name: "PropertyFooItem",
 			Doc: "PropertyFooItem is one item of PropertyFoo: a string or integer.\n" +
@@ -131,4 +124,110 @@ func TestItemUnionNameOrder(t *testing.T) {
 		{Alias: &GoTypeAlias{Name: "PropertyFoo", Doc: "PropertyFoo represents the property \"foo\".", Type: "[]PropertyFooItem"}},
 		{Alias: &GoTypeAlias{Name: "PropertyFooItem1", Doc: "PropertyFooItem1 represents the property \"fooItem\".", Type: "string"}},
 	}, ctx.PropertyTypes)
+}
+
+// Every custom type name is registered before the structs custom types
+// hoist, so a custom type named UserProfileAddress keeps its name and
+// UserProfile's hoisted address takes the suffix.
+func TestCustomTypeNameBeatsHoistedName(t *testing.T) {
+	var (
+		street      = plan.PropertySchema{Property: plan.Property{Name: "street", Types: []plan.PropertyType{plan.PrimitiveTypeString}}, Required: true}
+		userProfile = &plan.CustomType{
+			Name: "UserProfile",
+			Type: plan.PrimitiveTypeObject,
+			Schema: &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+				"address": {
+					Property: plan.Property{Name: "address", Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+					Schema:   &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"street": street}},
+				},
+			}},
+		}
+		userProfileAddress = &plan.CustomType{Name: "UserProfileAddress", Type: plan.PrimitiveTypeString}
+	)
+	p := trackPlan(
+		plan.Property{Name: "profile", Types: []plan.PropertyType{userProfile}},
+		plan.Property{Name: "address", Types: []plan.PropertyType{userProfileAddress}},
+	)
+
+	ctx, err := newContext(p, "", "ruddertyper")
+	require.NoError(t, err)
+
+	assert.Equal(t, []GoDecl{
+		{Struct: &GoStruct{
+			Name:         "CustomTypeUserProfile",
+			Doc:          "CustomTypeUserProfile represents the custom type \"UserProfile\".",
+			DeclaredKeys: []string{"address"},
+			Fields:       []GoField{{Name: "Address", Key: "address", Type: "*CustomTypeUserProfileAddress1", Pointer: true}},
+		}},
+		{Struct: &GoStruct{
+			Name:         "CustomTypeUserProfileAddress1",
+			Doc:          "CustomTypeUserProfileAddress1 is the object in CustomTypeUserProfile.Address.",
+			DeclaredKeys: []string{"street"},
+			Fields:       []GoField{{Name: "Street", Key: "street", Type: "PropertyStreet", Required: true}},
+		}},
+		{Alias: &GoTypeAlias{
+			Name: "CustomTypeUserProfileAddress",
+			Doc:  "CustomTypeUserProfileAddress represents the custom type \"UserProfileAddress\".",
+			Type: "string",
+		}},
+	}, ctx.CustomTypes)
+}
+
+// Hoisted names spell the path, so foo.barBaz and fooBar.baz both make
+// {Parent}FooBarBaz; the one registered second, depth-first in wire-key
+// order, takes the suffix.
+func TestHoistedNameCollision(t *testing.T) {
+	object := func(name string, properties map[string]plan.PropertySchema) plan.PropertySchema {
+		return plan.PropertySchema{
+			Property: plan.Property{Name: name, Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+			Schema:   &plan.ObjectSchema{Properties: properties},
+		}
+	}
+	leaf := map[string]plan.PropertySchema{"x": {Property: plan.Property{Name: "x", Types: []plan.PropertyType{plan.PrimitiveTypeString}}}}
+	p := trackPlan()
+	p.Rules[0].Schema.Properties = map[string]plan.PropertySchema{
+		"foo":    object("foo", map[string]plan.PropertySchema{"barBaz": object("barBaz", leaf)}),
+		"fooBar": object("fooBar", map[string]plan.PropertySchema{"baz": object("baz", leaf)}),
+	}
+
+	ctx, err := newContext(p, "", "ruddertyper")
+	require.NoError(t, err)
+
+	x := []GoField{{Name: "X", Key: "x", Type: "*PropertyX", Pointer: true}}
+	assert.Equal(t, []GoDecl{
+		{Struct: &GoStruct{
+			Name:         "TrackSomeEventProperties",
+			Doc:          "TrackSomeEventProperties holds the properties of \"Some Event\".",
+			Payload:      true,
+			DeclaredKeys: []string{"foo", "fooBar"},
+			Fields: []GoField{
+				{Name: "Foo", Key: "foo", Type: "*TrackSomeEventPropertiesFoo", Pointer: true},
+				{Name: "FooBar", Key: "fooBar", Type: "*TrackSomeEventPropertiesFooBar", Pointer: true},
+			},
+		}},
+		{Struct: &GoStruct{
+			Name:         "TrackSomeEventPropertiesFoo",
+			Doc:          "TrackSomeEventPropertiesFoo is the object in TrackSomeEventProperties.Foo.",
+			DeclaredKeys: []string{"barBaz"},
+			Fields:       []GoField{{Name: "BarBaz", Key: "barBaz", Type: "*TrackSomeEventPropertiesFooBarBaz", Pointer: true}},
+		}},
+		{Struct: &GoStruct{
+			Name:         "TrackSomeEventPropertiesFooBarBaz",
+			Doc:          "TrackSomeEventPropertiesFooBarBaz is the object in TrackSomeEventPropertiesFoo.BarBaz.",
+			DeclaredKeys: []string{"x"},
+			Fields:       x,
+		}},
+		{Struct: &GoStruct{
+			Name:         "TrackSomeEventPropertiesFooBar",
+			Doc:          "TrackSomeEventPropertiesFooBar is the object in TrackSomeEventProperties.FooBar.",
+			DeclaredKeys: []string{"baz"},
+			Fields:       []GoField{{Name: "Baz", Key: "baz", Type: "*TrackSomeEventPropertiesFooBarBaz1", Pointer: true}},
+		}},
+		{Struct: &GoStruct{
+			Name:         "TrackSomeEventPropertiesFooBarBaz1",
+			Doc:          "TrackSomeEventPropertiesFooBarBaz1 is the object in TrackSomeEventPropertiesFooBar.Baz.",
+			DeclaredKeys: []string{"x"},
+			Fields:       x,
+		}},
+	}, ctx.Payloads)
 }
