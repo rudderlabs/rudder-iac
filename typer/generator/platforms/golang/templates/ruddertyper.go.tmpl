@@ -26,9 +26,16 @@
 package {{ .PackageName }}
 
 import (
-{{- range .Imports }}
-	{{ quote . }}
-{{- end }}
+	"bytes"
+	"encoding"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"maps"
+	"math"
+	"reflect"
+	"slices"
+	"time"
 
 	analytics "github.com/rudderlabs/analytics-go/v4"
 )
