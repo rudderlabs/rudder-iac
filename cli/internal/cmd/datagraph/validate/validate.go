@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/validator"
+	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
 )
 
 var validateLog = logger.New("datagraph", logger.Attr{
@@ -31,6 +32,7 @@ func NewCmdValidate() *cobra.Command {
 		all        bool
 		modified   bool
 		jsonOutput bool
+		varFiles   []string
 	)
 
 	cmd := &cobra.Command{
@@ -57,6 +59,9 @@ func NewCmdValidate() *cobra.Command {
 
 			# Output as JSON
 			$ rudder-cli data-graphs validate --all --json
+
+			# Validate with variables from a file
+			$ rudder-cli data-graphs validate --all --var-file prod.vars.yaml
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if err := validateFlags(args, all, modified); err != nil {
@@ -68,7 +73,18 @@ func NewCmdValidate() *cobra.Command {
 				return fmt.Errorf("initialising dependencies: %w", err)
 			}
 
-			p = deps.NewProject()
+			projectOpts, err := app.NewProjectOptions(varFiles)
+			if err != nil {
+				return err
+			}
+
+			// Under --json stdout holds only the report, so the diagnostics
+			// the load renders, warnings included, go to stderr.
+			if jsonOutput {
+				projectOpts = append(projectOpts, project.WithRenderer(renderer.NewTextRenderer(cmd.ErrOrStderr())))
+			}
+
+			p = deps.NewProject(projectOpts...)
 
 			if err := p.Load(location); err != nil {
 				return fmt.Errorf("loading and validating project: %w", err)
@@ -76,9 +92,9 @@ func NewCmdValidate() *cobra.Command {
 
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
-				telemetry.TrackCommand("data-graphs validate", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "location", V: location},
 					{K: "all", V: all},
 					{K: "modified", V: modified},
@@ -136,6 +152,7 @@ func NewCmdValidate() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
+	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 	cmd.Flags().BoolVar(&all, "all", false, "Validate all data graph resources in the project")
 	cmd.Flags().BoolVar(&modified, "modified", false, "Validate only new or modified data graph resources")
 	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output results as JSON")

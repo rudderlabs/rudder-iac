@@ -45,7 +45,7 @@ func (r *recorder) Success(msg analytics.Message) {
 }
 
 func (r *recorder) Failure(msg analytics.Message, err error) {
-	r.t.Errorf("SDK failed to send %#v: %v", msg, err)
+	assert.NoError(r.t, err, "SDK failed to send %#v", msg)
 }
 
 // capture runs send against a real SDK client and returns the messages of the
@@ -80,23 +80,22 @@ func capture(t *testing.T, send func(analytics.Client)) ([]map[string]any, []ana
 }
 
 // assertMessage compares got whole with wantJSON, a JSON object. The SDK-filled
-// messageId, originalTimestamp, sentAt, anonymousId and context.library are
-// ignored unless wantJSON asserts them, so WithMessageID and WithTimestamp stay
-// testable.
+// messageId, originalTimestamp, sentAt, anonymousId and channel are ignored
+// unless wantJSON asserts them, so WithMessageID and WithTimestamp stay
+// testable. context.library is always ignored: the SDK overwrites it on every
+// message.
 func assertMessage(t *testing.T, wantJSON string, got map[string]any) {
 	t.Helper()
 	var want map[string]any
 	require.NoError(t, decode(strings.NewReader(wantJSON), &want))
 
 	got = maps.Clone(got)
-	for _, key := range []string{"messageId", "originalTimestamp", "sentAt", "anonymousId"} {
+	for _, key := range []string{"messageId", "originalTimestamp", "sentAt", "anonymousId", "channel"} {
 		if _, ok := want[key]; !ok {
 			delete(got, key)
 		}
 	}
-	wantContext, _ := want["context"].(map[string]any)
-	_, wantLibrary := wantContext["library"]
-	if gotContext, ok := got["context"].(map[string]any); ok && !wantLibrary {
+	if gotContext, ok := got["context"].(map[string]any); ok {
 		gotContext = maps.Clone(gotContext)
 		delete(gotContext, "library")
 		got["context"] = gotContext
@@ -112,12 +111,12 @@ func decode(r io.Reader, v any) error {
 	return d.Decode(v)
 }
 
-// assertPlain fails on any value in v that a snapshot must not hold, such as
-// an int or a generated type.
+// assertPlain fails on any value in v that the spec does not allow in a
+// snapshot, such as an int or a generated type.
 func assertPlain(t *testing.T, v any) {
 	t.Helper()
 	switch v := v.(type) {
-	case nil, string, bool, int64, float64:
+	case nil, string, bool, int64, uint64, float64, float32, json.Number:
 	case map[string]any:
 		for _, e := range v {
 			assertPlain(t, e)
@@ -139,55 +138,68 @@ const (
 
 func TestTrackWire(t *testing.T) {
 	var (
-		ex        *examples.RudderTyperAnalytics
-		ref       *ruddertyper.RudderTyperAnalytics
-		id        = examples.Identity{UserID: "user-123"}
-		refID     = ruddertyper.Identity{UserID: "user-123"}
-		someTrack = examples.TrackSomeTrackEventProperties{SomeString: "hello", SomeInteger: 42, SomeBoolean: examples.Ptr(false)}
-		closed    = analytics.New("write-key", "http://127.0.0.1")
+		ex            *examples.RudderTyperAnalytics
+		ref           *ruddertyper.RudderTyperAnalytics
+		id            = examples.Identity{UserID: "user-123"}
+		refID         = ruddertyper.Identity{UserID: "user-123"}
+		someTrack     = examples.TrackSomeTrackEventProperties{SomeString: "hello", SomeInteger: 42, SomeBoolean: examples.Ptr(false)}
+		someTrackJSON = `{"someString": "hello", "someInteger": 42, "someBoolean": false}`
+		closed        = analytics.New("write-key", "http://127.0.0.1")
+		msgID         string
 	)
 	require.NoError(t, closed.Close())
 
-	// The rows share one capture, which sets ex and ref when it starts, so the
-	// batch holds one message per row that succeeds, in row order.
+	// The rows share one capture, which sets ex and ref when it starts and msgID
+	// to each row's name before its call. A row that sends passes msgID to
+	// WithMessageID, and its messages are looked up by that ID, not by position:
+	// the SDK does not promise the order of Config.Callback calls.
 	tests := []struct {
-		name    string
-		call    func() error
-		want    string
-		err     error // the call must return exactly this error
-		errIs   error // the call must return an error wrapping this one
-		payload any   // when set, json.Marshal(payload) must equal the properties sent
+		name  string
+		call  func() error
+		want  string
+		err   error                // the call must return an error equal to this one
+		same  error                // the call must return this very error, such as an SDK sentinel
+		errIs error                // the call must return an error wrapping this one
+		props analytics.Properties // when set, the Config.Callback message must hold exactly these properties
 	}{
 		{
-			name:    "a set optional field sends its value, even false",
-			call:    func() error { return ex.TrackSomeTrackEvent(id, someTrack) },
-			payload: someTrack,
-			want: `{"type": "track", "channel": "server", "event": "Some Track Event", "userId": "user-123",
-				"properties": {"someString": "hello", "someInteger": 42, "someBoolean": false},
+			// TestTrackSmoke's call, so it keeps that test's identity with both IDs.
+			name: "a set optional field sends its value, even false",
+			call: func() error {
+				return ex.TrackSomeTrackEvent(examples.Identity{UserID: "user-123", AnonymousID: "anon-123"}, someTrack, examples.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Track Event", "userId": "user-123", "anonymousId": "anon-123",
+				"properties": ` + someTrackJSON + `,
 				"context": {"ruddertyper": ` + exMeta + `}}`,
 		},
 		{
 			name: "a nil optional field omits its key and an unset required field sends its zero value",
-			call: func() error { return ex.TrackSomeTrackEvent(id, examples.TrackSomeTrackEventProperties{}) },
+			call: func() error {
+				return ex.TrackSomeTrackEvent(id, examples.TrackSomeTrackEventProperties{}, examples.WithMessageID(msgID))
+			},
 			want: `{"type": "track", "channel": "server", "event": "Some Track Event", "userId": "user-123",
 				"properties": {"someString": "", "someInteger": 0},
 				"context": {"ruddertyper": ` + exMeta + `}}`,
 		},
 		{
 			name: "an empty closed event sends no properties",
-			call: func() error { return ref.TrackEmptyEventNoAdditionalProps(refID) },
+			call: func() error { return ref.TrackEmptyEventNoAdditionalProps(refID, ruddertyper.WithMessageID(msgID)) },
 			want: `{"type": "track", "channel": "server", "event": "Empty Event No Additional Props", "userId": "user-123",
 				"context": {"ruddertyper": ` + refMeta + `}}`,
 		},
 		{
 			name: "an empty open event sends no properties for nil",
-			call: func() error { return ref.TrackEmptyEventWithAdditionalProps(refID, nil) },
+			call: func() error {
+				return ref.TrackEmptyEventWithAdditionalProps(refID, nil, ruddertyper.WithMessageID(msgID))
+			},
 			want: `{"type": "track", "channel": "server", "event": "Empty Event With Additional Props", "userId": "user-123",
 				"context": {"ruddertyper": ` + refMeta + `}}`,
 		},
 		{
 			name: "an empty open event sends no properties for an empty map",
-			call: func() error { return ref.TrackEmptyEventWithAdditionalProps(refID, map[string]any{}) },
+			call: func() error {
+				return ref.TrackEmptyEventWithAdditionalProps(refID, map[string]any{}, ruddertyper.WithMessageID(msgID))
+			},
 			want: `{"type": "track", "channel": "server", "event": "Empty Event With Additional Props", "userId": "user-123",
 				"context": {"ruddertyper": ` + refMeta + `}}`,
 		},
@@ -197,17 +209,38 @@ func TestTrackWire(t *testing.T) {
 				return ref.TrackEmptyEventWithAdditionalProps(refID, map[string]any{
 					"plan":   "pro",
 					"nested": map[string]any{"list": []string(nil), "object": map[string]any(nil)},
-				})
+				}, ruddertyper.WithMessageID(msgID))
 			},
 			want: `{"type": "track", "channel": "server", "event": "Empty Event With Additional Props", "userId": "user-123",
 				"properties": {"plan": "pro", "nested": {"list": [], "object": {}}},
 				"context": {"ruddertyper": ` + refMeta + `}}`,
 		},
 		{
+			name: "untyped fields send numbers, bools and objects at depth",
+			call: func() error {
+				return ref.TrackUserSignedUp(refID, ruddertyper.TrackUserSignedUpProperties{
+					ArrayOfAny:    []any{"string item", 42, true, map[string]any{"nested": "object", "count": 100}},
+					PropertyOfAny: map[string]any{"custom_field_1": "value1", "custom_field_2": 999, "nested_object": map[string]any{"deep_field": "deep_value"}},
+					UntypedArray:  []any{3.14159, "mixed", false, map[string]any{"id": 123, "name": "test"}},
+					UntypedField:  map[string]any{"arbitrary_key": "arbitrary_value", "number": 42.5},
+				}, ruddertyper.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "User Signed Up", "userId": "user-123",
+				"properties": {
+					"array_of_any": ["string item", 42, true, {"nested": "object", "count": 100}],
+					"property_of_any": {"custom_field_1": "value1", "custom_field_2": 999, "nested_object": {"deep_field": "deep_value"}},
+					"untyped_array": [3.14159, "mixed", false, {"id": 123, "name": "test"}],
+					"untyped_field": {"arbitrary_key": "arbitrary_value", "number": 42.5}
+				},
+				"context": {"ruddertyper": ` + refMeta + `}}`,
+		},
+		{
 			// productId is required, so the open rule's empty case cannot be reached. The
 			// collision pair's closed structs below show the SDK omitting an empty map instead.
 			name: "the open rule's struct with nothing set sends only its required key",
-			call: func() error { return ex.TrackSomeOpenTrackEvent(id, examples.TrackSomeOpenTrackEventProperties{}) },
+			call: func() error {
+				return ex.TrackSomeOpenTrackEvent(id, examples.TrackSomeOpenTrackEventProperties{}, examples.WithMessageID(msgID))
+			},
 			want: `{"type": "track", "channel": "server", "event": "Some Open Track Event", "userId": "user-123",
 				"properties": {"productId": ""},
 				"context": {"ruddertyper": ` + exMeta + `}}`,
@@ -220,19 +253,34 @@ func TestTrackWire(t *testing.T) {
 					ProductID: "p1",
 					Amount:    examples.Ptr(9.5),
 					AdditionalProperties: map[string]any{
-						"coupon": "SAVE", "productId": "override", "productName": "fill",
+						"coupon": "SAVE", "productId": "override", "productName": "fill", "additionalProperties": "x",
 						"count": 3, "user": examples.TrackUserProperties{User: examples.Ptr("u")},
 					},
-				})
+				}, examples.WithMessageID(msgID))
 			},
 			want: `{"type": "track", "channel": "server", "event": "Some Open Track Event", "userId": "user-123",
 				"properties": {"productId": "p1", "amount": 9.5, "coupon": "SAVE", "count": 3, "user": {"user": "u"}},
 				"context": {"ruddertyper": ` + exMeta + `}}`,
+			props: analytics.Properties{
+				"productId": "p1", "amount": 9.5, "coupon": "SAVE",
+				"count": int64(3), "user": map[string]any{"user": "u"},
+			},
+		},
+		{
+			name: "quotes and backslashes in the event name and a value are sent unchanged",
+			call: func() error {
+				return ref.TrackProductPremiumClicked(refID, ruddertyper.TrackProductPremiumClickedProperties{
+					SpecialField: "value with \"quotes\" and \\path",
+				}, ruddertyper.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Product \"Premium\" Clicked", "userId": "user-123",
+				"properties": {"special_field": "value with \"quotes\" and \\path"},
+				"context": {"ruddertyper": ` + refMeta + `}}`,
 		},
 		{
 			name: "the collision pair's first event sends its own name",
 			call: func() error {
-				return ex.TrackEventWithNameCamelCase(id, examples.TrackEventWithNameCamelCaseProperties{})
+				return ex.TrackEventWithNameCamelCase(id, examples.TrackEventWithNameCamelCaseProperties{}, examples.WithMessageID(msgID))
 			},
 			want: `{"type": "track", "channel": "server", "event": "$eventWithNameCamelCase$!", "userId": "user-123",
 				"context": {"ruddertyper": ` + exMeta + `}}`,
@@ -240,7 +288,7 @@ func TestTrackWire(t *testing.T) {
 		{
 			name: "the collision pair's second event sends its own name",
 			call: func() error {
-				return ex.TrackEventWithNameCamelCase1(id, examples.TrackEventWithNameCamelCaseProperties1{})
+				return ex.TrackEventWithNameCamelCase1(id, examples.TrackEventWithNameCamelCaseProperties1{}, examples.WithMessageID(msgID))
 			},
 			want: `{"type": "track", "channel": "server", "event": "eventWithNameCamelCase", "userId": "user-123",
 				"context": {"ruddertyper": ` + exMeta + `}}`,
@@ -254,25 +302,33 @@ func TestTrackWire(t *testing.T) {
 					ToProperties1: examples.Ptr("t"),
 					UserID:        "u1",
 					UserID1:       examples.Ptr("u2"),
-				})
+				}, examples.WithMessageID(msgID))
 			},
 			want: `{"type": "track", "channel": "server", "event": "Name Collisions", "userId": "user-123",
 				"properties": {"1st_place": 1, "amount": "ten", "toProperties": "t", "userId": "u1", "user_id": "u2"},
 				"context": {"ruddertyper": ` + exMeta + `}}`,
 		},
 		{
+			name: "Identity.AnonymousID sends anonymousId",
+			call: func() error {
+				return ex.TrackSomeEmptyTrackEvent(examples.Identity{AnonymousID: "anon-1"}, examples.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event", "anonymousId": "anon-1",
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
+			// Found by msgID, so the lookup checks messageId.
 			name: "options send integrations, originalTimestamp and messageId",
 			call: func() error {
 				return ex.TrackSomeEmptyTrackEvent(id,
 					examples.WithIntegrations(analytics.Integrations{"All": false, "Amplitude": map[string]any{"sessionId": 1}}),
 					examples.WithTimestamp(time.Date(2026, 9, 29, 10, 0, 0, 0, time.UTC)),
-					examples.WithMessageID("msg-1"),
+					examples.WithMessageID(msgID),
 				)
 			},
 			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event", "userId": "user-123",
 				"integrations": {"All": false, "Amplitude": {"sessionId": 1}},
 				"originalTimestamp": "2026-09-29T10:00:00Z",
-				"messageId": "msg-1",
 				"context": {"ruddertyper": ` + exMeta + `}}`,
 		},
 		{
@@ -282,22 +338,22 @@ func TestTrackWire(t *testing.T) {
 					Locale: "en-US",
 					Traits: analytics.Traits{"plan": "pro", "seats": 2},
 					Extra:  map[string]any{"custom": 1, "ruddertyper": "overwritten"},
-				}))
+				}), examples.WithMessageID(msgID))
 			},
 			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event", "userId": "user-123",
 				"context": {"locale": "en-US", "traits": {"plan": "pro", "seats": 2}, "custom": 1, "ruddertyper": ` + exMeta + `}}`,
 		},
 		{
+			// Found by msgID, so the lookup checks that the later WithMessageID won.
 			name: "a later option overrides an earlier one and nil options are skipped",
 			call: func() error {
 				return ex.TrackSomeEmptyTrackEvent(id,
-					examples.WithMessageID("first"), nil, examples.WithMessageID("second"),
+					examples.WithMessageID("first"), nil, examples.WithMessageID(msgID),
 					examples.WithIntegrations(analytics.Integrations{"All": false}),
 					examples.WithIntegrations(analytics.Integrations{"Amplitude": true}),
 				)
 			},
 			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event", "userId": "user-123",
-				"messageId": "second",
 				"integrations": {"Amplitude": true},
 				"context": {"ruddertyper": ` + exMeta + `}}`,
 		},
@@ -309,7 +365,7 @@ func TestTrackWire(t *testing.T) {
 		{
 			name: "a closed client returns the SDK's ErrClosed",
 			call: func() error { return examples.New(closed).TrackSomeEmptyTrackEvent(id) },
-			err:  analytics.ErrClosed,
+			same: analytics.ErrClosed,
 		},
 		{
 			name: "a self-containing map is invalid",
@@ -354,6 +410,7 @@ func TestTrackWire(t *testing.T) {
 	wire, succeeded := capture(t, func(client analytics.Client) {
 		ex, ref = examples.New(client), ruddertyper.New(client)
 		for i, tt := range tests {
+			msgID = tt.name
 			errs[i] = tt.call()
 		}
 	})
@@ -364,48 +421,56 @@ func TestTrackWire(t *testing.T) {
 			sent++
 		}
 	}
-	require.Len(t, wire, sent, "a failed call sent a message, or a call sent none")
-	require.Len(t, succeeded, sent)
+	assert.Len(t, wire, sent, "a failed call sent a message, or a call sent none; errors: %v", errs)
+	assert.Len(t, succeeded, sent)
+
+	wireByID := make(map[any]map[string]any, len(wire))
+	for _, msg := range wire {
+		wireByID[msg["messageId"]] = msg
+	}
+	callbackByID := make(map[string]analytics.Track, len(succeeded))
+	for _, msg := range succeeded {
+		require.IsType(t, analytics.Track{}, msg)
+		track := msg.(analytics.Track)
+		callbackByID[track.MessageId] = track
+	}
 
 	for i, tt := range tests {
-		// Taking the row's message here, not in the subtest, keeps rows and
-		// messages paired when -run skips a subtest.
-		var msg map[string]any
-		if tt.want != "" {
-			msg, wire = wire[0], wire[1:]
-		}
 		t.Run(tt.name, func(t *testing.T) {
 			switch {
 			case tt.err != nil:
 				assert.Equal(t, tt.err, errs[i])
+			case tt.same != nil:
+				assert.Same(t, tt.same, errs[i])
 			case tt.errIs != nil:
 				assert.ErrorIs(t, errs[i], tt.errIs)
 			default:
 				require.NoError(t, errs[i])
+				msg, ok := wireByID[tt.name]
+				require.True(t, ok, "no message on the wire has this row's ID")
 				assertMessage(t, tt.want, msg)
-				if tt.payload != nil {
-					want, err := json.Marshal(tt.payload)
-					require.NoError(t, err)
-					got, err := json.Marshal(msg["properties"])
-					require.NoError(t, err)
-					assert.JSONEq(t, string(want), string(got))
+
+				// Config.Callback receives the snapshot itself, so its Go value
+				// types show what the wire JSON cannot. context.ruddertyper is
+				// skipped: it is generated constant metadata, not caller data, and
+				// the spec writes its trackingPlanVersion as an untyped constant, a Go int.
+				track, ok := callbackByID[tt.name]
+				require.True(t, ok, "Config.Callback received no message with this row's ID")
+				if tt.props != nil {
+					assert.Equal(t, tt.props, track.Properties)
+				}
+				require.NotNil(t, track.Context)
+				extra := maps.Clone(track.Context.Extra)
+				delete(extra, "ruddertyper")
+				for _, m := range []map[string]any{track.Properties, track.Integrations, track.Context.Traits, extra} {
+					assertPlain(t, m)
 				}
 			}
 		})
 	}
 
-	// Config.Callback receives the snapshot itself, so its Go value types show
-	// what the wire JSON cannot. context.ruddertyper is skipped: it is generated
-	// constant metadata, not caller data, and the spec writes its
-	// trackingPlanVersion as an untyped constant, a Go int.
-	for _, msg := range succeeded {
-		require.IsType(t, analytics.Track{}, msg)
-		track := msg.(analytics.Track)
-		require.NotNil(t, track.Context)
-		extra := maps.Clone(track.Context.Extra)
-		delete(extra, "ruddertyper")
-		for _, m := range []map[string]any{track.Properties, track.Integrations, track.Context.Traits, extra} {
-			assertPlain(t, m)
-		}
-	}
+	// The first row sends someTrackJSON, so json.Marshal of its payload must match it.
+	b, err := json.Marshal(someTrack)
+	require.NoError(t, err)
+	assert.JSONEq(t, someTrackJSON, string(b))
 }
