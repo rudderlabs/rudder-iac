@@ -9,6 +9,7 @@ import (
 
 	"github.com/kyokomi/emoji/v2"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	agentcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/agent"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/auth"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	datagraphPkg "github.com/rudderlabs/rudder-iac/cli/internal/cmd/datagraph"
@@ -84,6 +85,7 @@ func init() {
 
 	// Add subcommands to the root command
 	rootCmd.AddCommand(auth.NewCmdAuth())
+	rootCmd.AddCommand(agentcmd.NewCmdAgent())
 	rootCmd.AddCommand(trackingplan.NewCmdTrackingPlan())
 	rootCmd.AddCommand(telemetryCmd.NewCmdTelemetry())
 	rootCmd.AddCommand(workspace.NewCmdWorkspace())
@@ -156,6 +158,7 @@ func SetVersion(v string) {
 // telemetry.TrackCommand. TestTrackedCommandsMatchRunEReporters keeps the list
 // in step with the code.
 var trackedCommands = []string{
+	"agent init",
 	"apply",
 	"auth login",
 	"data-graphs validate",
