@@ -21,8 +21,10 @@ on:
       - "Makefile"
       - ".github/workflows/typer-go-validate.yml"
 
+# The PR number, not head_ref: two PRs can share a head branch name. Push runs
+# fall back to run_id, a group of one that is never cancelled.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 permissions:
