@@ -89,6 +89,12 @@ type RemoteConnection struct {
 	DestinationExternalID string
 }
 
+// WarehouseDestinationID names the destination this connection delivers to. A
+// destination being imported reads it, through an interface since that
+// package cannot import this one, to tell which destinations a warehouse
+// source connects to.
+func (r *RemoteConnection) WarehouseDestinationID() string { return r.DestinationID }
+
 // ConnectionsSpec mirrors the YAML spec structure: the body is a list of
 // connection entries. JSON tags enable the typed rule engine's
 // json.Marshal/Unmarshal round-trip and name the JSON Pointer references it
@@ -116,7 +122,9 @@ type ConnectionSpec struct {
 // and ClassifyFlow mirrors that. No raw map absorbs unknown keys, so a misspelt
 // field is an error rather than a silently dropped setting. Object is a pointer
 // so validation can tell an omitted object (a JSON mapper connection) from an
-// explicitly empty one, which is a spec error.
+// explicitly empty one, which is a spec error. SyncBehaviour lists mirror,
+// which only a visual-mapper-v2 connection can use; V-R2 refuses it on the
+// other flows, where the destination's field set is not declared up front.
 type ConfigSpec struct {
 	SyncBehaviour string            `json:"sync_behaviour"          mapstructure:"sync_behaviour" validate:"required,oneof=upsert mirror full"`
 	Schedule      ScheduleSpec      `json:"schedule"                mapstructure:"schedule"`

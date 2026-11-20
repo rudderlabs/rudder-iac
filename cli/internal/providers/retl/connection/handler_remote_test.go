@@ -337,7 +337,7 @@ func TestLoadResourcesFromRemote(t *testing.T) {
 		sources, destinations, err := h.endpoints(t.Context())
 		require.NoError(t, err)
 		_, err = h.remoteConnection(tableSource, sources, destinations)
-		assert.EqualError(t, err, `connection "conn-table-source": its source is a retl-source-table, which is not enabled (set RUDDERSTACK_X_RETL_TABLE_SUPPORT=true)`)
+		assert.EqualError(t, err, `connection "conn-table-source": its source is a retl-source-table, which this provider does not register`)
 	})
 
 	t.Run("an empty workspace never reaches for the endpoint catalogs", func(t *testing.T) {

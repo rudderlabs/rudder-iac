@@ -9,7 +9,7 @@ func (r *RudderTyperAnalytics) track(identity Identity, event string, properties
 		AnonymousId:       identity.AnonymousID,
 		Event:             event,
 		Properties:        properties,
-		Context:           o.analyticsContext(nil),
+		Context:           o.analyticsContext(),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,
 		MessageId:         o.messageID,
@@ -19,7 +19,8 @@ func (r *RudderTyperAnalytics) track(identity Identity, event string, properties
 {{- if .Helpers.identify }}
 
 // identify sends traits as the message's traits, or as context.traits when
-// the rule's identity section is context.traits.
+// the rule's identity section is context.traits, where they win over the
+// caller's Context.Traits keys.
 func (r *RudderTyperAnalytics) identify(identity Identity, traits analytics.Traits, inContext bool, opts []Option) error {
 	o, err := applyOptions(opts)
 	if err != nil {
@@ -28,15 +29,19 @@ func (r *RudderTyperAnalytics) identify(identity Identity, traits analytics.Trai
 	msg := analytics.Identify{
 		UserId:            identity.UserID,
 		AnonymousId:       identity.AnonymousID,
+		Context:           o.analyticsContext(),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,
 		MessageId:         o.messageID,
 	}
-	if inContext {
-		msg.Context = o.analyticsContext(traits)
-	} else {
-		msg.Context = o.analyticsContext(nil)
+	switch {
+	case !inContext:
 		msg.Traits = traits
+	case len(traits) > 0:
+		merged := make(analytics.Traits, len(msg.Context.Traits)+len(traits))
+		maps.Copy(merged, msg.Context.Traits)
+		maps.Copy(merged, traits)
+		msg.Context.Traits = merged
 	}
 	return r.client.Enqueue(msg)
 }
@@ -63,7 +68,7 @@ func (r *RudderTyperAnalytics) group(identity Identity, groupID string, traits a
 		AnonymousId:       identity.AnonymousID,
 		GroupId:           groupID,
 		Traits:            traits,
-		Context:           o.analyticsContext(nil),
+		Context:           o.analyticsContext(),
 		Integrations:      o.integrations,
 		OriginalTimestamp: o.timestamp,
 		MessageId:         o.messageID,

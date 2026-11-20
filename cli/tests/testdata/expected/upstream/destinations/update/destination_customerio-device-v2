@@ -10,6 +10,9 @@
     "connectionMode": {
       "web": "device"
     },
+    "useNativeSDK": {
+      "web": true
+    },
     "apiVersion": "v2",
     "userIdIdentifierType": "email",
     "sdkVersion": {

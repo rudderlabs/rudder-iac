@@ -23,9 +23,10 @@ func (c *fakeClient) Enqueue(msg analytics.Message) error {
 
 func (c *fakeClient) Close() error { return nil }
 
-// sendAndChange changes each input right after the call that took it. Both
-// ownership tests run it, so the deterministic fake-client check and the
-// -race check against the real SDK cover the same inputs.
+// sendAndChange changes each input right after the last call that took it:
+// props after the first call, the rest after the second. Both ownership tests
+// run it, so the deterministic fake-client check and the -race check against
+// the real SDK cover the same inputs.
 func sendAndChange(t *testing.T, client analytics.Client) {
 	t.Helper()
 	var (
@@ -72,20 +73,18 @@ func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
 	client := &fakeClient{}
 	sendAndChange(t, client)
 
-	context := func() *analytics.Context {
-		return &analytics.Context{
-			IP: net.IP{127, 0, 0, 1},
-			Extra: map[string]any{
-				"custom": map[string]any{"k": "v"},
-				"ruddertyper": map[string]any{
-					"platform":            "go",
-					"rudderCLIVersion":    "1.0.0",
-					"trackingPlanId":      "plan_12345",
-					"trackingPlanVersion": 13,
-				},
+	context := &analytics.Context{
+		IP: net.IP{127, 0, 0, 1},
+		Extra: map[string]any{
+			"custom": map[string]any{"k": "v"},
+			"ruddertyper": map[string]any{
+				"platform":            "go",
+				"rudderCLIVersion":    "1.0.0",
+				"trackingPlanId":      "plan_12345",
+				"trackingPlanVersion": 13,
 			},
-			Traits: analytics.Traits{"plan": []any{"pro"}},
-		}
+		},
+		Traits: analytics.Traits{"plan": []any{"pro"}},
 	}
 	assert.Equal(t, []analytics.Message{
 		analytics.Track{
@@ -99,14 +98,14 @@ func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
 				"profile":         map[string]any{"email": "", "first_name": ""},
 				"property_of_any": []any{"z"},
 			},
-			Context:      context(),
+			Context:      context,
 			Integrations: analytics.Integrations{"Amplitude": map[string]any{"key": "v"}},
 		},
 		analytics.Track{
 			UserId:       "user-123",
 			Event:        "Empty Event With Additional Props",
 			Properties:   analytics.Properties{"list": []any{"x"}},
-			Context:      context(),
+			Context:      context,
 			Integrations: analytics.Integrations{"Amplitude": map[string]any{"key": "v"}},
 		},
 	}, client.messages)

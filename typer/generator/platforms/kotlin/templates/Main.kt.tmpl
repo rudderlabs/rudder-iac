@@ -2,8 +2,10 @@
 
 package {{ .PackageName }}
 
+{{ if not .Common -}}
 import com.rudderstack.sdk.kotlin.core.Analytics
 import com.rudderstack.sdk.kotlin.core.internals.models.RudderOption
+{{ end -}}
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -11,6 +13,13 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+{{- if .Common }}
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.longOrNull
+{{- /* Common code has no implicit kotlin.jvm imports, and the generated serializers need this one. */}}
+import kotlin.jvm.JvmName
+{{- end }}
 {{- range .Imports }}
 import {{ . }}
 {{- end }}
@@ -76,4 +85,4 @@ private fun List<List<JsonNull>>.rudderSerialize(): JsonArray = JsonArray(this.m
 {{ template "dataclasswithindent" $ctx }}
 {{- end }}
 
-{{ template "rudderanalytics.tmpl" . }}
+{{ if .Common }}{{ template "ruddertyper.tmpl" . }}{{ else }}{{ template "rudderanalytics.tmpl" . }}{{ end }}
