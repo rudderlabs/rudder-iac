@@ -23,9 +23,9 @@ var telemetryCmd = &cobra.Command{
 		- Command usage statistics
 		- Error occurrences (without sensitive details)
 		- Basic system information
-		- The coding agent running the CLI, when one is
+		- The coding agent running the CLI and the skill it follows, when named
 
-		While telemetry is enabled, API calls also carry the agent's name and the
+		While telemetry is enabled, API calls also carry those two names and the
 		telemetry id in their User-Agent, so usage can be counted per workspace.
 		
 		Use 'status' to check current telemetry settings

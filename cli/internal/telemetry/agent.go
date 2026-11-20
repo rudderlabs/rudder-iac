@@ -11,6 +11,13 @@ import (
 // caller wants to say so itself. It wins over detection.
 const AgentEnvVar = "RUDDERSTACK_CLI_AGENT"
 
+// SkillEnvVar names the agent skill whose instructions run the CLI, such as
+// rudder-setup. Only the skill knows this, so it is never detected.
+const SkillEnvVar = "RUDDERSTACK_CLI_SKILL"
+
+// Skill returns the skill the caller named, or "".
+func Skill() string { return agentName(os.Getenv(SkillEnvVar)) }
+
 // agentEnv lists a variable each coding agent sets in the shells it starts.
 // Order matters only when two are set: the first match names the agent.
 // Variables a person's own terminal also carries (CURSOR_TRACE_ID in Cursor's
@@ -64,7 +71,7 @@ func agentName(raw string) string {
 }
 
 // UserAgent is the User-Agent of every API call. With telemetry on it names
-// the agent and carries the telemetry id, which is the only thing that ties a
+// the agent and the skill and carries the telemetry id, which is the only thing that ties a
 // command event to the workspace the API saw. With telemetry off it is the
 // version alone.
 func UserAgent(version string) string {
@@ -78,6 +85,9 @@ func UserAgent(version string) string {
 	var parts []string
 	if agent := Agent(); agent != "" {
 		parts = append(parts, "agent="+agent)
+	}
+	if skill := Skill(); skill != "" {
+		parts = append(parts, "skill="+skill)
 	}
 	if id := agentName(cfg.Telemetry.AnonymousID); id != "" {
 		parts = append(parts, "telemetry-id="+id)

@@ -13,6 +13,7 @@ func clearAgentEnv(t *testing.T) {
 	t.Helper()
 	t.Setenv(AgentEnvVar, "")
 	t.Setenv("AI_AGENT", "")
+	t.Setenv(SkillEnvVar, "")
 	for _, a := range agentEnv {
 		t.Setenv(a.env, "")
 	}
@@ -63,6 +64,15 @@ func TestUserAgent(t *testing.T) {
 		t.Setenv("CLAUDECODE", "1")
 		set(t, false, "0b0e7a1c-id")
 		assert.Equal(t, "rudder-cli/1.2.3 (agent=claude-code; telemetry-id=0b0e7a1c-id)", UserAgent("1.2.3"))
+	})
+
+	t.Run("agent, skill and telemetry id", func(t *testing.T) {
+		clearAgentEnv(t)
+		t.Setenv("CLAUDECODE", "1")
+		t.Setenv(SkillEnvVar, "Rudder-Setup")
+		set(t, false, "0b0e7a1c-id")
+		assert.Equal(t, "rudder-setup", Skill())
+		assert.Equal(t, "rudder-cli/1.2.3 (agent=claude-code; skill=rudder-setup; telemetry-id=0b0e7a1c-id)", UserAgent("1.2.3"))
 	})
 
 	t.Run("a person, telemetry on", func(t *testing.T) {

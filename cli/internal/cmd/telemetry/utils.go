@@ -118,6 +118,9 @@ func trackCommand(command string, err error, extras ...KV) {
 	if agent := telemetry.Agent(); agent != "" {
 		props["agent"] = agent
 	}
+	if skill := telemetry.Skill(); skill != "" {
+		props["skill"] = skill
+	}
 
 	if err := telemetry.TrackEvent(CommandExecutedEvent, props); err != nil {
 		log.Error("failed to track command", "error", err)
