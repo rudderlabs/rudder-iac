@@ -23,6 +23,24 @@ match_behavior:
                 user: RUDDER
                 authenticationType: keyPair
                 privateKey: "{{ .SNF_PRIVATEKEY }}"
+      - example_id: "account-v1-databricks-pat-valid"
+        title: "Valid Databricks personal-access-token account"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: account
+            metadata:
+              name: dbx
+            spec:
+              id: dbx
+              name: Databricks
+              account_definition_name: SOURCE_DATABRICKS
+              config:
+                host: dbc-00000000-0000.cloud.databricks.com
+                port: 443
+                path: /sql/1.0/warehouses/abc123
+                authenticationType: pat
+                token: "{{ .DBX_TOKEN }}"
     invalid:
       - example_id: "account-v1-missing-id"
         title: "Account spec without an id"

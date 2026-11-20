@@ -1,0 +1,20 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "externalId": "prod-dbx",
+  "name": "Production Databricks",
+  "definition": {
+    "name": "SOURCE_DATABRICKS",
+    "type": "databricks",
+    "category": "source"
+  },
+  "options": {
+    "host": "dbc-00000000-0000.cloud.databricks.com",
+    "port": 443,
+    "path": "/sql/1.0/warehouses/abc123",
+    "catalog": "analytics",
+    "authenticationType": "pat"
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}
