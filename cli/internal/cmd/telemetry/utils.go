@@ -114,6 +114,11 @@ func trackCommand(command string, err error, extras ...KV) {
 	// Automatically add execution context (CI)
 	maps.Copy(props, getCIExecutionContext())
 
+	// The coding agent running the CLI, when one is
+	if agent := telemetry.Agent(); agent != "" {
+		props["agent"] = agent
+	}
+
 	if err := telemetry.TrackEvent(CommandExecutedEvent, props); err != nil {
 		log.Error("failed to track command", "error", err)
 	}
