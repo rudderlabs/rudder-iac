@@ -142,6 +142,13 @@ type (
 func (s *ptrText) MarshalText() ([]byte, error) { return []byte(strings.ToUpper(string(*s))), nil }
 func (*ptrJSON) MarshalJSON() ([]byte, error)   { return []byte(`"from MarshalJSON"`), nil }
 
+// ptrJSONText has a pointer-receiver MarshalJSON and a value MarshalText.
+// encoding/json prefers the first on an addressable value.
+type ptrJSONText string
+
+func (*ptrJSONText) MarshalJSON() ([]byte, error) { return []byte(`"from MarshalJSON"`), nil }
+func (ptrJSONText) MarshalText() ([]byte, error)  { return []byte("from MarshalText"), nil }
+
 // upperText is encoded by its MarshalText, which differs from its value.
 type upperText string
 
@@ -234,6 +241,11 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			},
 		},
 		{
+			name: "arrays are walked like slices",
+			in:   map[string]any{"ints": [2]int{1, 2}, "nils": [1][]string{nil}},
+			want: map[string]any{"ints": []any{int64(1), int64(2)}, "nils": []any{[]any{}}},
+		},
+		{
 			name: "nil slices and maps in AdditionalProperties become [] and {}",
 			in:   testObject{Name: "a", AdditionalProperties: map[string]any{"list": []string(nil), "deep": map[string]any{"m": map[string]bool(nil)}}},
 			want: map[string]any{"name": "a", "tags": []any{}, "list": []any{}, "deep": map[string]any{"m": map[string]any{}}},
@@ -272,6 +284,11 @@ func TestSnapshotAndMarshal(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "nil variant array item",
+			in:      map[string]any{"items": [1]testVariant{nil}},
+			wantErr: true,
+		},
+		{
 			name: "[]byte becomes base64, a nil one null",
 			in:   map[string]any{"bytes": []byte("hi"), "nil": []byte(nil)},
 			want: map[string]any{"bytes": "aGk=", "nil": nil},
@@ -283,8 +300,8 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		},
 		{
 			name: "json.Number",
-			in:   map[string]any{"n": json.Number("12.50")},
-			want: map[string]any{"n": json.Number("12.50")},
+			in:   map[string]any{"n": json.Number("12.50"), "list": []json.Number{"1"}},
+			want: map[string]any{"n": json.Number("12.50"), "list": []any{json.Number("1")}},
 		},
 		{
 			name: "caller marshalers go through encoding/json",
@@ -321,12 +338,21 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		},
 		{
 			name: "pointer-receiver marshalers apply only to addressable values, as in encoding/json",
-			in:   map[string]any{"slice": []ptrText{"a"}, "map": map[string]ptrText{"k": "a"}, "pointer": &callerPtrJSON{}, "value": callerPtrJSON{}},
+			in: map[string]any{
+				"slice":        []ptrText{"a"},
+				"map":          map[string]ptrText{"k": "a"},
+				"pointer":      &callerPtrJSON{},
+				"value":        callerPtrJSON{},
+				"jsonTextList": []ptrJSONText{"a"},
+				"jsonTextMap":  map[string]ptrJSONText{"k": "a"},
+			},
 			want: map[string]any{
-				"slice":   []any{"A"},
-				"map":     map[string]any{"k": "a"},
-				"pointer": map[string]any{"J": "from MarshalJSON"},
-				"value":   map[string]any{"J": map[string]any{"N": json.Number("0")}},
+				"slice":        []any{"A"},
+				"map":          map[string]any{"k": "a"},
+				"pointer":      map[string]any{"J": "from MarshalJSON"},
+				"value":        map[string]any{"J": map[string]any{"N": json.Number("0")}},
+				"jsonTextList": []any{"from MarshalJSON"},
+				"jsonTextMap":  map[string]any{"k": "from MarshalText"},
 			},
 		},
 		{

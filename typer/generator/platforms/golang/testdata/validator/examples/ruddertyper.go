@@ -639,7 +639,13 @@ func wire(rv reflect.Value, depth int) (any, error) {
 		}
 		return nil, nil
 	}
-	switch v := rv.Interface().(type) {
+	v := rv.Interface()
+	if _, ok := v.(json.Number); !ok && rv.CanAddr() {
+		// encoding/json calls the marshalers of *T on an addressable T, such
+		// as a slice element, and they include T's own.
+		v = rv.Addr().Interface()
+	}
+	switch v := v.(type) {
 	case wireObject:
 		return wire(reflect.ValueOf(v.toMap()), depth)
 	case wireValuer:
@@ -650,14 +656,6 @@ func wire(rv reflect.Value, depth int) (any, error) {
 		return wire(reflect.ValueOf(x), depth)
 	case json.Number, json.Marshaler, encoding.TextMarshaler:
 		return encode(v)
-	}
-	// encoding/json also calls pointer-receiver marshalers on addressable
-	// values, such as slice elements.
-	if rv.CanAddr() {
-		switch p := rv.Addr().Interface().(type) {
-		case json.Marshaler, encoding.TextMarshaler:
-			return encode(p)
-		}
 	}
 	switch rv.Kind() {
 	case reflect.Interface, reflect.Pointer:
