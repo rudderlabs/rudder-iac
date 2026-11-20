@@ -19,6 +19,12 @@ func messageJSON(meta, typ, fields string) string {
 	return fmt.Sprintf(`{"type": %q, "channel": "server", "userId": "user-123", "anonymousId": "anon-1"%s, "context": {"ruddertyper": %s}}`, typ, fields, meta)
 }
 
+// contextTraitsJSON is messageJSON whose context also holds traits, a JSON
+// object, as context.traits.
+func contextTraitsJSON(meta, typ, fields, traits string) string {
+	return fmt.Sprintf(`{"type": %q, "channel": "server", "userId": "user-123", "anonymousId": "anon-1"%s, "context": {"traits": %s, "ruddertyper": %s}}`, typ, fields, traits, meta)
+}
+
 // Each row's name starts with the golden whose wrapper it calls.
 func TestNonTrackWire(t *testing.T) {
 	var (
@@ -46,8 +52,7 @@ func TestNonTrackWire(t *testing.T) {
 				return sections.Identify(sectionsID, &identitysections.IdentifyTraits{Email: "new@b.c"},
 					identitysections.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"email": "old@b.c", "plan": "free"}}))
 			},
-			want: `{"type": "identify", "channel": "server", "userId": "user-123", "anonymousId": "anon-1",
-				"context": {"traits": {"email": "new@b.c", "plan": "free"}, "ruddertyper": ` + sectionsMeta + `}}`,
+			want: contextTraitsJSON(sectionsMeta, "identify", "", `{"email": "new@b.c", "plan": "free"}`),
 		},
 		{
 			name: "identitysections: group on traits sends the message's traits",
@@ -62,24 +67,21 @@ func TestNonTrackWire(t *testing.T) {
 				return ref.Group(refID, "g1", &ruddertyper.GroupTraits{Active: true, Status: ruddertyper.Ptr(ruddertyper.CustomTypeStatusActive)},
 					ruddertyper.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"active": false, "plan": "pro"}}))
 			},
-			want: `{"type": "group", "channel": "server", "userId": "user-123", "anonymousId": "anon-1", "groupId": "g1", "traits": {"active": true, "status": "active"},
-				"context": {"traits": {"active": false, "plan": "pro"}, "ruddertyper": ` + refMeta + `}}`,
+			want: contextTraitsJSON(refMeta, "group", `, "groupId": "g1", "traits": {"active": true, "status": "active"}`, `{"active": false, "plan": "pro"}`),
 		},
 		{
 			name: "emptyidentity: the empty identify sends no traits and leaves the caller's context.traits untouched",
 			call: func() error {
 				return empty.Identify(emptyID, emptyidentity.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"plan": "pro"}}))
 			},
-			want: `{"type": "identify", "channel": "server", "userId": "user-123", "anonymousId": "anon-1",
-				"context": {"traits": {"plan": "pro"}, "ruddertyper": ` + emptyIdentityMeta + `}}`,
+			want: contextTraitsJSON(emptyIdentityMeta, "identify", "", `{"plan": "pro"}`),
 		},
 		{
 			name: "emptyidentity: the empty group sends no traits and leaves the caller's context.traits untouched",
 			call: func() error {
 				return empty.Group(emptyID, "g1", emptyidentity.WithAnalyticsContext(analytics.Context{Traits: analytics.Traits{"plan": "pro"}}))
 			},
-			want: `{"type": "group", "channel": "server", "userId": "user-123", "anonymousId": "anon-1", "groupId": "g1",
-				"context": {"traits": {"plan": "pro"}, "ruddertyper": ` + emptyIdentityMeta + `}}`,
+			want: contextTraitsJSON(emptyIdentityMeta, "group", `, "groupId": "g1"`, `{"plan": "pro"}`),
 		},
 		{
 			name: "examples: page sends a non-empty name as the top-level name",
@@ -312,8 +314,7 @@ func TestNonTrackWire(t *testing.T) {
 			call: func() error {
 				return ex.Identify2(id, examples.IdentifyVariantTraitsCaseBusiness{CompanyName: "Acme"})
 			},
-			want: `{"type": "identify", "channel": "server", "userId": "user-123", "anonymousId": "anon-1",
-				"context": {"traits": {"accountType": "business", "companyName": "Acme"}, "ruddertyper": ` + exMeta + `}}`,
+			want: contextTraitsJSON(exMeta, "identify", "", `{"accountType": "business", "companyName": "Acme"}`),
 		},
 		{
 			name: "examples: a group variant case on context.traits sends the message's traits",
