@@ -1,0 +1,50 @@
+{{ comment .Doc }}
+{{- if .MapAlias }}
+type {{ .Name }} = map[string]any
+{{- else if not (or .Fields .Open) }}
+type {{ .Name }} struct{}
+{{- else }}
+type {{ .Name }} struct {
+{{- range .Fields }}
+	{{ .Name }} {{ .Type }} // {{ if .Required }}required{{ else }}optional{{ end }}
+{{- end }}
+{{- if .Open }}
+	AdditionalProperties map[string]any // optional; undeclared keys only
+{{- end }}
+}
+{{- end }}
+{{- if not .MapAlias }}
+
+func (v {{ .Name }}) toMap() map[string]any {
+{{- if .Open }}
+	m := withAdditional(v.AdditionalProperties{{ range .DeclaredKeys }}, {{ quote . }}{{ end }})
+{{- else }}
+	m := map[string]any{
+{{- range .Fields }}{{ if .Required }}
+		{{ quote .Key }}: v.{{ .Name }},
+{{- end }}{{ end }}
+	}
+{{- end }}
+{{- /* A closed struct's literal already holds its required fields. */}}
+{{- range .Fields }}
+{{- if not .Required }}
+	if v.{{ .Name }} != nil {
+		m[{{ quote .Key }}] = {{ if .Pointer }}*{{ end }}v.{{ .Name }}
+	}
+{{- else if $.Open }}
+	m[{{ quote .Key }}] = v.{{ .Name }}
+{{- end }}
+{{- end }}
+	return m
+}
+
+// ToProperties returns the properties as sent on the wire.
+func (v {{ .Name }}) ToProperties() (analytics.Properties, error) {
+	return v.toMap(), nil
+}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v {{ .Name }}) MarshalJSON() ([]byte, error) {
+	return json.Marshal(v.toMap())
+}
+{{- end }}

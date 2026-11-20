@@ -51,7 +51,7 @@ RudderTyper 2.0 generates platform-specific RudderAnalytics bindings from tracki
 ### Platform Generators
 
 - **Purpose**: Platform-specific code generation implementations
-- **Current Implementation**: Kotlin generator in `typer/generator/platforms/kotlin/`
+- **Current Implementation**: one package per platform under `typer/generator/platforms/`: `golang/` (platform key `go`), `kotlin/`, `swift/` and `typescript/`
 - **Architecture**:
   - Direct function-based approach rather than full strategy pattern
   - Template-based code generation using Go embed
@@ -382,7 +382,10 @@ Add your generator to the platform registry in `typer/generator/platforms.go`:
 
 ```go
 var platforms = map[string]core.Generator{
-    "kotlin": &kotlin.Generator{},
+    "go":         &golang.Generator{},
+    "kotlin":     &kotlin.Generator{},
+    "swift":      &swift.Generator{},
+    "typescript": &typescript.Generator{},
     // Add new platforms here
 }
 ```
@@ -402,7 +405,7 @@ rudder typer options --platform kotlin
 
 ### Adding New Platforms
 
-1. Create a new package under `typer/generator/platforms/{platform}/`
+1. Create a new package under `typer/generator/platforms/{platform}/` (the Go generator lives in `golang/` because `go` is a keyword; its platform key is still `go`)
 2. Define platform-specific context types (like `KotlinContext`)
 3. Implement a `Generate` function following the current pattern
 4. **Use plan helper methods** (`ExtractAllCustomTypes`, `ExtractAllProperties`) for data extraction instead of implementing custom traversal logic
@@ -411,6 +414,7 @@ rudder typer options --platform kotlin
 7. Implement platform-specific collision handlers and naming functions
 8. Add template processing functions
 9. **Leverage the reference tracking plan** for comprehensive testing of your generator
+10. Register the platform in the generator dispatch map (`typer/generator/platforms.go`), the CLI allow-list and the `--platform` help of `typer generate` and `typer options` (`cli/internal/cmd/typer/`), and add a `typer-{platform}-update-testdata` Makefile target
 
 ### Extending TrackingPlan Model
 
