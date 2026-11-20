@@ -4,7 +4,7 @@ Generates a type-safe Go package for a tracking plan on top of analytics-go. Eac
 
 ## Generating
 
-- `rudder-cli typer generate --platform go --tracking-plan-id <id>` generates from your workspace's tracking plan; add `--local --location <project>` to generate from local specs ([Target Versions][spec]).
+- `rudder-cli typer generate --platform go --tracking-plan-id <id>` generates from your workspace's tracking plan. `rudder-cli typer generate --platform go --local --location <project>` generates from local specs; with `--local`, `--tracking-plan-id` takes the plan's local id and can be left out when the project has one plan ([Target Versions][spec]).
 - `rudder-cli typer options --platform go` lists the options; set one with `--option name=value` ([Generator Options][spec]).
 - The output is one file, `ruddertyper.go` in package `ruddertyper`; the `outputFileName` and `packageName` options rename them ([Generator Options][spec]). `--output` (`-o`) sets its directory, `.` by default: point it at the package's own directory, such as `-o internal/ruddertyper`.
 - Never edit the file; regenerate it after every tracking plan change ([Generated File Structure][spec]).
