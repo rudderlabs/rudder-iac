@@ -125,6 +125,7 @@ func (Null) wireValue() (any, error) { return nil, nil }
 func (Null) MarshalJSON() ([]byte, error) { return []byte("null"), nil }
 
 // Nullable holds either a value of T or JSON null. The zero value is null.
+// Value is ignored unless Valid is true.
 type Nullable[T any] struct {
 	Value T
 	Valid bool
