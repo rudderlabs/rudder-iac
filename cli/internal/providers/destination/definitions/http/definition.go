@@ -218,10 +218,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "http",
-		APIType:    "HTTP",
-		Version:    1,
-		Properties: properties,
+		Type:        "http",
+		DisplayName: "HTTP Webhook",
+		APIType:     "HTTP",
+		Version:     1,
+		Properties:  properties,
 		SecretKeys: []string{
 			"password",
 			"bearer_token",
@@ -230,6 +231,8 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"username",
 			"headers.from",
 		},
+		// A header value that is a JSONPath is read from each event.
+		JSONPathSecretKeys: []string{"headers.from"},
 		NewConfig: func() any {
 			return &httpConfig{}
 		},

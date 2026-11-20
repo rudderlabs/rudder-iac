@@ -67,8 +67,9 @@ func TestJSONNumbersRenderAsFloat64(t *testing.T) {
 }
 
 // Extracting a recursive custom type's references used to recurse forever on
-// every platform. Each generator only has to return here; Go's own tests pin
-// the error it returns.
+// every platform. Each generator only has to return here, not to emit code that
+// compiles: Swift's output, and TypeScript's once a key is renamed, does not.
+// Only Go rejects the cycle, and its own tests pin the error.
 func TestRecursiveCustomTypesTerminate(t *testing.T) {
 	// Should the recursion come back, crash fast instead of growing the stack
 	// to 1 GB.

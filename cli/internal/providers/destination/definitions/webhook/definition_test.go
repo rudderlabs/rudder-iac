@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/testutil"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/webhook"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -355,7 +356,7 @@ func TestWebhookHeaderSecretsAreWrappedRevealedAndMasked(t *testing.T) {
 		DisplayName:       "Webhook Production",
 		Type:              "webhook",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Config: map[string]any{
 			"webhook_url":    "https://webhooks.example.com/rudder",
 			"webhook_method": "POST",

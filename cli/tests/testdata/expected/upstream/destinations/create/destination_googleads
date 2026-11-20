@@ -11,6 +11,9 @@
     "connectionMode": {
       "web": "device"
     },
+    "useNativeSDK": {
+      "web": true
+    },
     "conversionID": "AW-123456789",
     "conversionLinker": true,
     "defaultPageConversion": "home",
