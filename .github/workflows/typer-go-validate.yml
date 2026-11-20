@@ -8,20 +8,23 @@ on:
       - "typer/generator/platforms/golang/**"
       - "typer/generator/core/**"
       - "typer/plan/**"
+      - "go.mod"
       - "Makefile"
       - ".github/workflows/typer-go-validate.yml"
+  # No branches filter, so stacked PRs that target a feature branch run it too.
   pull_request:
-    branches:
-      - main
     paths:
       - "typer/generator/platforms/golang/**"
       - "typer/generator/core/**"
       - "typer/plan/**"
+      - "go.mod"
       - "Makefile"
       - ".github/workflows/typer-go-validate.yml"
 
+# The PR number, not head_ref: two PRs can share a head branch name. Push runs
+# fall back to run_id, a group of one that is never cancelled.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 permissions:
@@ -56,6 +59,7 @@ jobs:
           changes=$(git status --porcelain -- typer/generator/platforms/golang/testdata/validator)
           if [ -n "$changes" ]; then
             echo "$changes"
+            git diff -- typer/generator/platforms/golang/testdata/validator
             echo "::error::Go golden files are out of date. Run 'make typer-go-update-testdata' locally and commit the changes."
             exit 1
           fi
@@ -66,7 +70,6 @@ jobs:
           GOTOOLCHAIN: go1.21.0
         run: make typer-go-validate
 
-      # The upgrade stays in this job; the committed pin is untouched.
       - name: run typer-go-validate against latest analytics-go v4
         env:
           GOTOOLCHAIN: go1.21.0

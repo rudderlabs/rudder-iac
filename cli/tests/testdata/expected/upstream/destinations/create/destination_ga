@@ -4,6 +4,9 @@
     "connectionMode": {
       "web": "device"
     },
+    "useNativeSDK": {
+      "web": true
+    },
     "contentGroupings": [
       {
         "from": "section",

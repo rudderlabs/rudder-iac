@@ -11,6 +11,9 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
+    "useNativeSDK": {
+      "web": false
+    },
     "siteID": "rudderCliE2eSiteId",
     "apiKey": "customerioApiKeyXXXXXXXXXXXXXX",
     "apiVersion": "v1",

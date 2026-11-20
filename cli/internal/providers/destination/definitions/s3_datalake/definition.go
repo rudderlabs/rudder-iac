@@ -120,11 +120,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "s3_datalake",
-		APIType:    "S3_DATALAKE",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"access_key_id", "access_key"},
+		Type:        "s3_datalake",
+		DisplayName: "S3 Data Lake",
+		APIType:     "S3_DATALAKE",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"access_key_id", "access_key"},
 		NewConfig: func() any {
 			return &s3DatalakeConfig{}
 		},
