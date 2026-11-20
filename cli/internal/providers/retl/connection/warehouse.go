@@ -24,7 +24,8 @@ var sqlWarehouse = WarehouseMetadata{
 
 // warehouseMetadataBySourceDefinition mirrors the options block of
 // rudder-integrations-config src/configurations/sources/<name>/db-config.json
-// at revision 9fa7b26, which is what the backend reads in
+// at revision 9fa7b26 (maxcompute: rudder-integrations-config#2913), which is
+// what the backend reads in
 // src/modules/retl/api-gateway/connection-config (constants.ts, assembler.ts,
 // connection-constraints.ts).
 var warehouseMetadataBySourceDefinition = map[string]WarehouseMetadata{
@@ -43,8 +44,8 @@ var warehouseMetadataBySourceDefinition = map[string]WarehouseMetadata{
 	// applies; it supports neither SQL models nor sync settings.
 	"clickhouse": {SyncBehaviours: []string{"upsert", "mirror", "full"}},
 
-	// maxcompute (ACT2-1534) is upsert over SQL models and tables in v1,
-	// behind the enable-maxcompute-retl-source flag; mirror and full come later.
+	// maxcompute is upsert over SQL models and tables, behind a feature flag in
+	// v1; mirror and full come later.
 	"maxcompute": {SyncBehaviours: []string{"upsert"}, SupportsSQLModel: true, SupportsSyncSettings: true},
 }
 
