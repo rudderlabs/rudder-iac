@@ -11,6 +11,7 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
@@ -109,4 +110,43 @@ func TestSync_PlanCheckerRunsBeforeImportPreview(t *testing.T) {
 
 	assert.EqualError(t, s.Sync(context.Background(), target), "refused")
 	assert.Empty(t, p.previewed, "the preview must not run for a refused plan")
+}
+
+type updatePreviewingProvider struct {
+	mockRawProvider
+	previewed []string
+}
+
+func (p *updatePreviewingProvider) PreviewImports(_ context.Context, plan *planner.Plan, _ *state.State) (map[string]differ.ResourceDiff, error) {
+	for _, op := range plan.Operations {
+		p.previewed = append(p.previewed, op.String())
+	}
+	return map[string]differ.ResourceDiff{"mock-parent:p": {URN: "mock-parent:p", Diffs: map[string]differ.PropertyDiff{
+		"Config (API keys the update removes).legacy": {Property: "Config (API keys the update removes).legacy", SourceValue: "(value)"},
+	}}}, nil
+}
+
+// An update's preview joins that update's own diff in the shown plan, and runs
+// with no importable resource to trigger it. A key the update removes is a real
+// change, so a resource that otherwise only re-applies a secret is listed as
+// updated.
+func TestSync_UpdatePreviewJoinsTheUpdatesDiff(t *testing.T) {
+	reporter := testutils.NewMockReporter()
+	initial := state.EmptyState()
+	initial.AddResource(&state.ResourceState{ID: "p", Type: "mock-parent", Input: map[string]any{"token": secret.NewUnknown()}})
+	p := &updatePreviewingProvider{mockRawProvider: mockRawProvider{initialState: initial}}
+	target := resources.NewGraph()
+	target.AddResource(resources.NewResource("p", "mock-parent", resources.ResourceData{"token": secret.New("x")}, nil))
+
+	s, err := syncer.New(p, mockWorkspace(), syncer.WithReporter(reporter), syncer.WithDryRun(true))
+	require.NoError(t, err)
+	require.NoError(t, s.Sync(context.Background(), target))
+
+	assert.Equal(t, []string{"Update mock-parent:p"}, p.previewed)
+	require.Len(t, reporter.ReportPlanCalls, 1)
+	assert.Equal(t, map[string]differ.ResourceDiff{"mock-parent:p": {URN: "mock-parent:p", Diffs: map[string]differ.PropertyDiff{
+		"token": {Property: "token", SourceValue: secret.NewUnknown(), TargetValue: secret.New("x"), SecretOnly: true},
+		"Config (API keys the update removes).legacy": {Property: "Config (API keys the update removes).legacy", SourceValue: "(value)"},
+	}}}, reporter.ReportPlanCalls[0].Diff.UpdatedResources)
+	assert.Empty(t, reporter.ReportPlanCalls[0].Diff.ImportableDiffs)
 }

@@ -855,7 +855,9 @@ func TestHandlerImpl_MapRemoteToState(t *testing.T) {
 		assert.Equal(t, "G-123", resource.Config["measurement_id"])
 		apiSecret := requireSecret(t, resource.Config, "api_secret")
 		assert.True(t, apiSecret.IsUnknown(), "remote secrets must be unknown — API never returns them")
-		assert.Equal(t, &destination.DestinationState{ID: "dst-1", TransformationID: "trans-1"}, state)
+		assert.Equal(t, &destination.DestinationState{
+			ID: "dst-1", TransformationID: "trans-1", RemoteConfig: json.RawMessage(`{"apiSecret":"secret-value","measurementId":"G-123"}`),
+		}, state)
 	})
 
 	t.Run("no transformation", func(t *testing.T) {

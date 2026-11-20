@@ -84,7 +84,9 @@ func (p *Provider) FormatForExport(
 
 // PreviewImports reports, per destination the plan imports, the config the
 // import writes over the remote one. Import pushes the spec to the destination
-// it adopts, so a value the spec does not share with the remote changes it. See
+// it adopts, so a value the spec does not share with the remote changes it. Per
+// destination the plan updates, it reports only the remote keys the update
+// removes that the plan's own comparison can't show. See
 // provider.ImportPreviewer.
 func (p *Provider) PreviewImports(ctx context.Context, plan *planner.Plan, st *state.State) (map[string]differ.ResourceDiff, error) {
 	// A resource the same plan imports keeps its remote ID, so a reference to it
@@ -98,11 +100,25 @@ func (p *Provider) PreviewImports(ctx context.Context, plan *planner.Plan, st *s
 
 	result := map[string]differ.ResourceDiff{}
 	for _, op := range plan.Operations {
-		if op.Type != planner.Import || op.Resource.Type() != DestinationResourceType {
+		if op.Resource.Type() != DestinationResourceType {
 			continue
 		}
 		data, ok := op.Resource.RawData().(*DestinationResource)
-		if !ok || op.Resource.ImportMetadata() == nil {
+		if !ok {
+			continue
+		}
+		if op.Type == planner.Update {
+			urn := op.Resource.URN()
+			diffs, err := p.handler.previewUpdate(data, st.GetResource(urn))
+			if err != nil {
+				return nil, fmt.Errorf("previewing update of %s: %w", urn, err)
+			}
+			if len(diffs) > 0 {
+				result[urn] = differ.ResourceDiff{URN: urn, Diffs: diffs}
+			}
+			continue
+		}
+		if op.Type != planner.Import || op.Resource.ImportMetadata() == nil {
 			continue
 		}
 		diffs, secretOnly, err := p.handler.previewImport(ctx, data, op.Resource.ImportMetadata().RemoteId, st, adopted)
