@@ -1673,11 +1673,11 @@ func (v TrackSomeOpenVariantEventPropertiesCaseOnLineGeo) MarshalJSON() ([]byte,
 //
 // Sold online.
 type TrackSomeOpenVariantEventPropertiesCaseOnLine1 struct {
-	Discriminator1       *PropertyDiscriminator                             // optional
-	Geo                  *TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo // optional
-	Meta                 *TrackSomeOpenVariantEventPropertiesMeta           // optional
-	URL                  PropertyURL                                        // required
-	AdditionalProperties map[string]any                                     // optional; undeclared keys only
+	Discriminator1       *PropertyDiscriminator                            // optional
+	Geo                  *TrackSomeOpenVariantEventPropertiesCaseOnLineGeo // optional
+	Meta                 *TrackSomeOpenVariantEventPropertiesMeta          // optional
+	URL                  PropertyURL                                       // required
+	AdditionalProperties map[string]any                                    // optional; undeclared keys only
 }
 
 func (TrackSomeOpenVariantEventPropertiesCaseOnLine1) isTrackSomeOpenVariantEventProperties() {}
@@ -1708,23 +1708,6 @@ func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1) ToProperties() (analytic
 
 // MarshalJSON implements json.Marshaler using the tracking plan's keys.
 func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1) MarshalJSON() ([]byte, error) {
-	return marshal(v)
-}
-
-// TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo is the object in TrackSomeOpenVariantEventPropertiesCaseOnLine1.Geo.
-type TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo struct {
-	Lat PropertyLat // required
-}
-
-func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo) toMap() map[string]any {
-	m := map[string]any{
-		"lat": v.Lat,
-	}
-	return m
-}
-
-// MarshalJSON implements json.Marshaler using the tracking plan's keys.
-func (v TrackSomeOpenVariantEventPropertiesCaseOnLine1Geo) MarshalJSON() ([]byte, error) {
 	return marshal(v)
 }
 

@@ -448,3 +448,41 @@ func TestGenerateVariantDiscriminatorValues(t *testing.T) {
 		})
 	}
 }
+
+// The structs of a case with several match values share the types the case
+// hoists, as every branch shares what the base hoists.
+func TestGenerateVariantCaseSharesHoistedTypes(t *testing.T) {
+	p := variantPlan(typed(onlyString...), discriminate([]any{"a", "b"}))
+	p.Rules[0].Variants[0].Cases[0].Schema = plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+		"geo": {
+			Property: plan.Property{Name: "geo", Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+			Schema:   &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"lat": {Property: plan.Property{Name: "lat", Types: onlyNumber}, Required: true}}},
+		},
+	}}
+	ctx, err := newContext(p, "", "ruddertyper")
+	require.NoError(t, err)
+
+	var (
+		structs []string
+		geo     []GoField
+	)
+	for _, d := range ctx.Payloads {
+		if d.Struct == nil {
+			continue
+		}
+		structs = append(structs, d.Struct.Name)
+		for _, f := range d.Struct.Fields {
+			if f.Key == "geo" {
+				geo = append(geo, f)
+			}
+		}
+	}
+	assert.Equal(t, []string{
+		"TrackSomeEventPropertiesCaseA",
+		"TrackSomeEventPropertiesCaseAGeo",
+		"TrackSomeEventPropertiesCaseB",
+		"TrackSomeEventPropertiesDefault",
+	}, structs)
+	field := GoField{Name: "Geo", Key: "geo", Type: "*TrackSomeEventPropertiesCaseAGeo", Pointer: true}
+	assert.Equal(t, []GoField{field, field}, geo)
+}

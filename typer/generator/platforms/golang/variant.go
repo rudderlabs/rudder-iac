@@ -288,8 +288,9 @@ func isVariant(p plan.Property) bool {
 
 // addVariant adds the interface name of v, then the structs implementing it,
 // each followed by the types it hoists: the structs the base schema hoists,
-// Absent, the cases in match order, and Default. lead starts the interface's
-// doc comment; a payload interface also lists ToProperties.
+// Absent, the cases in match order, and Default. A case with several match
+// values hoists its own types after its first struct. lead starts the
+// interface's doc comment; a payload interface also lists ToProperties.
 func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, lead, description string, v *variantSchema, payload bool) (*GoVariant, error) {
 	iface := &GoVariant{Name: name, Key: v.key, Payload: payload}
 	ctx.add(GoDecl{Variant: iface})
@@ -326,7 +327,8 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 		iface.DiscriminatorDoc = fmt.Sprintf("Discriminator returns the value of %s; ok is false when it is absent.", strconv.Quote(v.key))
 	}
 
-	addImplementation := func(id, suffix string, s *objectSchema) (*GoStruct, error) {
+	// shared maps a wire key of s to the type already hoisted for it.
+	addImplementation := func(id, suffix string, s *objectSchema, shared map[string]string) (*GoStruct, error) {
 		structName, err := registry.RegisterName(id, packageScope, name+suffix)
 		if err != nil {
 			return nil, fmt.Errorf("registering %s%s: %w", name, suffix, err)
@@ -336,7 +338,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 			return nil, fmt.Errorf("reserving Discriminator in %s: %w", structName, err)
 		}
 		for i := range s.fields {
-			s.fields[i].hoisted = hoisted[s.fields[i].wireKey]
+			s.fields[i].hoisted = shared[s.fields[i].wireKey]
 		}
 		st, err := addStruct(ctx, registry, propertyTypes, structName, "", s, payload)
 		if err != nil {
@@ -348,7 +350,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	}
 
 	if v.absent != nil {
-		st, err := addImplementation("absent:"+name, "Absent", v.absent)
+		st, err := addImplementation("absent:"+name, "Absent", v.absent, hoisted)
 		if err != nil {
 			return nil, err
 		}
@@ -357,10 +359,27 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 		st.Returns = "value, false"
 	}
 
+	// The structs of one case share its schema, so they also share what the
+	// first of them hoists.
+	caseHoisted := map[*plan.VariantCase]map[string]string{}
 	for _, c := range v.cases {
-		st, err := addImplementation("case:"+name+":"+c.text, "Case"+c.name, c.schema)
+		shared, seen := caseHoisted[c.vc]
+		if !seen {
+			shared = hoisted
+		}
+		st, err := addImplementation("case:"+name+":"+c.text, "Case"+c.name, c.schema, shared)
 		if err != nil {
 			return nil, err
+		}
+		if !seen {
+			shared = maps.Clone(hoisted)
+			for i, f := range c.schema.fields {
+				if f.nested != nil && f.hoisted == "" {
+					// An optional field's type points to the hoisted one.
+					shared[f.wireKey] = strings.TrimPrefix(st.Fields[i].Type, "*")
+				}
+			}
+			caseHoisted[c.vc] = shared
 		}
 		doc := fmt.Sprintf("%s is the case where %s is %s.", st.Name, v.key, c.text)
 		if c.vc.DisplayName != "" {
@@ -389,7 +408,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	}
 
 	if v.dflt != nil {
-		st, err := addImplementation("default:"+name, "Default", v.dflt)
+		st, err := addImplementation("default:"+name, "Default", v.dflt, hoisted)
 		if err != nil {
 			return nil, err
 		}

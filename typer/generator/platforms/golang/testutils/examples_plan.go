@@ -103,8 +103,8 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 		// An open base with an open case and an open default schema. Both
 		// match values name the case OnLine, so the second takes a suffix, and
 		// a property named discriminator takes one from the method. Every
-		// branch shares the struct the base hoists for meta, while each case
-		// struct hoists its own for geo.
+		// branch shares the struct the base hoists for meta, and both structs
+		// of the case share the one it hoists for geo.
 		openVariantEvent = track("Some Open Variant Event", "", true, map[string]plan.PropertySchema{
 			"kind":          required(property("kind", "", plan.PrimitiveTypeString)),
 			"discriminator": optional(property("discriminator", "", plan.PrimitiveTypeString)),
