@@ -1,6 +1,11 @@
 package golang_test
 
 import (
+	"go/ast"
+	"go/importer"
+	"go/parser"
+	"go/token"
+	"go/types"
 	"os"
 	"strings"
 	"testing"
@@ -376,4 +381,33 @@ func TestGenerateValueHelpers(t *testing.T) {
 			})
 		})
 	}
+}
+
+// Every union is its own type, though each holds a value any. Converting one
+// union to another would build a union holding a value that is not a member,
+// so the conversion must not compile.
+func TestGenerateUnionsAreNotConvertible(t *testing.T) {
+	files, err := (&golang.Generator{}).Generate(trackPlan(
+		plan.Property{Name: "a", Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeArray}},
+		plan.Property{Name: "b", Types: []plan.PropertyType{plan.PrimitiveTypeInteger, plan.PrimitiveTypeBoolean}},
+	), core.GenerateOptions{}, nil)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+
+	var (
+		fset = token.NewFileSet()
+		errs []string
+	)
+	file, err := parser.ParseFile(fset, "ruddertyper.go", files[0].Content+"\nvar _ = PropertyA(NewPropertyBBoolean(true))\n", 0)
+	require.NoError(t, err)
+	conf := types.Config{
+		// The source importer also checks the calls into analytics-go, so the
+		// conversion is the only error.
+		Importer: importer.ForCompiler(fset, "source", nil),
+		Error:    func(err error) { errs = append(errs, err.Error()) },
+	}
+	_, _ = conf.Check("ruddertyper", fset, []*ast.File{file}, nil)
+
+	require.Len(t, errs, 1)
+	assert.Contains(t, errs[0], "cannot convert NewPropertyBBoolean(true)")
 }

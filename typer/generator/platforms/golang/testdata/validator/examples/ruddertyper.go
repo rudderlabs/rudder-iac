@@ -194,7 +194,12 @@ type PropertyProductName = string
 // PropertySomeArrayOfMultipleTypesItem is one item of PropertySomeArrayOfMultipleTypes: a string, integer, number or boolean.
 // Build it with one of the NewPropertySomeArrayOfMultipleTypesItem* functions.
 // Null is not a member, so the zero value cannot be sent.
-type PropertySomeArrayOfMultipleTypesItem struct{ value any }
+type PropertySomeArrayOfMultipleTypesItem struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertySomeArrayOfMultipleTypesItem
+	value any
+}
 
 // NewPropertySomeArrayOfMultipleTypesItemString returns a string value.
 func NewPropertySomeArrayOfMultipleTypesItemString(v string) PropertySomeArrayOfMultipleTypesItem {
@@ -249,7 +254,12 @@ type PropertySomeInteger = int64
 // PropertySomeMixedArrayOrNullItem is one item of PropertySomeMixedArrayOrNull: a string or integer.
 // Build it with one of the NewPropertySomeMixedArrayOrNullItem* functions.
 // Null is not a member, so the zero value cannot be sent.
-type PropertySomeMixedArrayOrNullItem struct{ value any }
+type PropertySomeMixedArrayOrNullItem struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertySomeMixedArrayOrNullItem
+	value any
+}
 
 // NewPropertySomeMixedArrayOrNullItemString returns a string value.
 func NewPropertySomeMixedArrayOrNullItemString(v string) PropertySomeMixedArrayOrNullItem {
@@ -281,7 +291,12 @@ type PropertySomeMixedArrayOrNull = Nullable[[]PropertySomeMixedArrayOrNullItem]
 // PropertySomeMultiType represents the property "someMultiType": a string, integer, number, boolean, object, array or null.
 // Build it with one of the NewPropertySomeMultiType* functions.
 // Null is a member, so the zero value is null.
-type PropertySomeMultiType struct{ value any }
+type PropertySomeMultiType struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertySomeMultiType
+	value any
+}
 
 // NewPropertySomeMultiTypeString returns a string value.
 func NewPropertySomeMultiTypeString(v string) PropertySomeMultiType {
@@ -338,7 +353,12 @@ type PropertyString = string
 // PropertyStringOrMixedArrayItem is one item of PropertyStringOrMixedArray: a string or integer.
 // Build it with one of the NewPropertyStringOrMixedArrayItem* functions.
 // Null is not a member, so the zero value cannot be sent.
-type PropertyStringOrMixedArrayItem struct{ value any }
+type PropertyStringOrMixedArrayItem struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertyStringOrMixedArrayItem
+	value any
+}
 
 // NewPropertyStringOrMixedArrayItemString returns a string value.
 func NewPropertyStringOrMixedArrayItemString(v string) PropertyStringOrMixedArrayItem {
@@ -367,7 +387,12 @@ func (u PropertyStringOrMixedArrayItem) MarshalJSON() ([]byte, error) { return m
 // PropertyStringOrMixedArray represents the property "stringOrMixedArray": a string or array.
 // Build it with one of the NewPropertyStringOrMixedArray* functions.
 // Null is not a member, so the zero value cannot be sent.
-type PropertyStringOrMixedArray struct{ value any }
+type PropertyStringOrMixedArray struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertyStringOrMixedArray
+	value any
+}
 
 // NewPropertyStringOrMixedArrayString returns a string value.
 func NewPropertyStringOrMixedArrayString(v string) PropertyStringOrMixedArray {
@@ -396,7 +421,12 @@ func (u PropertyStringOrMixedArray) MarshalJSON() ([]byte, error) { return marsh
 // PropertyStringOrStrings represents the property "stringOrStrings": a string or array.
 // Build it with one of the NewPropertyStringOrStrings* functions.
 // Null is not a member, so the zero value cannot be sent.
-type PropertyStringOrStrings struct{ value any }
+type PropertyStringOrStrings struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertyStringOrStrings
+	value any
+}
 
 // NewPropertyStringOrStringsString returns a string value.
 func NewPropertyStringOrStringsString(v string) PropertyStringOrStrings {

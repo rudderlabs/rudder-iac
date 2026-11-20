@@ -164,7 +164,12 @@ type PropertyMixedUnicode = string
 // PropertyMultiTypeArrayItem is one item of PropertyMultiTypeArray: a string or integer.
 // Build it with one of the NewPropertyMultiTypeArrayItem* functions.
 // Null is not a member, so the zero value cannot be sent.
-type PropertyMultiTypeArrayItem struct{ value any }
+type PropertyMultiTypeArrayItem struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertyMultiTypeArrayItem
+	value any
+}
 
 // NewPropertyMultiTypeArrayItemString returns a string value.
 func NewPropertyMultiTypeArrayItemString(v string) PropertyMultiTypeArrayItem {
@@ -200,7 +205,12 @@ type PropertyMultiTypeArray = []PropertyMultiTypeArrayItem
 // Null is not a member, so the zero value cannot be sent.
 //
 // A field that can be string, integer, or boolean
-type PropertyMultiTypeField struct{ value any }
+type PropertyMultiTypeField struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertyMultiTypeField
+	value any
+}
 
 // NewPropertyMultiTypeFieldString returns a string value.
 func NewPropertyMultiTypeFieldString(v string) PropertyMultiTypeField {
@@ -236,7 +246,12 @@ func (u PropertyMultiTypeField) MarshalJSON() ([]byte, error) { return marshal(u
 // Null is a member, so the zero value is null.
 //
 // Property that can be string, integer, or null
-type PropertyMultiTypeWithNull struct{ value any }
+type PropertyMultiTypeWithNull struct {
+	// A field type unique to this union, so another union cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertyMultiTypeWithNull
+	value any
+}
 
 // NewPropertyMultiTypeWithNullString returns a string value.
 func NewPropertyMultiTypeWithNullString(v string) PropertyMultiTypeWithNull {
