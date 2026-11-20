@@ -17,6 +17,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -347,5 +349,38 @@ func TestTableSupportEnabled(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, &retlClient.PreviewSubmitRequest{AccountID: "acc-1", SQL: `select * from "public"."users" limit 5`, Limit: 5}, got)
+	})
+
+	// The table handler's own tests call its CheckPlan directly. This one goes
+	// through Provider.CheckPlan, so a provider that stopped forwarding to the
+	// handler, or looked it up under the wrong type, would fail here. The plan is
+	// built as the syncer builds it, from remote state and the loaded spec.
+	t.Run("refuses a table change on a connected source through Provider.CheckPlan", func(t *testing.T) {
+		t.Parallel()
+		client, _ := newWorkspaceClient()
+		client.listConnectionsFunc = func(_ context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
+			if req.SourceID != "table-managed" {
+				return &retlClient.RETLConnectionsPage{}, nil
+			}
+			return &retlClient.RETLConnectionsPage{Data: []retlClient.RETLConnection{{ID: "conn-1"}}}, nil
+		}
+		p := retl.New(client, retl.WithTableSupport())
+		desired := tableSpec()
+		desired.Spec["table"] = "customers"
+		require.NoError(t, p.LoadSpec("users.yaml", desired))
+		target, err := p.ResourceGraph()
+		require.NoError(t, err)
+		remote, err := p.LoadResourcesFromRemote(context.Background())
+		require.NoError(t, err)
+		st, err := p.MapRemoteToState(remote)
+		require.NoError(t, err)
+		plan := planner.New("ws-1").Plan(syncer.StateToGraph(st), target)
+		require.Contains(t, plan.Diff.UpdatedResources, "retl-source-table:users-table")
+
+		err = p.CheckPlan(context.Background(), plan, st)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `table "users" -> "customers"`)
+		assert.Contains(t, err.Error(), "conn-1")
 	})
 }

@@ -68,7 +68,8 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 			track("$eventWithNameCamelCase$!", "", false, map[string]plan.PropertySchema{
 				"someString": optional(property("someString", "some string property", plan.PrimitiveTypeString)),
 			}),
-			// Property names that are Go keywords or predeclared identifiers.
+			// One property named after each primitive type, plus type: string
+			// and any are predeclared Go identifiers, and type is a keyword.
 			track("Every Primitive Type", "", false, map[string]plan.PropertySchema{
 				"string":  required(property("string", "", plan.PrimitiveTypeString)),
 				"integer": optional(property("integer", "", plan.PrimitiveTypeInteger)),
@@ -99,6 +100,8 @@ func GetExamplesTrackingPlan() *plan.TrackingPlan {
 				"someArrayOrNull":          optional(items(property("someArrayOrNull", "", plan.PrimitiveTypeArray, plan.PrimitiveTypeNull), plan.PrimitiveTypeString)),
 				"someObjectOrNull":         required(property("someObjectOrNull", "", plan.PrimitiveTypeObject, plan.PrimitiveTypeNull)),
 				"someArrayOfMultipleTypes": optional(items(property("someArrayOfMultipleTypes", "", plan.PrimitiveTypeArray), plan.PrimitiveTypeString, plan.PrimitiveTypeInteger, plan.PrimitiveTypeNumber, plan.PrimitiveTypeBoolean)),
+				"someMixedArrayOrNull":     optional(items(property("someMixedArrayOrNull", "", plan.PrimitiveTypeArray, plan.PrimitiveTypeNull), plan.PrimitiveTypeString, plan.PrimitiveTypeInteger)),
+				"stringOrMixedArray":       optional(items(property("stringOrMixedArray", "", plan.PrimitiveTypeArray, plan.PrimitiveTypeString), plan.PrimitiveTypeString, plan.PrimitiveTypeInteger)),
 				"matrix":                   required(items(property("matrix", "", plan.PrimitiveTypeArray), plan.PrimitiveTypeArray)),
 			}),
 			// Enum shapes the reference plan lacks. statusActive takes the type

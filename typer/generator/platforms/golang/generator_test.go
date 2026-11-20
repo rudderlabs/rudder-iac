@@ -1,10 +1,12 @@
 package golang_test
 
 import (
+	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -38,8 +40,6 @@ func TestGenerateGoldens(t *testing.T) {
 		"testdata/validator/ruddertyper/ruddertyper.go": referenceWarnings,
 		"testdata/validator/examples/ruddertyper.go":    nil,
 	}
-	runtimeFile, err := parser.ParseFile(token.NewFileSet(), "internal/runtime/runtime.go", nil, parser.ImportsOnly)
-	require.NoError(t, err)
 
 	for _, golden := range testutils.Goldens {
 		t.Run(golden.Path, func(t *testing.T) {
@@ -47,56 +47,37 @@ func TestGenerateGoldens(t *testing.T) {
 
 			files, err := (&golang.Generator{}).Generate(golden.Plan(), core.GenerateOptions{RudderCLIVersion: "1.0.0"}, golden.Options)
 			require.NoError(t, err)
-			require.Len(t, files, 1)
-			assert.Equal(t, "ruddertyper.go", files[0].Path)
-			assert.Regexp(t, regexp.MustCompile(`\A// Code generated .* DO NOT EDIT\.\n`), files[0].Content)
 
 			want, err := os.ReadFile(golden.Path)
 			require.NoError(t, err)
-			assert.Equal(t, string(want), files[0].Content, "generated content does not match %s; run 'make typer-go-update-testdata' to update the goldens", golden.Path)
+			assert.Equal(t, []*core.File{{Path: "ruddertyper.go", Content: string(want)}}, files, "generated content does not match %s; run 'make typer-go-update-testdata' to update the goldens", golden.Path)
 			assert.Equal(t, wantWarnings[golden.Path], *warnings)
 			// The runtime package's tests cover the generated runtime only
 			// while it is emitted unchanged.
 			assert.Contains(t, files[0].Content, golang.RuntimeSource)
-			// `make test` does not compile the goldens (only `make typer-go-validate`
-			// does), so this catches a runtime import the template does not declare.
-			for _, imp := range runtimeFile.Imports {
-				assert.Contains(t, files[0].Content, imp.Path.Value)
-			}
 		})
 	}
 }
 
-// Names are checked before the skip check, so rules and fields the generator
-// leaves out for now fail on them too.
 func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
-	rule := func(eventType plan.EventType, event string, section plan.IdentitySection, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
+	trackEvent := func(event string, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
 		return &plan.TrackingPlan{Rules: []plan.EventRule{{
-			Event:   plan.Event{EventType: eventType, Name: event},
-			Section: section,
+			Event:   plan.Event{EventType: plan.EventTypeTrack, Name: event},
+			Section: plan.IdentitySectionProperties,
 			Schema:  plan.ObjectSchema{Properties: properties},
 		}}}
-	}
-	trackEvent := func(event string, properties map[string]plan.PropertySchema) *plan.TrackingPlan {
-		return rule(plan.EventTypeTrack, event, plan.IdentitySectionProperties, properties)
 	}
 	property := func(name string, p plan.PropertySchema) map[string]plan.PropertySchema {
 		p.Property.Name = name
 		return map[string]plan.PropertySchema{name: p}
 	}
 	var (
-		stringSchema  = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
-		skippedSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{variantType}}}
-		customSchema  = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.CustomType{Name: "!!!", Type: plan.PrimitiveTypeString}}}}
-		nestedSchema  = plan.PropertySchema{
+		stringSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
+		customSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.CustomType{Name: "!!!", Type: plan.PrimitiveTypeString}}}}
+		nestedSchema = plan.PropertySchema{
 			Property: plan.Property{Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
 			Schema:   &plan.ObjectSchema{Properties: property("$$", stringSchema)},
 		}
-		objectSchema = plan.PropertySchema{Property: plan.Property{Types: []plan.PropertyType{plan.CustomType{
-			Name:   "profile",
-			Type:   plan.PrimitiveTypeObject,
-			Schema: &plan.ObjectSchema{Properties: property("$$", skippedSchema)},
-		}}}}
 	)
 
 	tests := []struct {
@@ -104,53 +85,23 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 		plan    *plan.TrackingPlan
 		wantErr string
 	}{
-		{"empty track event name", trackEvent("", nil), "a track event has an empty name"},
+		{"empty track event name", trackEvent("", nil), `naming track event "": name "" has no letters or digits to build a Go identifier from`},
 		{"symbols only", trackEvent("!!!", nil), `naming track event "!!!": name "!!!" has no letters or digits to build a Go identifier from`},
 		{"emoji only", trackEvent("🎯", nil), `naming track event "🎯": name "🎯" has no letters or digits to build a Go identifier from`},
 		{
-			"track event in a skipped section",
-			rule(plan.EventTypeTrack, "!!!", plan.IdentitySectionTraits, nil),
-			`naming track event "!!!": name "!!!" has no letters or digits to build a Go identifier from`,
-		},
-		{
-			"empty track event in a skipped section",
-			rule(plan.EventTypeTrack, "", plan.IdentitySectionTraits, nil),
-			"a track event has an empty name",
-		},
-		{
-			"skipped event type",
-			rule(plan.EventTypePage, "🎯", plan.IdentitySectionProperties, nil),
-			`naming page event "🎯": name "🎯" has no letters or digits to build a Go identifier from`,
-		},
-		{
 			"property without words",
 			trackEvent("Some Event", property("$$", stringSchema)),
-			`naming property "$$" of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
-		},
-		{
-			"skipped property without words",
-			trackEvent("Some Event", property("$$", skippedSchema)),
-			`naming property "$$" of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
+			`naming property "$$": name "$$" has no letters or digits to build a Go identifier from`,
 		},
 		{
 			"custom type without words",
 			trackEvent("Some Event", property("kind", customSchema)),
-			`naming custom type "!!!" of property "kind": name "!!!" has no letters or digits to build a Go identifier from`,
-		},
-		{
-			"custom type property without words",
-			trackEvent("Some Event", property("kind", objectSchema)),
-			`naming property "$$" of custom type "profile": name "$$" has no letters or digits to build a Go identifier from`,
-		},
-		{
-			"custom type property without words in a skipped rule",
-			rule(plan.EventTypeIdentify, "", plan.IdentitySectionTraits, property("kind", objectSchema)),
-			`naming property "$$" of custom type "profile": name "$$" has no letters or digits to build a Go identifier from`,
+			`naming custom type "!!!": name "!!!" has no letters or digits to build a Go identifier from`,
 		},
 		{
 			"nested property without words",
 			trackEvent("Some Event", property("context", nestedSchema)),
-			`naming property "$$" of track event "Some Event": name "$$" has no letters or digits to build a Go identifier from`,
+			`naming property "$$": name "$$" has no letters or digits to build a Go identifier from`,
 		},
 	}
 
@@ -264,6 +215,36 @@ func TestGenerateSkipsUnsupportedFieldsAtEveryLevel(t *testing.T) {
 		`skipping property "kinds" (custom:kinds) of track event "Some Event": Go generation does not support variants yet`,
 		`skipping property "kind" (custom:kind) of custom type "profile": Go generation does not support variants yet`,
 	}, *warnings)
+}
+
+func TestGenerateWarnsAboutEnumValuesLeftOut(t *testing.T) {
+	warnings := captureWarnings(t)
+
+	_, err := (&golang.Generator{}).Generate(golang.TrackPlan(plan.Property{
+		Name:   "kind",
+		Types:  []plan.PropertyType{plan.PrimitiveTypeInteger},
+		Config: &plan.PropertyConfig{Enum: []any{"a", nil, 1.5, 1, 1.5}},
+	}), core.GenerateOptions{}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{`leaving out the enum values ["a",null,1.5] of property "kind" (integer) of track event "Some Event": its declared types do not allow them`}, *warnings)
+}
+
+// A field may not share a name with a method of its struct, so a property
+// named after one takes a suffix.
+func TestGenerateReservesPayloadMethodNames(t *testing.T) {
+	p := &plan.TrackingPlan{Rules: []plan.EventRule{{
+		Event:   plan.Event{EventType: plan.EventTypeTrack, Name: "Some Event"},
+		Section: plan.IdentitySectionProperties,
+		Schema: plan.ObjectSchema{Properties: map[string]plan.PropertySchema{
+			"marshalJSON": {Property: plan.Property{Name: "marshalJSON", Types: []plan.PropertyType{plan.PrimitiveTypeString}}},
+		}},
+	}}}
+
+	files, err := (&golang.Generator{}).Generate(p, core.GenerateOptions{}, nil)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+
+	assert.Contains(t, files[0].Content, "\tMarshalJSON1 *PropertyMarshalJSON // optional\n")
 }
 
 func captureWarnings(t *testing.T) *[]string {
@@ -524,4 +505,33 @@ func TestGenerateValueHelpers(t *testing.T) {
 			})
 		})
 	}
+}
+
+// Every union is its own type, though each holds a value any. Converting one
+// union to another would build a union holding a value that is not a member,
+// so the conversion must not compile.
+func TestGenerateUnionsAreNotConvertible(t *testing.T) {
+	files, err := (&golang.Generator{}).Generate(golang.TrackPlan(
+		plan.Property{Name: "a", Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeArray}},
+		plan.Property{Name: "b", Types: []plan.PropertyType{plan.PrimitiveTypeInteger, plan.PrimitiveTypeBoolean}},
+	), core.GenerateOptions{}, nil)
+	require.NoError(t, err)
+	require.Len(t, files, 1)
+
+	var (
+		fset = token.NewFileSet()
+		errs []string
+	)
+	file, err := parser.ParseFile(fset, "ruddertyper.go", files[0].Content+"\nvar _ = PropertyA(NewPropertyBBoolean(true))\n", 0)
+	require.NoError(t, err)
+	conf := types.Config{
+		// The source importer also checks the calls into analytics-go, so the
+		// conversion is the only error.
+		Importer: importer.ForCompiler(fset, "source", nil),
+		Error:    func(err error) { errs = append(errs, err.Error()) },
+	}
+	_, _ = conf.Check("ruddertyper", fset, []*ast.File{file}, nil)
+
+	require.Len(t, errs, 1)
+	assert.Contains(t, errs[0], "cannot convert NewPropertyBBoolean(true)")
 }

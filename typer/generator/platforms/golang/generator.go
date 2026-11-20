@@ -2,7 +2,6 @@ package golang
 
 import (
 	"cmp"
-	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -16,6 +15,16 @@ import (
 // Generator generates a Go package for the RudderStack Go SDK,
 // github.com/rudderlabs/analytics-go/v4.
 type Generator struct{}
+
+// Registry scopes: Go has one namespace per package, methods live on
+// RudderTyperAnalytics, and each struct's fields share a namespace with its
+// methods. Every name derived from the plan starts with a role prefix
+// (Property, Track, ...), so none can equal a runtime name such as New or
+// Identity, and neither scope needs reservations.
+const (
+	packageScope = "package"
+	methodScope  = "methods"
+)
 
 // Generate produces one Go file from a tracking plan.
 func (g *Generator) Generate(p *plan.TrackingPlan, options core.GenerateOptions, platformOptions any) ([]*core.File, error) {
@@ -116,16 +125,6 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 	}
 
 	registry := core.NewNameRegistry(core.DefaultCollisionHandler)
-	for _, name := range runtimeNames {
-		if _, err := registry.RegisterName("runtime:"+name, packageScope, name); err != nil {
-			return nil, fmt.Errorf("reserving %s: %w", name, err)
-		}
-	}
-	// No event may take Alias, so a future alias rule needs no renames.
-	if _, err := registry.RegisterName("reserved:Alias", methodScope, "Alias"); err != nil {
-		return nil, fmt.Errorf("reserving Alias: %w", err)
-	}
-
 	rules, customTypes, err := trackRules(p)
 	if err != nil {
 		return nil, err
@@ -201,14 +200,14 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, []*customType, error) {
 
 	var (
 		res    = &resolver{customTypes: map[string]*customType{}}
-		checks = &planCheck{visited: map[string]bool{}}
+		cycles = &cycleCheck{visited: map[string]bool{}}
 		rules  []trackRule
 	)
 	for _, r := range all {
-		// Names and cycles are checked before the skip check, so a rule or
-		// field left out for now still fails generation on a name no Go
-		// identifier can carry or on a custom type that refers to itself.
-		if err := checks.rule(r.rule); err != nil {
+		// The resolver relies on the cycle check to end. It runs before the
+		// skip check, so a rule left out for now still fails generation on a
+		// custom type that refers to itself.
+		if err := cycles.rule(r.rule); err != nil {
 			return nil, nil, err
 		}
 
@@ -276,6 +275,9 @@ func (res *resolver) schema(s *plan.ObjectSchema, where, path string) (*objectSc
 		if f.enum, err = resolveEnum(p); err != nil {
 			return nil, fmt.Errorf("mapping property %q of %s: %w", name, where, err)
 		}
+		if f.enum != nil && len(f.enum.dropped) > 0 {
+			core.Warn(fmt.Sprintf("leaving out the enum values %s of property %q (%s) of %s: its declared types do not allow them", jsonText(f.enum.dropped), name, declaredTypes(p), where))
+		}
 		// The enum beats the declared types, object included.
 		if f.enum == nil && declares(p.Types, plan.PrimitiveTypeObject) && isStruct(ps.Schema) {
 			if f.nested, err = res.schema(ps.Schema, where, name+"."); err != nil {
@@ -333,76 +335,49 @@ func (res *resolver) customType(ct *plan.CustomType) (*customType, error) {
 	return c, nil
 }
 
-// planCheck rejects a supplied event, property or custom-type name that
-// produces no words, and a custom type that refers to itself, reached through
-// any rule, variant, nested schema or array item. It fails with the first
-// problem in rule-key and wire-key order. Every rule shares one check, so each
+// cycleCheck rejects a custom type that refers to itself, reached through
+// any rule, variant, nested schema or array item, and fails with the first
+// cycle in rule-key and wire-key order. Every rule shares one check, so each
 // custom type is visited once.
-type planCheck struct {
+type cycleCheck struct {
 	// path holds the custom types being visited, outermost first.
 	path    []string
 	visited map[string]bool
 }
 
-// rule checks rule. Only a track event must have a name; the other event types
-// are named by their type.
-func (c *planCheck) rule(rule *plan.EventRule) error {
-	event := rule.Event
-	if event.EventType == plan.EventTypeTrack && event.Name == "" {
-		return errors.New("a track event has an empty name")
-	}
-	if event.Name != "" {
-		if _, err := pascalCase(event.Name); err != nil {
-			return fmt.Errorf("naming %s event %q: %w", event.EventType, event.Name, err)
-		}
-	}
-	where := fmt.Sprintf("%s event %q", event.EventType, event.Name)
-	if err := c.schema(&rule.Schema, where); err != nil {
+func (c *cycleCheck) rule(rule *plan.EventRule) error {
+	if err := c.schema(&rule.Schema); err != nil {
 		return err
 	}
-	return c.variants(rule.Variants, where)
+	return c.variants(rule.Variants)
 }
 
-// schema checks s, which belongs to where, its nested object schemas and the
-// custom types they reference.
-func (c *planCheck) schema(s *plan.ObjectSchema, where string) error {
+func (c *cycleCheck) schema(s *plan.ObjectSchema) error {
 	if s == nil {
 		return nil
 	}
 	for _, wireKey := range slices.Sorted(maps.Keys(s.Properties)) {
 		ps := s.Properties[wireKey]
-		for _, name := range []string{wireKey, ps.Property.Name} {
-			if _, err := pascalCase(name); err != nil {
-				return fmt.Errorf("naming property %q of %s: %w", name, where, err)
-			}
-		}
 		for _, t := range slices.Concat(ps.Property.Types, ps.Property.ItemTypes) {
-			ct := plan.AsCustomType(t)
-			if ct == nil {
-				continue
-			}
-			if _, err := pascalCase(ct.Name); err != nil {
-				return fmt.Errorf("naming custom type %q of property %q: %w", ct.Name, wireKey, err)
-			}
-			if err := c.customType(ct); err != nil {
+			if err := c.customType(plan.AsCustomType(t)); err != nil {
 				return err
 			}
 		}
-		if err := c.schema(ps.Schema, where); err != nil {
+		if err := c.schema(ps.Schema); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *planCheck) variants(variants []plan.Variant, where string) error {
+func (c *cycleCheck) variants(variants []plan.Variant) error {
 	for _, v := range variants {
 		for i := range v.Cases {
-			if err := c.schema(&v.Cases[i].Schema, where); err != nil {
+			if err := c.schema(&v.Cases[i].Schema); err != nil {
 				return err
 			}
 		}
-		if err := c.schema(v.DefaultSchema, where); err != nil {
+		if err := c.schema(v.DefaultSchema); err != nil {
 			return err
 		}
 	}
@@ -410,7 +385,7 @@ func (c *planCheck) variants(variants []plan.Variant, where string) error {
 }
 
 // customType checks ct, when it is set, and the custom types it refers to.
-func (c *planCheck) customType(ct *plan.CustomType) error {
+func (c *cycleCheck) customType(ct *plan.CustomType) error {
 	if ct == nil || c.visited[ct.Name] {
 		return nil
 	}
@@ -418,11 +393,10 @@ func (c *planCheck) customType(ct *plan.CustomType) error {
 		return fmt.Errorf("custom type %q refers to itself: %s → %s", ct.Name, strings.Join(c.path[i:], " → "), ct.Name)
 	}
 	c.path = append(c.path, ct.Name)
-	where := fmt.Sprintf("custom type %q", ct.Name)
-	if err := c.schema(ct.Schema, where); err != nil {
+	if err := c.schema(ct.Schema); err != nil {
 		return err
 	}
-	if err := c.variants(ct.Variants, where); err != nil {
+	if err := c.variants(ct.Variants); err != nil {
 		return err
 	}
 	if err := c.customType(plan.AsCustomType(ct.ItemType)); err != nil {

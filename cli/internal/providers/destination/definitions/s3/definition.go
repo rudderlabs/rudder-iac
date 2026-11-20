@@ -48,8 +48,8 @@ type s3Config struct {
 	// IAM role ARN is required when role-based auth is on; forbidden when off.
 	IAMRoleARN string `mapstructure:"iam_role_arn" validate:"required_if=RoleBasedAuth true,omitempty,dynamic_or_pattern=single_line_100"`
 	// Access keys are required for key-based auth and forbidden when role-based
-	// auth is on. Import/export never invents these secrets — users must supply
-	// them (e.g. via {{ .VAR }} + a var file) when role_based_auth is false.
+	// auth is on. The API never returns them, so import writes {{ .VAR }}
+	// references for them only when role_based_auth is false.
 	AccessKeyID       string                   `mapstructure:"access_key_id" validate:"required_if=RoleBasedAuth false,omitempty,dynamic_or_pattern=single_line_100"`
 	AccessKey         string                   `mapstructure:"access_key" validate:"required_if=RoleBasedAuth false,omitempty,dynamic_or_pattern=single_line_100"`
 	EnableSSE         *bool                    `mapstructure:"enable_sse" default:"false"`
@@ -72,11 +72,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "s3",
-		APIType:    "S3",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"access_key_id", "access_key"},
+		Type:        "s3",
+		DisplayName: "Amazon S3",
+		APIType:     "S3",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"access_key_id", "access_key"},
 		NewConfig: func() any {
 			return &s3Config{}
 		},

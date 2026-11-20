@@ -2,10 +2,42 @@ package common
 
 import (
 	"fmt"
-	"regexp"
+	"slices"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 )
 
-var consentValuePattern = regexp.MustCompile(`^(\{\{.*\|\|.*\}\}|env\..+|.{0,100})$`)
+const (
+	// ConsentProviderCustom is the provider whose entries need a
+	// resolution_strategy.
+	ConsentProviderCustom = "custom"
+	// ConsentValuePattern names the registered pattern each value in an
+	// entry's consents must match: a `{{ path || fallback }}` template, an
+	// `env.` value, or at most 100 characters.
+	ConsentValuePattern = "consent_value"
+	consentValueMessage = "must be at most 100 characters"
+)
+
+var (
+	consentProviders            = []string{ConsentProviderCustom, "iubenda", "ketch", "oneTrust"}
+	consentResolutionStrategies = []string{"and", "or"}
+)
+
+func init() {
+	funcs.NewPattern(ConsentValuePattern, `^(\{\{.*\|\|.*\}\}|env\..+|.{0,100})$`, consentValueMessage)
+}
+
+// ConsentProviders returns a copy of the provider values ValidateConsentEntries
+// accepts, for Describe to document.
+func ConsentProviders() []string {
+	return slices.Clone(consentProviders)
+}
+
+// ConsentResolutionStrategies returns the values resolution_strategy accepts
+// when the provider is custom. Other providers' entries leave it unchecked.
+func ConsentResolutionStrategies() []string {
+	return slices.Clone(consentResolutionStrategies)
+}
 
 // ConsentManagement stores consent entries by local source type.
 type ConsentManagement map[string][]ConsentEntry
@@ -54,10 +86,10 @@ func validateConsentEntry(index int, entry ConsentEntry) []ConsentValidationErro
 	if !isValidConsentProvider(entry.Provider) {
 		return []ConsentValidationError{{
 			Path:    fmt.Sprintf("/%d/provider", index),
-			Message: "'provider' must be one of [custom iubenda ketch oneTrust]",
+			Message: fmt.Sprintf("'provider' must be one of %v", consentProviders),
 		}}
 	}
-	if entry.Provider != "custom" {
+	if entry.Provider != ConsentProviderCustom {
 		return nil
 	}
 	if entry.ResolutionStrategy == "" {
@@ -66,10 +98,10 @@ func validateConsentEntry(index int, entry ConsentEntry) []ConsentValidationErro
 			Message: "'resolution_strategy' is required when 'provider' is custom",
 		}}
 	}
-	if entry.ResolutionStrategy != "and" && entry.ResolutionStrategy != "or" {
+	if !slices.Contains(consentResolutionStrategies, entry.ResolutionStrategy) {
 		return []ConsentValidationError{{
 			Path:    fmt.Sprintf("/%d/resolution_strategy", index),
-			Message: "'resolution_strategy' must be one of [and or]",
+			Message: fmt.Sprintf("'resolution_strategy' must be one of %v", consentResolutionStrategies),
 		}}
 	}
 	return nil
@@ -78,22 +110,17 @@ func validateConsentEntry(index int, entry ConsentEntry) []ConsentValidationErro
 func validateConsentValues(entryIndex int, consents []string) []ConsentValidationError {
 	var errors []ConsentValidationError
 	for consentIndex, consent := range consents {
-		if consentValuePattern.MatchString(consent) {
+		if funcs.MatchPattern(ConsentValuePattern, consent) {
 			continue
 		}
 		errors = append(errors, ConsentValidationError{
 			Path:    fmt.Sprintf("/%d/consents/%d", entryIndex, consentIndex),
-			Message: "'consent' must be at most 100 characters",
+			Message: "'consent' " + consentValueMessage,
 		})
 	}
 	return errors
 }
 
 func isValidConsentProvider(provider string) bool {
-	switch provider {
-	case "custom", "iubenda", "ketch", "oneTrust":
-		return true
-	default:
-		return false
-	}
+	return slices.Contains(consentProviders, provider)
 }
