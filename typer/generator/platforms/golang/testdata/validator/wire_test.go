@@ -159,9 +159,12 @@ func TestTrackWire(t *testing.T) {
 		props analytics.Properties // when set, the Config.Callback message must hold exactly these properties
 	}{
 		{
+			// TestTrackSmoke's call, so it keeps that test's identity with both IDs.
 			name: "a set optional field sends its value, even false",
-			call: func() error { return ex.TrackSomeTrackEvent(id, someTrack) },
-			want: `{"type": "track", "channel": "server", "event": "Some Track Event", "userId": "user-123",
+			call: func() error {
+				return ex.TrackSomeTrackEvent(examples.Identity{UserID: "user-123", AnonymousID: "anon-123"}, someTrack)
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Track Event", "userId": "user-123", "anonymousId": "anon-123",
 				"properties": ` + someTrackJSON + `,
 				"context": {"ruddertyper": ` + exMeta + `}}`,
 		},
