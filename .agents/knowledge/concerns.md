@@ -21,7 +21,7 @@
 - `cli/internal/config/config.go (createConfigFileIfNotExists, updateConfig)` writes config (including `auth.accessToken`) with world-readable defaults (`os.Create`, then `os.WriteFile(..., 0644)`), exposing secrets on multi-user hosts.
 - `api/client/client.go (New)` constructs `http.Client{}` without timeout; network hangs can block CLI/API operations indefinitely (availability risk and potential resource exhaustion).
 - `cli/internal/cmd/import/retl-source.go (writeSQLToFile)` builds output path using unsanitized `localID` via `fmt.Sprintf("%s/%s.sql", sqlLocation, localID)`, enabling path traversal-style writes if IDs contain separators.
-- `cli/internal/cmd/import/retl-source.go (NewCmdRetlSource)` telemetry captures raw `localID`, `remoteID`, `location`, and `sqlLocation`; this can leak workspace structure/resource identifiers to telemetry backends.
+- `cli/internal/cmd/import/retl-source.go (NewCmdRetlSource)` telemetry captures raw `localID` and `remoteID`; this can leak resource identifiers to telemetry backends. `location` and `sqlLocation` are still passed, and `commandProps` in `cli/internal/cmd/telemetry/utils.go` drops them before sending.
 - `cli/internal/cmd/telemetry/utils.go (TrackCommand)` blindly copies arbitrary `extras` into telemetry properties, with no allowlist/redaction boundary for future sensitive fields.
 - `cli/internal/cmd/root.go (recovery)` prints full panic stack traces in debug mode; stack traces may contain sensitive config/path/token-adjacent context depending on upstream errors.
 

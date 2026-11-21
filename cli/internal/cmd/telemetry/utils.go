@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -140,6 +141,21 @@ func TrackInvalidInput(root *cobra.Command, args []string, err error, tracked []
 func trackCommand(command string, err error, extras ...KV) {
 	reported.Store(true)
 
+	// Building the properties writes the session to disk, so stop before it.
+	if config.GetConfig().Telemetry.Disabled {
+		return
+	}
+
+	props := commandProps(command, err, extras...)
+
+	if err := telemetry.TrackEvent(CommandExecutedEvent, props); err != nil {
+		log.Error("failed to track command", "error", err)
+	}
+}
+
+// commandProps builds the properties of a command event. It must never return a
+// file path, spec content, a resource name or a workspace name.
+func commandProps(command string, err error, extras ...KV) map[string]interface{} {
 	props := map[string]interface{}{
 		"command": command,
 		"errored": err != nil,
@@ -148,6 +164,13 @@ func trackCommand(command string, err error, extras ...KV) {
 	for _, extra := range extras {
 		props[extra.K] = extra.V
 	}
+
+	// Commands pass the values of their location flags. They are paths, so the
+	// location names the project for the hash and neither is sent.
+	location, _ := props["location"].(string)
+	delete(props, "location")
+	delete(props, "sqlLocation")
+	props["session_id"], props["project_id"] = correlationIDs(stateFile(), location, time.Now())
 
 	// Automatically add experimental flags
 	cfg := config.GetConfig()
@@ -159,9 +182,7 @@ func trackCommand(command string, err error, extras ...KV) {
 	// Automatically add execution context (CI)
 	maps.Copy(props, getCIExecutionContext())
 
-	if err := telemetry.TrackEvent(CommandExecutedEvent, props); err != nil {
-		log.Error("failed to track command", "error", err)
-	}
+	return props
 }
 
 // TrackPreRunFailures reports failures of the PreRunE and PersistentPreRunE
