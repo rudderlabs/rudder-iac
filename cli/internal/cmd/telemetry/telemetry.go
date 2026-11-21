@@ -23,6 +23,9 @@ var telemetryCmd = &cobra.Command{
 		- Command usage statistics
 		- Error occurrences (without sensitive details)
 		- Basic system information
+		- A session id: random, and replaced after 30 minutes without a command
+		- A project id: a hash of the project directory, keyed with a random
+		  value that stays on this machine. The path itself is never sent
 		
 		Use 'status' to check current telemetry settings
 		Use 'enable' or 'disable' to modify telemetry collection
