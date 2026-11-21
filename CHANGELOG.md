@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0](https://github.com/rudderlabs/rudder-iac/compare/v1.3.0...v1.4.0) (2026-11-21)
+
+
+### Features
+
+* **retl:** accept maxcompute in SQL model and table source specs ([#1048](https://github.com/rudderlabs/rudder-iac/issues/1048)) ([5c71996](https://github.com/rudderlabs/rudder-iac/commit/5c7199657983cc324012e596a896be2463c8745f))
+
+
+### Bug Fixes
+
+* **telemetry:** name the CI service when the workflow does not set it ([#996](https://github.com/rudderlabs/rudder-iac/issues/996)) ([77838e0](https://github.com/rudderlabs/rudder-iac/commit/77838e0c7feabb93642031928efa05abf55d5ea7))
+
 ## [1.3.0](https://github.com/rudderlabs/rudder-iac/compare/v1.2.0...v1.3.0) (2026-11-19)
 
 
