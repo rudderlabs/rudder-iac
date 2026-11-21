@@ -1,6 +1,8 @@
 package destination
 
 import (
+	"encoding/json"
+
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -30,12 +32,19 @@ type DestinationResource struct {
 	Config            map[string]any
 }
 
-// DestinationState is the persisted apply-cycle state. ID is the remote
-// destination API ID; TransformationID is the linked transformation's remote
-// ID (empty when no link exists).
+// DestinationState is the apply-cycle state. ID is the remote destination API
+// ID; TransformationID is the linked transformation's remote ID (empty when no
+// link exists).
+//
+// RemoteConfig is the API config as MapRemoteToState loaded it, empty after
+// Create, Update or Import. It is read only to preview what an update removes,
+// and is never persisted or sent: an update writes the spec's config alone, and
+// keys a definition doesn't model are modelled per definition, not carried over
+// (DEX-690).
 type DestinationState struct {
 	ID               string
 	TransformationID string
+	RemoteConfig     json.RawMessage
 }
 
 // RemoteDestination wraps client.Destination to satisfy handler.RemoteResource

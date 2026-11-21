@@ -196,12 +196,17 @@ type PlanChecker interface {
 	CheckPlan(ctx context.Context, plan *planner.Plan, st *state.State) error
 }
 
-// ImportPreviewer is implemented by a provider whose Import pushes the spec to
-// the remote resource it adopts, so adopting it can change that resource. It
-// returns, per importable URN in the plan, the changes the import writes, for
-// the plan to show before anything runs. A URN may be left out when its
-// import changes nothing. st is the stored state, read to resolve references
-// the plan has not resolved yet.
+// ImportPreviewer is implemented by a provider whose Import or Update pushes the
+// spec over a remote resource, so the write can change parts of it the plan's
+// own comparison can't see. It returns, per importable URN in the plan, the
+// changes the import writes, and per updated URN only the lines the update's
+// own diff lacks, for the plan to show before anything runs. A URN may be left
+// out when there is nothing to add. st is the stored state, read to resolve
+// references the plan has not resolved yet and the remote an update replaces.
+//
+// An error fails the whole plan. Return one only for an import: an update's
+// lines only add to a change the plan already shows, so a provider that can't
+// compute them logs a warning and leaves the URN out.
 type ImportPreviewer interface {
 	PreviewImports(ctx context.Context, plan *planner.Plan, st *state.State) (map[string]differ.ResourceDiff, error)
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
+	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
@@ -24,6 +25,8 @@ import (
 	vdocs "github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
+
+var log = logger.New("destinationprovider")
 
 // importDir is the top-level base directory import output is written under.
 // Destinations own their full path via ImportPath ("destinations/"), so the
@@ -84,7 +87,9 @@ func (p *Provider) FormatForExport(
 
 // PreviewImports reports, per destination the plan imports, the config the
 // import writes over the remote one. Import pushes the spec to the destination
-// it adopts, so a value the spec does not share with the remote changes it. See
+// it adopts, so a value the spec does not share with the remote changes it. Per
+// destination the plan updates, it reports only the remote keys the update
+// removes that the plan's own comparison can't show. See
 // provider.ImportPreviewer.
 func (p *Provider) PreviewImports(ctx context.Context, plan *planner.Plan, st *state.State) (map[string]differ.ResourceDiff, error) {
 	// A resource the same plan imports keeps its remote ID, so a reference to it
@@ -98,11 +103,29 @@ func (p *Provider) PreviewImports(ctx context.Context, plan *planner.Plan, st *s
 
 	result := map[string]differ.ResourceDiff{}
 	for _, op := range plan.Operations {
-		if op.Type != planner.Import || op.Resource.Type() != DestinationResourceType {
+		if op.Resource.Type() != DestinationResourceType {
 			continue
 		}
 		data, ok := op.Resource.RawData().(*DestinationResource)
-		if !ok || op.Resource.ImportMetadata() == nil {
+		if !ok {
+			continue
+		}
+		if op.Type == planner.Update {
+			urn := op.Resource.URN()
+			diffs, err := p.handler.previewUpdate(data, st.GetResource(urn))
+			if err != nil {
+				// The plan already shows this update and ran without these lines
+				// before they existed, so a preview that fails costs the lines,
+				// not the apply. Imports below still fail hard.
+				log.Warn("skipping the removed-keys preview of a destination update", "urn", urn, "error", err.Error())
+				continue
+			}
+			if len(diffs) > 0 {
+				result[urn] = differ.ResourceDiff{URN: urn, Diffs: diffs}
+			}
+			continue
+		}
+		if op.Type != planner.Import || op.Resource.ImportMetadata() == nil {
 			continue
 		}
 		diffs, secretOnly, err := p.handler.previewImport(ctx, data, op.Resource.ImportMetadata().RemoteId, st, adopted)

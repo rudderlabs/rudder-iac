@@ -68,6 +68,10 @@ type bqConfig struct {
 	Prefix      string `mapstructure:"prefix" validate:"omitempty,pattern=single_line_100"`
 	Namespace   string `mapstructure:"namespace" validate:"omitempty,pattern=bq_namespace"`
 	Credentials string `mapstructure:"credentials" validate:"required"`
+	// The backend stamps schema.json's default on every write, so leaving the key
+	// unmodelled would read as removed on every plan. Workload identity federation
+	// needs pool and provider keys this definition doesn't carry yet.
+	AuthMethod string `mapstructure:"auth_method" validate:"omitempty,oneof=serviceAccountKey" default:"serviceAccountKey"`
 
 	SyncFrequency string         `mapstructure:"sync_frequency" validate:"required,oneof=5 10 15 30 60 180 360 720 1440"`
 	SyncStartAt   string         `mapstructure:"sync_start_at"`
@@ -95,6 +99,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		converter.Simple("prefix", "prefix"),
 		converter.Simple("namespace", "namespace"),
 		converter.Simple("credentials", "credentials"),
+		converter.Simple("authMethod", "auth_method"),
 		converter.Simple("syncFrequency", "sync_frequency"),
 		converter.Simple("syncStartAt", "sync_start_at"),
 		converter.Simple("excludeWindow.excludeWindowStartTime", "exclude_window.start_time"),

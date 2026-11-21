@@ -3,12 +3,14 @@ package syncer
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sync"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
@@ -145,15 +147,16 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 		}
 	}
 
-	// A preview that cannot be read fails the plan, dry run and apply alike:
-	// adopting a resource whose changes could not be shown is what the preview
-	// exists to prevent. The error names the resource.
-	if previewer, ok := s.provider.(provider.ImportPreviewer); ok && len(plan.Diff.ImportableResources) > 0 {
+	// A preview error fails the plan, dry run and apply alike: adopting a
+	// resource whose changes could not be shown is what the preview exists to
+	// prevent. The error names the resource. See provider.ImportPreviewer for
+	// why an update's preview never returns one.
+	if previewer, ok := s.provider.(provider.ImportPreviewer); ok {
 		diffs, err := previewer.PreviewImports(ctx, plan, state)
 		if err != nil {
 			return []error{err}
 		}
-		plan.Diff.ImportableDiffs = diffs
+		mergePreview(plan.Diff, diffs)
 	}
 
 	ui.StopSpinner()
@@ -196,6 +199,26 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 	}
 
 	return nil
+}
+
+// mergePreview places each previewed resource where the plan shows it. An
+// update's preview adds lines its own diff can't show, and a removal is a real
+// change, so the update is no longer only a secret re-apply. Any other URN is an
+// importable one.
+func mergePreview(diff *differ.Diff, preview map[string]differ.ResourceDiff) {
+	for urn, previewed := range preview {
+		updated, ok := diff.UpdatedResources[urn]
+		if !ok {
+			if diff.ImportableDiffs == nil {
+				diff.ImportableDiffs = map[string]differ.ResourceDiff{}
+			}
+			diff.ImportableDiffs[urn] = previewed
+			continue
+		}
+		maps.Copy(updated.Diffs, previewed.Diffs)
+		updated.SecretOnly = false
+		diff.UpdatedResources[urn] = updated
+	}
 }
 
 func StateToGraph(state *state.State) *resources.Graph {
