@@ -161,6 +161,7 @@ type TrackingPlanStore interface {
 	DeleteTrackingPlan(ctx context.Context, id string) error
 	DeleteTrackingPlanEvent(ctx context.Context, trackingPlanId string, eventId string) error
 	GetTrackingPlanWithSchemas(ctx context.Context, id string) (*TrackingPlanWithSchemas, error)
+	GetTrackingPlanVersionWithSchemas(ctx context.Context, id string, version int) (*TrackingPlanWithSchemas, error)
 	GetTrackingPlan(ctx context.Context, id string) (*TrackingPlan, error)
 	GetTrackingPlans(ctx context.Context, options ListOptions) ([]*TrackingPlan, error)
 	GetTrackingPlanWithIdentifiers(ctx context.Context, id string, rebuildSchemas bool) (*TrackingPlanWithIdentifiers, error)
@@ -361,13 +362,116 @@ func (c *RudderDataCatalog) GetTrackingPlanWithSchemas(ctx context.Context, id s
 		return nil, fmt.Errorf("fetching all events on tracking plan: %s: %w", id, err)
 	}
 
-	trackingPlan.Events = make([]TrackingPlanEventSchema, len(events))
+	// One request per event: fetched serially, a plan with hundreds of events
+	// takes minutes. The tasker stops starting requests after the first failure,
+	// and cancelling the context also aborts the ones already in flight, so a
+	// request that never answers cannot hold back the error from the one that failed.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var (
+		paths   = make([]string, len(events))
+		tasks   = make([]tasker.Task, 0, len(events))
+		seen    = make(map[string]bool, len(events))
+		results = tasker.NewResults[*TrackingPlanEventSchema]()
+		fetch   = apitask.RunAPIFetchTask(ctx, results)
+	)
 	for i, event := range events {
-		schema, err := c.GetTrackingPlanEventSchema(ctx, id, event.ID)
+		paths[i] = fmt.Sprintf("v2/catalog/tracking-plans/%s/events/%s?format=schema", id, event.ID)
+
+		// An event listed twice has one schema, and the tasker rejects duplicate tasks
+		if seen[paths[i]] {
+			continue
+		}
+		seen[paths[i]] = true
+		tasks = append(tasks, apitask.NewAPIFetchTask[*TrackingPlanEventSchema](c.client, paths[i]))
+	}
+
+	errs := tasker.RunTasks(ctx, tasks, c.concurrency, false, func(task tasker.Task) error {
+		err := fetch(task)
 		if err != nil {
-			return nil, fmt.Errorf("fetching event schema: %s on tracking plan: %s: %w", event.ID, id, err)
+			cancel()
+		}
+		return err
+	})
+	if err := joinFailures(errs); err != nil {
+		return nil, fmt.Errorf("fetching event schemas on tracking plan: %s: %w", id, err)
+	}
+
+	// Looked up by path so the event order does not depend on completion order
+	trackingPlan.Events = make([]TrackingPlanEventSchema, len(events))
+	for i, path := range paths {
+		schema, ok := results.Get(path)
+		if !ok || schema == nil {
+			return nil, fmt.Errorf("event schema %s is missing or empty in the response", events[i].ID)
 		}
 		trackingPlan.Events[i] = *schema
+	}
+
+	return &trackingPlan, nil
+}
+
+// joinFailures reports what failed. It drops the cancellations the tasker
+// records for every task it skips after the first failure, and the context
+// errors of requests aborted because of that failure, so the error shows the
+// cause and not one line per skipped or aborted request. When nothing else
+// remains, such as after the caller cancelled the context, those are kept
+// because they are then the cause.
+func joinFailures(errs []error) error {
+	var failed, causes []error
+	for _, err := range errs {
+		var cancelled *tasker.ErrTaskCancelled
+		if errors.As(err, &cancelled) {
+			continue
+		}
+		failed = append(failed, err)
+		if !errors.Is(err, context.Canceled) {
+			causes = append(causes, err)
+		}
+	}
+
+	switch {
+	case len(causes) > 0:
+		return errors.Join(causes...)
+	case len(failed) > 0:
+		return errors.Join(failed...)
+	case len(errs) > 0:
+		return errs[0]
+	}
+	return nil
+}
+
+// ErrVersionedSchemasUnsupported is returned when the server answers a pinned
+// version request with plan metadata only, which is what servers released before
+// the fetchSchemas parameter do. Generating from that response would silently
+// produce code for an empty plan.
+var ErrVersionedSchemasUnsupported = errors.New("the server does not return events for a pinned tracking plan version")
+
+// GetTrackingPlanVersionWithSchemas fetches a historical version of a tracking
+// plan with all its event schemas in one request, unlike the latest plan which
+// needs one request per event.
+func (c *RudderDataCatalog) GetTrackingPlanVersionWithSchemas(ctx context.Context, id string, version int) (*TrackingPlanWithSchemas, error) {
+	resp, err := c.client.Do(ctx, "GET", fmt.Sprintf("v2/catalog/tracking-plans/%s?version=%d&fetchSchemas=true", id, version), nil)
+	if err != nil {
+		return nil, fmt.Errorf("executing http request to fetch tracking plan version %d: %w", version, err)
+	}
+
+	var raw struct {
+		Events *json.RawMessage `json:"events"`
+	}
+	if err := json.Unmarshal(resp, &raw); err != nil {
+		return nil, fmt.Errorf("decoding tracking plan response: %w", err)
+	}
+	if raw.Events == nil {
+		return nil, ErrVersionedSchemasUnsupported
+	}
+
+	trackingPlan := TrackingPlanWithSchemas{}
+	if err := json.Unmarshal(resp, &trackingPlan); err != nil {
+		return nil, fmt.Errorf("decoding tracking plan response: %w", err)
+	}
+	if trackingPlan.Version != version {
+		return nil, fmt.Errorf("requested tracking plan version %d but the server returned version %d", version, trackingPlan.Version)
 	}
 
 	return &trackingPlan, nil

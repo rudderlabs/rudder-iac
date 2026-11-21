@@ -1,10 +1,16 @@
 package validate
 
 import (
+	"bytes"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry/telemetrytest"
+	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 )
 
 func TestNewCmdValidateAcceptsVarFile(t *testing.T) {
@@ -150,4 +156,64 @@ func TestValidateFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+// literalSecretDestination holds a literal in a secret key, so loading it
+// renders a destination/secret-reference warning.
+const literalSecretDestination = `version: rudder/v1
+kind: destination
+metadata:
+  name: shop-amplitude
+spec:
+  id: shop-amplitude
+  display_name: Shop Amplitude
+  type: am
+  definition_version: 1
+  enabled: true
+  config:
+    api_key: fake-literal-amplitude-key
+    residency_server: standard
+`
+
+const secretWarning = `warning[destination/secret-reference]: secret key "api_key" must hold only a variable reference with no default`
+
+// Under --json stdout holds only the report, so the warnings the project load
+// renders go to stderr. Without --json they stay on stdout.
+func TestValidateKeepsLoadDiagnosticsOffJSONOutput(t *testing.T) {
+	testutils.UseFakeAPI(t)
+	telemetrytest.Record(t)
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "destination.yaml"), []byte(literalSecretDestination), 0o600))
+
+	t.Run("json", func(t *testing.T) {
+		stdout, stderr := executeValidate(t, "--all", "--json", "--location", dir)
+
+		assert.JSONEq(t, `{"resources": []}`, stdout)
+		assert.Contains(t, stderr, secretWarning)
+		assert.Contains(t, stderr, "Found 0 error(s), 1 warning(s)")
+		assert.NotContains(t, stdout+stderr, "fake-literal-amplitude-key")
+	})
+
+	t.Run("text", func(t *testing.T) {
+		stdout, stderr := executeValidate(t, "--all", "--location", dir)
+
+		assert.Contains(t, stdout, secretWarning)
+		assert.Contains(t, stdout, "Found 0 error(s), 1 warning(s)\nNo resources to validate\n")
+		assert.Empty(t, stderr)
+		assert.NotContains(t, stdout, "fake-literal-amplitude-key")
+	})
+}
+
+func executeValidate(t *testing.T, args ...string) (stdout, stderr string) {
+	t.Helper()
+
+	var errOut bytes.Buffer
+	stdout = testutils.CaptureStdout(t, func() {
+		cmd := NewCmdValidate()
+		cmd.SetArgs(args)
+		cmd.SetErr(&errOut)
+		require.NoError(t, cmd.Execute())
+	})
+	return stdout, errOut.String()
 }

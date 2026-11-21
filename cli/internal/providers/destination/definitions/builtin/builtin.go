@@ -22,11 +22,13 @@ import (
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
 	facebookconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_conversions"
 	facebookpixel "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_pixel"
+	fbcustomaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/fb_custom_audience"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/firebase"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
 	googleadwordsofflineconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_adwords_offline_conversions"
+	googleadwordsremarketinglists "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_adwords_remarketing_lists"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googleads"
 	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
 	googlesheets "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlesheets"
@@ -35,6 +37,7 @@ import (
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/intercom"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/iterable"
+	iterableaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/iterable_audience"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kafka"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kinesis"
 	linkedinads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_ads"
@@ -95,32 +98,35 @@ var entries = []entry{
 	{NewDefinition: snowflake.NewDefinition, Verified: true},
 	{NewDefinition: tiktokads.NewDefinition, Verified: true},
 	{NewDefinition: webhook.NewDefinition, Verified: true},
-	{NewDefinition: adj.NewDefinition},
-	{NewDefinition: adobeanalytics.NewDefinition},
+	{NewDefinition: adj.NewDefinition, Verified: true},
+	{NewDefinition: adobeanalytics.NewDefinition, Verified: true},
+	{NewDefinition: confluentcloud.NewDefinition, Verified: true},
+	{NewDefinition: firebase.NewDefinition, Verified: true},
+	{NewDefinition: ga.NewDefinition, Verified: true},
+	{NewDefinition: googlepubsub.NewDefinition, Verified: true},
+	{NewDefinition: googlesheets.NewDefinition, Verified: true},
+	{NewDefinition: gtm.NewDefinition, Verified: true},
+	{NewDefinition: intercom.NewDefinition, Verified: true},
+	{NewDefinition: kinesis.NewDefinition, Verified: true},
+	{NewDefinition: kafka.NewDefinition, Verified: true},
+	{NewDefinition: linkedininsighttag.NewDefinition, Verified: true},
+	{NewDefinition: marketo.NewDefinition, Verified: true},
+	{NewDefinition: qualtrics.NewDefinition, Verified: true},
+	{NewDefinition: redis.NewDefinition, Verified: true},
+	{NewDefinition: salesforce.NewDefinition, Verified: true},
+	{NewDefinition: sentry.NewDefinition, Verified: true},
+	{NewDefinition: slack.NewDefinition, Verified: true},
+	{NewDefinition: snowpipestreaming.NewDefinition, Verified: true},
+	{NewDefinition: statsig.NewDefinition, Verified: true},
+	{NewDefinition: vwo.NewDefinition, Verified: true},
+	{NewDefinition: zendesk.NewDefinition, Verified: true},
 	{NewDefinition: bingadsofflineconversions.NewDefinition},
-	{NewDefinition: confluentcloud.NewDefinition},
 	{NewDefinition: customerioaudience.NewDefinition},
-	{NewDefinition: firebase.NewDefinition},
-	{NewDefinition: ga.NewDefinition},
 	{NewDefinition: googleadwordsofflineconversions.NewDefinition},
-	{NewDefinition: googlepubsub.NewDefinition},
-	{NewDefinition: googlesheets.NewDefinition},
-	{NewDefinition: gtm.NewDefinition},
-	{NewDefinition: intercom.NewDefinition},
-	{NewDefinition: kinesis.NewDefinition},
-	{NewDefinition: kafka.NewDefinition},
 	{NewDefinition: linkedinads.NewDefinition},
-	{NewDefinition: linkedininsighttag.NewDefinition},
-	{NewDefinition: marketo.NewDefinition},
-	{NewDefinition: qualtrics.NewDefinition},
-	{NewDefinition: redis.NewDefinition},
-	{NewDefinition: salesforce.NewDefinition},
-	{NewDefinition: sentry.NewDefinition},
-	{NewDefinition: slack.NewDefinition},
-	{NewDefinition: snowpipestreaming.NewDefinition},
-	{NewDefinition: statsig.NewDefinition},
-	{NewDefinition: vwo.NewDefinition},
-	{NewDefinition: zendesk.NewDefinition},
+	{NewDefinition: fbcustomaudience.NewDefinition},
+	{NewDefinition: googleadwordsremarketinglists.NewDefinition},
+	{NewDefinition: iterableaudience.NewDefinition},
 }
 
 // NewRegistry registers the verified definitions and, with includeUnverified,

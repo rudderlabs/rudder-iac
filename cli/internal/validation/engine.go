@@ -11,6 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/varsubst"
 )
 
 // ValidationEngine is the main orchestrator for the two-phase validation framework.
@@ -28,6 +29,11 @@ type ValidationEngine interface {
 	// workspace-scoped rules via ValidationContext.WorkspaceID.
 	// Returns diagnostics for semantic errors (invalid references, dependency issues, etc.)
 	ValidateSemantic(ctx context.Context, rawSpecs map[string]*specs.RawSpec, graph *resources.Graph, workspaceID string) (Diagnostics, error)
+
+	// ValidateSources runs the rules that read specs as written (see
+	// rules.SourceRule). sources holds the specs before variable substitution,
+	// and positions point into those bytes.
+	ValidateSources(ctx context.Context, sources map[string]*specs.RawSpec) (Diagnostics, error)
 }
 
 type validationEngine struct {
@@ -133,24 +139,11 @@ func (e *validationEngine) runProjectValidationRules(rawSpecs map[string]*specs.
 				return nil, fmt.Errorf("building path indexer for %s: %w", filePath, err)
 			}
 
-			for _, result := range results {
-				position, err := pi.PositionLookup(result.Reference)
-				if err != nil {
-					if !errors.Is(err, pathindex.ErrPathNotFound) {
-						return nil, fmt.Errorf("getting position for reference %s: %w", result.Reference, err)
-					}
-					position = pi.NearestPosition(result.Reference)
-				}
-
-				diagnostics = append(diagnostics, Diagnostic{
-					RuleID:   rule.ID(),
-					Severity: rule.Severity(),
-					Message:  result.Message,
-					File:     filePath,
-					Position: *position,
-					Examples: rule.Examples(),
-				})
+			fileDiagnostics, err := ruleDiagnostics(rule, filePath, pi, results)
+			if err != nil {
+				return nil, err
 			}
+			diagnostics = append(diagnostics, fileDiagnostics...)
 		}
 	}
 
@@ -228,30 +221,131 @@ func (e *validationEngine) runValidationRules(
 			WorkspaceID: workspaceID,
 		})
 
-		for _, result := range results {
-			position, err := pi.PositionLookup(result.Reference)
-			if err != nil {
-				if !errors.Is(
-					err,
-					pathindex.ErrPathNotFound,
-				) {
-					return nil, fmt.Errorf("getting position for reference %s: %w", result.Reference, err)
-				}
-
-				// if the error is ErrPathNotFound which is usually the case, we
-				// use the nearest position to the reference.
-				position = pi.NearestPosition(result.Reference)
-			}
-			diagnostics = append(diagnostics, Diagnostic{
-				RuleID:   rule.ID(),
-				Severity: rule.Severity(),
-				Message:  result.Message,
-				File:     path,
-				Position: *position,
-				Examples: rule.Examples(),
-			})
+		ruleDiags, err := ruleDiagnostics(rule, path, pi, results)
+		if err != nil {
+			return nil, err
 		}
+		diagnostics = append(diagnostics, ruleDiags...)
 	}
 
 	return diagnostics, nil
+}
+
+// ValidateSources runs every registered rule that implements SourceRule, once,
+// with the sources whose kind and version match the rule. It reads kind and
+// version without substituting, so it reports on a spec whose variables are
+// not defined yet.
+func (e *validationEngine) ValidateSources(ctx context.Context, sources map[string]*specs.RawSpec) (Diagnostics, error) {
+	var sourceRules []rules.Rule
+	for _, rule := range e.registry.AllSyntacticRules() {
+		if _, ok := rule.(rules.SourceRule); ok {
+			sourceRules = append(sourceRules, rule)
+		}
+	}
+
+	if len(sourceRules) == 0 {
+		return nil, nil
+	}
+
+	contexts := make(map[string]*rules.ValidationContext, len(sources))
+	for path, source := range sources {
+		contexts[path] = rules.NewSourceContext(path, source)
+	}
+
+	diagnostics := make(Diagnostics, 0)
+	for _, rule := range sourceRules {
+		resultsMap := rule.(rules.SourceRule).ValidateSources(filterContextsByPatterns(contexts, rule.AppliesTo()))
+
+		for filePath, results := range resultsMap {
+			source, ok := sources[filePath]
+			if !ok {
+				return nil, fmt.Errorf("source rule %s returned results for unknown file: %s", rule.ID(), filePath)
+			}
+
+			fileDiagnostics, err := sourceDiagnostics(rule, filePath, source, contexts[filePath].References, results)
+			if err != nil {
+				return nil, err
+			}
+			diagnostics = append(diagnostics, fileDiagnostics...)
+		}
+	}
+
+	diagnostics.Sort()
+	return diagnostics, nil
+}
+
+// sourceDiagnostics places a source rule's results in the source as written.
+// A source that is not YAML as written, such as one with an unquoted reference
+// followed by more text, is indexed with its references swapped for
+// placeholders, since that copy parses. Each position found in that copy is
+// then mapped back to the source, and each line a diagnostic shows is given
+// its references back, so no placeholder is printed. When even that copy does
+// not parse, results are placed at the start of the file.
+func sourceDiagnostics(rule rules.Rule, file string, source *specs.RawSpec, replaced varsubst.Replaced, results []rules.ValidationResult) (Diagnostics, error) {
+	if pi, err := source.PathIndexer(); err == nil {
+		return ruleDiagnostics(rule, file, pi, results)
+	}
+
+	pi, err := pathindex.NewPathIndexer(replaced.Data)
+	if err != nil {
+		pi = nil
+	}
+	diagnostics, err := ruleDiagnostics(rule, file, pi, results)
+	if err != nil {
+		return nil, err
+	}
+	for i := range diagnostics {
+		position := &diagnostics[i].Position
+		position.Line, position.Column = replaced.SourcePosition(position.Line, position.Column)
+		position.LineText = replaced.Restore(position.LineText)
+	}
+	return diagnostics, nil
+}
+
+// ruleDiagnostics turns rule's results for file into diagnostics, each placed
+// where its reference points in pi.
+func ruleDiagnostics(rule rules.Rule, file string, pi pathindex.PathIndexer, results []rules.ValidationResult) (Diagnostics, error) {
+	diagnostics := make(Diagnostics, 0, len(results))
+	for _, result := range results {
+		position, err := resultPosition(pi, result)
+		if err != nil {
+			return nil, err
+		}
+		diagnostics = append(diagnostics, Diagnostic{
+			RuleID:    rule.ID(),
+			Severity:  rule.Severity(),
+			Message:   result.Message,
+			File:      file,
+			Position:  position,
+			Sensitive: result.Sensitive,
+			Examples:  rule.Examples(),
+		})
+	}
+	return diagnostics, nil
+}
+
+// resultPosition resolves a result's reference to its position in the file,
+// falling back to the nearest ancestor when the path does not exist, and to the
+// start of the file when there is no indexer. A sensitive result has the value
+// on its line masked here, before any renderer sees it.
+func resultPosition(pi pathindex.PathIndexer, result rules.ValidationResult) (pathindex.Position, error) {
+	if pi == nil {
+		return pathindex.StartingPosition, nil
+	}
+
+	if result.Sensitive {
+		return *pi.MaskedPosition(result.Reference), nil
+	}
+
+	position, err := pi.PositionLookup(result.Reference)
+	if err != nil {
+		if !errors.Is(err, pathindex.ErrPathNotFound) {
+			return pathindex.Position{}, fmt.Errorf("getting position for reference %s: %w", result.Reference, err)
+		}
+
+		// if the error is ErrPathNotFound which is usually the case, we
+		// use the nearest position to the reference.
+		position = pi.NearestPosition(result.Reference)
+	}
+	return *position, nil
 }

@@ -27,13 +27,19 @@ type DestinationDefinition struct {
 	DisplayName string
 	// APIType is the upstream API destination type (e.g. "S3").
 	// When empty at registration, it defaults to Type.
-	APIType         string
-	Version         int64
-	Properties      []converter.ConfigProperty
-	SecretKeys      []string
-	NewConfig       func() any
-	SourceTypes     []string
-	ConnectionModes map[string][]string
+	APIType    string
+	Version    int64
+	Properties []converter.ConfigProperty
+	SecretKeys []string
+	// JSONPathSecretKeys lists the secret keys whose value the destination
+	// reads from each event at delivery when it is a JSONPath, such as http's
+	// headers.from set to $.messageId. Such a value holds no secret, so
+	// validate does not ask for a variable there. A JSONPath in any other
+	// secret key is a literal value. Every entry must be in SecretKeys.
+	JSONPathSecretKeys []string
+	NewConfig          func() any
+	SourceTypes        []string
+	ConnectionModes    map[string][]string
 	// ConnectionRequiredKeys lists, per local source type and connection mode,
 	// the local config keys a source of that type must carry to connect in that
 	// mode. Both dimensions matter: Braze needs rest_api_key from a cloud-mode
@@ -51,6 +57,29 @@ type DestinationDefinition struct {
 	// With it, a rETL connection that names an object runs the object-mapping
 	// flow; without it every connection is a JSON-mapper one.
 	SupportsVisualMapper bool
+	// SupportsVisualMapperV2 mirrors db-config.json
+	// config.supportsVisualMapperV2, the flag the vdm-next destinations carry
+	// (the audience destinations: fb_custom_audience,
+	// google_adwords_remarketing_lists, iterable_audience and the rest). It
+	// replaces supportsVisualMapper rather than adding to it: none of those
+	// destinations declares both, and the field set comes from the
+	// destination's own config instead of a named object. A connection to such
+	// a destination runs the visual-mapper-v2 flow, the only flow this CLI
+	// accepts mirror on. The backend is wider: its FLOWS_DISALLOWING_MIRROR
+	// holds the JSON mapper alone, so it stores mirror on object mapping too.
+	// V-R2 refuses that case anyway, and says why.
+	//
+	// The flag is necessary but not sufficient: admission is the backend's
+	// VDM_V2_DESTINATIONS table, in config-backend
+	// src/modules/retl/api-gateway/connection-config/constants.ts. A
+	// destination absent from it is refused, and four entries that are in it
+	// carry a refusedBecause instead of a required-key list —
+	// GAINSIGHT_PX_AUDIENCE, PINTEREST_AUDIENCE, HS_AUDIENCE and
+	// MARKETO_AUDIENCE — so a create for those fails whatever this flag says.
+	// Set this to match db-config.json and nothing else: whether a create
+	// succeeds is the backend's to answer, and a second allowlist here would go
+	// stale the moment that one moves.
+	SupportsVisualMapperV2 bool
 	// ConsentValidationOverrides replaces canonical consent validation for selected local source types.
 	ConsentValidationOverrides map[string]common.ConsentValidator
 	// ConfigValidateFuncs registers extra go-playground custom validate tags,
@@ -90,9 +119,12 @@ func (d *RegisteredDefinition) ValidateConfig(config map[string]any) []ConfigErr
 	nullErrors := errorsOutside(findNullValues(config, ""), findUnknownKeys(config, d.configType, ""))
 	rawErrors := slices.Concat(nullErrors, findEmptyEnumValues(config, d.fields))
 	config = d.ApplyDefaults(config)
-	errors := validateConfigModel(config, d.configType, "", d.ConfigValidateFuncs...)
-	errors = append(errors, d.validateConsentManagement(config)...)
-	errors = append(errors, d.validateConnectionMode(config)...)
+	// The source-type checks own the paths they report: they word a wrong shape
+	// more specifically than model decoding does.
+	sourceTypeErrors := d.validateConsentManagement(config)
+	sourceTypeErrors = append(sourceTypeErrors, d.validateConnectionMode(config)...)
+	errors := errorsOutside(validateConfigModel(config, d.configType, "", d.ConfigValidateFuncs...), sourceTypeErrors)
+	errors = append(errors, sourceTypeErrors...)
 	return append(rawErrors, errorsOutside(errors, rawErrors)...)
 }
 
@@ -136,6 +168,15 @@ func (d *RegisteredDefinition) SecretKeys() []string {
 	return append([]string(nil), d.DestinationDefinition.SecretKeys...)
 }
 
+// JSONPathSecretKeys returns the secret keys whose value may be a JSONPath
+// read from each event.
+func (d *RegisteredDefinition) JSONPathSecretKeys() []string {
+	if d.DestinationDefinition == nil {
+		return nil
+	}
+	return slices.Clone(d.DestinationDefinition.JSONPathSecretKeys)
+}
+
 func (d *RegisteredDefinition) SupportedSourceTypes() []string {
 	if d.DestinationDefinition == nil || len(d.SourceTypes) == 0 {
 		return nil
@@ -154,12 +195,11 @@ var defaultSyncBehaviours = []string{"upsert", "mirror", "full"}
 // backend default only when the definition declares none at all.
 //
 // This is the destination-level list, not the set a connection may actually
-// use: the backend intersects it with the source's own list and rejects
-// "mirror" outright for the JSON-mapper flow (FLOWS_DISALLOWING_MIRROR in
-// config-backend retl/api-gateway/connection-config/assembler.ts). So HTTP
-// reads back [upsert mirror full] yet can never use "mirror", and a
-// mirror-only destination like bingads_offline_conversions has no valid
-// behaviour at all unless the connection carries an object.
+// use: the rETL connection rules intersect it with the source's own list and
+// keep "mirror" on the visual-mapper-v2 flow alone. So HTTP reads back
+// [upsert mirror full] yet can never use "mirror", and a mirror-only
+// destination without supportsVisualMapperV2, such as
+// bingads_offline_conversions, has no valid behaviour at all.
 func (d *RegisteredDefinition) SyncBehaviours() []string {
 	behaviours := d.DestinationDefinition.SyncBehaviours
 	if behaviours == nil {
@@ -176,6 +216,10 @@ func (d *RegisteredDefinition) SupportsVisualMapper() bool {
 	return d.DestinationDefinition.SupportsVisualMapper
 }
 
+func (d *RegisteredDefinition) SupportsVisualMapperV2() bool {
+	return d.DestinationDefinition.SupportsVisualMapperV2
+}
+
 // LocalSourceTypeKeys returns keys allowed under source-type-scoped config blocks.
 func (d *RegisteredDefinition) LocalSourceTypeKeys() []string {
 	return d.SupportedSourceTypes()
@@ -188,6 +232,36 @@ func (d *RegisteredDefinition) ConnectionModes(sourceType string) ([]string, err
 	}
 	return append([]string(nil), modes...), nil
 }
+
+// ImpliedConnectionMode returns the mode a source type connects in when the
+// config declares none, or "" when there is none to imply. Only a warehouse
+// source has one: cloud, and only while cloud is the single warehouse mode the
+// definition offers (true of every destination upstream today). The day a
+// definition offers a warehouse source a second mode, nothing is implied and a
+// warehouse connection must declare its mode like any other.
+func (d *RegisteredDefinition) ImpliedConnectionMode(sourceType string) string {
+	if sourceType != common.SourceTypeWarehouse {
+		return ""
+	}
+	modes, err := d.ConnectionModes(sourceType)
+	if err != nil || !slices.Equal(modes, []string{warehouseImpliedMode}) {
+		return ""
+	}
+	return warehouseImpliedMode
+}
+
+// ConnectMode returns the mode a source of sourceType connects in: the one
+// config declares under connection_mode, else the implied one (see
+// ImpliedConnectionMode), else "".
+func (d *RegisteredDefinition) ConnectMode(sourceType string, config map[string]any) string {
+	block, _ := config["connection_mode"].(map[string]any)
+	if mode, _ := block[sourceType].(string); mode != "" {
+		return mode
+	}
+	return d.ImpliedConnectionMode(sourceType)
+}
+
+const warehouseImpliedMode = "cloud"
 
 // ConnectionRequiredKeys returns the keys the given source type must carry to
 // connect in the given mode. A nil result means the pair requires none.
@@ -278,6 +352,11 @@ func newRegisteredDefinition(def *DestinationDefinition) (*RegisteredDefinition,
 
 	if err := validateSecretKeys(def.SecretKeys, fields); err != nil {
 		return nil, fmt.Errorf("validating secret keys: %w", err)
+	}
+	for _, key := range def.JSONPathSecretKeys {
+		if !slices.Contains(def.SecretKeys, key) {
+			return nil, fmt.Errorf("validating secret keys: JSONPath secret key %q is not a secret key", key)
+		}
 	}
 
 	return &RegisteredDefinition{

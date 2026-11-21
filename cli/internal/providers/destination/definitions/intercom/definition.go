@@ -32,6 +32,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -45,6 +46,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type intercomConfig struct {
@@ -182,12 +184,18 @@ func NewDefinition() *definitions.DestinationDefinition {
 			{Tag: "intercom_app_id_required", Func: intercomModeConditional("device", intercomDeviceSources), CallEvenIfNull: true},
 			{Tag: "intercom_api_key_required", Func: intercomModeConditional("cloud", intercomCloudSources), CallEvenIfNull: true},
 		},
-		SecretKeys: []string{"api_key"},
+		SecretKeys: []string{
+			"api_key",
+			"app_id",
+			"mobile_api_key_android",
+			"mobile_api_key_ios",
+		},
 		NewConfig: func() any {
 			return &intercomConfig{}
 		},
 		SourceTypes:            append([]string(nil), sourceTypes...),
 		ConnectionModes:        connectionModes,
 		ConnectionRequiredKeys: connectionRequiredKeys,
+		SupportsVisualMapper:   true,
 	}
 }
