@@ -2,6 +2,7 @@ package importer
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestCheckSyncStatus(t *testing.T) {
@@ -253,4 +255,74 @@ func TestWorkspaceImport_WritesManifestWhenFlagOn(t *testing.T) {
 
 	_, err = os.Stat(filepath.Join(dir, ImportedDir, importmanifest.FileName))
 	assert.NoError(t, err, "import-manifest.yaml must be written when importMerge is on")
+}
+
+// A re-run merge import re-matches resources an earlier manifest already
+// linked; re-emitting them would duplicate their URNs across manifest files.
+func TestWorkspaceImport_OmitsManifestEntriesForLinkedResources(t *testing.T) {
+	enableImportMerge(t)
+
+	dir := t.TempDir()
+	graph := resources.NewGraph()
+	graph.AddResource(resources.NewResource("linked", "source", resources.ResourceData{}, nil,
+		resources.WithResourceImportMetadata("rid-linked", "ws-1")))
+	graph.AddResource(resources.NewResource("other-ws", "source", resources.ResourceData{}, nil,
+		resources.WithResourceImportMetadata("rid-other", "ws-2")))
+	graph.AddResource(resources.NewResource("unlinked", "source", resources.ResourceData{}, nil))
+
+	entries := []importmanifest.ImportEntry{
+		{WorkspaceID: "ws-1", URN: "source:linked", RemoteID: "rid-linked"},
+		{WorkspaceID: "ws-1", URN: "source:other-ws", RemoteID: "rid-other-ws"},
+		{WorkspaceID: "ws-1", URN: "source:unlinked", RemoteID: "rid-unlinked"},
+		{WorkspaceID: "ws-1", URN: "source:my-src", RemoteID: "rid-1"},
+	}
+
+	err := WorkspaceImport(context.Background(), &stubProject{
+		location: dir,
+		graph:    graph,
+	}, &stubImportProvider{
+		importable: importableCollection(),
+		entries:    entries,
+	}, ImportOptions{Merge: true})
+	require.NoError(t, err)
+
+	raw, err := os.ReadFile(filepath.Join(dir, ImportedDir, importmanifest.FileName))
+	require.NoError(t, err)
+	var spec specs.Spec
+	require.NoError(t, yaml.Unmarshal(raw, &spec))
+	assert.Equal(t, importmanifest.BuildSpec(entries[1:]), &spec)
+}
+
+func TestWorkspaceImport_NothingNewToImport(t *testing.T) {
+	enableImportMerge(t)
+
+	dir := t.TempDir()
+	graph := resources.NewGraph()
+	graph.AddResource(resources.NewResource("linked", "source", resources.ResourceData{}, nil,
+		resources.WithResourceImportMetadata("rid-linked", "ws-1")))
+
+	stdout := os.Stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	os.Stdout = w
+
+	err = WorkspaceImport(context.Background(), &stubProject{
+		location: dir,
+		graph:    graph,
+	}, &stubImportProvider{
+		importable: importableCollection(),
+		entries: []importmanifest.ImportEntry{
+			{WorkspaceID: "ws-1", URN: "source:linked", RemoteID: "rid-linked"},
+		},
+	}, ImportOptions{Merge: true})
+	os.Stdout = stdout
+	require.NoError(t, err)
+	require.NoError(t, w.Close())
+
+	out, err := io.ReadAll(r)
+	require.NoError(t, err)
+	assert.Equal(t, "Nothing new to import\n", string(out))
+
+	_, err = os.Stat(filepath.Join(dir, ImportedDir))
+	assert.True(t, os.IsNotExist(err), "nothing must be written when every entry is already linked")
 }

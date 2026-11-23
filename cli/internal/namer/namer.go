@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	"github.com/rudderlabs/rudder-iac/cli/internal/typer/generator/core" // Import for NameRegistry
+	"github.com/rudderlabs/rudder-iac/typer/generator/core" // Import for NameRegistry
 )
 
 var (

@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: retl-source-table
+metadata:
+  name: e2e-lifecycle-table
+spec:
+  id: e2e-lifecycle-table
+  display_name: E2E Lifecycle Table
+  account: "#account:e2e-lifecycle-sf"
+  primary_key: id
+  source_definition: snowflake
+  schema: analytics
+  table: users
+  enabled: true

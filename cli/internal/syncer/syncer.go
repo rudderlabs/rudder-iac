@@ -119,8 +119,9 @@ func (s *ProjectSyncer) Destroy(ctx context.Context) []error {
 }
 
 func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, continueOnFail bool) []error {
-	spinner := ui.NewSpinner("Loading state ...")
-	spinner.Start()
+	// Deferred so the early error returns below cannot leave it spinning.
+	ui.StartSpinner("Loading state ...")
+	defer ui.StopSpinner()
 
 	resources, err := s.provider.LoadResourcesFromRemote(ctx)
 	if err != nil {
@@ -136,7 +137,26 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 	p := planner.New(s.workspace.ID)
 	plan := p.Plan(source, target)
 
-	spinner.Stop()
+	// A refused plan stops before the preview reads anything, and its refusal
+	// is the error the user sees.
+	if checker, ok := s.provider.(provider.PlanChecker); ok {
+		if err := checker.CheckPlan(ctx, plan, state); err != nil {
+			return []error{err}
+		}
+	}
+
+	// A preview that cannot be read fails the plan, dry run and apply alike:
+	// adopting a resource whose changes could not be shown is what the preview
+	// exists to prevent. The error names the resource.
+	if previewer, ok := s.provider.(provider.ImportPreviewer); ok && len(plan.Diff.ImportableResources) > 0 {
+		diffs, err := previewer.PreviewImports(ctx, plan, state)
+		if err != nil {
+			return []error{err}
+		}
+		plan.Diff.ImportableDiffs = diffs
+	}
+
+	ui.StopSpinner()
 
 	s.reporter.ReportPlan(plan)
 
@@ -170,6 +190,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 
 	// Consolidate sync: providers can perform batch operations or multi-resource
 	// coordination after all individual resources have been processed
+	ui.StartSpinner("Finalizing ...")
 	if err := s.provider.ConsolidateSync(ctx, target, state); err != nil {
 		return []error{err}
 	}

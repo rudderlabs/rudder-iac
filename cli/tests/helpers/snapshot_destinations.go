@@ -10,13 +10,11 @@ import (
 
 // DestinationLister is the subset of the destinations API client the tester needs.
 type DestinationLister interface {
-	GetAll(ctx context.Context) ([]client.Destination, error)
+	GetAll(ctx context.Context, opts ...client.ListDestinationsOption) ([]client.Destination, error)
 }
 
 // DestinationSnapshotTester compares the CLI-managed destinations fetched from the
-// API against expected snapshot files, mirroring UpstreamSnapshotTester. Unlike
-// the catalog client, the destinations API exposes no hasExternalId list filter,
-// so managed destinations are selected client-side by ExternalID presence.
+// API against expected snapshot files, mirroring UpstreamSnapshotTester.
 type DestinationSnapshotTester struct {
 	client      DestinationLister
 	fileManager *SnapshotFileManager
@@ -40,18 +38,14 @@ func NewDestinationSnapshotTester(
 // managed count against the number of expected files so an unexpected create or
 // delete upstream fails the test, matching UpstreamSnapshotTester.
 func (d *DestinationSnapshotTester) SnapshotTest(ctx context.Context) error {
-	all, err := d.client.GetAll(ctx)
+	all, err := d.client.GetAll(ctx, client.WithDestinationsHasExternalID(true))
 	if err != nil {
 		return fmt.Errorf("listing destinations: %w", err)
 	}
 
-	// The destinations API has no hasExternalId filter, so drop UI/other-tool
-	// resources here — only CLI-managed destinations carry an external ID.
-	managed := make(map[string]client.Destination)
+	managed := make(map[string]client.Destination, len(all))
 	for _, dest := range all {
-		if dest.ExternalID != "" {
-			managed[urn(destination.DestinationResourceType, dest.ExternalID)] = dest
-		}
+		managed[urn(destination.DestinationResourceType, dest.ExternalID)] = dest
 	}
 
 	expectedResources, err := d.fileManager.ListResources()

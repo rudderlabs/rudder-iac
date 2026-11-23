@@ -1,0 +1,51 @@
+{
+  "id": "<ignored>",
+  "workspaceId": "<ignored>",
+  "version": "<ignored>",
+  "externalId": "customerio-device-v2",
+  "name": "E2E Customer.io Device V2",
+  "type": "CUSTOMERIO",
+  "enabled": true,
+  "config": {
+    "connectionMode": {
+      "web": "device"
+    },
+    "useNativeSDK": {
+      "web": true
+    },
+    "apiVersion": "v2",
+    "userIdIdentifierType": "id",
+    "sdkVersion": {
+      "web": "v2"
+    },
+    "writeKey": {
+      "web": "customerio-e2e-write-key"
+    },
+    "anonymousInApp": {
+      "web": false
+    },
+    "datacenter": "US",
+    "deviceTokenEventName": "Device Token Registered",
+    "whitelistedEvents": [
+      {
+        "eventName": "Order Completed"
+      }
+    ],
+    "eventFilteringOption": "whitelistedEvents",
+    "sendPageNameInSDK": {
+      "web": false
+    },
+    "autoTrackDeviceAttributes": {
+      "android": false,
+      "ios": false
+    },
+    "backgroundQueueMinNumberOfTasks": {
+      "android": "10"
+    },
+    "backgroundQueueSecondsDelay": {
+      "android": "30"
+    }
+  },
+  "createdAt": "<ignored>",
+  "updatedAt": "<ignored>"
+}

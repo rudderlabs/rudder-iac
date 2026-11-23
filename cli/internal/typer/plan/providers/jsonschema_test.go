@@ -7,8 +7,8 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/api/client/catalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/typer/plan/providers"
+	"github.com/rudderlabs/rudder-iac/typer/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,9 +18,22 @@ type mockTrackingPlanStore struct {
 	*datacatalog.EmptyCatalog
 	trackingPlanWithSchemas *catalog.TrackingPlanWithSchemas
 	err                     error
+	requestedVersion        int
+	latestCalls             int
+	versionedCalls          int
 }
 
 func (m *mockTrackingPlanStore) GetTrackingPlanWithSchemas(ctx context.Context, id string) (*catalog.TrackingPlanWithSchemas, error) {
+	m.latestCalls++
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.trackingPlanWithSchemas, nil
+}
+
+func (m *mockTrackingPlanStore) GetTrackingPlanVersionWithSchemas(ctx context.Context, id string, version int) (*catalog.TrackingPlanWithSchemas, error) {
+	m.requestedVersion = version
+	m.versionedCalls++
 	if m.err != nil {
 		return nil, m.err
 	}

@@ -13,6 +13,7 @@ import (
 	transformations "github.com/rudderlabs/rudder-iac/api/client/transformations"
 	"github.com/rudderlabs/rudder-iac/cli/internal/namer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	providerhandler "github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers/transformation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/model"
 )
@@ -151,9 +152,12 @@ func TestHandlerMetadata(t *testing.T) {
 
 	metadata := handler.Impl.Metadata()
 
-	assert.Equal(t, "transformation", metadata.ResourceType)
-	assert.Equal(t, "transformation", metadata.SpecKind)
-	assert.Equal(t, "transformations", metadata.SpecMetadataName)
+	assert.Equal(t, providerhandler.HandlerMetadata{
+		ResourceType:     "transformation",
+		SpecKind:         "transformation",
+		SpecMetadataName: "transformations",
+		ReferencedByKind: true,
+	}, metadata)
 }
 
 func TestNewSpec(t *testing.T) {

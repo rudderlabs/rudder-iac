@@ -28,7 +28,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "cloud", "react_native", "flutter", "cordova",
+		"unity", "cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -43,19 +43,26 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"react_native":   {"cloud", "device"},
 		"flutter":        {"cloud", "device"},
 		"cordova":        {"cloud"},
+		"warehouse":      {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
 		require.NoError(t, err)
 		assert.Equal(t, want, modes, "source type %s", sourceType)
 	}
-	// Upstream lists amp, warehouse and shopify, but the CLI cannot produce
-	// those source tokens, so the definition does not advertise them.
-	for _, sourceType := range []string{"amp", "warehouse", "shopify"} {
+	// Upstream lists amp and shopify, but the CLI cannot produce those source
+	// tokens, so the definition does not advertise them.
+	for _, sourceType := range []string{"amp", "shopify"} {
 		assert.NotContains(t, registered.SupportedSourceTypes(), sourceType)
 		_, err := registered.ConnectionModes(sourceType)
 		require.Error(t, err)
 	}
+
+	// db-config.json declares the visual mapper but no syncBehaviours, so the
+	// backend fallback applies.
+	assert.Nil(t, am.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.True(t, registered.SupportsVisualMapper())
 
 	assert.Equal(t, map[string]any{
 		"track_all_pages":                    false,
@@ -423,7 +430,7 @@ func TestAmplitudeConfigValidation(t *testing.T) {
 	// up by sourceTypeKeyResults, which owns unsupported source keys for it.
 	t.Run("dropped source types rejected in consent_management", func(t *testing.T) {
 		t.Parallel()
-		for _, sourceType := range []string{"amp", "warehouse", "shopify"} {
+		for _, sourceType := range []string{"amp", "shopify"} {
 			config := validMinimal()
 			config["consent_management"] = map[string]any{sourceType: []any{}}
 
@@ -740,5 +747,6 @@ func TestAmplitudeConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }

@@ -95,14 +95,14 @@ func TestCreate(t *testing.T) {
 	t.Run("refuses a destination the read path would skip", func(t *testing.T) {
 		t.Parallel()
 
-		// dst-eventstream is S3: registered, but it takes no warehouse source.
+		// dst-eventstream is Google Ads: registered, but it takes no warehouse source.
 		data := graphData(t, jsonMapperConfig())
 		data[DestinationKey] = "dst-eventstream"
 
 		mock := lifecycleClient()
 		_, err := lifecycleHandler(t, mock).Create(context.Background(), localID, data)
 
-		assert.EqualError(t, err, `vetting rETL connection "users-to-webhook": destination type "S3" does not accept warehouse sources`)
+		assert.EqualError(t, err, `vetting rETL connection "users-to-webhook": destination type "GOOGLEADS" does not accept warehouse sources`)
 		assert.Empty(t, mock.CreateCalls, "the api must not be called for a connection that cannot be read back")
 	})
 
@@ -383,7 +383,7 @@ func TestUpdate(t *testing.T) {
 		mock := lifecycleClient()
 		_, err := lifecycleHandler(t, mock).Update(context.Background(), localID, data, stateData(t, jsonMapperConfig()))
 
-		assert.EqualError(t, err, `connection "users-to-webhook": destination type "S3" does not accept warehouse sources`)
+		assert.EqualError(t, err, `connection "users-to-webhook": destination type "GOOGLEADS" does not accept warehouse sources`)
 		assert.Empty(t, mock.DeleteCalls, "the live connection must survive a refused replacement")
 		assert.Empty(t, mock.CreateCalls)
 	})

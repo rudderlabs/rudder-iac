@@ -1,0 +1,35 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: customerio-device-v2
+spec:
+  id: customerio-device-v2
+  display_name: E2E Customer.io Device V2 Updated
+  type: customerio
+  enabled: true
+  definition_version: 1
+  config:
+    api_version: v2
+    user_id_identifier_type: email
+    sdk_version:
+      web: v2
+    write_key:
+      web: customerio-e2e-write-key-updated
+    anonymous_in_app:
+      web: true
+    datacenter: EU
+    device_token_event_name: Token Refreshed
+    event_filtering:
+      blacklist:
+        - Page Viewed
+    send_page_name_in_sdk:
+      web: true
+    auto_track_device_attributes:
+      android: true
+      ios: true
+    background_queue_min_number_of_tasks:
+      android: "25"
+    background_queue_seconds_delay:
+      android: "45"
+    connection_mode:
+      web: device

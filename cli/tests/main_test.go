@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"testing"
+
+	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 )
 
 var (
@@ -14,6 +16,13 @@ var (
 // runs the package tests. It honours the cli/logging and cli/testing rules by
 // printing only essential information and performing cleanup after execution.
 func TestMain(m *testing.M) {
+	// A cancelled run can leave its connection seed behind, and the suites that
+	// run before TestRETLConnectionImportClaim cannot destroy past it.
+	if os.Getenv("RUN_RETL_E2E") == "1" {
+		sweepSeededConnections()
+	}
+	sweepLeftoverUnmanagedWebhooks()
+
 	exec, err := NewCmdExecutor("")
 	if err != nil {
 		fmt.Println("failed to init executor:", err)
@@ -43,6 +52,32 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
+// sweepSeededConnections runs removeSeededConnections outside any test, which
+// TestMain has no *testing.T for. Any failure exits before a suite runs.
+func sweepSeededConnections() {
+	t := &mainTB{}
+	removeSeededConnections(t, retlClient.NewRudderRETLStore(newAccountsAPIClient(t)))
+	if t.failed {
+		os.Exit(1)
+	}
+}
+
+// mainTB implements only the testing.TB methods the sweep's helpers and
+// testify reach; the embedded nil TB panics on any other, loudly.
+type mainTB struct {
+	testing.TB
+	failed bool
+}
+
+func (*mainTB) Helper()      {}
+func (*mainTB) Name() string { return "TestMain" }
+func (*mainTB) FailNow()     { os.Exit(1) }
+
+func (tb *mainTB) Errorf(format string, args ...any) {
+	tb.failed = true
+	fmt.Printf(format+"\n", args...)
+}
+
 // allowManagedResidue lets remote state loading see every managed kind a
 // previous run could have left behind in the shared workspace, so the destroy
 // each live test opens with can remove it.
@@ -53,21 +88,12 @@ func TestMain(m *testing.M) {
 // attentive_tag/http/rs/salesforce destinations; if its cleanup destroy fails,
 // only s3 is registered on the next run and the residue fails the whole load.
 //
-// rETL kinds: retl-source-table and retl-connections load only behind their
-// own flags, and a destroy cannot see a kind it has not loaded. PR runs are
-// cancelled in-progress by design, so a run killed mid TestRETLConnectionsApply
-// would otherwise leave rows the next run's opening destroy cannot reach —
-// the source then cannot be deleted either while a connection still uses it.
-//
 // Keep this with the tests rather than as CI repository variables, so the
 // requirement travels with the code. Callers still set
-// RUDDERSTACK_CLI_EXPERIMENTAL themselves for their own flags; it is set here
-// too because the rETL flags take effect only under it.
+// RUDDERSTACK_CLI_EXPERIMENTAL themselves for their own flags.
 func allowManagedResidue(t *testing.T) {
 	t.Helper()
 
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDERSTACK_X_UNVERIFIED_DESTINATIONS", "true")
-	t.Setenv("RUDDERSTACK_X_RETL_TABLE_SUPPORT", "true")
-	t.Setenv("RUDDERSTACK_X_RETL_CONNECTION_SUPPORT", "true")
 }

@@ -31,6 +31,10 @@ var blockedByConnectionsMessages = []string{
 	"connected to some destinations",
 }
 
+// accountInUseMessage is the 409 the public accounts API raises when an account
+// is still used. Only the message identifies it, as APIError.ErrorCode is empty.
+const accountInUseMessage = "can't be removed because it is being used"
+
 type Paging struct {
 	Total int    `json:"total"`
 	Next  string `json:"next"`
@@ -49,11 +53,22 @@ type APIError struct {
 }
 
 func (e *APIError) Error() string {
-	msg := fmt.Sprintf("http status code: %d, error code: '%s', error: '%s'", e.HTTPStatusCode, e.ErrorCode, e.Msg())
+	reason := fmt.Sprintf("'%s'", e.Msg())
 	if suffix := formatDetails(e.Details); suffix != "" {
-		msg += " " + suffix
+		reason += " " + suffix
 	}
-	return msg
+
+	// Name a fix only for 403s whose message says what they are: the control plane
+	// also uses 403 for business-rule refusals (e.g. a tracking plan still connected
+	// to sources) that no token or feature change resolves.
+	if e.FeatureFlagNotEnabled() {
+		return fmt.Sprintf("feature not enabled: %s: ask RudderStack support to enable it for your account", reason)
+	}
+	if e.HTTPStatusCode == http.StatusForbidden && strings.Contains(strings.ToLower(e.Msg()), "permission") {
+		return fmt.Sprintf("permission denied: %s: use an access token with the required permissions, or ask a workspace admin to grant them", reason)
+	}
+
+	return fmt.Sprintf("http status code: %d, error code: '%s', error: %s", e.HTTPStatusCode, e.ErrorCode, reason)
 }
 
 // formatDetails renders APIError.Details as a parenthesised suffix.
@@ -105,6 +120,15 @@ func (e *APIError) BlockedByConnections() bool {
 	}
 
 	return false
+}
+
+// BlockedByAccountUsage reports whether this is the control plane refusing to
+// delete an account because sources, destinations or data graphs still use it.
+func (e *APIError) BlockedByAccountUsage() bool {
+	if e.HTTPStatusCode != http.StatusConflict {
+		return false
+	}
+	return strings.Contains(strings.ToLower(e.Msg()), accountInUseMessage)
 }
 
 func (e *APIError) Msg() string {

@@ -35,7 +35,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
-		"cloud", "react_native", "flutter", "cordova",
+		"cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -44,6 +44,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{"cloud"}, modes)
 	}
+
+	// db-config.json declares neither rETL field, so the backend fallback applies.
+	assert.Nil(t, facebookconversions.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	byAPI, err := registry.GetByAPIType("FACEBOOK_CONVERSIONS", 1)
 	require.NoError(t, err)
@@ -148,6 +153,18 @@ func TestFacebookConversionsConfigValidation(t *testing.T) {
 			require.NotEmpty(t, errors, value)
 			assert.Equal(t, "/action_source", errors[0].Path)
 		}
+	})
+
+	t.Run("empty mapped event target", func(t *testing.T) {
+		t.Parallel()
+		errors := registered.ValidateConfig(map[string]any{
+			"dataset_id":   "dataset-1",
+			"access_token": "access-token-1",
+			"events_to_events": []any{
+				map[string]any{"from": "Signed Up", "to": ""},
+			},
+		})
+		assert.Empty(t, errors)
 	})
 
 	t.Run("invalid mapped event target", func(t *testing.T) {
@@ -415,6 +432,7 @@ func TestFacebookConversionsConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 

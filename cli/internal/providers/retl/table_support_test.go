@@ -17,6 +17,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
@@ -129,6 +131,10 @@ func TestTableSupportDisabled(t *testing.T) {
 		assert.Contains(t, err.Error(), "unsupported kind: retl-source-table")
 
 		_, err = p.Create(context.Background(), "users-table", table.ResourceType, resources.ResourceData{})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no handler for resource type: retl-source-table")
+
+		_, err = p.Preview(context.Background(), "users-table", table.ResourceType, resources.ResourceData{}, 10)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no handler for resource type: retl-source-table")
 	})
@@ -314,5 +320,67 @@ func TestTableSupportEnabled(t *testing.T) {
 			ExternalID:           "users-table",
 		}, got)
 		assert.Equal(t, "src-new", (*output)[sqlmodel.IDKey])
+	})
+
+	// What this pins that the handler-level tests cannot: that Provider.Preview
+	// forwards its limit rather than dropping or hardcoding it. preview_test.go
+	// calls the handler directly, so a Provider.Preview that passed a literal
+	// would still pass there. The handler-map dispatch itself is covered by the
+	// create subtest above, which reads the same p.handlers map.
+	t.Run("previews table sources through the preview API", func(t *testing.T) {
+		t.Parallel()
+		client := newDefaultMockClient()
+		var got *retlClient.PreviewSubmitRequest
+		client.submitPreviewFunc = func(_ context.Context, req *retlClient.PreviewSubmitRequest) (*retlClient.PreviewSubmitResponse, error) {
+			got = req
+			return &retlClient.PreviewSubmitResponse{ID: "req-1"}, nil
+		}
+		p := retl.New(client, retl.WithTableSupport())
+		require.NoError(t, p.LoadSpec("users.yaml", tableSpec()))
+		graph, err := p.ResourceGraph()
+		require.NoError(t, err)
+		r, ok := graph.GetResource("retl-source-table:users-table")
+		require.True(t, ok)
+
+		// Non-zero on purpose: with 0 the expected request carries Limit at its
+		// zero value, which is exactly what a Provider.Preview that dropped the
+		// limit would also produce.
+		_, err = p.Preview(context.Background(), r.ID(), r.Type(), r.Data(), 5)
+
+		require.NoError(t, err)
+		assert.Equal(t, &retlClient.PreviewSubmitRequest{AccountID: "acc-1", SQL: `select * from "public"."users" limit 5`, Limit: 5}, got)
+	})
+
+	// The table handler's own tests call its CheckPlan directly. This one goes
+	// through Provider.CheckPlan, so a provider that stopped forwarding to the
+	// handler, or looked it up under the wrong type, would fail here. The plan is
+	// built as the syncer builds it, from remote state and the loaded spec.
+	t.Run("refuses a table change on a connected source through Provider.CheckPlan", func(t *testing.T) {
+		t.Parallel()
+		client, _ := newWorkspaceClient()
+		client.listConnectionsFunc = func(_ context.Context, req *retlClient.ListRETLConnectionsRequest) (*retlClient.RETLConnectionsPage, error) {
+			if req.SourceID != "table-managed" {
+				return &retlClient.RETLConnectionsPage{}, nil
+			}
+			return &retlClient.RETLConnectionsPage{Data: []retlClient.RETLConnection{{ID: "conn-1"}}}, nil
+		}
+		p := retl.New(client, retl.WithTableSupport())
+		desired := tableSpec()
+		desired.Spec["table"] = "customers"
+		require.NoError(t, p.LoadSpec("users.yaml", desired))
+		target, err := p.ResourceGraph()
+		require.NoError(t, err)
+		remote, err := p.LoadResourcesFromRemote(context.Background())
+		require.NoError(t, err)
+		st, err := p.MapRemoteToState(remote)
+		require.NoError(t, err)
+		plan := planner.New("ws-1").Plan(syncer.StateToGraph(st), target)
+		require.Contains(t, plan.Diff.UpdatedResources, "retl-source-table:users-table")
+
+		err = p.CheckPlan(context.Background(), plan, st)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `table "users" -> "customers"`)
+		assert.Contains(t, err.Error(), "conn-1")
 	})
 }

@@ -74,7 +74,8 @@ func sdkBaseURLConditional(fl validator.FieldLevel) bool {
 }
 
 // Source types from integrations-config destinations/ga4/db-config.json
-// supportedSourceTypes, restricted to types the CLI event-stream provider owns.
+// supportedSourceTypes, restricted to types the CLI can reach: those the
+// event-stream provider owns, plus warehouse for rETL.
 var sourceTypes = []string{
 	common.SourceTypeAndroid,
 	common.SourceTypeAndroidKotlin,
@@ -86,6 +87,7 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -99,6 +101,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type piiProperty struct {
@@ -185,11 +188,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "ga4",
-		APIType:    "GA4",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"api_secret", "measurement_id"},
+		Type:        "ga4",
+		DisplayName: "Google Analytics 4",
+		APIType:     "GA4",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"api_secret", "measurement_id"},
 		NewConfig: func() any {
 			return &ga4Config{}
 		},

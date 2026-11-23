@@ -23,13 +23,15 @@ import (
 // ignored key may be *extra* in the response, which is what keeps versionInfo
 // harmless — the API only attaches it once a destination's stored major falls
 // behind its definition's current one, so it is absent from every snapshot here.
+//
+// Backend-derived keys the CLI never sends, such as useNativeSDK (set from
+// connectionMode), are deliberately kept in the snapshots rather than ignored,
+// so the stored values stay visible and a change in the derivation fails here.
 var destinationSnapshotIgnore = []string{"id", "workspaceId", "version", "versionInfo", "createdAt", "updatedAt"}
 
 // destinationRawSecrets are literal secret values from the var file that must
 // never surface in CLI output.
 var destinationRawSecrets = []string{
-	"-----BEGIN PRIVATE KEY-----snowflakePrivateKeyXXXXXXXXXXX-----END PRIVATE KEY-----",
-	"-----BEGIN PRIVATE KEY-----snowpipeStreamingPrivateKeyXXXXXXXXXX-----END PRIVATE KEY-----",
 	"123456789012345",
 	"1234567890123456",
 	"6543210987654321",
@@ -153,6 +155,54 @@ var destinationRawSecrets = []string{
 	"googlesheets-dummy",
 	"AKIADATALAKEXXXXXXXX",
 	"s3DatalakeSecretAccessKeyXXXXXXXXXXXXXXXXX",
+	"rudderCliE2eAppToken",
+	"metrics.example.com",
+	"metrics-updated.example.com",
+	"heartbeat.example.com",
+	"heartbeat-updated.example.com",
+	"rudderCliE2eOrgId",
+	"rudderCliE2eOrgIdUpdated",
+	"rudderCliE2eAudienceSiteId",
+	"rudderCliE2eAudienceSiteIdUpdated",
+	"UA-123456-1",
+	"UA-654321-2",
+	"OPT-E2ECREATE",
+	"OPT-E2EUPDATE",
+	"GTM-E2ECREATE",
+	"GTM-E2EUPDATE",
+	"rudderCliE2eGtmAuthToken",
+	"rudderCliE2eGtmAuthTokenUpdated",
+	"rudderCliE2eAppId",
+	"rudderCliE2eAppIdUpdated",
+	"rudderCliE2eAndroidKey",
+	"rudderCliE2eAndroidKeyUpdated",
+	"rudderCliE2eIosKey",
+	"rudderCliE2eIosKeyUpdated",
+	"rudderCliE2eDeviceAppId",
+	"rudderCliE2eDeviceAppIdUpdated",
+	"rudderCliE2eDeviceAndroidKey",
+	"rudderCliE2eDeviceAndroidKeyUpdated",
+	"rudderCliE2eDeviceIosKey",
+	"rudderCliE2eDeviceIosKeyUpdated",
+	"kafka-1.rudder-cli-e2e.internal,kafka-2.rudder-cli-e2e.internal",
+	"rudderCliE2eKafkaUser",
+	"kafka-avro.rudder-cli-e2e.internal",
+	"kafka-ssh.rudder-cli-e2e.internal",
+	"rudderCliE2eKafkaSshUser",
+	"rudderCliE2eKafkaSshUserUpdated",
+	"rudderCliE2eFullPartner",
+	"rudderCliE2eFullPartnerUpdated",
+	"marketo-client-id",
+	"rudderCliE2eFullProject",
+	"rudderCliE2eFullProjectUpdated",
+	"rudder-cli-e2e@example.com",
+	"https://rudderclie2e@o0.ingest.sentry.io/0",
+	"https://rudderclie2eupdated@o0.ingest.sentry.io/1",
+	"https://hooks.slack.com/services/T000/B000/example",
+	"https://hooks.slack.com/services/T000/B111/orders",
+	"RUDDER_CLI_E2E_SNOWPIPE_USER",
+	"rudderCliE2eAccount",
+	"rudderCliE2eAccountUpdated",
 }
 
 // assertNoRawSecrets fails if any write-only secret appears in CLI output. Both

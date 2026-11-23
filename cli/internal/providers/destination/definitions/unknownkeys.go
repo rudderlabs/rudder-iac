@@ -136,6 +136,8 @@ func mapstructureFieldTag(field reflect.StructField) (string, bool) {
 	return name, true
 }
 
+// joinConfigPath leaves segment unescaped, unlike a JSON pointer: pathindex
+// indexes the raw YAML keys, so an escaped key would miss its anchor.
 func joinConfigPath(basePath, segment string) string {
 	if basePath == "" {
 		return "/" + segment

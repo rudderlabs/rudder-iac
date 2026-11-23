@@ -1,0 +1,17 @@
+version: rudder/v1
+kind: destination
+metadata:
+  name: refused-link-webhook
+spec:
+  id: refused-link-webhook
+  display_name: E2E Refused Link Webhook
+  type: webhook
+  enabled: true
+  definition_version: 1
+  transformation: "#transformation:refused-link-tx"
+  config:
+    webhook_url: https://webhooks.example.com/rudder
+    webhook_method: POST
+    connection_mode:
+      web: cloud
+      android_kotlin: cloud

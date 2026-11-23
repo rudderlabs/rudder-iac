@@ -134,9 +134,15 @@
 ## DEX-509 — Kafka Destination Config Surface
 <!-- ticket:DEX-509 -->
 - Kafka Avro schema config uses local key `avro_schemas` and API key `avroSchemas`; treat Terraform's singular `avro_schema` / `avroSchema` mapping as stale for this field because integrations-config schema/UI/runtime surfaces use the plural key.
-- Kafka `SecretKeys` should include only local key `password`; certificate/public-key material such as `ca_certificate` and `ssh_public_key` remains import/export visible because db-config marks only `password` as secret.
+- Kafka `SecretKeys` follow the revision-2 secrecy policy: `password`, `host_name`, `ssh.user`, and `username`. Certificate/public-key material such as `ca_certificate` and `ssh.public_key` remains import/export visible.
 - Kafka SASL validation follows the nested schema condition: require `sasl_type` and `username` only when both `ssl_enabled` and `use_sasl` are true; `password` remains optional, and `use_sasl: true` with `ssl_enabled: false` is accepted.
 - Kafka models shared `consent_management` only; do not add legacy include-key consent blocks `one_trust_cookie_categories` or `ketch_consent_purposes` unless a future task explicitly changes the destination-definition policy.
+
+## DEX-1088 — Kafka Static Versus Dynamic Pattern Validation
+<!-- ticket:DEX-1088 -->
+- Kafka `host_name`, `port`, `topic`, `username`, and `ssh.{host,port,user,public_key}` use plain `pattern=kafka_*` validation because their upstream schema properties expose only static regexes; accepting templates locally would make validation pass values that the backend rejects during apply.
+- Kafka topic-mapping fields remain dynamic where their own upstream properties explicitly include a template alternative: `event_type_to_topic_map[].to` and `event_to_topic_map[].{from,to}` use `dynamic_or_pattern`.
+- Decide template support per upstream property, not per destination or shared named regex; Kafka intentionally mixes static and template-capable fields.
 
 ## DEX-487 — ActiveCampaign Config Surface
 <!-- ticket:DEX-487 -->
@@ -178,8 +184,7 @@
 
 ## DEX-518 — Qualtrics Config Surface
 <!-- ticket:DEX-518 -->
-- Qualtrics `SecretKeys` should stay empty because integrations-config `db-config.json` `secretKeys` is authoritative for CLI write-only secret handling; Terraform `Sensitive` metadata and UI secret metadata do not by themselves make `project_id` a CLI secret placeholder.
-- Qualtrics `project_id` remains a normal required local config field, not a write-only secret field.
+- Qualtrics `project_id` is a required local config field and, under the revision-2 secrecy policy, a write-only secret, even though db-config `secretKeys` omits it.
 - Qualtrics local `enable_generic_page_title.web` maps to API `enableGenericPageTitle.web`; do not use Terraform's flat `enable_generic_page_title` shape as the CLI YAML shape.
 - Omit `connection_mode` from Qualtrics local config because `schema.json` does not declare `connectionMode`, even though db-config destination config lists it per source.
 
@@ -262,7 +267,7 @@
 <!-- ticket:DEX-812 -->
 - Kafka keeps `use_ssh` as the top-level SSH branch selector while grouping the four SSH member keys under `ssh.host`, `ssh.port`, `ssh.user`, and `ssh.public_key` in local YAML.
 - The nested SSH key names intentionally drop the redundant `ssh_` prefix inside the `ssh` block; there is no Terraform mapping precedent for Kafka SSH keys, so the shape is a CLI ergonomics convention rather than a Terraform parity rule.
-- Kafka's only CLI secret remains `password`; SSH config such as `ssh.public_key` is import/export visible and should not be added to `SecretKeys` unless upstream db-config secret metadata changes.
+- Of the Kafka SSH keys only `ssh.user` is a CLI secret (revision-2 secrecy policy); `ssh.host`, `ssh.port`, and `ssh.public_key` stay import/export visible.
 
 ## DEX-852 — Missing Destination Connection Mode Config Surface
 <!-- ticket:DEX-852 -->
@@ -288,3 +293,20 @@
 - Do not make a key `required` so that validation sees a value; declare its schema default instead. Nested defaults still fill only a block the spec carries, so a key inside an omitted block stays absent during validation too.
 - A key that stays required declares no default, even when `schema.json` has one: a default would fill in before validation and switch the requirement off. Registration rejects this only for a bare `required` tag, not for custom required checks. Redshift `use_iam_for_auth`, Snowflake `use_key_pair_auth` and Snowflake `s3.role_based_auth` stay required on purpose.
 - Customer.io `api_version` defaults to `v2`, matching integrations-config #2705, so a spec that omits it requires `user_id_identifier_type`.
+
+## RUD-3185 — Customer.io Device-Mode V2 Validation
+
+- Customer.io device-mode-v2 requiredness counts only an explicit `sdk_version.web: v2`. The nested `v2` default fills only an `sdk_version` block the spec carries, so an omitted block is sent absent, and upstream's `allOf` conditionals and the web SDK both read an absent version as v1. Treating it as `v2` during validation rejects existing web device-mode destinations that upstream accepts.
+- Attach the conditional `write_key` requirement to the top-level `WriteKey` pointer and register it with `CallEvenIfNull`; validating only nested `write_key.web` cannot catch a completely omitted `write_key` block.
+- Customer.io `write_key.web` uses plain `pattern=single_line_100`: upstream's pattern has no template branch, so a template is judged as a literal and gets no length exemption.
+
+## DEX-1079 — Destination Envelope Required Numbers Are Pointers
+<!-- ticket:DEX-1079 -->
+- `DestinationSpec.DefinitionVersion` (`cli/internal/providers/destination/model.go`) is `*int64` with `validate:"required"`. go-playground's `required` rejects a plain number's zero value, so as an `int64` an explicit `definition_version: 0` reported `'definition_version' is required` and never reached the `version not valid for destination type '<type>'; valid versions: <n>` check in `specSyntaxValidRule.Validate`. As a pointer, `required` fails only on an absent or `null` key.
+- Registration's rejection of a required non-pointer number covers definition config structs only; nothing checks the `DestinationSpec` envelope, so a new required number or bool there must be made a pointer by hand.
+- Rejected alternative: keep `int64`, drop the tag, and check the raw key in `specSyntaxValidRule.Validate`. It duplicates the shared `'<field>' is required` message by hand, and re-adding the tag later would report the error twice.
+
+## DEX-1081 — Decode Error Messages Read The Type Off The Model
+<!-- ticket:DEX-1081 -->
+- mapstructure v2.5.0 types only scalar and map mismatches (`*mapstructure.UnconvertibleTypeError`, whose `Expected` holds the target). Slice and struct mismatches are plain text (`source data must be an array or slice, got string`, `expected a map or struct, got "string"`). So `decodeErrorMessage` (`cli/internal/providers/destination/definitions/validator.go`) finds the expected type by walking the root struct along the decode path (`typeAt`: struct fields by mapstructure tag, then map values and list items), and never parses error text.
+- Rejected alternatives: rETL's `'<field>' is not valid: <reason>` (`cli/internal/providers/retl/rules/connection/connection_spec_valid.go`) still prints Go types such as `map[string]interface {}` and `common.ConsentManagement`. Matching mapstructure's message text has no precedent in the repo and breaks silently on a library upgrade. A decode hook that raises typed errors would re-implement mapstructure's conversion rules.

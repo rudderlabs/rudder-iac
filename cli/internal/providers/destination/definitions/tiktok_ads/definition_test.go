@@ -27,7 +27,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
-		"unity", "react_native", "flutter", "cordova", "cloud",
+		"unity", "react_native", "flutter", "cordova", "cloud", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -43,7 +43,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 
 	assert.NotContains(t, registered.SupportedSourceTypes(), "amp")
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
+
+	// db-config.json declares neither rETL field, so the backend fallback applies.
+	assert.Nil(t, tiktokads.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	byAPI, err := registry.GetByAPIType("TIKTOK_ADS", 1)
 	require.NoError(t, err)
@@ -216,12 +220,12 @@ func TestTiktokAdsConfigValidation(t *testing.T) {
 		errors := registered.ValidateConfig(map[string]any{
 			"pixel_code": "C12345",
 			"consent_management": map[string]any{
-				"warehouse": []any{},
+				"amp": []any{},
 			},
 		})
 		require.Len(t, errors, 1)
-		assert.Equal(t, "/consent_management/warehouse", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "source type 'warehouse' is not supported")
+		assert.Equal(t, "/consent_management/amp", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "source type 'amp' is not supported")
 	})
 
 	t.Run("invalid consent provider rejected", func(t *testing.T) {
@@ -240,10 +244,9 @@ func TestTiktokAdsConfigValidation(t *testing.T) {
 	})
 }
 
-// Empty-string handling on enum fields is not decided by the enum: omitempty
-// and dynamic_or_oneof both pass "" through regardless of what schema.json
-// lists. These cases pin the resulting verdicts so a later tightening has to
-// confront them deliberately — see docs/destination-validation-discrepancies.md.
+// Empty-string handling follows schema enum membership rather than omitempty:
+// an explicit empty value passes only where the enum lists the empty member,
+// while strict enums reject it.
 func TestTiktokAdsEmptyEnumValues(t *testing.T) {
 	t.Parallel()
 
@@ -282,23 +285,13 @@ func TestTiktokAdsEmptyEnumValues(t *testing.T) {
 		assert.Equal(t, "/events_to_standard/0/to", errors[0].Path)
 	})
 
-	// Known divergence: schema.json's version enum is ["v2","v1"] with no empty
-	// member, yet "" validates and ships as an empty value the backend rejects.
-	// Pinned as-is; flipping this assertion is the marker for that fix landing.
-	t.Run("version accepts empty despite the upstream enum", func(t *testing.T) {
+	t.Run("version rejects an explicit empty value", func(t *testing.T) {
 		t.Parallel()
 
-		config := map[string]any{"pixel_code": "C12345", "version": ""}
-		assert.Empty(t, registered.ValidateConfig(config),
-			"known gap: omitempty passes \"\" before the enum is consulted")
-
-		api, err := registered.LocalToAPI(config)
-		require.NoError(t, err)
-		assert.Equal(t, "", api["version"], "the empty value reaches the payload")
-
-		absent, err := registered.LocalToAPI(map[string]any{"pixel_code": "C12345"})
-		require.NoError(t, err)
-		assert.NotContains(t, absent, "version", "an absent key stays absent — distinguishable from \"\"")
+		errors := registered.ValidateConfig(map[string]any{"pixel_code": "C12345", "version": ""})
+		require.Len(t, errors, 1)
+		assert.Equal(t, "/version", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "must be one of")
 	})
 }
 
@@ -378,5 +371,6 @@ func TestTiktokAdsConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }

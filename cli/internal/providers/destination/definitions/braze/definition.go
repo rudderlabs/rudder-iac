@@ -23,6 +23,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -36,6 +37,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud", "device"},
 	common.SourceTypeFlutter:       {"cloud", "device"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type eventFiltering struct {
@@ -178,6 +180,7 @@ var connectionRequiredKeys = map[string]map[string][]string{
 	common.SourceTypeFlutter:       {"cloud": {"rest_api_key"}},
 	common.SourceTypeCordova:       {"cloud": {"rest_api_key"}},
 	common.SourceTypeCloud:         {"cloud": {"rest_api_key"}},
+	common.SourceTypeWarehouse:     {"cloud": {"rest_api_key"}},
 }
 
 // NewDefinition returns the Braze destination definition.
@@ -222,10 +225,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "braze",
-		APIType:    "BRAZE",
-		Version:    1,
-		Properties: properties,
+		Type:        "braze",
+		DisplayName: "Braze",
+		APIType:     "BRAZE",
+		Version:     1,
+		Properties:  properties,
 		// db-config declares only restApiKey as a secret. Terraform also marks appKey
 		// sensitive, but db-config is authoritative for CLI write-only wrapping.
 		ConfigValidateFuncs: []rules.CustomValidateFunc{
@@ -247,6 +251,7 @@ func NewDefinition() *definitions.DestinationDefinition {
 		},
 		SourceTypes:            append([]string(nil), sourceTypes...),
 		ConnectionModes:        connectionModes,
+		SupportsVisualMapper:   true,
 		ConnectionRequiredKeys: connectionRequiredKeys,
 	}
 }
