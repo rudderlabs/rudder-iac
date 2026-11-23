@@ -8,6 +8,11 @@ import (
 var (
 	ErrUndefinedVariable = errors.New("undefined variable")
 	ErrInvalidVarSyntax  = errors.New("invalid variable syntax")
+
+	// ErrUnescapedSingleQuote reports a value that would end a single-quoted
+	// YAML scalar early. Without this check the failure is a YAML parse error
+	// far from the variable, or, for a doubled pair, a silently changed value.
+	ErrUnescapedSingleQuote = errors.New("value contains a single quote inside a single-quoted slot; write each ' as '' in the variable")
 )
 
 type SubstitutionError struct {

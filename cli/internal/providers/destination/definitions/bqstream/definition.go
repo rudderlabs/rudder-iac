@@ -7,7 +7,8 @@ import (
 )
 
 // Source types from integrations-config destinations/bqstream/db-config.json
-// supportedSourceTypes, restricted to types the CLI event-stream provider owns.
+// supportedSourceTypes, restricted to types the CLI can reach: those the
+// event-stream provider owns, plus warehouse for rETL.
 var sourceTypes = []string{
 	common.SourceTypeAndroid,
 	common.SourceTypeAndroidKotlin,
@@ -19,6 +20,7 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -32,6 +34,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // bqstreamConfig is the local YAML config model. Field set mirrors
@@ -60,11 +63,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "bqstream",
-		APIType:    "BQSTREAM",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"credentials"},
+		Type:        "bqstream",
+		DisplayName: "BigQuery Stream",
+		APIType:     "BQSTREAM",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"credentials"},
 		NewConfig: func() any {
 			return &bqstreamConfig{}
 		},

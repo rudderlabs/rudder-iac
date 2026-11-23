@@ -11,7 +11,7 @@ spec:
   config:
     host: postgres.rudder-cli-e2e.internal
     database: analytics_updated
-    user: rudder
+    user: "{{ .POSTGRES_USER }}"
     password: "{{ .POSTGRES_PASSWORD }}"
     port: "5432"
     namespace: rudder_e2e_updated

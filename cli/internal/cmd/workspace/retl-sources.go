@@ -25,12 +25,11 @@ func newCmdListRetlSources() *cobra.Command {
 		Use:   "list",
 		Short: "List RETL sources in the workspace",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			jsonOutput, _ := cmd.Flags().GetBool("json")
 
-			var err error
 			defer func() {
-				telemetry.TrackCommand("workspace retl-source list", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "json", V: jsonOutput},
 				}...)
 			}()
@@ -49,8 +48,7 @@ func newCmdListRetlSources() *cobra.Command {
 			}
 			l := lister.New(retlProvider, lister.WithFormat(format))
 
-			err = l.List(cmd.Context(), sqlmodel.ResourceType, nil)
-			return err
+			return l.List(cmd.Context(), sqlmodel.ResourceType, nil)
 		},
 	}
 	cmd.Flags().Bool("json", false, "Output as JSON")

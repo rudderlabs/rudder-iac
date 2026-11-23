@@ -15,6 +15,12 @@ var sqlModelKind = SourceKind{
 	SourceType:   retlClient.ModelSourceType,
 }
 
+var tableKind = SourceKind{
+	Kind:         "retl-source-table",
+	ResourceType: "retl-source-table",
+	SourceType:   retlClient.TableSourceType,
+}
+
 // TestSourceKinds pins the whole table, not just the sql model row: registering
 // a kind is a contract change — the kind's handler has to publish the shared
 // source keys and the warehouse table has to cover its source definitions — so
@@ -22,7 +28,7 @@ var sqlModelKind = SourceKind{
 func TestSourceKinds(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, []SourceKind{sqlModelKind}, SourceKinds)
+	assert.Equal(t, []SourceKind{sqlModelKind, tableKind}, SourceKinds)
 }
 
 func TestSourceKindLookups(t *testing.T) {
@@ -34,7 +40,11 @@ func TestSourceKindLookups(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, sqlModelKind, found)
 
-		_, ok = SourceKindByKind("retl-source-table")
+		found, ok = SourceKindByKind("retl-source-table")
+		require.True(t, ok)
+		assert.Equal(t, tableKind, found)
+
+		_, ok = SourceKindByKind("retl-source-audience")
 		assert.False(t, ok)
 	})
 
@@ -43,6 +53,10 @@ func TestSourceKindLookups(t *testing.T) {
 		found, ok := SourceKindByResourceType("retl-source-sql-model")
 		require.True(t, ok)
 		assert.Equal(t, sqlModelKind, found)
+
+		found, ok = SourceKindByResourceType("retl-source-table")
+		require.True(t, ok)
+		assert.Equal(t, tableKind, found)
 
 		_, ok = SourceKindByResourceType("event-stream-source")
 		assert.False(t, ok)
@@ -54,7 +68,11 @@ func TestSourceKindLookups(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, sqlModelKind, found)
 
-		_, ok = SourceKindBySourceType(retlClient.TableSourceType)
+		found, ok = SourceKindBySourceType(retlClient.TableSourceType)
+		require.True(t, ok)
+		assert.Equal(t, tableKind, found)
+
+		_, ok = SourceKindBySourceType(retlClient.SourceType("audience"))
 		assert.False(t, ok)
 	})
 }
@@ -74,6 +92,11 @@ func TestParseSourceRef(t *testing.T) {
 			want: &resources.PropertyRef{URN: "retl-source-sql-model:users", Property: "id"},
 		},
 		{
+			name: "table",
+			ref:  "#retl-source-table:users",
+			want: &resources.PropertyRef{URN: "retl-source-table:users", Property: "id"},
+		},
+		{
 			name: "surrounding whitespace",
 			ref:  "  #retl-source-sql-model:users  ",
 			want: &resources.PropertyRef{URN: "retl-source-sql-model:users", Property: "id"},
@@ -81,12 +104,12 @@ func TestParseSourceRef(t *testing.T) {
 		{
 			name:    "wrong family",
 			ref:     "#event-stream-source:users",
-			wantErr: `source reference "#event-stream-source:users" is not a rETL source: expected #retl-source-sql-model:<id>`,
+			wantErr: `source reference "#event-stream-source:users" is not a rETL source: expected #retl-source-sql-model:<id> or #retl-source-table:<id>`,
 		},
 		{
 			name:    "not a reference",
 			ref:     "users",
-			wantErr: `invalid source reference "users": expected #retl-source-sql-model:<id>`,
+			wantErr: `invalid source reference "users": expected #retl-source-sql-model:<id> or #retl-source-table:<id>`,
 		},
 	}
 

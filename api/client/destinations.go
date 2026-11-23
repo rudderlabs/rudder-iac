@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -53,6 +55,18 @@ type destinations struct {
 type DestinationsPage struct {
 	APIPage
 	Destinations []Destination `json:"destinations"`
+}
+
+type ListDestinationsOption func(*ListDestinationsOptions)
+
+func WithDestinationsHasExternalID(hasExternalID bool) ListDestinationsOption {
+	return func(o *ListDestinationsOptions) {
+		o.HasExternalID = &hasExternalID
+	}
+}
+
+type ListDestinationsOptions struct {
+	HasExternalID *bool
 }
 
 type DestinationTransformation struct {
@@ -121,13 +135,32 @@ func (s *destinations) Next(ctx context.Context, paging Paging) (*DestinationsPa
 	return page, err
 }
 
-func (s *destinations) List(ctx context.Context) (*DestinationsPage, error) {
+func (s *destinations) List(ctx context.Context, opts ...ListDestinationsOption) (*DestinationsPage, error) {
 	page := &DestinationsPage{}
-	if err := s.list(ctx, page); err != nil {
+	if err := s.list(ctx, page, opts...); err != nil {
 		return nil, err
 	}
 
 	return page, nil
+}
+
+func (s *destinations) list(ctx context.Context, result interface{}, opts ...ListDestinationsOption) error {
+	options := &ListDestinationsOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	path := s.basePath
+	query := url.Values{}
+	if options.HasExternalID != nil {
+		query.Add("hasExternalId", strconv.FormatBool(*options.HasExternalID))
+	}
+	if len(query) > 0 {
+		path = fmt.Sprintf("%s?%s", path, query.Encode())
+	}
+
+	_, err := s.next(ctx, Paging{Next: path}, result)
+	return err
 }
 
 func (s *destinations) Get(ctx context.Context, id string) (*Destination, error) {
@@ -175,10 +208,10 @@ func (s *destinations) Delete(ctx context.Context, id string) error {
 	return s.service.delete(ctx, id)
 }
 
-func (s *destinations) GetAll(ctx context.Context) ([]Destination, error) {
+func (s *destinations) GetAll(ctx context.Context, opts ...ListDestinationsOption) ([]Destination, error) {
 	var all []Destination
 
-	page, err := s.List(ctx)
+	page, err := s.List(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("listing destinations: %w", err)
 	}

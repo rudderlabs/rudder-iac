@@ -386,15 +386,12 @@ func discriminatorValue(apiKey string, values DiscriminatorValues) FromLocalFunc
 				continue
 			}
 
-			switch r.Type {
-			case gjson.JSON:
-				if r.IsArray() && len(r.Value().([]any)) == 0 {
-					continue
-				}
-			case gjson.String:
-				if r.Value() == "" {
-					continue
-				}
+			// An empty list is a selection, not an absence: whitelisting with no
+			// event named discards every event. A null or empty-string member
+			// says nothing is chosen — and skipping null keeps the choice
+			// deterministic when a null sibling accompanies a real list.
+			if r.Type == gjson.Null || (r.Type == gjson.String && r.Value() == "") {
+				continue
 			}
 
 			return sjson.Set(config, apiKey, v)

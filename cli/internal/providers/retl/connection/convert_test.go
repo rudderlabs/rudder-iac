@@ -12,15 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// The mapping targets the backend folds into identifiers and reconstructs on
-// read — USER_ID, ANONYMOUS_ID and SYSTEM_CONSTANTS.id in config-backend
-// src/modules/retl/api-gateway/connection-config/constants.ts.
-const (
-	userIDTarget      = "user_id"
-	anonymousIDTarget = "anonymous_id"
-	externalIDTarget  = "context.externalId[0].id"
-)
-
 // graphData builds the resource entry the syncer hands the lifecycle: endpoint
 // refs already dereferenced to remote ids, plus the canonical config map.
 func graphData(t *testing.T, config ConfigSpec) resources.ResourceData {
@@ -56,7 +47,7 @@ func backendResponse(request *retlClient.CreateRETLConnectionRequest) *retlClien
 
 	if request.Object == "" {
 		for _, mapping := range slices.Concat(request.Identifiers, request.Mappings) {
-			if mapping.To == userIDTarget || mapping.To == anonymousIDTarget {
+			if mapping.To == UserIDTarget || mapping.To == AnonymousIDTarget {
 				conn.Identifiers = append(conn.Identifiers, mapping)
 				continue
 			}
@@ -74,12 +65,12 @@ func backendResponse(request *retlClient.CreateRETLConnectionRequest) *retlClien
 	// back out of the system constants. Constants and event never surface.
 	identifier := request.Identifiers[0]
 	stored := append([]retlClient.Mapping{
-		{From: identifier.From, To: userIDTarget},
-		{From: identifier.From, To: externalIDTarget},
+		{From: identifier.From, To: UserIDTarget},
+		{From: identifier.From, To: ExternalIDTarget},
 	}, request.Mappings...)
 
 	for _, mapping := range stored {
-		if mapping.To == userIDTarget || mapping.To == externalIDTarget {
+		if mapping.To == UserIDTarget || mapping.To == ExternalIDTarget {
 			continue
 		}
 		conn.Mappings = append(conn.Mappings, mapping)
@@ -400,6 +391,60 @@ func TestToUpdateRequestObjectMapping(t *testing.T) {
 	}`, string(body))
 }
 
+// A visual-mapper-v2 connection carries no object and no constants, which is
+// exactly the shape that used to be mistaken for the JSON mapper: the PUT body
+// went out with `"constants": []` and the API answered
+// 400 validation/immutable-field: constants, because its VdmV2 mutable set has
+// no constants and it refuses any value that is not undefined. That broke every
+// enable, schedule change and mapping edit on a v2 connection, so assert the
+// serialized body rather than the struct — a nil *[]Constant and a pointer to
+// an empty slice differ only once marshalled.
+func TestToUpdateRequestVisualMapperV2OmitsConstants(t *testing.T) {
+	t.Parallel()
+
+	config := visualMapperV2Config()
+	config.Schedule = ScheduleSpec{Type: "basic", EveryMinutes: ptr(720)}
+
+	request, err := toUpdateRequest(graphData(t, config), graphData(t, visualMapperV2Config()))
+	require.NoError(t, err)
+	assert.Nil(t, request.Constants, "a v2 PUT must not name constants at all")
+
+	body, err := json.Marshal(request)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{
+		"enabled": true,
+		"schedule": {"type": "basic", "everyMinutes": 720},
+		"identifiers": [{"from": "id", "to": "user_id"}],
+		"mappings": [{"from": "email", "to": "traits.email"}]
+	}`, string(body))
+}
+
+// The narrower condition must not cost the JSON mapper its ability to clear
+// constants, which is the one reason the field is a pointer. Stored has some,
+// desired has none: the body still has to carry the empty array.
+func TestToUpdateRequestJSONMapperStillClearsConstants(t *testing.T) {
+	t.Parallel()
+
+	stored := jsonMapperConfig()
+	stored.Constants = []ConstantSpec{{Key: "source", Value: "warehouse"}}
+
+	request, err := toUpdateRequest(graphData(t, jsonMapperConfig()), graphData(t, stored))
+	require.NoError(t, err)
+	require.NotNil(t, request.Constants)
+	assert.Empty(t, *request.Constants)
+}
+
+// A JSON mapper connection that never had constants has nothing to clear, so
+// the key stays off the body. The API accepts it on this flow either way; the
+// point is that an absent object no longer decides the question by itself.
+func TestToUpdateRequestJSONMapperWithoutConstantsOmitsThem(t *testing.T) {
+	t.Parallel()
+
+	request, err := toUpdateRequest(graphData(t, jsonMapperConfig()), graphData(t, jsonMapperConfig()))
+	require.NoError(t, err)
+	assert.Nil(t, request.Constants)
+}
+
 func TestToUpdateRequestSyncSettings(t *testing.T) {
 	t.Parallel()
 
@@ -407,14 +452,14 @@ func TestToUpdateRequestSyncSettings(t *testing.T) {
 	nondefault.SyncSettings = &SyncSettingsSpec{FailedKeys: &FailedKeysSpec{Retry: ptr(false)}}
 
 	// Only the settings differ across the rows; the rest of the body has to
-	// stay put, constants included — those travel as [] on every row.
+	// stay put. Neither side of any row has constants, and nothing is stored to
+	// clear, so the field stays off the body on all three.
 	wantRequest := func(settings *retlClient.SyncSettings) *retlClient.UpdateRETLConnectionRequest {
 		return &retlClient.UpdateRETLConnectionRequest{
 			Enabled:      lo.ToPtr(true),
 			Schedule:     retlClient.Schedule{Type: retlClient.ScheduleTypeBasic, EveryMinutes: lo.ToPtr(30)},
 			Identifiers:  []retlClient.Mapping{{From: "id", To: "user_id"}},
 			Mappings:     lo.ToPtr([]retlClient.Mapping{{From: "email", To: "traits.email"}}),
-			Constants:    lo.ToPtr([]retlClient.Constant{}),
 			SyncSettings: settings,
 		}
 	}
@@ -527,7 +572,7 @@ func representableConnection() *retlClient.RETLConnection {
 		ID:            "conn-1",
 		SyncBehaviour: retlClient.SyncBehaviourUpsert,
 		Schedule:      retlClient.Schedule{Type: retlClient.ScheduleTypeBasic, EveryMinutes: lo.ToPtr(30)},
-		Identifiers:   []retlClient.Mapping{{From: "id", To: userIDTarget}},
+		Identifiers:   []retlClient.Mapping{{From: "id", To: UserIDTarget}},
 		Mappings:      []retlClient.Mapping{{From: "email", To: "traits.email"}},
 		SyncSettings:  mergedSyncSettings(nil),
 	}
@@ -659,21 +704,21 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 		t.Parallel()
 
 		config := jsonMapperConfig()
-		config.Mappings = []MappingSpec{{From: "device", To: anonymousIDTarget}, {From: "email", To: "traits.email"}}
+		config.Mappings = []MappingSpec{{From: "device", To: AnonymousIDTarget}, {From: "email", To: "traits.email"}}
 
 		request, err := toCreateRequest(graphData(t, config))
 		require.NoError(t, err)
 
 		// The request carries the user's entries untouched: the reclassification
 		// below is the backend's doing, not ours.
-		assert.Equal(t, []retlClient.Mapping{{From: "id", To: userIDTarget}}, request.Identifiers)
-		assert.Equal(t, []retlClient.Mapping{{From: "device", To: anonymousIDTarget}, {From: "email", To: "traits.email"}}, request.Mappings)
+		assert.Equal(t, []retlClient.Mapping{{From: "id", To: UserIDTarget}}, request.Identifiers)
+		assert.Equal(t, []retlClient.Mapping{{From: "device", To: AnonymousIDTarget}, {From: "email", To: "traits.email"}}, request.Mappings)
 
 		remote, err := configFromRemote(backendResponse(request))
 		require.NoError(t, err)
 
 		reclassified := jsonMapperConfig()
-		reclassified.Identifiers = []MappingSpec{{From: "id", To: userIDTarget}, {From: "device", To: anonymousIDTarget}}
+		reclassified.Identifiers = []MappingSpec{{From: "id", To: UserIDTarget}, {From: "device", To: AnonymousIDTarget}}
 		assert.Equal(t, reclassified, remote)
 		assert.NotEqual(t, normalizeConfig(config), remote)
 	})
@@ -682,15 +727,15 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 		t.Parallel()
 
 		config := objectMappingConfig()
-		config.Mappings = []MappingSpec{{From: "id", To: externalIDTarget}, {From: "email", To: "Email"}}
+		config.Mappings = []MappingSpec{{From: "id", To: ExternalIDTarget}, {From: "email", To: "Email"}}
 
 		request, err := toCreateRequest(graphData(t, config))
 		require.NoError(t, err)
 
 		// The entry aimed at the reserved target is still in the request; only
 		// the backend consumes it as a synthetic identifier.
-		assert.Equal(t, []retlClient.Mapping{{From: "id", To: userIDTarget}}, request.Identifiers)
-		assert.Equal(t, []retlClient.Mapping{{From: "id", To: externalIDTarget}, {From: "email", To: "Email"}}, request.Mappings)
+		assert.Equal(t, []retlClient.Mapping{{From: "id", To: UserIDTarget}}, request.Identifiers)
+		assert.Equal(t, []retlClient.Mapping{{From: "id", To: ExternalIDTarget}, {From: "email", To: "Email"}}, request.Mappings)
 
 		remote, err := configFromRemote(backendResponse(request))
 		require.NoError(t, err)
@@ -704,8 +749,8 @@ func TestRoundTripSurfacesReservedMappingTargets(t *testing.T) {
 
 // A change to an immutable field cannot ride on a PUT: the body has no field
 // for it, so the server would apply nothing and the diff would return on every
-// apply. DEX-825 routes these to delete-then-create, so this guard only fires
-// on a bug — but a loud error beats silent perpetual drift.
+// apply. Only an endpoint change is replaced; the rest are reported here, with
+// the remedy the UI imposes too.
 func TestToUpdateRequestRejectsImmutableChanges(t *testing.T) {
 	t.Parallel()
 

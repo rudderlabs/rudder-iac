@@ -24,11 +24,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "adj", registered.Type)
 	assert.Equal(t, "ADJ", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Empty(t, registered.SecretKeys(), "db-config declares no secretKeys")
+	assert.Equal(t, []string{"app_token"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift",
-		"unity", "react_native", "flutter", "cordova", "cloud",
+		"unity", "react_native", "flutter", "cordova", "cloud", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -42,6 +42,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"flutter":        {"cloud", "device"},
 		"cordova":        {"cloud"},
 		"cloud":          {"cloud"},
+		"warehouse":      {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
@@ -50,7 +51,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	}
 
 	assert.NotContains(t, registered.SupportedSourceTypes(), "shopify")
-	assert.NotContains(t, registered.SupportedSourceTypes(), "warehouse")
+
+	// db-config.json declares neither rETL field, so the backend fallback applies.
+	assert.Nil(t, adj.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	// One flag per platform, matching schema.json's four sub-keys and db-config's
 	// deliberately ungated, so it does not appear here.
@@ -326,12 +331,12 @@ func TestAdjustConfigValidation(t *testing.T) {
 		errors := registered.ValidateConfig(map[string]any{
 			"app_token": "abc123",
 			"consent_management": map[string]any{
-				"warehouse": []any{},
+				"amp": []any{},
 			},
 		})
 		require.Len(t, errors, 1)
-		assert.Equal(t, "/consent_management/warehouse", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "source type 'warehouse' is not supported")
+		assert.Equal(t, "/consent_management/amp", errors[0].Path)
+		assert.Contains(t, errors[0].Message, "source type 'amp' is not supported")
 	})
 
 	t.Run("invalid consent provider rejected", func(t *testing.T) {
@@ -441,6 +446,55 @@ func TestAdjustAPIToLocalDropsUnselectedList(t *testing.T) {
 	}
 }
 
+// A spec that selects a list but names no events discards every event, so it
+// has to survive a round trip. It used to convert to nothing outbound — no list
+// and no discriminator — so the next plan saw local config the remote state
+// never carried, and the destination showed a pending update on every apply.
+func TestAdjustEmptySelectedListRoundTrips(t *testing.T) {
+	t.Parallel()
+
+	registry := definitions.NewRegistry()
+	require.NoError(t, registry.Register(adj.NewDefinition()))
+
+	registered, err := registry.Get("adj", 1)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		filter   map[string]any
+		wantWire map[string]any
+	}{
+		{
+			name:     "empty whitelist discards every event",
+			filter:   map[string]any{"whitelist": []any{}},
+			wantWire: map[string]any{"eventFilteringOption": "whitelistedEvents"},
+		},
+		{
+			name:     "empty blacklist filters nothing",
+			filter:   map[string]any{"blacklist": []any{}},
+			wantWire: map[string]any{"eventFilteringOption": "blacklistedEvents"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			local := map[string]any{"app_token": "app-token", "event_filtering": tt.filter}
+
+			api, err := registered.LocalToAPI(local)
+			require.NoError(t, err)
+			for key, want := range tt.wantWire {
+				assert.Equal(t, want, api[key], "the selector must reach the API")
+			}
+
+			back, err := registered.APIToLocal(api)
+			require.NoError(t, err)
+			assert.Equal(t, tt.filter, back["event_filtering"], "apply then plan must converge")
+		})
+	}
+}
+
 func TestAdjustConversionRoundTrip(t *testing.T) {
 	t.Parallel()
 
@@ -539,6 +593,7 @@ func TestAdjustConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 

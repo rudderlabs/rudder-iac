@@ -5,40 +5,28 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
-func specEntity(spec map[string]any) writer.FormattableEntity {
-	return writer.FormattableEntity{
-		Content: &specs.Spec{
-			Version:  specs.SpecVersionV1,
-			Kind:     "books",
-			Metadata: map[string]any{"name": "books"},
-			Spec:     spec,
-		},
-		RelativePath: "books/books.yaml",
-	}
-}
-
 func TestCollectVariableNames(t *testing.T) {
 	entities := []writer.FormattableEntity{
-		specEntity(map[string]any{
+		newSpecEntity("books", "books/books.yaml", map[string]any{
 			"books": []any{
 				map[string]any{"id": "a", "accessKey": "{{ .B_ACCESS_KEY }}"},
 				map[string]any{"id": "b", "nested": map[string]any{"token": "{{ .A_TOKEN }}"}},
 				map[string]any{"id": "c", "plain": "no token", "count": 3},
 			},
 		}),
-		// Every generated entity is scanned, spec file or not.
-		{Content: "select * from {{ .RAW_TABLE }}", RelativePath: "raw.txt"},
+		// A raw code file is loaded verbatim, never substituted, so its
+		// "{{ .NAME }}" is code and needs no var file entry.
+		{Content: "export function transformEvent(e) { return '{{ .CODE_ONLY }}' }", RelativePath: "transformations/t.js"},
 	}
 
 	assert.Equal(t,
-		[]string{"A_TOKEN", "B_ACCESS_KEY", "RAW_TABLE"},
+		[]string{"A_TOKEN", "B_ACCESS_KEY"},
 		collectVariableNames(entities),
 	)
 }
@@ -47,7 +35,7 @@ func TestScaffoldSecretsVarFile(t *testing.T) {
 	dir := t.TempDir()
 
 	entities := []writer.FormattableEntity{
-		specEntity(map[string]any{"accessKey": "{{ .BOOKS_ACCESS_KEY }}"}),
+		newSpecEntity("books", "books/books.yaml", map[string]any{"accessKey": "{{ .BOOKS_ACCESS_KEY }}"}),
 	}
 
 	path, err := scaffoldSecretsVarFile(t.Context(), dir, entities)
@@ -61,6 +49,8 @@ func TestScaffoldSecretsVarFile(t *testing.T) {
 	raw, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.Contains(t, string(raw), "# Variables referenced by the imported specs")
+	assert.Contains(t, string(raw), "# For a multi-line value such as a PEM certificate or key, use a YAML literal")
+	assert.Contains(t, string(raw), "# The generated '{{ .VAR }}' references keep those line breaks.")
 	assert.Contains(t, string(raw), "BOOKS_ACCESS_KEY:\n")
 }
 
@@ -73,7 +63,7 @@ func TestScaffoldSecretsVarFile_ExistingFileErrors(t *testing.T) {
 	require.NoError(t, os.WriteFile(existing, []byte("BOOKS_ACCESS_KEY: \"filled-in\"\n"), 0600))
 
 	entities := []writer.FormattableEntity{
-		specEntity(map[string]any{"accessKey": "{{ .BOOKS_ACCESS_KEY }}"}),
+		newSpecEntity("books", "books/books.yaml", map[string]any{"accessKey": "{{ .BOOKS_ACCESS_KEY }}"}),
 	}
 
 	_, err := scaffoldSecretsVarFile(t.Context(), dir, entities)
@@ -85,7 +75,7 @@ func TestScaffoldSecretsVarFile_NoVariables(t *testing.T) {
 	dir := t.TempDir()
 
 	path, err := scaffoldSecretsVarFile(t.Context(), dir, []writer.FormattableEntity{
-		specEntity(map[string]any{"plain": "value"}),
+		newSpecEntity("books", "books/books.yaml", map[string]any{"plain": "value"}),
 	})
 	require.NoError(t, err)
 	assert.Empty(t, path)
@@ -99,4 +89,30 @@ func readVarFile(t *testing.T, path string) map[string]any {
 	vars := make(map[string]any)
 	require.NoError(t, yaml.Unmarshal(data, &vars))
 	return vars
+}
+
+// TestCheckVariableOwners_RefusesNewResourcesSharingAVariable pins that two generated
+// files never share a secret variable. Names come from the resource id and key
+// path joined with "_", so a destination and an account both imported as "pg"
+// with a password both reference PG_PASSWORD, and one entry would fill both.
+func TestCheckVariableOwners_RefusesNewResourcesSharingAVariable(t *testing.T) {
+	err := checkVariableOwners("", []writer.FormattableEntity{
+		{Content: map[string]any{"password": "{{ .PG_PASSWORD }}"}, RelativePath: "destinations/pg.yaml"},
+		{Content: map[string]any{"password": "{{ .PG_PASSWORD }}"}, RelativePath: "accounts/pg.yaml"},
+		{Content: map[string]any{"token": "{{ .OTHER_TOKEN }}"}, RelativePath: "destinations/other.yaml"},
+	})
+	require.EqualError(t, err, "imported specs would share secret variables: PG_PASSWORD (in imported/accounts/pg.yaml and imported/destinations/pg.yaml); "+
+		"the names come from each resource's id, so rename one of the resources whose ids collide and import again")
+}
+
+// TestCheckVariableOwners_IgnoresSharedReferencesInRawCode pins that raw code
+// files, which are loaded verbatim rather than variable-substituted, never
+// count as sharing a secret variable: two transformation scripts may hold the
+// same literal "{{ .NAME }}".
+func TestCheckVariableOwners_IgnoresSharedReferencesInRawCode(t *testing.T) {
+	err := checkVariableOwners("", []writer.FormattableEntity{
+		{Content: "export function transformEvent(e) { return '{{ .NAME }}' }", RelativePath: "transformations/a.js"},
+		{Content: "def transformEvent(e): return '{{ .NAME }}'", RelativePath: "transformations/b.py"},
+	})
+	require.NoError(t, err)
 }

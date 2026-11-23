@@ -27,6 +27,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -40,6 +41,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type webBool struct {
@@ -152,17 +154,23 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "mp",
-		APIType:    "MP",
-		Version:    1,
-		Properties: properties,
+		Type:        "mp",
+		DisplayName: "Mixpanel",
+		APIType:     "MP",
+		Version:     1,
+		Properties:  properties,
 		// Deliberately broader than db-config secretKeys, which lists only
 		// gdprApiToken. token is Sensitive in terraform, and serviceAccountSecret
 		// is a credential by name and function though neither source classifies it
 		// (terraform does not model it at all). The cost is accepted: the API
 		// returns both, so each reads back as an unknown secret and re-applies on
 		// every plan — the same trade recorded for customerio and posthog.
-		SecretKeys: []string{"token", "gdpr_api_token", "service_account_secret"},
+		SecretKeys: []string{
+			"token",
+			"gdpr_api_token",
+			"service_account_secret",
+			"service_account_user_name",
+		},
 		NewConfig: func() any {
 			return &mpConfig{}
 		},

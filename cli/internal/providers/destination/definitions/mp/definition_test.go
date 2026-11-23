@@ -24,11 +24,11 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "mp", registered.Type)
 	assert.Equal(t, "MP", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"token", "gdpr_api_token", "service_account_secret"}, registered.SecretKeys())
+	assert.Equal(t, []string{"token", "gdpr_api_token", "service_account_secret", "service_account_user_name"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web", "unity",
-		"cloud", "react_native", "flutter", "cordova",
+		"cloud", "react_native", "flutter", "cordova", "warehouse",
 	}
 	assert.Equal(t, expectedSourceTypes, registered.SupportedSourceTypes())
 
@@ -43,12 +43,18 @@ func TestNewDefinitionMetadata(t *testing.T) {
 		"react_native":   {"cloud"},
 		"flutter":        {"cloud"},
 		"cordova":        {"cloud"},
+		"warehouse":      {"cloud"},
 	}
 	for sourceType, want := range expectedModes {
 		modes, err := registered.ConnectionModes(sourceType)
 		require.NoError(t, err)
 		assert.Equal(t, want, modes, "source type %s", sourceType)
 	}
+
+	// db-config.json declares neither rETL field, so the backend fallback applies.
+	assert.Nil(t, mp.NewDefinition().SyncBehaviours)
+	assert.Equal(t, []string{"upsert", "mirror", "full"}, registered.SyncBehaviours())
+	assert.False(t, registered.SupportsVisualMapper())
 
 	assert.Equal(t, map[string][]string{
 		"session_replay_percentage/web": {"web"},
@@ -237,22 +243,28 @@ func TestMPConfigValidation(t *testing.T) {
 		assert.Contains(t, errors[0].Message, "required")
 	})
 
-	t.Run("page template required when custom page event name is enabled", func(t *testing.T) {
+	t.Run("page template defaults when custom page event name is enabled", func(t *testing.T) {
 		t.Parallel()
 
 		config := validMinimalConfig()
 		config["use_user_defined_page_event_name"] = true
+		assert.Empty(t, registered.ValidateConfig(config))
+
+		config["user_defined_page_event_template"] = ""
 		errors := registered.ValidateConfig(config)
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/user_defined_page_event_template", errors[0].Path)
 		assert.Contains(t, errors[0].Message, "required")
 	})
 
-	t.Run("screen template required when custom screen event name is enabled", func(t *testing.T) {
+	t.Run("screen template defaults when custom screen event name is enabled", func(t *testing.T) {
 		t.Parallel()
 
 		config := validMinimalConfig()
 		config["use_user_defined_screen_event_name"] = true
+		assert.Empty(t, registered.ValidateConfig(config))
+
+		config["user_defined_screen_event_template"] = ""
 		errors := registered.ValidateConfig(config)
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/user_defined_screen_event_template", errors[0].Path)
@@ -384,7 +396,9 @@ func TestMPSecretKeysWrapSensitiveValues(t *testing.T) {
 		require.True(t, ok, "expected %s to be wrapped as a secret", key)
 		assert.NotContains(t, wrapped.String(), "raw-")
 	}
-	assert.Equal(t, "visible-user", config["service_account_user_name"])
+	userName, ok := config["service_account_user_name"].(*secret.String)
+	require.True(t, ok, "service_account_user_name must be wrapped as a secret")
+	assert.Equal(t, "visible-user", userName.Reveal())
 }
 
 func TestMPConversionRoundTrip(t *testing.T) {
@@ -528,6 +542,7 @@ func TestMPConversionRoundTrip(t *testing.T) {
 				}
 			}`,
 		},
+		testutil.WarehouseSettings,
 	})
 }
 

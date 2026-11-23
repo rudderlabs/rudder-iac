@@ -1,0 +1,16 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: test_transformations
+spec:
+  id: substituted_transform
+  name: Substituted Transform
+  description: Verifies variables are resolved before transformation validation
+  language: "{{ .TRANSFORMATION_LANGUAGE }}"
+  code: |
+    export function transformEvent(event, metadata) {
+      return event;
+    }
+  tests:
+    - name: substitution_success
+      input: ./input/substituted_transform

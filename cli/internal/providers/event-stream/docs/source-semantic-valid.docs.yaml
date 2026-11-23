@@ -185,3 +185,33 @@ match_behavior:
             reference: "/name"
             severity: "error"
             message_contains: "duplicate name 'Shared Name' within kind 'event-stream-source'"
+      - example_id: "es-source-v1-semantic-case-variant-name"
+        title: "v1 sources whose names differ only in case (names compare case-insensitively)"
+        files:
+          source-a.yaml: |
+            version: rudder/v1
+            kind: event-stream-source
+            metadata:
+              name: source-a
+            spec:
+              id: src-a
+              name: Web App
+              type: javascript
+          source-b.yaml: |
+            version: rudder/v1
+            kind: event-stream-source
+            metadata:
+              name: source-b
+            spec:
+              id: src-b
+              name: web app
+              type: node
+        expected_diagnostics:
+          - file: "source-a.yaml"
+            reference: "/name"
+            severity: "error"
+            message_contains: "duplicate name 'Web App' (case-insensitive match with 'web app') within kind 'event-stream-source'"
+          - file: "source-b.yaml"
+            reference: "/name"
+            severity: "error"
+            message_contains: "duplicate name 'web app' (case-insensitive match with 'Web App') within kind 'event-stream-source'"

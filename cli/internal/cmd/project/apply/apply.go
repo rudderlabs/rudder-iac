@@ -28,7 +28,6 @@ func NewCmdApply() *cobra.Command {
 		deps      app.Deps
 		p         project.Project
 		workspace *client.Workspace
-		err       error
 		location  string
 		dryRun    bool
 		confirm   bool
@@ -48,7 +47,7 @@ func NewCmdApply() *cobra.Command {
 			$ rudder-cli apply --location </path/to/dir or file> --dry-run
 			$ rudder-cli apply --location </path/to/dir or file> --confirm=false
 		`),
-		PreRunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, args []string) (err error) {
 			deps, err = app.NewDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
@@ -58,6 +57,8 @@ func NewCmdApply() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
+
+			printWorkspaceBanner(workspace)
 
 			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
@@ -78,12 +79,12 @@ func NewCmdApply() *cobra.Command {
 
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			applyLog.Debug("apply", "location", location, "dryRun", dryRun, "confirm", confirm)
 			applyLog.Debug("identifying changes for the upstream catalog")
 
 			defer func() {
-				telemetry.TrackCommand("apply", err, []telemetry.KV{
+				telemetry.TrackCommand(telemetry.CommandName(cmd), err, []telemetry.KV{
 					{K: "location", V: location},
 					{K: "dryRun", V: dryRun},
 					{K: "confirm", V: confirm},
@@ -131,4 +132,15 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 
 	return cmd
+}
+
+// printWorkspaceBanner names the workspace the apply is about to touch, so a run
+// against the wrong token is visible before any change is planned.
+func printWorkspaceBanner(workspace *client.Workspace) {
+	ui.Printf(
+		"%s %s %s\n",
+		ui.Color("Workspace:", ui.ColorBlue),
+		ui.Bold(workspace.Name),
+		ui.GreyedOut("("+workspace.ID+")"),
+	)
 }

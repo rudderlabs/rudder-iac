@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -421,17 +422,12 @@ func (h *Handler) updateTrackingPlanConfig(ctx context.Context, trackingPlanID, 
 
 func (h *Handler) LoadResourcesFromRemote(ctx context.Context) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
-	sources, err := h.client.GetSources(ctx)
+	sources, err := h.client.GetSources(ctx, sourceClient.WithSourcesHasExternalID(true))
 	if err != nil {
 		return nil, fmt.Errorf("getting event stream sources: %w", err)
 	}
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, source := range sources {
-		if source.ExternalID == "" {
-			// loop over the sources which have externalID not set
-			// as they are not anyway part of the state
-			continue
-		}
 		resourceMap[source.ID] = &resources.RemoteResource{
 			ID:         source.ID,
 			ExternalID: source.ExternalID,
@@ -450,6 +446,12 @@ func (p *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 		if !ok {
 			return nil, fmt.Errorf("unable to cast resource to event stream source")
 		}
+		// Unmanaged sources hold no state, and resolving their tracking plan
+		// first would be fatal: the tracking plan collection is loaded managed
+		// only, so a UI-linked plan is missing from it entirely.
+		if source.ExternalID == "" {
+			continue
+		}
 		var trackingPlanURN *string
 		if source.TrackingPlan != nil {
 			tpURN, err := collection.GetURNByID(types.TrackingPlanResourceType, source.TrackingPlan.ID)
@@ -463,12 +465,8 @@ func (p *Handler) MapRemoteToState(collection *resources.RemoteResources) (*stat
 				trackingPlanURN = &tpURN
 			}
 		}
-		resourceState, skip := mapRemoteToState(&source, trackingPlanURN)
-		if skip {
-			continue
-		}
 		urn := resources.URN(esResource.ExternalID, ResourceType)
-		s.Resources[urn] = resourceState
+		s.Resources[urn] = mapRemoteToState(&source, trackingPlanURN)
 	}
 	return s, nil
 }
@@ -491,7 +489,7 @@ func (h *Handler) Delete(ctx context.Context, id string, state resources.Resourc
 	}
 	err := h.client.Delete(ctx, remoteID)
 	if err != nil {
-		return fmt.Errorf("deleting event stream source: %w", err)
+		return fmt.Errorf("deleting event stream source: %w", provider.ExplainBlockingEventStreamConnections(err))
 	}
 	return nil
 }
@@ -568,15 +566,12 @@ func (h *Handler) Import(ctx context.Context, id string, data resources.Resource
 
 func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
-	sources, err := h.client.GetSources(ctx)
+	sources, err := h.client.GetSources(ctx, sourceClient.WithSourcesHasExternalID(false))
 	if err != nil {
 		return nil, fmt.Errorf("getting event stream sources: %w", err)
 	}
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, source := range sources {
-		if source.ExternalID != "" {
-			continue
-		}
 		externalID, err := idNamer.Name(namer.ScopeName{
 			Name:  source.Name,
 			Scope: ResourceType,
@@ -802,10 +797,7 @@ func toEventConfigImportSpec(config *sourceClient.EventTypeConfig) map[string]an
 	return result
 }
 
-func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN *string) (*state.ResourceState, bool) {
-	if source.ExternalID == "" {
-		return nil, true
-	}
+func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN *string) *state.ResourceState {
 	input := resources.ResourceData{
 		NameKey:             source.Name,
 		EnabledKey:          source.Enabled,
@@ -827,7 +819,7 @@ func mapRemoteToState(source *sourceClient.EventStreamSource, trackingPlanURN *s
 		ID:     source.ExternalID,
 		Input:  input,
 		Output: *output,
-	}, false
+	}
 }
 
 func toResourceData(sourceID string, trackingPlanID string) *resources.ResourceData {

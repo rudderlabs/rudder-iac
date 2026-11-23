@@ -49,18 +49,9 @@ type ListProvider interface {
 }
 
 func (l *Lister) List(ctx context.Context, resourceType string, filters Filters) error {
-	var rs []resources.ResourceData
-	var err error
-
-	if l.Format != JSONFormat {
-		spinner := ui.NewSpinner(fmt.Sprintf("Fetching %s...", resourceType))
-		spinner.Start()
-		rs, err = l.Provider.List(ctx, resourceType, filters)
-		spinner.Stop()
-	} else {
-		rs, err = l.Provider.List(ctx, resourceType, filters)
-	}
-
+	ui.StartSpinner(fmt.Sprintf("Fetching %s...", resourceType))
+	rs, err := l.Provider.List(ctx, resourceType, filters)
+	ui.StopSpinner()
 	if err != nil {
 		return err
 	}

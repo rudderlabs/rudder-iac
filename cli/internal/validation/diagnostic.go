@@ -31,6 +31,11 @@ type Diagnostic struct {
 	// to do any file I/O or position lookup
 	Position pathindex.Position
 
+	// Sensitive marks a diagnostic whose line can show a secret value. The
+	// engine has already masked the value in Position.LineText, and another
+	// diagnostic on the same line should be masked too.
+	Sensitive bool
+
 	// Examples provides valid and invalid usage examples for this rule
 	// Can be nil if the rule doesn't provide examples
 	Examples rules.Examples
@@ -59,8 +64,11 @@ func (d Diagnostics) HasWarnings() bool {
 	return false
 }
 
+// Sort orders diagnostics by position. It is stable so that two diagnostics at
+// the same position — a syntactic and a semantic one, say — keep the order the
+// engine produced them in, instead of rendering differently between runs.
 func (d Diagnostics) Sort() {
-	sort.Slice(d, func(i, j int) bool {
+	sort.SliceStable(d, func(i, j int) bool {
 		if d[i].File != d[j].File {
 			return d[i].File < d[j].File
 		}

@@ -18,6 +18,19 @@ func jsonMapperConfig() ConfigSpec {
 	}
 }
 
+// visualMapperV2Config is the smallest config the visual-mapper-v2 flow
+// accepts. It carries no object, because a vdm-next destination names its
+// target in its own destination config rather than an object, and mirror is the
+// one flow a spec can declare it on.
+func visualMapperV2Config() ConfigSpec {
+	return ConfigSpec{
+		SyncBehaviour: "mirror",
+		Schedule:      ScheduleSpec{Type: "basic", EveryMinutes: ptr(1440)},
+		Identifiers:   []MappingSpec{{From: "id", To: "user_id"}},
+		Mappings:      []MappingSpec{{From: "email", To: "traits.email"}},
+	}
+}
+
 // objectMappingConfig is the smallest config the object mapping flow accepts:
 // exactly one identifier and an object, and no constants or event.
 func objectMappingConfig() ConfigSpec {
