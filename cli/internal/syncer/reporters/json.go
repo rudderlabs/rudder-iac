@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
+	"sync"
 
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 )
 
@@ -14,27 +17,27 @@ import (
 // as a single JSON document, so a machine consumer can reason about blast radius
 // before approving an apply.
 //
-// It accumulates rather than writing per callback because the reporter's own
-// lifecycle is not a reliable flush point: a dry run, an empty plan and a
-// declined confirmation all return from the syncer before SyncCompleted is ever
-// called. The command owns the flush instead — see Flush.
+// It writes nothing from the callbacks. A dry run, an empty plan, a declined
+// confirmation and a failed load all return before SyncCompleted, so the command
+// calls Flush on every exit path instead.
 type JSONSyncReporter struct {
-	w       io.Writer
-	dryRun  bool
-	plan    *planner.Plan
-	results []jsonTaskResult
+	w io.Writer
+
+	// mu guards out: the syncer reports task results from many goroutines.
+	mu  sync.Mutex
+	out jsonSyncOutput
 }
 
 func NewJSONSyncReporter(w io.Writer, dryRun bool) *JSONSyncReporter {
-	return &JSONSyncReporter{w: w, dryRun: dryRun}
+	return &JSONSyncReporter{w: w, out: jsonSyncOutput{DryRun: dryRun, Results: []jsonTaskResult{}}}
 }
 
 type jsonOperation struct {
 	Type string `json:"type"`
 	URN  string `json:"urn"`
-	// Properties names the fields that changed on an update. Names only, never
-	// values: a diff can carry secrets, and the name alone is what a consumer
-	// needs to judge blast radius.
+	// Properties names the fields that changed on an update or an import. Names
+	// only, never values: a diff can carry secrets, and the name alone is what a
+	// consumer needs to judge blast radius.
 	Properties []string `json:"properties,omitempty"`
 	// SecretOnly marks a resource that differs only by an unreadable secret, so
 	// it re-applies on every run. Without it a consumer sees permanent drift and
@@ -53,19 +56,54 @@ type jsonPlan struct {
 	Summary    map[string]int  `json:"summary"`
 }
 
+// jsonSyncOutput is the document apply --json writes. Plan is null when the run
+// failed before a plan existed, and Error then says why: without it that run
+// would look the same as one with nothing to change.
 type jsonSyncOutput struct {
 	DryRun  bool             `json:"dryRun"`
-	Plan    jsonPlan         `json:"plan"`
+	Plan    *jsonPlan        `json:"plan"`
 	Results []jsonTaskResult `json:"results"`
+	Error   string           `json:"error,omitempty"`
 }
 
 func (r *JSONSyncReporter) ReportPlan(plan *planner.Plan) {
-	r.plan = plan
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	out := &jsonPlan{
+		Operations: make([]jsonOperation, 0, len(plan.Operations)),
+		Summary:    map[string]int{"create": 0, "update": 0, "delete": 0, "import": 0},
+	}
+
+	for _, op := range plan.Operations {
+		urn := op.Resource.URN()
+		entry := jsonOperation{Type: strings.ToLower(op.Type.String()), URN: urn}
+
+		// An import keeps its changes in ImportableDiffs, not UpdatedResources.
+		diffs := plan.Diff.UpdatedResources
+		if op.Type == planner.Import {
+			diffs = plan.Diff.ImportableDiffs
+		}
+		if diff, ok := diffs[urn]; ok {
+			entry.SecretOnly = diff.IsSecretOnly()
+			entry.Properties = propertyNames(diff)
+		}
+
+		out.Operations = append(out.Operations, entry)
+		out.Summary[entry.Type]++
+	}
+
+	r.out.Plan = out
+}
+
+func propertyNames(diff differ.ResourceDiff) []string {
+	return slices.Sorted(maps.Keys(diff.Diffs))
 }
 
 // AskConfirmation always declines, matching PlainSyncReporter: there is no way to
-// prompt a consumer that is parsing stdout. A caller that means to apply passes
-// --confirm=false, which is the same contract CI already runs under.
+// prompt a consumer that is parsing stdout. The command refuses --json without
+// --dry-run or --confirm=false, so a declined apply cannot be mistaken for one
+// that ran.
 func (r *JSONSyncReporter) AskConfirmation() (bool, error) { return false, nil }
 
 func (r *JSONSyncReporter) SyncStarted(int)            {}
@@ -78,61 +116,27 @@ func (r *JSONSyncReporter) TaskCompleted(taskID string, _ string, err error) {
 		result.Status = "failed"
 		result.Error = err.Error()
 	}
-	r.results = append(r.results, result)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.out.Results = append(r.out.Results, result)
 }
 
-// Flush writes the accumulated document. The command defers it so every exit
-// path is covered — including the ones that never reach SyncCompleted.
-func (r *JSONSyncReporter) Flush() error {
-	out := jsonSyncOutput{
-		DryRun: r.dryRun,
-		Plan: jsonPlan{
-			Operations: r.operations(),
-			Summary:    map[string]int{"create": 0, "update": 0, "delete": 0, "import": 0},
-		},
-		Results: r.results,
-	}
+// Flush writes the document. runErr is what the command is returning: a failure
+// is recorded in the document, so it is never left holding only "ok" results.
+func (r *JSONSyncReporter) Flush(runErr error) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	if out.Results == nil {
-		out.Results = []jsonTaskResult{}
-	}
-
-	for _, op := range out.Plan.Operations {
-		out.Plan.Summary[op.Type]++
+	if runErr != nil {
+		r.out.Error = runErr.Error()
 	}
 
 	encoder := json.NewEncoder(r.w)
 	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(out); err != nil {
+	if err := encoder.Encode(r.out); err != nil {
 		return fmt.Errorf("encoding sync report: %w", err)
 	}
 
 	return nil
-}
-
-func (r *JSONSyncReporter) operations() []jsonOperation {
-	operations := make([]jsonOperation, 0)
-	if r.plan == nil {
-		return operations
-	}
-
-	for _, op := range r.plan.Operations {
-		urn := op.Resource.URN()
-		entry := jsonOperation{
-			Type: strings.ToLower(op.Type.String()),
-			URN:  urn,
-		}
-
-		if diff, ok := r.plan.Diff.UpdatedResources[urn]; ok {
-			entry.SecretOnly = diff.IsSecretOnly()
-			for property := range diff.Diffs {
-				entry.Properties = append(entry.Properties, property)
-			}
-			sort.Strings(entry.Properties)
-		}
-
-		operations = append(operations, entry)
-	}
-
-	return operations
 }

@@ -160,9 +160,7 @@ func (s *ProjectSyncer) apply(ctx context.Context, target *resources.Graph, cont
 
 	s.reporter.ReportPlan(plan)
 
-	// "No changes to apply" is reported by ReportPlan above rather than printed
-	// here: writing to stdout from the syncer bypasses the reporter and corrupts
-	// any machine-readable output format.
+	// "No changes to apply" is reported by ReportPlan above.
 	if s.dryRun || len(plan.Operations) == 0 {
 		return nil
 	}

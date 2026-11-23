@@ -1,0 +1,69 @@
+{{ comment .Doc }}
+{{- if .MapAlias }}
+type {{ .Name }} = map[string]any
+{{- else if not (or .Fields .Open) }}
+type {{ .Name }} struct{}
+{{- else }}
+type {{ .Name }} struct {
+{{- range .Fields }}
+	{{ .Name }} {{ .Type }} // {{ if .Required }}required{{ else }}optional{{ end }}{{ with .Note }}; {{ inline . }}{{ end }}
+{{- end }}
+{{- if .Open }}
+	AdditionalProperties map[string]any // optional; undeclared keys only
+{{- end }}
+}
+{{- end }}
+{{- with .Variant }}
+
+func ({{ $.Name }}) is{{ .Name }}() {}
+
+{{ comment $.DiscriminatorDoc }}
+func ({{ if $.ReadsReceiver }}v {{ end }}{{ $.Name }}) Discriminator() {{ .Result }} { return {{ $.Returns }} }
+{{- end }}
+{{- with .CategoryMode }}
+
+func ({{ $.Name }}) categoryMode() categoryMode { return {{ . }} }
+{{- end }}
+{{- if not .MapAlias }}
+
+func (v {{ .Name }}) toMap() map[string]any {
+{{- if .Open }}
+	m := withAdditional(v.AdditionalProperties{{ range .DeclaredKeys }}, {{ quote . }}{{ end }})
+{{- with .Sends }}
+	m[{{ quote $.Variant.Key }}] = {{ . }}
+{{- end }}
+{{- else }}
+	m := map[string]any{
+{{- with .Sends }}
+		{{ quote $.Variant.Key }}: {{ . }},
+{{- end }}
+{{- range .Fields }}{{ if .Required }}
+		{{ quote .Key }}: {{ if .Variant }}required(v.{{ .Name }}, {{ quote .Key }}){{ else }}v.{{ .Name }}{{ end }},
+{{- end }}{{ end }}
+	}
+{{- end }}
+{{- /* A closed struct's literal already holds its required fields. */}}
+{{- range .Fields }}
+{{- if not .Required }}
+	if {{ if .Variant }}!isNil(v.{{ .Name }}){{ else }}v.{{ .Name }} != nil{{ end }} {
+		m[{{ quote .Key }}] = {{ if .Pointer }}*{{ end }}v.{{ .Name }}
+	}
+{{- else if $.Open }}
+	m[{{ quote .Key }}] = {{ if .Variant }}required(v.{{ .Name }}, {{ quote .Key }}){{ else }}v.{{ .Name }}{{ end }}
+{{- end }}
+{{- end }}
+	return m
+}
+{{- with .Noun }}
+
+// To{{ . }} returns a deep copy of the {{ lower . }} as sent on the wire.
+func (v {{ $.Name }}) To{{ . }}() (analytics.{{ . }}, error) {
+	return snapshot(v)
+}
+{{- end }}
+
+// MarshalJSON implements json.Marshaler using the tracking plan's keys.
+func (v {{ .Name }}) MarshalJSON() ([]byte, error) {
+	return marshal(v)
+}
+{{- end }}
