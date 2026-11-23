@@ -3,9 +3,10 @@
 This document is the contract between `rudder-cli` and the control plane for
 creating and re-authorizing an OAuth integration account. The CLI half is
 built (`cli/internal/oauthhandoff`, `rudder-cli workspace accounts create`,
-`rudder-cli workspace accounts reauthorize`). **The server half does not
-exist.** Until it ships, both commands fail against production, which is why
-they sit behind an experimental flag.
+`rudder-cli workspace accounts reauthorize`). **The server half is not
+released.** It is open as rudder-config-backend#6972, rudder-control-plane#2806
+and rudder-webapp#10426. Until it ships, both commands fail against production,
+which is why they sit behind an experimental flag.
 
 Read this as the specification to implement. Every request, response, status
 value and timeout the CLI depends on is stated here. Nothing in it requires

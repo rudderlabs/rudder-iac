@@ -10,9 +10,10 @@
 // the browser runs the whole consent exchange under the user's dashboard
 // session and the CLI watches a session the server holds.
 //
-// The API this package calls DOES NOT EXIST YET. docs/oauth-account-handoff.md
-// is the contract to implement; the types and verbs here match it exactly, and
-// handofftest serves it for tests.
+// The server half is not released: it is open as rudder-config-backend#6972,
+// rudder-control-plane#2806 and rudder-webapp#10426. docs/oauth-account-handoff.md
+// is the contract; the types and verbs here match it exactly, and handofftest
+// serves it for tests.
 package oauthhandoff
 
 import (
@@ -23,7 +24,9 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strings"
 	"time"
+	"unicode"
 )
 
 // Status is a handoff session's state. Only these four are contractual; an
@@ -71,7 +74,18 @@ func (e *DeniedError) Error() string {
 	if e.Reason == "" {
 		return "authorization was refused"
 	}
-	return e.Reason
+	return stripControl(e.Reason)
+}
+
+// stripControl drops control characters, so a reason the server controls cannot
+// move the cursor or recolour the terminal it is printed to.
+func stripControl(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) && r != '\n' {
+			return -1
+		}
+		return r
+	}, s)
 }
 
 // OpenRequest opens a session. Exactly one of its two shapes is valid, and the
@@ -216,9 +230,11 @@ type WaitOptions struct {
 // seconds at a stretch, which reads as a hung CLI. The ticker paints while a
 // poll is in flight.
 //
-// ponytail: a failed poll ends the wait instead of being retried. The session
-// is still claimable, so the recovery is --resume rather than a retry loop
-// here; add one only if real waits turn out to be flaky.
+// A failed poll ends the wait instead of being retried. The session is still
+// claimable, so the recovery is --resume rather than a retry loop here.
+//
+// The deadline covers the polls too: each poll runs under a context that ends at
+// the deadline, so a slow response cannot succeed after Timeout.
 func Wait(ctx context.Context, api API, sessionID string, opts WaitOptions) (*State, error) {
 	type result struct {
 		state *State
@@ -241,6 +257,11 @@ func Wait(ctx context.Context, api API, sessionID string, opts WaitOptions) (*St
 		inFlight bool
 	)
 
+	// Ends at the deadline, and is cancelled on return so a poll still in
+	// flight is abandoned rather than left running.
+	pollCtx, cancel := context.WithDeadline(ctx, deadline)
+	defer cancel()
+
 	ticker := time.NewTicker(tickEvery)
 	defer ticker.Stop()
 
@@ -254,7 +275,7 @@ func Wait(ctx context.Context, api API, sessionID string, opts WaitOptions) (*St
 			}
 			inFlight = true
 			go func(wait time.Duration) {
-				state, err := api.Poll(ctx, sessionID, wait)
+				state, err := api.Poll(pollCtx, sessionID, wait)
 				polls <- result{state: state, err: err}
 			}(min(pollWait, remaining))
 		}
@@ -265,11 +286,18 @@ func Wait(ctx context.Context, api API, sessionID string, opts WaitOptions) (*St
 
 		select {
 		case <-ticker.C:
-		case <-ctx.Done():
-			return nil, ctx.Err()
+		case <-pollCtx.Done():
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			return nil, ErrTimedOut
 		case polled := <-polls:
 			inFlight = false
 			if polled.err != nil {
+				// A poll cut off by the deadline is the timeout, not a request error.
+				if ctx.Err() == nil && errors.Is(polled.err, context.DeadlineExceeded) && !time.Now().Before(deadline) {
+					return nil, ErrTimedOut
+				}
 				return nil, polled.err
 			}
 			switch polled.state.Status {

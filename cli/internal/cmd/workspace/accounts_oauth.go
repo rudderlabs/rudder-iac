@@ -8,12 +8,15 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
@@ -100,7 +103,7 @@ and with --write-spec writes the matching 'kind: account' spec, so
 				}...)
 			}()
 
-			if err := validateCreateFlags(definition, name, resume); err != nil {
+			if err := validateCreateFlags(definition, name, resume, timeout); err != nil {
 				return err
 			}
 
@@ -109,7 +112,12 @@ and with --write-spec writes the matching 'kind: account' spec, so
 				return err
 			}
 
-			return runner.create(cmd.Context(), definition, name, specDir, resume)
+			// Ctrl-C cancels this context instead of killing the process, so
+			// the wait ends through explainWaitFailure and prints --resume.
+			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+
+			return runner.create(ctx, definition, name, specDir, resume)
 		},
 	}
 
@@ -153,12 +161,19 @@ grant, not for upkeep. An unattended 'apply' never needs it.
 				}...)
 			}()
 
+			if timeout <= 0 {
+				return errors.New("--timeout must be greater than zero")
+			}
+
 			runner, err := newHandoffRunner(cmd.OutOrStdout(), noBrowser, timeout)
 			if err != nil {
 				return err
 			}
 
-			return runner.reauthorize(cmd.Context(), args[0])
+			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+
+			return runner.reauthorize(ctx, args[0])
 		},
 	}
 
@@ -170,7 +185,10 @@ grant, not for upkeep. An unattended 'apply' never needs it.
 
 // validateCreateFlags refuses a definition the CLI cannot create before any
 // network call, naming the ones it can.
-func validateCreateFlags(definition, name, resume string) error {
+func validateCreateFlags(definition, name, resume string, timeout time.Duration) error {
+	if timeout <= 0 {
+		return errors.New("--timeout must be greater than zero")
+	}
 	if resume != "" {
 		// A resumed session carries its own definition and name, so neither
 		// flag is needed and a conflicting one would be ignored silently.
@@ -185,6 +203,11 @@ func validateCreateFlags(definition, name, resume string) error {
 	}
 	if name == "" {
 		return errors.New("--name is required: it is the account's display name and the spec id is derived from it")
+	}
+	// Checked here because the same refusal after consent leaves an account the
+	// CLI cannot claim, and --resume keeps the name, so it cannot repair it.
+	if baseExternalID(name) == "" {
+		return fmt.Errorf("--name %q has no letters or digits to build a spec id from", name)
 	}
 	if !accounts.IsOAuthDefinition(definition) {
 		return fmt.Errorf(`no OAuth account definition named %q.
@@ -255,25 +278,44 @@ func (r *handoffRunner) create(ctx context.Context, definition, name, specDir, r
 	if err != nil {
 		return r.explainWaitFailure(err, fmt.Sprintf(
 			"  The link stays valid until it expires. Finish in the browser, then run:\n"+
-				"    rudder-cli workspace accounts create --resume %s", sessionID))
+				"    rudder-cli workspace accounts create --resume %s", sessionID),
+			"Nothing was created. Run the command again to retry. If you cannot consent, ask a workspace admin to create\n"+
+				"  the account in the dashboard and use its remote account id in the destination spec.")
 	}
 	fmt.Fprintln(r.out, ui.Success("Account created: "+state.AccountID))
 
-	// The claim needs nothing new from the API: PUT /v2/accounts/{id}/external-id
-	// is already open to the CLI and already idempotent.
 	displayName := firstNonEmpty(name, state.Name)
-	externalID, taken, err := r.externalIDFor(ctx, displayName, specDir)
+
+	// An account that already holds an external id was claimed by an earlier
+	// run of this session, such as a --resume after the spec write failed. Its
+	// id is kept: deriving a new one would count the account's own id as taken
+	// and rename it, which breaks every spec and #account: reference to it.
+	existing, err := r.accounts.Accounts.Get(ctx, state.AccountID)
 	if err != nil {
-		return fmt.Errorf("deriving the spec id to claim %s under: %w", state.AccountID, err)
+		return fmt.Errorf("reading account %s before claiming it: %w", state.AccountID, err)
 	}
-	if err := r.accounts.Accounts.SetExternalID(ctx, state.AccountID, externalID); err != nil {
-		return fmt.Errorf("claiming account %s as %q: %w", state.AccountID, externalID, err)
-	}
-	// The id is printed whether or not the namer changed it, so a disambiguated
-	// id is seen here rather than discovered on the next apply.
-	fmt.Fprintln(r.out, ui.Success("Claimed as "+externalID))
-	if base := baseExternalID(displayName); externalID != base {
-		fmt.Fprintf(r.out, "   (%q is taken by %s)\n", base, taken.describe(base, specDir))
+
+	var externalID string
+	if existing.ExternalID != "" {
+		externalID = existing.ExternalID
+		fmt.Fprintln(r.out, ui.Success("Already claimed as "+externalID))
+	} else {
+		// The claim needs nothing new from the API: PUT /v2/accounts/{id}/external-id
+		// is already open to the CLI and already idempotent.
+		var taken takenIDs
+		externalID, taken, err = r.externalIDFor(ctx, displayName, specDir)
+		if err != nil {
+			return fmt.Errorf("deriving the spec id to claim %s under: %w", state.AccountID, err)
+		}
+		if err := r.accounts.Accounts.SetExternalID(ctx, state.AccountID, externalID); err != nil {
+			return fmt.Errorf("claiming account %s as %q: %w", state.AccountID, externalID, err)
+		}
+		// The id is printed whether or not the namer changed it, so a disambiguated
+		// id is seen here rather than discovered on the next apply.
+		fmt.Fprintln(r.out, ui.Success("Claimed as "+externalID))
+		if base := baseExternalID(displayName); externalID != base {
+			fmt.Fprintf(r.out, "   (%q is taken by %s)\n", base, taken.describe(base, specDir))
+		}
 	}
 
 	if specDir != "" {
@@ -315,7 +357,8 @@ func (r *handoffRunner) reauthorize(ctx context.Context, ref string) error {
 	if _, err := oauthhandoff.Wait(ctx, r.api, session.ID, r.waitOptions()); err != nil {
 		return r.explainWaitFailure(err,
 			"  The link stays valid until it expires. Finishing in the browser re-authorizes\n"+
-				"  the account, whether or not this command is still watching.")
+				"  the account, whether or not this command is still watching.",
+			"The account is unchanged. Run the command again to retry, or ask a workspace admin to re-authorize it in the dashboard.")
 	}
 
 	fmt.Fprintln(r.out, ui.Success("Re-authorized "+account.ID))
@@ -412,7 +455,7 @@ func (r *handoffRunner) paintWait(elapsed time.Duration) {
 // the session up with --resume, while re-authorize has no such flag and needs
 // none. Finishing in the browser re-authorizes the account whether or not the
 // CLI was still watching, and there is nothing left for it to claim.
-func (r *handoffRunner) explainWaitFailure(err error, recovery string) error {
+func (r *handoffRunner) explainWaitFailure(err error, recovery, deniedHint string) error {
 	if r.paints() {
 		fmt.Fprintf(r.out, "\n")
 	}
@@ -424,10 +467,11 @@ func (r *handoffRunner) explainWaitFailure(err error, recovery string) error {
 	case errors.Is(err, context.Canceled):
 		return fmt.Errorf("cancelled. The authorization session is untouched.\n%s", recovery)
 	case errors.As(err, &denied):
-		return fmt.Errorf("%w\n"+
-			"  Ask a workspace admin to create the account, then adopt it with 'rudder-cli import workspace'", err)
+		return fmt.Errorf("%w\n  %s", err, deniedHint)
 	default:
-		return err
+		// A failed poll, such as a restart of the API mid-wait. The session is
+		// still there, so the caller's recovery applies.
+		return fmt.Errorf("%w\n%s", err, recovery)
 	}
 }
 
@@ -512,33 +556,60 @@ func (t takenIDs) describe(id string, dir string) string {
 	}
 }
 
-// localSpecIDs is the ids the specs in dir already use. The id is the file's
-// base name, which is how both this command and 'import workspace' name the
-// file they write, and is what the write would collide on either way.
+// localSpecIDs is the ids the specs under dir already use, searched
+// recursively like the project loader. An id is taken twice over: a file's base
+// name is what this command's own write would collide on, and the 'id' of a
+// 'kind: account' spec is what a duplicate-resource check collides on, whatever
+// the file is called.
 func localSpecIDs(dir string) (map[string]bool, error) {
 	ids := map[string]bool{}
 	if dir == "" {
 		return ids, nil
 	}
 
-	entries, err := os.ReadDir(dir)
+	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		ext := filepath.Ext(path)
+		if entry.IsDir() || (ext != ".yaml" && ext != ".yml") {
+			return nil
+		}
+		ids[strings.TrimSuffix(entry.Name(), ext)] = true
+
+		if id := accountSpecID(path); id != "" {
+			ids[id] = true
+		}
+		return nil
+	})
 	if errors.Is(err, fs.ErrNotExist) {
 		return ids, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: %w", dir, err)
 	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if ext := filepath.Ext(name); ext == ".yaml" || ext == ".yml" {
-			ids[strings.TrimSuffix(name, ext)] = true
-		}
-	}
 	return ids, nil
+}
+
+// accountSpecID is the id of the 'kind: account' spec in a file, or empty when
+// the file is another kind or cannot be read as a spec. An unreadable file is
+// left for the project loader to report: this only widens the set of taken ids.
+func accountSpecID(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+
+	var doc struct {
+		Kind string `yaml:"kind"`
+		Spec struct {
+			ID string `yaml:"id"`
+		} `yaml:"spec"`
+	}
+	if err := yaml.Unmarshal(data, &doc); err != nil || doc.Kind != accounts.AccountSpecKind {
+		return ""
+	}
+	return doc.Spec.ID
 }
 
 // writeAccountSpec renders the 'kind: account' spec create and adopt share. An

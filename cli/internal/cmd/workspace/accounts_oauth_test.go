@@ -3,6 +3,7 @@ package workspace
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -222,7 +223,9 @@ func TestCreateSurfacesTheDenialFromThePage(t *testing.T) {
 	_, err := execCreate(t, "--definition", oauthDefinition, "--name", "Ads", "--no-browser")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "credentialsManagement role")
-	assert.Contains(t, err.Error(), "rudder-cli import workspace")
+	// Nothing was created, so there is nothing to adopt: the hint says to retry.
+	assert.Contains(t, err.Error(), "Nothing was created")
+	assert.NotContains(t, err.Error(), "import workspace")
 }
 
 // Ctrl-C ends the wait and nothing else, so the session can still be resumed.
@@ -666,4 +669,84 @@ func TestWriteAccountSpecNamesThePathOnce(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, path+" already exists, and the spec is never overwritten", err.Error())
 	assert.Equal(t, 1, strings.Count(err.Error(), path))
+}
+
+// Resuming a session whose account an earlier run already claimed keeps that
+// id. Deriving a new one counted the account's own id as taken and renamed it,
+// which dangles every #account: reference to it.
+func TestResumeOnAClaimedSessionKeepsTheExternalID(t *testing.T) {
+	server := useHandoffServer(t)
+	telemetrytest.Record(t)
+	specDir := t.TempDir()
+
+	server.OnSessionOpened(server.Consent)
+	out, err := execCreate(t, "--definition", oauthDefinition, "--name", "Ads",
+		"--write-spec", specDir, "--no-browser")
+	require.NoError(t, err, out)
+	sessionID := server.LastSession().ID
+	accountID := server.LastSession().AccountID
+
+	out, err = execCreate(t, "--resume", sessionID, "--write-spec", specDir)
+	require.NoError(t, err, out)
+
+	account, ok := server.Account(accountID)
+	require.True(t, ok)
+	assert.Equal(t, "ads", account.ExternalID, "the second resume must not rename the account")
+	assert.Contains(t, out, "Already claimed as ads")
+	assert.NotContains(t, out, "ads-1")
+	assert.NoFileExists(t, filepath.Join(specDir, "ads-1.yaml"))
+}
+
+// A name with no letters or digits cannot become a spec id. It is refused
+// before the session opens, because after consent the account exists and the
+// same refusal leaves it unclaimed.
+func TestCreateRefusesANameWithNoSpecIDBeforeOpeningTheSession(t *testing.T) {
+	server := useHandoffServer(t)
+	telemetrytest.Record(t)
+
+	_, err := execCreate(t, "--definition", oauthDefinition, "--name", "!!!", "--no-browser")
+	assert.ErrorContains(t, err, "no letters or digits")
+	assert.Zero(t, server.Sessions(), "no session may be opened for a name that cannot be claimed")
+}
+
+func TestCommandsRefuseAZeroTimeout(t *testing.T) {
+	server := useHandoffServer(t)
+	telemetrytest.Record(t)
+
+	_, err := execCreate(t, "--definition", oauthDefinition, "--name", "Ads", "--timeout", "0")
+	assert.ErrorContains(t, err, "--timeout must be greater than zero")
+	_, err = execReauthorize(t, "ads", "--timeout", "0")
+	assert.ErrorContains(t, err, "--timeout must be greater than zero")
+	assert.Zero(t, server.Sessions())
+}
+
+// A poll that fails, such as an API restart mid-wait, ends the wait. The
+// session is still there, so the error carries the recovery rather than a bare
+// transport message.
+func TestExplainWaitFailureKeepsTheRecoveryForAFailedPoll(t *testing.T) {
+	r := &handoffRunner{out: &bytes.Buffer{}, timeout: time.Minute}
+
+	err := r.explainWaitFailure(errors.New("could not parse error response"), "  RECOVERY", "DENIED")
+	assert.ErrorContains(t, err, "could not parse error response")
+	assert.ErrorContains(t, err, "RECOVERY")
+	assert.NotContains(t, err.Error(), "DENIED")
+}
+
+// An account spec holds its id in the file, not only in the file's name, and
+// the loader reads specs from subdirectories.
+func TestLocalSpecIDsReadsTheIDOfAnAccountSpecInAnySubdirectory(t *testing.T) {
+	dir := t.TempDir()
+	sub := filepath.Join(dir, "integrations")
+	require.NoError(t, os.MkdirAll(sub, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(sub, "integration.yaml"), []byte(
+		"version: rudder/v1\nkind: account\nmetadata:\n  name: ads\nspec:\n  id: ads\n  name: Ads\n"), 0o644))
+	// Another kind's id is not an account id.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "other.yaml"), []byte(
+		"version: rudder/v1\nkind: destination\nspec:\n  id: not-an-account\n"), 0o644))
+
+	ids, err := localSpecIDs(dir)
+	require.NoError(t, err)
+	assert.True(t, ids["ads"], "the id inside the spec")
+	assert.True(t, ids["integration"], "the file name, which the write would collide on")
+	assert.False(t, ids["not-an-account"])
 }

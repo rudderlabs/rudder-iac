@@ -284,3 +284,45 @@ func TestCanOpenBrowser(t *testing.T) {
 		})
 	}
 }
+
+// hangingAPI answers a poll only when its context ends, like a server that
+// never replies.
+type hangingAPI struct{}
+
+func (hangingAPI) Open(context.Context, OpenRequest) (*Session, error) {
+	return nil, errors.New("unused")
+}
+
+func (hangingAPI) Poll(ctx context.Context, _ string, _ time.Duration) (*State, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// The deadline covers a poll that is still in flight: a slow response cannot
+// succeed after Timeout, and it ends as the timeout rather than as a request error.
+func TestWaitEnforcesTheDeadlineWhileAPollIsInFlight(t *testing.T) {
+	started := time.Now()
+	_, err := Wait(context.Background(), hangingAPI{}, "sess", WaitOptions{
+		Timeout: 100 * time.Millisecond, PollWait: time.Minute,
+	})
+
+	assert.ErrorIs(t, err, ErrTimedOut)
+	assert.Less(t, time.Since(started), 5*time.Second)
+}
+
+func TestWaitReportsACallerCancellationAsCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		cancel()
+	}()
+
+	_, err := Wait(ctx, hangingAPI{}, "sess", WaitOptions{Timeout: time.Minute, PollWait: time.Minute})
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.NotErrorIs(t, err, ErrTimedOut)
+}
+
+func TestDeniedErrorDropsControlCharacters(t *testing.T) {
+	err := &DeniedError{Reason: "\x1b[31mdenied\x1b[0m\rby role"}
+	assert.Equal(t, "[31mdenied[0mby role", err.Error())
+}
