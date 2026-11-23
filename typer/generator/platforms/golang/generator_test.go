@@ -26,35 +26,26 @@ var referenceWarnings = []string{
 	`skipping the identify rule (section "traits"): Go generation does not support identify events yet`,
 	`skipping the page rule (section "properties"): Go generation does not support page events yet`,
 	`skipping the screen rule (section "properties"): Go generation does not support screen events yet`,
-	`skipping property "dollar_field" (string) of track event "$Variable$String": Go generation does not support enums yet`,
 	`skipping property "email" (custom:email) of track event "$eventWithNameCamelCase$!": Go generation does not support custom types yet`,
 	`ignoring the variants of track event "Event With Variants": Go generation does not support variants yet`,
-	`skipping property "device_type" (string) of track event "Event With Variants": Go generation does not support enums yet`,
 	`skipping property "page_context" (custom:page_context) of track event "Event With Variants": Go generation does not support custom types yet`,
 	`skipping property "profile" (custom:user_profile) of track event "Event With Variants": Go generation does not support custom types yet`,
-	`skipping property "status_code" (string) of track event "Product \"Premium\" Clicked": Go generation does not support enums yet`,
 	`skipping property "active" (custom:active) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "addresses" (custom:address_list) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "age" (custom:age) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "contacts" (array of custom:email) of track event "User Signed Up": Go generation does not support arrays of custom types yet`,
 	`skipping property "context" (object) of track event "User Signed Up": Go generation does not support nested object schemas yet`,
 	`skipping property "custom_null_field" (custom:null_type) of track event "User Signed Up": Go generation does not support custom types yet`,
-	`skipping property "device_type" (string) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "email_list" (custom:email_list) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "empty_object_no_additional_props" (custom:empty_object_no_additional_props) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "empty_object_with_additional_props" (custom:empty_object_with_additional_props) of track event "User Signed Up": Go generation does not support custom types yet`,
-	`skipping property "enabled" (boolean) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "feature_config" (custom:feature_config) of track event "User Signed Up": Go generation does not support custom types yet`,
-	`skipping property "mixed_value" (any) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "nested_empty_object_no_additional_props" (object) of track event "User Signed Up": Go generation does not support nested object schemas yet`,
 	`skipping property "phone_numbers" (array of custom:phone_number) of track event "User Signed Up": Go generation does not support arrays of custom types yet`,
-	`skipping property "priority" (integer) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "profile" (custom:user_profile) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "profile_list" (custom:profile_list) of track event "User Signed Up": Go generation does not support custom types yet`,
-	`skipping property "rating" (number) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "status" (custom:status) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "unicode_custom_type" (custom:типы_данных) of track event "User Signed Up": Go generation does not support custom types yet`,
-	`skipping property "unicode_enum_field" (string) of track event "User Signed Up": Go generation does not support enums yet`,
 	`skipping property "user_access" (custom:user_access) of track event "User Signed Up": Go generation does not support custom types yet`,
 	`skipping property "active" (custom:active) of track event "eventWithNameCamelCase": Go generation does not support custom types yet`,
 }
@@ -150,8 +141,8 @@ func TestGenerateRejectsUnnameableIdentifiers(t *testing.T) {
 
 func TestGenerateQuickStart(t *testing.T) {
 	var (
-		stringProperty = plan.PropertySchema{Property: plan.Property{Name: "name", Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
-		enumProperty   = plan.PropertySchema{Property: plan.Property{Name: "kind", Types: []plan.PropertyType{plan.PrimitiveTypeString}, Config: &plan.PropertyConfig{Enum: []any{"a"}}}}
+		stringProperty  = plan.PropertySchema{Property: plan.Property{Name: "name", Types: []plan.PropertyType{plan.PrimitiveTypeString}}}
+		skippedProperty = plan.PropertySchema{Property: plan.Property{Name: "kind", Types: []plan.PropertyType{plan.CustomType{Name: "kind", Type: plan.PrimitiveTypeString}}}}
 	)
 	rule := func(event string, properties map[string]plan.PropertySchema) plan.EventRule {
 		return plan.EventRule{
@@ -168,12 +159,12 @@ func TestGenerateQuickStart(t *testing.T) {
 	}{
 		{
 			"payload that declares only skipped properties before one with an emitted field",
-			[]plan.EventRule{rule("A", map[string]plan.PropertySchema{"kind": enumProperty}), rule("B", map[string]plan.PropertySchema{"name": stringProperty})},
+			[]plan.EventRule{rule("A", map[string]plan.PropertySchema{"kind": skippedProperty}), rule("B", map[string]plan.PropertySchema{"name": stringProperty})},
 			"//\terr := rt.TrackA(\n",
 		},
 		{
 			"payload that declares a property before one without properties",
-			[]plan.EventRule{rule("A", nil), rule("B", map[string]plan.PropertySchema{"kind": enumProperty})},
+			[]plan.EventRule{rule("A", nil), rule("B", map[string]plan.PropertySchema{"kind": skippedProperty})},
 			"//\terr := rt.TrackB(\n",
 		},
 		{
@@ -206,7 +197,7 @@ func TestGenerateReservesSkippedDeclaredKeys(t *testing.T) {
 			AdditionalProperties: true,
 			Properties: map[string]plan.PropertySchema{
 				"name": {Property: plan.Property{Name: "name", Types: []plan.PropertyType{plan.PrimitiveTypeString}}},
-				"kind": {Property: plan.Property{Name: "kind", Types: []plan.PropertyType{plan.PrimitiveTypeString}, Config: &plan.PropertyConfig{Enum: []any{"a"}}}},
+				"kind": {Property: plan.Property{Name: "kind", Types: []plan.PropertyType{plan.CustomType{Name: "kind", Type: plan.PrimitiveTypeString}}}},
 			},
 		},
 	}}}
@@ -216,7 +207,19 @@ func TestGenerateReservesSkippedDeclaredKeys(t *testing.T) {
 	require.Len(t, files, 1)
 
 	assert.Contains(t, files[0].Content, "\tm := withAdditional(v.AdditionalProperties, \"kind\", \"name\")\n")
-	assert.Equal(t, []string{`skipping property "kind" (string) of track event "Some Event": Go generation does not support enums yet`}, *warnings)
+	assert.Equal(t, []string{`skipping property "kind" (custom:kind) of track event "Some Event": Go generation does not support custom types yet`}, *warnings)
+}
+
+func TestGenerateWarnsAboutEnumValuesLeftOut(t *testing.T) {
+	warnings := captureWarnings(t)
+
+	_, err := (&golang.Generator{}).Generate(golang.TrackPlan(plan.Property{
+		Name:   "kind",
+		Types:  []plan.PropertyType{plan.PrimitiveTypeInteger},
+		Config: &plan.PropertyConfig{Enum: []any{"a", nil, 1.5, 1, 1.5}},
+	}), core.GenerateOptions{}, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{`leaving out the enum values ["a",null,1.5] of property "kind" (integer) of track event "Some Event": its declared types do not allow them`}, *warnings)
 }
 
 // A field may not share a name with a method of its struct, so a property
@@ -247,23 +250,11 @@ func captureWarnings(t *testing.T) *[]string {
 	return &warnings
 }
 
-// trackPlan is a plan with one track event, "Some Event", declaring properties.
-func trackPlan(properties ...plan.Property) *plan.TrackingPlan {
-	schema := plan.ObjectSchema{Properties: map[string]plan.PropertySchema{}}
-	for _, p := range properties {
-		schema.Properties[p.Name] = plan.PropertySchema{Property: p}
-	}
-	return &plan.TrackingPlan{Rules: []plan.EventRule{{
-		Event:   plan.Event{EventType: plan.EventTypeTrack, Name: "Some Event"},
-		Section: plan.IdentitySectionProperties,
-		Schema:  schema,
-	}}}
-}
-
 // A custom type cannot be a union member, as in Kotlin and Swift, whether the
 // union holds the property or its array items. With one non-null type it is a
 // nullable custom type, or an array of them, left out until custom types are
-// generated.
+// generated. So is a union with a custom member and an enum, whose effective
+// enum depends on the custom type.
 func TestGenerateCustomTypeInUnion(t *testing.T) {
 	var (
 		email = plan.CustomType{Name: "email", Type: plan.PrimitiveTypeString}
@@ -274,6 +265,7 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 		name         string
 		types        []plan.PropertyType
 		items        []plan.PropertyType
+		config       *plan.PropertyConfig
 		wantErr      string
 		wantWarnings []string
 	}{
@@ -300,6 +292,12 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 			wantErr: `mapping property "contact": mapping the item types of PropertyContact: custom type "email" cannot be a member of a multi-type union`,
 		},
 		{
+			name:         "union member with an enum",
+			types:        []plan.PropertyType{plan.PrimitiveTypeInteger, email},
+			config:       &plan.PropertyConfig{Enum: []any{"x@y", 1}},
+			wantWarnings: []string{`skipping property "contact" (custom:email|integer) of track event "Some Event": Go generation does not support custom types yet`},
+		},
+		{
 			name:         "nullable custom type",
 			types:        []plan.PropertyType{email, plan.PrimitiveTypeNull},
 			wantWarnings: []string{`skipping property "contact" (custom:email|null) of track event "Some Event": Go generation does not support custom types yet`},
@@ -322,7 +320,7 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			warnings := captureWarnings(t)
 
-			_, err := (&golang.Generator{}).Generate(trackPlan(plan.Property{Name: "contact", Types: tt.types, ItemTypes: tt.items}), core.GenerateOptions{}, nil)
+			_, err := (&golang.Generator{}).Generate(golang.TrackPlan(plan.Property{Name: "contact", Types: tt.types, ItemTypes: tt.items, Config: tt.config}), core.GenerateOptions{}, nil)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
 				return
@@ -334,7 +332,7 @@ func TestGenerateCustomTypeInUnion(t *testing.T) {
 }
 
 // Each value helper is emitted only when the generated types use it, under a
-// section header emitted only with one of them. trackPlan's fields are
+// section header emitted only with one of them. TrackPlan's fields are
 // optional, so Ptr comes with every type that cannot hold nil. Null also comes
 // with an untyped property, which takes Null{} to send null.
 func TestGenerateValueHelpers(t *testing.T) {
@@ -394,11 +392,21 @@ func TestGenerateValueHelpers(t *testing.T) {
 			properties: []plan.Property{property("nullable_items", array, nullable...)},
 			want:       helpers{header: true, nullable: true},
 		},
+		{
+			name:       "enum whose only value is null",
+			properties: []plan.Property{{Name: "null_enum", Types: nullable, Config: &plan.PropertyConfig{Enum: []any{nil}}}},
+			want:       helpers{header: true, ptr: true, null: true},
+		},
+		{
+			name:       "nullable enum",
+			properties: []plan.Property{{Name: "nullable_enum", Types: nullable, Config: &plan.PropertyConfig{Enum: []any{"a", nil}}}},
+			want:       helpers{header: true, ptr: true, nullable: true},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			files, err := (&golang.Generator{}).Generate(trackPlan(tt.properties...), core.GenerateOptions{}, nil)
+			files, err := (&golang.Generator{}).Generate(golang.TrackPlan(tt.properties...), core.GenerateOptions{}, nil)
 			require.NoError(t, err)
 			require.Len(t, files, 1)
 
@@ -413,31 +421,67 @@ func TestGenerateValueHelpers(t *testing.T) {
 	}
 }
 
-// Every union is its own type, though each holds a value any. Converting one
-// union to another would build a union holding a value that is not a member,
-// so the conversion must not compile.
+// Every union and every mixed-type enum is its own type, though each holds a
+// value any. Converting one to another would build a value the target does not
+// allow, so the conversion must not compile.
 func TestGenerateUnionsAreNotConvertible(t *testing.T) {
-	files, err := (&golang.Generator{}).Generate(trackPlan(
-		plan.Property{Name: "a", Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeArray}},
-		plan.Property{Name: "b", Types: []plan.PropertyType{plan.PrimitiveTypeInteger, plan.PrimitiveTypeBoolean}},
-	), core.GenerateOptions{}, nil)
-	require.NoError(t, err)
-	require.Len(t, files, 1)
-
 	var (
+		union     = []plan.PropertyType{plan.PrimitiveTypeInteger, plan.PrimitiveTypeBoolean}
+		mixedEnum = func(name string, values ...any) plan.Property {
+			return plan.Property{Name: name, Config: &plan.PropertyConfig{Enum: values}}
+		}
 		fset = token.NewFileSet()
-		errs []string
+		// Shared, so analytics-go is type-checked once for every row.
+		imp = importer.ForCompiler(fset, "source", nil)
 	)
-	file, err := parser.ParseFile(fset, "ruddertyper.go", files[0].Content+"\nvar _ = PropertyA(NewPropertyBBoolean(true))\n", 0)
-	require.NoError(t, err)
-	conf := types.Config{
-		// The source importer also checks the calls into analytics-go, so the
-		// conversion is the only error.
-		Importer: importer.ForCompiler(fset, "source", nil),
-		Error:    func(err error) { errs = append(errs, err.Error()) },
+	tests := []struct {
+		name       string
+		properties []plan.Property
+		conversion string
+		wantErr    string
+	}{
+		{
+			name: "union to union",
+			properties: []plan.Property{
+				{Name: "a", Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeArray}},
+				{Name: "b", Types: union},
+			},
+			conversion: "PropertyA(NewPropertyBBoolean(true))",
+			wantErr:    "cannot convert NewPropertyBBoolean(true)",
+		},
+		{
+			name:       "mixed enum to mixed enum",
+			properties: []plan.Property{mixedEnum("a", "x", 1), mixedEnum("b", "x", true)},
+			conversion: "PropertyA(PropertyBX())",
+			wantErr:    "cannot convert PropertyBX()",
+		},
+		{
+			name:       "union to mixed enum",
+			properties: []plan.Property{mixedEnum("a", "x", 1), {Name: "b", Types: union}},
+			conversion: "PropertyA(NewPropertyBBoolean(true))",
+			wantErr:    "cannot convert NewPropertyBBoolean(true)",
+		},
 	}
-	_, _ = conf.Check("ruddertyper", fset, []*ast.File{file}, nil)
 
-	require.Len(t, errs, 1)
-	assert.Contains(t, errs[0], "cannot convert NewPropertyBBoolean(true)")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files, err := (&golang.Generator{}).Generate(golang.TrackPlan(tt.properties...), core.GenerateOptions{}, nil)
+			require.NoError(t, err)
+			require.Len(t, files, 1)
+
+			file, err := parser.ParseFile(fset, "ruddertyper.go", files[0].Content+"\nvar _ = "+tt.conversion+"\n", 0)
+			require.NoError(t, err)
+			var errs []string
+			conf := types.Config{
+				// The source importer also checks the calls into analytics-go, so the
+				// conversion is the only error.
+				Importer: imp,
+				Error:    func(err error) { errs = append(errs, err.Error()) },
+			}
+			_, _ = conf.Check("ruddertyper", fset, []*ast.File{file}, nil)
+
+			require.Len(t, errs, 1)
+			assert.Contains(t, errs[0], tt.wantErr)
+		})
+	}
 }

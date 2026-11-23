@@ -133,7 +133,7 @@ func createVariantSealedClass(
 
 	// Create a subclass for each match value in each case
 	for _, variantCase := range variant.Cases {
-		for _, matchValue := range variantCase.Match {
+		for _, matchValue := range plan.Float64Numbers(variantCase.Match) {
 			subclass, err := createSealedSubclass(
 				name,
 				matchValue,
