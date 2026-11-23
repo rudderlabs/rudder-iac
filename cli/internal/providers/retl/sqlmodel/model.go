@@ -34,6 +34,7 @@ const (
 	SourceDefinitionMySQL      SourceDefinition = "mysql"
 	SourceDefinitionDatabricks SourceDefinition = "databricks"
 	SourceDefinitionTrino      SourceDefinition = "trino"
+	SourceDefinitionMaxCompute SourceDefinition = "maxcompute"
 )
 
 // validSourceDefinitions contains all valid source definition values
@@ -45,6 +46,7 @@ var validSourceDefinitions = map[SourceDefinition]bool{
 	SourceDefinitionMySQL:      true,
 	SourceDefinitionDatabricks: true,
 	SourceDefinitionTrino:      true,
+	SourceDefinitionMaxCompute: true,
 }
 
 type ImportResourceInfo struct {
@@ -72,7 +74,7 @@ type SQLModelSpec struct {
 	AccountID        string           `json:"account_id"        mapstructure:"account_id"        validate:"required_without=Account,excluded_with=Account"`
 	Account          string           `json:"account"           mapstructure:"account"           validate:"omitempty,pattern=account_ref"`
 	PrimaryKey       string           `json:"primary_key"       mapstructure:"primary_key"       validate:"required"`
-	SourceDefinition SourceDefinition `json:"source_definition" mapstructure:"source_definition" validate:"required,oneof=postgres redshift snowflake bigquery mysql databricks trino"`
+	SourceDefinition SourceDefinition `json:"source_definition" mapstructure:"source_definition" validate:"required,oneof=postgres redshift snowflake bigquery mysql databricks trino maxcompute"`
 	Enabled          *bool            `json:"enabled"           mapstructure:"enabled"`
 }
 

@@ -196,4 +196,4 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/source_definition"
             severity: "error"
-            message_contains: "'source_definition' must be one of [postgres redshift snowflake bigquery mysql databricks trino s3]"
+            message_contains: "'source_definition' must be one of [postgres redshift snowflake bigquery mysql databricks trino maxcompute s3]"
