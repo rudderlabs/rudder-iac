@@ -16,4 +16,8 @@ type {{ .Name }} = {{ .Type }}
 
 {{ template "struct.tmpl" . }}
 {{- end }}
+{{- with .Variant }}
+
+{{ template "variant.tmpl" . }}
+{{- end }}
 {{- end }}
