@@ -1,5 +1,66 @@
 # Changelog
 
+## [1.3.0](https://github.com/rudderlabs/rudder-iac/compare/v1.2.0...v1.3.0) (2026-11-19)
+
+
+### Features
+
+* **destination:** onboard the three customer-requested vdm-next audiences ([#1026](https://github.com/rudderlabs/rudder-iac/issues/1026)) ([903bee8](https://github.com/rudderlabs/rudder-iac/commit/903bee816e22c8b280690dee9f63294a0796e56f))
+* **destination:** preview import changes, reference required secrets, imply cloud warehouse mode ([#1041](https://github.com/rudderlabs/rudder-iac/issues/1041)) ([19afcdc](https://github.com/rudderlabs/rudder-iac/commit/19afcdc50ee407af8417da30a78468e5f5d6cebf))
+
+
+### Bug Fixes
+
+* **retl:** keep constants off a PUT that must not carry them ([#1029](https://github.com/rudderlabs/rudder-iac/issues/1029)) ([827b846](https://github.com/rudderlabs/rudder-iac/commit/827b8463896668f4b2f40dac5a7595e42bd9c8fa))
+
+## [1.2.0](https://github.com/rudderlabs/rudder-iac/compare/v1.1.0...v1.2.0) (2026-11-17)
+
+
+### Features
+
+* **typer:** add emit=common for SDK-free Kotlin multiplatform output ([#1035](https://github.com/rudderlabs/rudder-iac/issues/1035)) ([92b4ae2](https://github.com/rudderlabs/rudder-iac/commit/92b4ae2ae4633dfb36ecede6e7dac2b097d989d1))
+
+## [1.1.0](https://github.com/rudderlabs/rudder-iac/compare/v1.0.0...v1.1.0) (2026-11-13)
+
+
+### Features
+
+* **typer:** generate from a snapshot file or a pinned tracking plan version ([#1032](https://github.com/rudderlabs/rudder-iac/issues/1032)) ([6a3436c](https://github.com/rudderlabs/rudder-iac/commit/6a3436c226dfa893a858c7e5215eab37895f4db3))
+
+
+### Bug Fixes
+
+* **client:** retry rate-limited requests and honour Retry-After ([#1033](https://github.com/rudderlabs/rudder-iac/issues/1033)) ([2b60ef5](https://github.com/rudderlabs/rudder-iac/commit/2b60ef5f0893ac1d394a8f4ff30bf6934c644d6d))
+* **retl:** allow mirror sync on the visual mapper v2 flow ([#1022](https://github.com/rudderlabs/rudder-iac/issues/1022)) ([b80e73f](https://github.com/rudderlabs/rudder-iac/commit/b80e73ff936515916dcfd331a17a0fd8f4fa5bac))
+* **retl:** refuse a remote sync_behaviour import cannot express ([#1027](https://github.com/rudderlabs/rudder-iac/issues/1027)) ([f02bb59](https://github.com/rudderlabs/rudder-iac/commit/f02bb59d8d9cfc782ede3dbbe460a24cdb42a4e1))
+
+
+### Miscellaneous
+
+* **ci:** move codecov-action to v7.1.1 ([#985](https://github.com/rudderlabs/rudder-iac/issues/985)) ([a5ff4ae](https://github.com/rudderlabs/rudder-iac/commit/a5ff4aee56b567b4ec2f28f1d33122f7c61ae1f1))
+* **ci:** move the PR title check to check-pr-title v2.0.3 ([#1020](https://github.com/rudderlabs/rudder-iac/issues/1020)) ([de5f96c](https://github.com/rudderlabs/rudder-iac/commit/de5f96cd3466efa41e9f7c78a975d9b3903065d8))
+* remove release-as now that 1.0.0 is released ([#1018](https://github.com/rudderlabs/rudder-iac/issues/1018)) ([d9f87ed](https://github.com/rudderlabs/rudder-iac/commit/d9f87edd29ebee39328016a03f3ddd6d611da46e))
+
+## [1.0.0](https://github.com/rudderlabs/rudder-iac/compare/v0.29.1...v1.0.0) (2026-10-30)
+
+
+### Features
+
+* release 1.0.0 ([#1014](https://github.com/rudderlabs/rudder-iac/issues/1014)) ([0d5c3b2](https://github.com/rudderlabs/rudder-iac/commit/0d5c3b218e0d88f2a7f7ad3092f846ccbf1fed52))
+
+
+### Miscellaneous
+
+* release 1.0.0 and document semantic versioning ([#1015](https://github.com/rudderlabs/rudder-iac/issues/1015)) ([c0f2d3f](https://github.com/rudderlabs/rudder-iac/commit/c0f2d3f4fe0aa24fc6eee0042f5113d431bbe91a))
+
+## [0.29.1](https://github.com/rudderlabs/rudder-iac/compare/v0.29.0...v0.29.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* **destination:** refuse linking a transformation created in the same apply ([#1013](https://github.com/rudderlabs/rudder-iac/issues/1013)) ([a41fc94](https://github.com/rudderlabs/rudder-iac/commit/a41fc9498672553c664d8e040fdfe0a110b06028))
+* reject enabled: false on event-stream connections ([#1010](https://github.com/rudderlabs/rudder-iac/issues/1010)) ([de7fce9](https://github.com/rudderlabs/rudder-iac/commit/de7fce9d72d9c528116db27c57c2eff13818b896))
+
 ## [0.29.0](https://github.com/rudderlabs/rudder-iac/compare/v0.28.0...v0.29.0) (2026-10-28)
 
 

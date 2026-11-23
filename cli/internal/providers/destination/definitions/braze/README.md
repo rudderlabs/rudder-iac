@@ -275,7 +275,7 @@ destination 'braze-prod' config is missing fields required to connect a 'cloud' 
 
 The app identifier keys aren't checked per connection — they're covered by the destination-level rules in [Key dependencies](#key-dependencies).
 
-A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it, and `rest_api_key`.
+A Reverse ETL connection reaches this destination as source type `warehouse`. It needs no `connection_mode` entry, since `cloud` is the only mode a warehouse source runs in, but it does need `rest_api_key`.
 
 ## Secrets
 

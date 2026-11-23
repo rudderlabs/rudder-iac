@@ -121,7 +121,7 @@ func validateRETLMetadata(def *DestinationDefinition) error {
 		}
 	}
 
-	if (def.SyncBehaviours != nil || def.SupportsVisualMapper) && !slices.Contains(def.SourceTypes, common.SourceTypeWarehouse) {
+	if (def.SyncBehaviours != nil || def.SupportsVisualMapper || def.SupportsVisualMapperV2) && !slices.Contains(def.SourceTypes, common.SourceTypeWarehouse) {
 		return fmt.Errorf("rETL metadata requires the warehouse source type")
 	}
 	return nil

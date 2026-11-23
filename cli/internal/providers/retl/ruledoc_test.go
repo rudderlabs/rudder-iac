@@ -13,6 +13,7 @@ import (
 	bingads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bingads_offline_conversions"
 	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
 	facebookpixel "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_pixel"
+	fbcustomaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/fb_custom_audience"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googleads"
 	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
 	eventstream "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
@@ -39,9 +40,10 @@ func TestProviderRuleDocs(t *testing.T) {
 	// http, Amplitude, Google Ads and Facebook Pixel are verified, so a default
 	// CLI registers them and the examples using them run as written. Bing and
 	// Customer.io Audience are unverified and registered only behind a flag; the
-	// examples use them for Bing's mirror-only object mapping and Customer.io
-	// Audience's own rETL flow, their fragments name the flag, and it is
-	// registered unconditionally here.
+	// examples use them for Bing's mirror-only object mapping, Customer.io
+	// Audience's own rETL flow and Facebook Custom Audience's visual mapper v2
+	// flow, their fragments name the flag, and it is registered
+	// unconditionally here.
 	registry := definitions.NewRegistry()
 	for _, definition := range []*definitions.DestinationDefinition{
 		httpdest.NewDefinition(),
@@ -50,6 +52,7 @@ func TestProviderRuleDocs(t *testing.T) {
 		facebookpixel.NewDefinition(),
 		bingads.NewDefinition(),
 		customerioaudience.NewDefinition(),
+		fbcustomaudience.NewDefinition(),
 	} {
 		require.NoError(t, registry.Register(definition))
 	}

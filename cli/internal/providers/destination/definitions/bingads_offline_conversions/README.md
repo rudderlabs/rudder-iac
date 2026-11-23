@@ -85,7 +85,7 @@ Both keys are objects keyed by the local source type — the tokens listed under
 
 Maps each source type you connect to the mode its events reach BingAds Offline Conversions in. BingAds Offline Conversions accepts only `warehouse: cloud`.
 
-- The entry is required to connect a Reverse ETL source — see [Connect a source](#connect-a-source).
+- The entry is optional: `cloud` is the only mode a warehouse source runs in, so a Reverse ETL connection without it runs in `cloud` — see [Connect a source](#connect-a-source).
 
 ```yaml
 connection_mode:
@@ -120,23 +120,15 @@ destination 'bing-offline-conversions-prod' (type 'bingads_offline_conversions')
 source type 'web' is not among supported source types: warehouse
 ```
 
-**The destination config must carry a `connection_mode` entry for `warehouse`.** This lives on the destination spec, not on the connection spec. Without it:
+**The destination config needs no `connection_mode` entry for `warehouse`.** `cloud` is the only mode a warehouse source runs in, so an absent entry means `cloud`. A written entry must be `cloud`.
+
+**The connection needs a sync behaviour that both sides offer, and none is left.** BingAds Offline Conversions accepts only `mirror`, and a spec can carry `mirror` on the visual-mapper-v2 flow alone, which this destination does not run. So the two sides share nothing whatever the connection sets, and every `sync_behaviour` is refused with the same message. One that sets `object` runs object mapping and reports:
 
 ```text
-destination 'bing-offline-conversions-prod' config has no 'connection_mode' entry for source type 'warehouse'
+source definition 'postgres' and destination 'bing-offline-conversions-prod' share no sync behaviour on object mapping; the connection cannot sync
 ```
 
-**The connection needs a sync behaviour that both sides offer, and none is left.** BingAds Offline Conversions accepts only `mirror`, which Rudder CLI doesn't support. A connection that sets `sync_behaviour: mirror` fails validation:
-
-```text
-'sync_behaviour' must be one of [upsert full]
-```
-
-With `upsert` or `full`, the connection is refused instead. One that sets `object` runs object mapping and reports the following; without `object`, the message names the `json_mapper` flow:
-
-```text
-source definition 'postgres' and destination 'bing-offline-conversions-prod' share no sync behaviour for the object_mapping flow; the connection cannot sync
-```
+Without `object` the connection runs the JSON mapper, and the message names that flow instead.
 
 The OAuth account in `rudder_account_id` isn't checked at `validate` time.
 

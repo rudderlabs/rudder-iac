@@ -131,15 +131,15 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 			name:   "unsupported sync_behaviour",
 			mutate: func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "replace" },
 			expected: []rules.ValidationResult{
-				{Reference: "/connections/0/config/sync_behaviour", Message: "'sync_behaviour' must be one of [upsert full]"},
+				{Reference: "/connections/0/config/sync_behaviour", Message: "'sync_behaviour' must be one of [upsert mirror full]"},
 			},
 		},
 		{
-			name:   "mirror sync_behaviour",
-			mutate: func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "mirror" },
-			expected: []rules.ValidationResult{
-				{Reference: "/connections/0/config/sync_behaviour", Message: "'sync_behaviour' must be one of [upsert full]"},
-			},
+			// Mirror is in the enum again: which flows can use it is V-R2's to
+			// decide, and a syntax error here would stop the load before it runs.
+			name:     "mirror sync_behaviour",
+			mutate:   func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "mirror" },
+			expected: []rules.ValidationResult{},
 		},
 		{
 			name:   "no identifiers",
