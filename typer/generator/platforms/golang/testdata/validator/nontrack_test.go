@@ -280,9 +280,9 @@ func TestNonTrackWire(t *testing.T) {
 			want: messageJSON(exMeta, "group", `, "groupId": "g1"`),
 		},
 		{
-			name:  "examples: group with an empty group ID returns the SDK's FieldError",
-			call:  func() error { return ex.Group(id, "", &examples.GroupTraits{CompanyName: "Acme"}) },
-			errIs: analytics.FieldError{Type: "analytics.Group", Name: "GroupId", Value: ""},
+			name: "examples: group with an empty group ID returns the SDK's FieldError",
+			call: func() error { return ex.Group(id, "", &examples.GroupTraits{CompanyName: "Acme"}) },
+			err:  analytics.FieldError{Type: "analytics.Group", Name: "GroupId", Value: ""},
 		},
 		{
 			name: "examples: WithCategory on an open case adds properties.category",
