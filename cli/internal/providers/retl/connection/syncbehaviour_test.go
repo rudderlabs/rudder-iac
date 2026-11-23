@@ -89,7 +89,7 @@ func TestAcceptedSyncBehavioursStayWithinTheSpecTag(t *testing.T) {
 
 	// Every warehouse the CLI knows, offered everything any destination could
 	// accept, on every flow: the widest set the helper can ever hand out.
-	for _, sourceDefinition := range []string{"bigquery", "clickhouse", "databricks", "mysql", "postgres", "redshift", "s3", "sftp", "snowflake", "trino"} {
+	for _, sourceDefinition := range []string{"bigquery", "clickhouse", "databricks", "maxcompute", "mysql", "postgres", "redshift", "s3", "sftp", "snowflake", "trino"} {
 		for _, flow := range []Flow{FlowJSONMapper, FlowObjectMapping} {
 			accepted, known := AcceptedSyncBehaviours(sourceDefinition, []string{"upsert", "mirror", "full"}, flow)
 			require.True(t, known, "source definition %q is in the metadata table", sourceDefinition)
