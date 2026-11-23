@@ -218,6 +218,7 @@ func TestTrackWire(t *testing.T) {
 				"context": {"ruddertyper": ` + refMeta + `}}`,
 		},
 		{
+			// active and profile are required custom types, so their zero values are sent.
 			name: "untyped fields send numbers, bools and objects at depth",
 			call: func() error {
 				return ref.TrackUserSignedUp(refID, ruddertyper.TrackUserSignedUpProperties{
@@ -229,6 +230,8 @@ func TestTrackWire(t *testing.T) {
 			},
 			want: `{"type": "track", "channel": "server", "event": "User Signed Up", "userId": "user-123",
 				"properties": {
+					"active": false,
+					"profile": {"email": "", "first_name": ""},
 					"array_of_any": ["string item", 42, true, {"nested": "object", "count": 100}],
 					"property_of_any": {"custom_field_1": "value1", "custom_field_2": 999, "nested_object": {"deep_field": "deep_value"}},
 					"untyped_array": [3.14159, "mixed", false, {"id": 123, "name": "test"}],
