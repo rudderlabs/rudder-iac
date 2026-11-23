@@ -83,7 +83,9 @@ func capture(t *testing.T, send func(analytics.Client)) ([]map[string]any, []ana
 // messageId, originalTimestamp, sentAt, anonymousId and channel are ignored
 // unless wantJSON asserts them, so WithMessageID and WithTimestamp stay
 // testable. context.library is always ignored: the SDK overwrites it on every
-// message.
+// message. The wire cannot tell an SDK-filled value from one the generated
+// code invented; TestGeneratedMethodsOwnTheirInputs checks the message the
+// generated code hands the SDK.
 func assertMessage(t *testing.T, wantJSON string, got map[string]any) {
 	t.Helper()
 	var want map[string]any
@@ -415,8 +417,15 @@ func TestTrackWire(t *testing.T) {
 		}
 	})
 
-	var sent int
+	// Rows find their messages by name, so two rows with one name would share a
+	// message ID and one row's message would stand in for the other's.
+	var (
+		sent  int
+		names = make(map[string]bool, len(tests))
+	)
 	for _, tt := range tests {
+		require.False(t, names[tt.name], "two rows are named %q", tt.name)
+		names[tt.name] = true
 		if tt.want != "" {
 			sent++
 		}

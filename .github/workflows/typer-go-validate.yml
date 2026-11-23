@@ -70,6 +70,30 @@ jobs:
           GOTOOLCHAIN: go1.21.0
         run: make typer-go-validate
 
+  # A breaking analytics-go v4 release would otherwise fail every PR that
+  # touches these paths, whatever it changes. This job keeps that signal
+  # without failing the workflow run.
+  typer-go-validate-latest:
+    name: validate generated Go against latest analytics-go v4 (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - name: checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: setup go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+
+      # Keep this step last: go get rewrites the validator's go.mod and go.sum.
       - name: run typer-go-validate against latest analytics-go v4
         env:
           GOTOOLCHAIN: go1.21.0
