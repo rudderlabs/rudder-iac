@@ -1,0 +1,66 @@
+{{- if .Methods }}
+func (r *RudderTyperAnalytics) track(identity Identity, event string, properties analytics.Properties, opts []Option) error {
+	o := applyOptions(opts)
+	return r.client.Enqueue(analytics.Track{
+		UserId:            identity.UserID,
+		AnonymousId:       identity.AnonymousID,
+		Event:             event,
+		Properties:        properties,
+		Context:           o.analyticsContext(),
+		Integrations:      o.integrations,
+		OriginalTimestamp: o.timestamp,
+		MessageId:         o.messageID,
+	})
+}
+{{- end }}
+
+// rudderTyperContext returns the metadata sent as context.ruddertyper. It
+// builds a new map on every call because Config.Callback receives the
+// message and could otherwise modify a shared one.
+func rudderTyperContext() map[string]any {
+	return map[string]any{
+		"platform": "go",
+		"rudderCLIVersion": {{ quote .RudderCLIVersion }},
+		"trackingPlanId": {{ quote .PlanID }},
+		"trackingPlanVersion": {{ .PlanVersion }},
+	}
+}
+
+// applyOptions applies opts in order, skipping nil ones.
+func applyOptions(opts []Option) callOptions {
+	var o callOptions
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&o)
+		}
+	}
+	return o
+}
+
+// analyticsContext builds a fresh context for the call, because the SDK
+// writes into the context it is given.
+func (o callOptions) analyticsContext() *analytics.Context {
+	var ctx analytics.Context
+	if o.context != nil {
+		ctx = *o.context
+	}
+	extra := make(map[string]any, len(ctx.Extra)+1)
+	maps.Copy(extra, ctx.Extra)
+	extra["ruddertyper"] = rudderTyperContext()
+	ctx.Extra = extra
+	return &ctx
+}
+{{- if .UsesWithAdditional }}
+
+// withAdditional starts an object from the keys of extra that the tracking
+// plan does not declare. Declared keys always come from the typed fields.
+func withAdditional(extra map[string]any, declared ...string) map[string]any {
+	m := make(map[string]any, len(extra)+len(declared))
+	for k, v := range extra {
+		if !slices.Contains(declared, k) {
+			m[k] = v
+		}
+	}
+	return m
+}
+{{- end }}

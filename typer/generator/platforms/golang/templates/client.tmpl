@@ -1,0 +1,74 @@
+// --- Client ---
+
+// RudderTyperAnalytics sends the events of the tracking plan {{ quote .PlanName }}
+// through a RudderStack Go SDK client. It holds no mutable state, so one
+// value can be shared by many goroutines.
+type RudderTyperAnalytics struct {
+	client analytics.Client
+}
+
+// New returns a RudderTyperAnalytics that sends events through client.
+// The caller keeps ownership of client and must Close it on shutdown.
+func New(client analytics.Client) *RudderTyperAnalytics {
+	if client == nil {
+		panic("ruddertyper: New called with a nil analytics.Client")
+	}
+	return &RudderTyperAnalytics{client: client}
+}
+
+// Identity identifies who performed an event. Set UserID, AnonymousID or
+// both; the SDK rejects a call that sets neither. When AnonymousID is empty,
+// the SDK generates a random one for track, page, screen and group (not
+// identify) calls.
+type Identity struct {
+	UserID      string
+	AnonymousID string
+}
+
+// Errors returned by generated methods, in addition to the SDK's own. Match
+// them with errors.Is.
+var (
+	// ErrNilPayload reports a nil or typed-nil payload that the tracking
+	// plan requires.
+	ErrNilPayload = errors.New("ruddertyper: payload is nil")
+	// ErrInvalidValue reports a value that cannot be sent as the tracking
+	// plan requires, such as an unset union or an unset required variant,
+	// or that JSON cannot carry, such as NaN or a value that contains itself.
+	ErrInvalidValue = errors.New("ruddertyper: invalid value")
+	// ErrCategoryConflict reports a WithCategory value that the event's
+	// tracking plan rule does not accept.
+	ErrCategoryConflict = errors.New("ruddertyper: category conflicts with the tracking plan")
+)
+
+// Option customizes a single call. Options apply in order, so a later option
+// overrides an earlier one of the same kind.
+type Option func(*callOptions)
+
+type callOptions struct {
+	context      *analytics.Context
+	integrations analytics.Integrations
+	timestamp    time.Time
+	messageID    string
+}
+
+// WithAnalyticsContext sets the event context. RudderTyper adds its metadata
+// under context.ruddertyper, replacing any "ruddertyper" key in ctx.Extra.
+func WithAnalyticsContext(ctx analytics.Context) Option {
+	return func(o *callOptions) { o.context = &ctx }
+}
+
+// WithIntegrations selects the destinations the event is sent to.
+func WithIntegrations(integrations analytics.Integrations) Option {
+	return func(o *callOptions) { o.integrations = integrations }
+}
+
+// WithTimestamp sets when the event happened (originalTimestamp). The SDK
+// uses the current time when it is not set.
+func WithTimestamp(t time.Time) Option {
+	return func(o *callOptions) { o.timestamp = t }
+}
+
+// WithMessageID sets the message ID. The SDK generates one when it is not set.
+func WithMessageID(id string) Option {
+	return func(o *callOptions) { o.messageID = id }
+}
