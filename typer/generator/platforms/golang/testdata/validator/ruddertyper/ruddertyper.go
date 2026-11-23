@@ -268,7 +268,12 @@ type PropertyMixedUnicode = string
 // Values can only be obtained from the functions below; the zero value cannot be sent.
 //
 // Mixed type enum
-type PropertyMixedValue struct{ value any }
+type PropertyMixedValue struct {
+	// A field type unique to this enum, so another enum cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertyMixedValue
+	value any
+}
 
 // PropertyMixedValueActive returns the allowed value "active".
 func PropertyMixedValueActive() PropertyMixedValue { return PropertyMixedValue{value: "active"} }
