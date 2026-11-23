@@ -41,7 +41,38 @@ match_behavior:
                 path: /sql/1.0/warehouses/abc123
                 authenticationType: pat
                 token: "{{ .DBX_TOKEN }}"
+      - example_id: "account-v1-oauth-no-config"
+        title: "OAuth account, adopted from the dashboard"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: account
+            metadata:
+              name: google-ads-prod
+            spec:
+              id: google-ads-prod
+              name: Google Ads (prod)
+              account_definition_name: DESTINATION_GOOGLE_ADWORDS_OFFLINE_CONVERSIONS_OAUTH
     invalid:
+      - example_id: "account-v1-oauth-with-config"
+        title: "OAuth account with a config block"
+        files:
+          spec.yaml: |
+            version: rudder/v1
+            kind: account
+            metadata:
+              name: google-ads-prod
+            spec:
+              id: google-ads-prod
+              name: Google Ads (prod)
+              account_definition_name: DESTINATION_GOOGLE_ADWORDS_OFFLINE_CONVERSIONS_OAUTH
+              config:
+                customerId: "123-456-7890"
+        expected_diagnostics:
+          - file: "spec.yaml"
+            reference: "/config"
+            severity: "error"
+            message_contains: "'config' is not allowed"
       - example_id: "account-v1-missing-id"
         title: "Account spec without an id"
         files:
