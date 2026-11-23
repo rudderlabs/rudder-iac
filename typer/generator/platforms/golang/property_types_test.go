@@ -231,3 +231,44 @@ func TestHoistedNameCollision(t *testing.T) {
 		}},
 	}, ctx.Payloads)
 }
+
+// Every payload name is registered before the structs payloads hoist, so an
+// event that pascal-cases to APropertiesB keeps TrackAPropertiesBProperties
+// and event A's hoisted "b properties" takes the suffix. Rule keys sort
+// "A Properties B" before "A" and "a properties b" after it; the names are
+// the same either way.
+func TestPayloadNameBeatsHoistedName(t *testing.T) {
+	leaf := map[string]plan.PropertySchema{"x": {Property: plan.Property{Name: "x", Types: []plan.PropertyType{plan.PrimitiveTypeString}}}}
+	rule := func(event string, properties map[string]plan.PropertySchema) plan.EventRule {
+		return plan.EventRule{
+			Event:   plan.Event{EventType: plan.EventTypeTrack, Name: event},
+			Section: plan.IdentitySectionProperties,
+			Schema:  plan.ObjectSchema{Properties: properties},
+		}
+	}
+
+	for _, other := range []string{"A Properties B", "a properties b"} {
+		t.Run(other, func(t *testing.T) {
+			p := &plan.TrackingPlan{Rules: []plan.EventRule{
+				rule("A", map[string]plan.PropertySchema{"b properties": {
+					Property: plan.Property{Name: "b properties", Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+					Schema:   &plan.ObjectSchema{Properties: leaf},
+				}}),
+				rule(other, leaf),
+			}}
+
+			ctx, err := newContext(p, "", "ruddertyper")
+			require.NoError(t, err)
+
+			docs := map[string]string{}
+			for _, d := range ctx.Payloads {
+				docs[d.Struct.Name] = d.Struct.Doc
+			}
+			assert.Equal(t, map[string]string{
+				"TrackAProperties":             `TrackAProperties holds the properties of "A".`,
+				"TrackAPropertiesBProperties":  `TrackAPropertiesBProperties holds the properties of "` + other + `".`,
+				"TrackAPropertiesBProperties1": "TrackAPropertiesBProperties1 is the object in TrackAProperties.BProperties.",
+			}, docs)
+		})
+	}
+}
