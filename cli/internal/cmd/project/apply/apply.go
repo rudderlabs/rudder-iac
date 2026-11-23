@@ -156,8 +156,7 @@ func NewCmdApply() *cobra.Command {
 			reporter := app.SyncReporter()
 			if jsonOutput {
 				jsonReporter := reporters.NewJSONSyncReporter(cmd.OutOrStdout(), dryRun)
-				// Deferred so every exit path writes the document, and err is the
-				// named return, so a failure is recorded in it.
+				// err is the named return, so the document records a failure.
 				defer func() {
 					// A document that could not be written is a failure: exiting 0
 					// would leave the caller with none, or a truncated one.
