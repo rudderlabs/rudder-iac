@@ -151,6 +151,13 @@ func TestVariantsWire(t *testing.T) {
 			want: someVariantSent(`, "releases": [{"stage": "live", "url": "https://x.io"}]`),
 		},
 		{
+			name: "variant: Some Open Variant Event Online sends its second match value on_line",
+			call: func() error {
+				return ex.TrackSomeOpenVariantEvent(id, examples.TrackSomeOpenVariantEventPropertiesCaseOnLine1{URL: "https://x"})
+			},
+			want: trackJSON(exMeta, "Some Open Variant Event", `{"kind": "on_line", "url": "https://x"}`),
+		},
+		{
 			name: "variant: shipping Express sends its optional discriminator",
 			call: func() error {
 				p := someVariant
@@ -197,6 +204,15 @@ func TestVariantsWire(t *testing.T) {
 			},
 			want: trackJSON(refMeta, "Event With Variants",
 				`{"device_type": "tablet", "profile": {"email": "a@b.c", "first_name": "Ann"}, "page_context": {"page_type": "settings", "page_data": {"theme": "dark", "language": "en"}}}`),
+		},
+		{
+			name: "default: shipping Default sends the method it holds under its optional discriminator",
+			call: func() error {
+				p := someVariant
+				p.Shipping = examples.CustomTypeShippingDefault{Address: address, Carrier: "ups", Method: "ground"}
+				return ex.TrackSomeVariantEvent(id, p)
+			},
+			want: trackJSON(exMeta, "Some Variant Event", `{"shipping": {"address": {"city": "Pune"}, "carrier": "ups", "method": "ground"}}`),
 		},
 		{
 			name: "absent: shipping Absent sends no discriminator key",
@@ -320,14 +336,13 @@ func TestVariantsWire(t *testing.T) {
 
 func TestVariantsDiscriminator(t *testing.T) {
 	// Only the values no wire row checks: Express's toMap writes a literal,
-	// Absent sends none, and no row sends the other three. Every other case's
-	// toMap writes Discriminator(), so its wire row checks it. methodOK packs
-	// an optional discriminator's (value, ok) into one value, so each pair is
-	// compared whole in a single assert.
+	// Default's writes Method, Absent sends none, and no row sends Case2B.
+	// Every other case's toMap writes Discriminator(), so its wire row checks
+	// it. methodOK packs an optional discriminator's (value, ok) into one
+	// value, so each pair is compared whole in a single assert.
 	methodOK := func(v examples.PropertyMethod, ok bool) []any { return []any{v, ok} }
 	assert.Equal(t, methodOK("express", true), methodOK(examples.CustomTypeShippingCaseExpress{}.Discriminator()))
 	assert.Equal(t, methodOK("", false), methodOK(examples.CustomTypeShippingAbsent{}.Discriminator()))
 	assert.Equal(t, methodOK("ground", true), methodOK(examples.CustomTypeShippingDefault{Method: "ground"}.Discriminator()))
-	assert.Equal(t, "on_line", examples.TrackSomeOpenVariantEventPropertiesCaseOnLine1{}.Discriminator())
 	assert.Equal(t, "case_2_b", examples.CustomTypeSomeVariantTypeCaseCase2B{}.Discriminator())
 }

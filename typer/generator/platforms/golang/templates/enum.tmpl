@@ -9,7 +9,12 @@ const (
 {{- end }}
 )
 {{- else }}
-type {{ .Name }} struct{ value any }
+type {{ .Name }} struct {
+	// A field type unique to this enum, so another enum cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*{{ .Name }}
+	value any
+}
 {{- range .Values }}
 
 // {{ .Name }} returns the allowed value {{ .Text }}.
