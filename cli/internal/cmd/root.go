@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	datagraphPkg "github.com/rudderlabs/rudder-iac/cli/internal/cmd/datagraph"
 	d "github.com/rudderlabs/rudder-iac/cli/internal/cmd/debug"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/experimental"
 	importcmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/import"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/apply"
@@ -21,6 +22,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/migrate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/validate"
 	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
+	sourcescmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/sources"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/trackingplan"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/transformations"
@@ -63,6 +65,7 @@ func recovery() {
 var (
 	debugCmd        *cobra.Command
 	experimentalCmd *cobra.Command
+	devCmd          *cobra.Command
 	datagraphCmd    *cobra.Command
 )
 
@@ -99,11 +102,18 @@ func init() {
 	rootCmd.AddCommand(debugCmd)
 	rootCmd.AddCommand(experimentalCmd)
 
+	devCmd = sourcescmd.NewCmdSources()
+	rootCmd.AddCommand(devCmd)
+
 	rootCmd.AddCommand(typer.NewCmdTyper())
 	rootCmd.AddCommand(transformations.NewCmdTransformations())
+	rootCmd.AddCommand(docs.NewCmdDocs())
 
 	datagraphCmd = datagraphPkg.NewCmdDataGraph()
 	rootCmd.AddCommand(datagraphCmd)
+
+	// Must run after every command is registered.
+	telemetryCmd.TrackPreRunFailures(rootCmd, trackedCommands)
 }
 
 func initConfig() {
@@ -118,6 +128,10 @@ func initConfig() {
 	// in order to avoid confusion between Experimental and ExperimentalFlags when used to toggle experimental features
 	if viper.GetBool("experimental") {
 		experimentalCmd.Hidden = false
+	}
+
+	if config.GetConfig().ExperimentalFlags.SourcesListen {
+		devCmd.Hidden = false
 	}
 }
 
@@ -137,6 +151,33 @@ func initTelemetry() {
 
 func SetVersion(v string) {
 	rootCmd.Version = v
+}
+
+// trackedCommands are the commands whose RunE reports its own result through
+// telemetry.TrackCommand. TestTrackedCommandsMatchRunEReporters keeps the list
+// in step with the code.
+var trackedCommands = []string{
+	"apply",
+	"auth login",
+	"data-graphs validate",
+	"destroy",
+	"docs destination",
+	"docs source",
+	"import retl-sources",
+	"import workspace",
+	"migrate",
+	"retl-sources preview",
+	"retl-sources validate",
+	"transformations show-default-events",
+	"transformations test",
+	"typer generate",
+	"typer snapshot",
+	"validate",
+	"workspace accounts list",
+	"workspace event-stream-sources list",
+	"workspace info",
+	"workspace retl-sources list",
+	"workspace tracking-plans list",
 }
 
 var rootCmd = &cobra.Command{
@@ -168,6 +209,9 @@ func Execute() {
 	defer recovery()
 
 	if err := rootCmd.Execute(); err != nil {
+		// Reports the input cobra rejects before any hook runs, when nothing else did.
+		telemetryCmd.TrackInvalidInput(rootCmd, os.Args[1:], err, trackedCommands)
+
 		var silent *cmderrors.SilentError
 		if !errors.As(err, &silent) {
 			ui.PrintError(err)

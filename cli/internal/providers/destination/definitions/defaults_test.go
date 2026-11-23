@@ -28,8 +28,10 @@ func registeredWithConfig(t *testing.T, newConfig func() any) *RegisteredDefinit
 
 	def := GA4TestDefinition()
 	def.NewConfig = newConfig
-	// These stubs replace GA4's config surface; scope its required keys to match.
+	// These stubs replace GA4's config surface; scope its required and secret
+	// keys to match.
 	def.ConnectionRequiredKeys = nil
+	def.SecretKeys = nil
 
 	registered, err := newRegisteredDefinition(def)
 	require.NoError(t, err)
@@ -269,10 +271,30 @@ func TestRegisterRejectsInvalidDefaults(t *testing.T) {
 			name: "unsupported field kind",
 			newConfig: func() any {
 				return &struct {
-					Events []string `mapstructure:"events" default:"a,b"`
+					Limits map[string]string `mapstructure:"limits" default:"a"`
 				}{}
 			},
-			wantErr: `config key "events": unsupported kind slice for a default tag`,
+			wantErr: `config key "limits": unsupported kind map for a default tag`,
+		},
+		{
+			// A list default carries strings only; anything else would have to
+			// guess at an element encoding.
+			name: "list of non-strings",
+			newConfig: func() any {
+				return &struct {
+					Sizes []int `mapstructure:"sizes" default:"1,2"`
+				}{}
+			},
+			wantErr: `config key "sizes": unsupported list element kind int for a default tag`,
+		},
+		{
+			name: "list default with an empty element",
+			newConfig: func() any {
+				return &struct {
+					Events []string `mapstructure:"events" default:"a,,b"`
+				}{}
+			},
+			wantErr: `config key "events": invalid list default "a,,b": empty element`,
 		},
 	}
 
@@ -292,6 +314,31 @@ func TestRegisterRejectsInvalidDefaults(t *testing.T) {
 	}
 }
 
+// A list default is kept as []any so it compares equal to the same JSON array
+// decoded from an API response, which is what lets a spec that omits the key
+// converge instead of diffing on every apply.
+func TestStringListDefaultApplies(t *testing.T) {
+	t.Parallel()
+
+	def := GA4TestDefinition()
+	def.ConnectionRequiredKeys = nil
+	def.SecretKeys = nil
+	def.NewConfig = func() any {
+		return &struct {
+			Schema []string `mapstructure:"schema" default:"EMAIL, PHONE"`
+		}{}
+	}
+
+	registered, err := newRegisteredDefinition(def)
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]any{"schema": []any{"EMAIL", "PHONE"}}, registered.ApplyDefaults(map[string]any{}))
+	assert.Equal(t,
+		[]any{"MADID"},
+		registered.ApplyDefaults(map[string]any{"schema": []any{"MADID"}})["schema"],
+	)
+}
+
 func TestRegisterAllowsDefaultOnConditionallyRequiredField(t *testing.T) {
 	t.Parallel()
 
@@ -304,4 +351,33 @@ func TestRegisterAllowsDefaultOnConditionallyRequiredField(t *testing.T) {
 	})
 
 	assert.Equal(t, map[string]any{"mode": "cloud"}, registered.ConfigDefaults())
+}
+
+func TestValidateConfigDefaultSatisfiesConditionalRequirement(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredWithConfig(t, func() any {
+		return &struct {
+			UseIAM        *bool `mapstructure:"use_iam"`
+			UseServerless *bool `mapstructure:"use_serverless" validate:"required_if=UseIAM true" default:"false"`
+		}{}
+	})
+
+	assert.Empty(t, registered.ValidateConfig(map[string]any{"use_iam": true}))
+}
+
+func TestValidateConfigDefaultTriggersConditionalRequirement(t *testing.T) {
+	t.Parallel()
+
+	registered := registeredWithConfig(t, func() any {
+		return &struct {
+			RoleBasedAuth *bool  `mapstructure:"role_based_auth" default:"true"`
+			IAMRoleARN    string `mapstructure:"iam_role_arn" validate:"required_if=RoleBasedAuth true"`
+		}{}
+	})
+
+	assert.Equal(t, []ConfigError{{
+		Path:    "/iam_role_arn",
+		Message: "'iam_role_arn' is required when 'role_based_auth' is true",
+	}}, registered.ValidateConfig(map[string]any{}))
 }

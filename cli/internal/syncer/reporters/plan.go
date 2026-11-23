@@ -49,7 +49,7 @@ func renderDiff(diff *differ.Diff) string {
 	b := &strings.Builder{}
 
 	if len(diff.ImportableResources) > 0 {
-		listResources(b, "Importable resources", diff.ImportableResources, nil)
+		renderImportableResources(b, diff)
 	}
 
 	if len(diff.NewResources) > 0 {
@@ -82,19 +82,7 @@ func renderUpdatedResources(b *strings.Builder, diff *differ.Diff) {
 	}
 
 	detail := func(urn string) string {
-		r := diff.UpdatedResources[urn]
-		details := ""
-		diffKeys := make([]string, 0, len(r.Diffs))
-		for k := range r.Diffs {
-			diffKeys = append(diffKeys, k)
-		}
-		sort.Strings(diffKeys)
-		for _, k := range diffKeys {
-			for _, line := range renderPropertyDiff(r.Diffs[k]) {
-				details += line
-			}
-		}
-		return details
+		return renderResourceDiff(diff.UpdatedResources[urn])
 	}
 
 	if len(updated) > 0 {
@@ -105,6 +93,56 @@ func renderUpdatedResources(b *strings.Builder, diff *differ.Diff) {
 		sort.Strings(secretOnly)
 		listResources(b, "Always re-applied (secret values can't be read back)", secretOnly, detail)
 	}
+}
+
+// renderImportableResources splits importable resources the way updates are
+// split. An import can push the spec over the resource it adopts, so one its
+// provider previews as changing it is listed with the changes, and one that
+// only re-applies secrets is listed apart, as an update's would be. The rest
+// adopt without a change their provider can see.
+func renderImportableResources(b *strings.Builder, diff *differ.Diff) {
+	var adoptOnly, changed, secretOnly []string
+	for _, urn := range diff.ImportableResources {
+		r, ok := diff.ImportableDiffs[urn]
+		switch {
+		case !ok || len(r.Diffs) == 0:
+			adoptOnly = append(adoptOnly, urn)
+		case r.IsSecretOnly():
+			secretOnly = append(secretOnly, urn)
+		default:
+			changed = append(changed, urn)
+		}
+	}
+
+	detail := func(urn string) string {
+		return renderResourceDiff(diff.ImportableDiffs[urn])
+	}
+	if len(adoptOnly) > 0 {
+		listResources(b, "Importable resources", adoptOnly, nil)
+	}
+	if len(changed) > 0 {
+		listResources(b, "Importable resources, changed on import", changed, detail)
+	}
+	if len(secretOnly) > 0 {
+		listResources(b, "Importable resources, secrets re-applied on import (values can't be read back)", secretOnly, detail)
+	}
+}
+
+// renderResourceDiff renders a resource's property diffs, one line per
+// changed path, in a stable order. A zero ResourceDiff renders nothing.
+func renderResourceDiff(r differ.ResourceDiff) string {
+	details := ""
+	diffKeys := make([]string, 0, len(r.Diffs))
+	for k := range r.Diffs {
+		diffKeys = append(diffKeys, k)
+	}
+	sort.Strings(diffKeys)
+	for _, k := range diffKeys {
+		for _, line := range renderPropertyDiff(r.Diffs[k]) {
+			details += line
+		}
+	}
+	return details
 }
 
 func listResources(b *strings.Builder, label string, resources []string, detailFn func(string) string) {
@@ -212,6 +250,14 @@ func renderPropertyDiff(diff differ.PropertyDiff) []string {
 }
 
 func formattedLine(property string, pair ValuePair) string {
+	// A secret the change drops has no value to show on either side.
+	if pair.Target == nil && isSecretValue(pair.Source) {
+		return fmt.Sprintf(
+			"    - %s: %s\n",
+			ui.Color(property, ui.ColorWhite),
+			ui.Color("(secret, removed)", ui.ColorYellow),
+		)
+	}
 	return fmt.Sprintf(
 		"    - %s: %s %s %s\n",
 		ui.Color(property, ui.ColorWhite),
@@ -219,6 +265,15 @@ func formattedLine(property string, pair ValuePair) string {
 		ui.Color("=>", ui.ColorYellow),
 		printable(pair.Target),
 	)
+}
+
+func isSecretValue(v any) bool {
+	switch v.(type) {
+	case secret.String, *secret.String:
+		return true
+	default:
+		return false
+	}
 }
 
 // renderSecretDiff renders a property whose only change is a secret. The remote

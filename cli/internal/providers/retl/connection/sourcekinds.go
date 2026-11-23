@@ -7,6 +7,7 @@ import (
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
 
@@ -22,10 +23,15 @@ type SourceKind struct {
 // SourceKinds are the rETL source kinds a connection may reference. Adding one
 // is more than a line here: the kind's handler must publish the shared source
 // keys below plus an "id" in its output, the warehouse table must cover the
-// source definitions it accepts, and both need tests. Table and audience
-// sources are absent because none of that exists for them yet.
+// source definitions it accepts, and both need tests. Audience sources are
+// absent because none of that exists for them yet.
+//
+// This list also decides which remote rows are eligible and how their sources
+// resolve, so a provider built without a kind (tests do) narrows the handler to
+// the registered kinds (EnableSourceKinds).
 var SourceKinds = []SourceKind{
 	{Kind: sqlmodel.ResourceKind, ResourceType: sqlmodel.ResourceType, SourceType: retlClient.ModelSourceType},
+	{Kind: table.ResourceKind, ResourceType: table.ResourceType, SourceType: retlClient.TableSourceType},
 }
 
 // The graph data every rETL source handler publishes about its source,
@@ -73,13 +79,13 @@ func SourceKindBySourceType(sourceType retlClient.SourceType) (SourceKind, bool)
 // A reference of the wrong family and a malformed one fail differently: only
 // the first can name the kind the author actually wrote.
 func parseSourceRef(ref string) (*resources.PropertyRef, error) {
-	kind, id, ok := refID(ref)
+	kind, id, ok := RefID(ref)
 	if !ok {
-		return nil, fmt.Errorf("invalid source reference %q: expected %s", ref, sourceKindRefForms())
+		return nil, fmt.Errorf("invalid source reference %q: expected %s", ref, SourceKindRefForms())
 	}
 	sourceKind, ok := SourceKindByKind(kind)
 	if !ok {
-		return nil, fmt.Errorf("source reference %q is not a rETL source: expected %s", ref, sourceKindRefForms())
+		return nil, fmt.Errorf("source reference %q is not a rETL source: expected %s", ref, SourceKindRefForms())
 	}
 	return &resources.PropertyRef{
 		URN:      resources.URN(id, sourceKind.ResourceType),
@@ -93,9 +99,10 @@ func parseSourceRef(ref string) (*resources.PropertyRef, error) {
 // multiple lines.
 var scalarRefRegex = regexp.MustCompile(`^#([a-zA-Z0-9_-]+):(.+)$`)
 
-// refID splits a scalar "#<kind>:<id>" reference into its parts, reporting
-// whether it is well formed at all.
-func refID(ref string) (kind string, id string, ok bool) {
+// RefID splits a scalar "#<kind>:<id>" reference into its parts, reporting
+// whether it is well formed at all. Exported so the connection rules parse
+// references with this same function and cannot drift from the handler.
+func RefID(ref string) (kind string, id string, ok bool) {
 	matches := scalarRefRegex.FindStringSubmatch(strings.TrimSpace(ref))
 	if matches == nil {
 		return "", "", false
@@ -103,8 +110,10 @@ func refID(ref string) (kind string, id string, ok bool) {
 	return matches[1], matches[2], true
 }
 
-// sourceKindRefForms lists the reference forms a source may take, for errors.
-func sourceKindRefForms() string {
+// SourceKindRefForms lists the reference forms a source may take, for errors.
+// Exported so the connection spec rules describe the accepted forms from the
+// same table reference parsing uses.
+func SourceKindRefForms() string {
 	forms := make([]string, len(SourceKinds))
 	for i, sk := range SourceKinds {
 		forms[i] = fmt.Sprintf("#%s:<id>", sk.Kind)

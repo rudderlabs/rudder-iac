@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: retl-source-table
+metadata:
+  name: e2e-scn-table
+spec:
+  id: e2e-scn-table
+  display_name: E2E Scenarios Customers
+  account: "#account:e2e-scn-pg"
+  primary_key: id
+  source_definition: postgres
+  schema: analytics
+  table: customers
+  enabled: true

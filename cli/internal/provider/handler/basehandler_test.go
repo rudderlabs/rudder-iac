@@ -6,8 +6,11 @@ import (
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/backend"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/handlers/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider/testutils/example/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -117,6 +120,50 @@ spec:
 		require.Error(t, err, "both URN and local_id set should be rejected")
 		assert.Contains(t, out, "project/metadata-syntax-valid")
 		assert.Contains(t, out, "cannot be specified together")
+	})
+}
+
+// referencedWriter is the example writer impl with ReferencedByKind set.
+type referencedWriter struct {
+	handler.HandlerImpl[model.WriterSpec, model.WriterResource, model.WriterState, model.RemoteWriter]
+}
+
+func (referencedWriter) Metadata() handler.HandlerMetadata {
+	m := writer.HandlerMetadata
+	m.ReferencedByKind = true
+	return m
+}
+
+func TestBaseHandler_Resources_ReferencedByKind(t *testing.T) {
+	t.Parallel()
+
+	spec := &specs.Spec{
+		Version: "rudder/v0.1",
+		Kind:    "writer",
+		Spec:    map[string]any{"id": "tolkien", "name": "J.R.R. Tolkien"},
+	}
+
+	t.Run("stamps the kind reference import resolves a managed resource by", func(t *testing.T) {
+		t.Parallel()
+		h := handler.NewHandler(referencedWriter{writer.NewHandler(backend.NewBackend()).Impl})
+		require.NoError(t, h.LoadSpec("writer/tolkien.yaml", spec))
+
+		rs, err := h.Resources()
+		require.NoError(t, err)
+		require.Len(t, rs, 1)
+		require.NotNil(t, rs[0].FileMetadata())
+		assert.Equal(t, "#writer:tolkien", rs[0].FileMetadata().MetadataRef)
+	})
+
+	t.Run("stamps nothing by default", func(t *testing.T) {
+		t.Parallel()
+		h := writer.NewHandler(backend.NewBackend())
+		require.NoError(t, h.LoadSpec("writer/tolkien.yaml", spec))
+
+		rs, err := h.Resources()
+		require.NoError(t, err)
+		require.Len(t, rs, 1)
+		assert.Nil(t, rs[0].FileMetadata())
 	})
 }
 

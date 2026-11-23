@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -29,7 +30,7 @@ func TestNewDefinitionMetadata(t *testing.T) {
 	assert.Equal(t, "http", registered.Type)
 	assert.Equal(t, "HTTP", registered.APIType)
 	assert.Equal(t, int64(1), registered.Version)
-	assert.Equal(t, []string{"password", "bearer_token", "api_key_value"}, registered.SecretKeys())
+	assert.Equal(t, []string{"password", "bearer_token", "api_key_value", "api_key_name", "username", "headers.from"}, registered.SecretKeys())
 
 	expectedSourceTypes := []string{
 		"android", "android_kotlin", "ios", "ios_swift", "web",
@@ -124,7 +125,7 @@ func TestHTTPSpecMatchesRemoteStateWithDefaults(t *testing.T) {
 		DisplayName:       "HTTP No Auth",
 		Type:              "http",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Config:            validMinimalConfig(),
 	})
 	require.NoError(t, err)
@@ -390,7 +391,7 @@ func TestHTTPConfigValidation(t *testing.T) {
 		errors := registered.ValidateConfig(config)
 		require.NotEmpty(t, errors)
 		assert.Equal(t, "/max_batch_size", errors[0].Path)
-		assert.Contains(t, errors[0].Message, "expected type 'string'")
+		assert.Equal(t, "'max_batch_size' must be a string", errors[0].Message)
 	})
 
 	t.Run("max_batch_size range rejected", func(t *testing.T) {
@@ -924,7 +925,7 @@ func TestHTTPSecretKeysUseLocalConfigKeys(t *testing.T) {
 		DisplayName:       "HTTP Production",
 		Type:              "http",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Config: map[string]any{
 			"api_url":       "https://example.com/webhook",
 			"auth":          "apiKeyAuth",
@@ -942,7 +943,7 @@ func TestHTTPSecretKeysUseLocalConfigKeys(t *testing.T) {
 	assertWrappedSecret(t, config, "password", "password-value")
 	assertWrappedSecret(t, config, "bearer_token", "bearer-token-value")
 	assertWrappedSecret(t, config, "api_key_value", "api-key-secret-value")
-	assert.Equal(t, "X-Api-Key", config["api_key_name"])
+	assertWrappedSecret(t, config, "api_key_name", "X-Api-Key")
 }
 
 func TestHTTPRemoteSecretsAreUnknownAndRedacted(t *testing.T) {

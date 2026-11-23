@@ -13,7 +13,7 @@ spec:
     host: rudder-cli-e2e-role.redshift.amazonaws.com
     port: "5439"
     database: analytics
-    user: rudder
+    user: "{{ .RS_OWN_STORAGE_ROLE_USER }}"
     password: "{{ .RS_PASSWORD }}"
     namespace: rudder_events_role
     sync_frequency: "180"

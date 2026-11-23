@@ -1,10 +1,22 @@
 # Breaking Changes
 
-This document lists breaking changes between releases of `rudder-cli`. It is separate from [CHANGELOG.md](CHANGELOG.md) and covers changes that require users to update their YAML spec files or workflows.
+This document lists breaking changes between releases of `rudder-cli`. It is separate from [CHANGELOG.md](CHANGELOG.md) and covers changes that require users to update their YAML spec files or workflows. Breaking changes to destination `config` are in [cli/internal/providers/destination/definitions/BREAKING_CHANGES.md](cli/internal/providers/destination/definitions/BREAKING_CHANGES.md).
 
 ---
 
 ## Upcoming (unreleased)
+
+### Secret references in imported specs are single-quoted
+
+**Scope:** spec, var file
+
+**Why:** `import workspace` used to write secret fields as a bare `{{ .VAR }}`. Substitution rewrites the file before YAML parsing, so a JSON secret, such as a Google service account key, parsed as a mapping and was sent to the control plane as an empty string, which failed with a 400. Import now writes `'{{ .VAR }}'`, in single quotes.
+
+What to do:
+
+- A project imported earlier keeps its bare slots, and re-import is refused once resources are managed. Change a JSON secret's reference by hand, for example `credentials: '{{ .BQ_CREDENTIALS }}'`. Apply already repairs BigQuery account credentials in bare slots (#951), but destination JSON secrets are not covered.
+- A secret that contains a single quote must have each one doubled in the var file, and written without quotes there: for the password `it's-a-secret`, write `PW: it''s-a-secret`. An undoubled quote now fails with an error that names the variable.
+- JSON values are single-quoted in the var file. Double quotes turn `\n` escapes into real newlines and break a private key.
 
 ### Spec format upgrade: `rudder/0.1` → `rudder/v1`
 

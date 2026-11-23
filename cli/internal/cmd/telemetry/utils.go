@@ -4,6 +4,11 @@ import (
 	"encoding/json"
 	"maps"
 	"os"
+	"slices"
+	"strings"
+	"sync/atomic"
+
+	"github.com/spf13/cobra"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/telemetry"
@@ -16,6 +21,45 @@ const (
 type KV struct {
 	K string
 	V interface{}
+}
+
+// ciPlatforms names the CI service behind each variable that service sets on
+// every job. The CLI reports the name as ci_platform when
+// RUDDERSTACK_CLI_CI_PLATFORM is not set, so runs in a user's own pipeline are
+// not counted as runs by a person. The official workflow sets both
+// RUDDERSTACK_CLI_* variables, so cli_workflow_version still tells its runs
+// apart. The bare CI variable is left out: some tools and coding agents set it
+// to turn off prompts on a developer's machine.
+var ciPlatforms = []struct{ envVar, platform string }{
+	{"GITHUB_ACTIONS", "github-actions"},
+	{"GITLAB_CI", "gitlab-ci"},
+	{"CIRCLECI", "circleci"},
+	{"BUILDKITE", "buildkite"},
+	{"JENKINS_URL", "jenkins"},
+	{"TF_BUILD", "azure-pipelines"},
+	{"BITBUCKET_BUILD_NUMBER", "bitbucket-pipelines"},
+	{"CODEBUILD_BUILD_ID", "aws-codebuild"},
+	{"TEAMCITY_VERSION", "teamcity"},
+	{"TRAVIS", "travis-ci"},
+	{"DRONE", "drone"},
+}
+
+// ciAlsoRequires names a second variable a job sets, for a service whose first
+// one can also sit in a shell profile. JENKINS_URL does, on a machine that
+// talks to Jenkins; BUILD_ID is set only inside a job.
+var ciAlsoRequires = map[string]string{"JENKINS_URL": "BUILD_ID"}
+
+// detectCIPlatform returns the CI service the CLI runs in, or "" outside CI.
+func detectCIPlatform() string {
+	for _, ci := range ciPlatforms {
+		if os.Getenv(ci.envVar) == "" {
+			continue
+		}
+		if also, ok := ciAlsoRequires[ci.envVar]; !ok || os.Getenv(also) != "" {
+			return ci.platform
+		}
+	}
+	return ""
 }
 
 // getCIExecutionContext returns the execution context of the CLI if running in CI.
@@ -33,10 +77,68 @@ func getCIExecutionContext() map[string]interface{} {
 		}
 	}
 
+	if _, set := executionContext["ci_platform"]; !set {
+		if platform := detectCIPlatform(); platform != "" {
+			executionContext["ci_platform"] = platform
+		}
+	}
+
 	return executionContext
 }
 
-func TrackCommand(command string, err error, extras ...KV) {
+// TrackCommand is a variable so tests can observe what a command reports.
+// Callers report from a deferred call in RunE, so RunE needs a named error
+// return: an unnamed return is copied before the defer runs.
+var TrackCommand = trackCommand
+
+// reported is set once any command event is emitted, so TrackInvalidInput does
+// not count a failure twice.
+var reported atomic.Bool
+
+// telemetryReady is a variable so tests can stand in for loaded config.
+var telemetryReady = telemetry.Ready
+
+// CommandName is the command path below the root. Every tracking site derives
+// its name from here, so RunE and PreRunE report the same name by construction.
+func CommandName(cmd *cobra.Command) string {
+	return strings.TrimPrefix(cmd.CommandPath(), cmd.Root().Name()+" ")
+}
+
+// InvalidInputStage labels failures cobra raises itself, before any hook runs.
+const InvalidInputStage = "invalid_input"
+
+// TrackInvalidInput reports a failure cobra raised on the user's input: stray
+// arguments, a missing required flag, a violated flag group. Cobra rejects
+// these outside the hooks TrackPreRunFailures wraps, so Execute is the only
+// place that sees them.
+//
+// It reports only for the commands in tracked, those whose RunE reports its own
+// result. For any other command the event would be a failure with no success
+// events to set it against, which reads as a 100% failure rate.
+//
+// It reports nothing for flag-parse errors or an unknown command: cobra fails
+// those before the OnInitialize hooks load config and telemetry, and without
+// the config the opt-out setting cannot be honoured.
+func TrackInvalidInput(root *cobra.Command, args []string, err error, tracked []string) {
+	if err == nil || reported.Load() || !telemetryReady() {
+		return
+	}
+
+	target, _, findErr := root.Find(args)
+	if findErr != nil || target == nil {
+		return
+	}
+
+	name := CommandName(target)
+	if !slices.Contains(tracked, name) {
+		return
+	}
+
+	TrackCommand(name, err, KV{K: "stage", V: InvalidInputStage})
+}
+
+func trackCommand(command string, err error, extras ...KV) {
+	reported.Store(true)
 
 	props := map[string]interface{}{
 		"command": command,
@@ -59,5 +161,36 @@ func TrackCommand(command string, err error, extras ...KV) {
 
 	if err := telemetry.TrackEvent(CommandExecutedEvent, props); err != nil {
 		log.Error("failed to track command", "error", err)
+	}
+}
+
+// TrackPreRunFailures reports failures of the PreRunE and PersistentPreRunE
+// hooks (auth, workspace lookup, spec loading) across the command tree under
+// the same name RunE uses, for the commands in tracked. Any other command never
+// reports success, so a failure event would read as a 100% failure rate. Call
+// it once, after every command is registered: a second call wraps each hook
+// again and reports every failure twice.
+func TrackPreRunFailures(cmd *cobra.Command, tracked []string) {
+	for _, sub := range cmd.Commands() {
+		TrackPreRunFailures(sub, tracked)
+	}
+
+	cmd.PreRunE = trackHook(cmd.PreRunE, tracked)
+	cmd.PersistentPreRunE = trackHook(cmd.PersistentPreRunE, tracked)
+}
+
+// trackHook wraps a hook so its failure is reported under the command being
+// run, which cobra passes in: a persistent hook on a parent runs for the child.
+func trackHook(hook func(*cobra.Command, []string) error, tracked []string) func(*cobra.Command, []string) error {
+	if hook == nil {
+		return nil
+	}
+
+	return func(c *cobra.Command, args []string) error {
+		err := hook(c, args)
+		if err != nil && slices.Contains(tracked, CommandName(c)) {
+			TrackCommand(CommandName(c), err, KV{K: "stage", V: "pre_run"})
+		}
+		return err
 	}
 }

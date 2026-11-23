@@ -18,56 +18,7 @@ import (
 	dgProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph"
 	destProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
-	activecampaign "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/active_campaign"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/adj"
-	adobeanalytics "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/adobe_analytics"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/am"
-	attentivetag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/attentive_tag"
-	bingadsofflineconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bingads_offline_conversions"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bq"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/bqstream"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/braze"
-	confluentcloud "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/confluent_cloud"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio"
-	customerioaudience "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/customerio_audience"
-	facebookconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_conversions"
-	facebookpixel "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/facebook_pixel"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/firebase"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/ga4"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gcs"
-	googleadwordsofflineconversions "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/google_adwords_offline_conversions"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googleads"
-	googlepubsub "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlepubsub"
-	googlesheets "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/googlesheets"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/gtm"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/hs"
-	httpdest "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/http"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/intercom"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/iterable"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kafka"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/kinesis"
-	linkedinads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_ads"
-	linkedininsighttag "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/linkedin_insight_tag"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/marketo"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/mp"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/postgres"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/posthog"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/qualtrics"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/redis"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/rs"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3"
-	s3datalake "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/s3_datalake"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/salesforce"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/sentry"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/slack"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/snowflake"
-	snowpipestreaming "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/snowpipe_streaming"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/statsig"
-	tiktokads "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/tiktok_ads"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/vwo"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/webhook"
-	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/zendesk"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/builtin"
 	esProvider "github.com/rudderlabs/rudder-iac/cli/internal/providers/event-stream"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations"
@@ -107,7 +58,9 @@ type deps struct {
 
 // Deps defines the dependencies initialized globally for Rudder CLI
 type Deps interface {
-	// Client returns the RudderStack API client instance, configured with authentication and base URL
+	// Client returns the RudderStack API client instance, configured with the base URL.
+	// Deps from NewOfflineDeps carry a placeholder token, so calls through their
+	// client fail authentication.
 	Client() *client.Client
 
 	// Providers returns the initialized Providers struct containing all provider instances
@@ -163,7 +116,23 @@ func NewDeps() (Deps, error) {
 		return nil, err
 	}
 
-	c, err := setupClient(v)
+	return newDeps(config.GetConfig().Auth.AccessToken)
+}
+
+// NewOfflineDeps builds the same providers as NewDeps (so it observes the same
+// registered rules) for commands that must never contact the API, such as
+// validate, which is expected to run in CI without credentials. It skips the
+// access-token check and gives the client a placeholder token because client.New
+// rejects an empty one; any API call made through it fails auth, which surfaces
+// an accidental network dependency instead of hiding it.
+func NewOfflineDeps() (Deps, error) {
+	return newDeps("offline")
+}
+
+// newDeps is the single construction path for NewDeps and NewOfflineDeps, so a
+// client option or provider added here reaches both.
+func newDeps(token string) (Deps, error) {
+	c, err := setupClient(token, v)
 	if err != nil {
 		return nil, fmt.Errorf("setup client: %w", err)
 	}
@@ -187,50 +156,22 @@ func NewDeps() (Deps, error) {
 // Composition is the only part that needs the app's machinery, so it lives
 // here in the composition root; the provider-in, catalog-out assembly lives in
 // package ruledoc where it can be tested without credentials. Generation makes
-// no network calls, so it skips the access-token check NewDeps enforces.
+// no network calls, so it uses the offline deps.
 //
 // verrs carries catalog validation failures (e.g. a registered rule with no
 // authored fragment); a non-nil error means the catalog could not be assembled
 // at all. generatedAt is injected so callers own the timestamp.
 func GenerateRuleCatalog(generatedAt string) (docs.DocumentedRules, []error, error) {
-	cp, err := newCompositeProvider()
+	d, err := NewOfflineDeps()
 	if err != nil {
-		return docs.DocumentedRules{}, nil, fmt.Errorf("building composite provider: %w", err)
+		return docs.DocumentedRules{}, nil, fmt.Errorf("building offline deps: %w", err)
 	}
 
-	return ruledoc.Build(cp, GetVersion(), generatedAt)
-}
-
-// newCompositeProvider builds the composite provider without requiring
-// credentials. It is used only by GenerateRuleCatalog: rule-doc generation
-// enumerates rules and reads authored fragments but makes no network calls, so
-// it skips the auth check NewDeps enforces and feeds client.New a placeholder
-// token (an empty token is rejected outright, which would otherwise break
-// generation in CI where no credentials are configured). It shares
-// composeProviders with NewDeps so the documented rule set stays identical to
-// the one project validation observes — they can't drift.
-func newCompositeProvider() (provider.Provider, error) {
-	cfg := config.GetConfig()
-
-	c, err := client.New(
-		"rule-doc-generation", // unused: generation makes no API calls
-		client.WithBaseURL(cfg.APIURL),
-		client.WithUserAgent("rudder-cli/"+v),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("setup client: %w", err)
-	}
-
-	cp, _, err := composeProviders(c)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize composite provider: %w", err)
-	}
-
-	return cp, nil
+	return ruledoc.Build(d.CompositeProvider(), GetVersion(), generatedAt)
 }
 
 // composeProviders builds the provider set and aggregates it into a composite
-// provider. Shared by NewDeps and newCompositeProvider so every consumer
+// provider. Shared by NewDeps and NewOfflineDeps so every consumer
 // observes the same providers (and therefore the same registered rules).
 func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 	rawProviders, providerMap, err := setupProviders(c)
@@ -238,7 +179,7 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 		return nil, nil, fmt.Errorf("failed to initialize providers: %w", err)
 	}
 
-	cp, err := provider.NewCompositeProvider(providerMap)
+	cp, err := provider.NewCompositeProvider(providerMap, providerOrder...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize composite provider: %w", err)
 	}
@@ -246,13 +187,41 @@ func composeProviders(c *client.Client) (provider.Provider, *Providers, error) {
 	return cp, rawProviders, nil
 }
 
-func setupClient(version string) (*client.Client, error) {
+func setupClient(token, version string) (*client.Client, error) {
 	cfg := config.GetConfig()
 	return client.New(
-		cfg.Auth.AccessToken,
+		token,
 		client.WithBaseURL(cfg.APIURL),
 		client.WithUserAgent("rudder-cli/"+version),
 	)
+}
+
+// providerOrder is the order the composite aggregates import --merge matchers
+// in. A matcher that consults another provider's matches only finds them if
+// that provider's matchers ran first, so a provider comes after everything it
+// depends on. providerEdges records those dependencies, and a test keeps the
+// two in step: a new cross-provider reference is a one-line addition there.
+var providerOrder = []string{
+	"account",
+	"transformations",
+	"datacatalog",
+	"destination",
+	"datagraph",
+	"eventstream",
+	"retl",
+}
+
+// providerEdges maps each provider to the providers whose matches its
+// matchers consult or whose resources its specs reference.
+var providerEdges = map[string][]string{
+	// transformation: "#transformation:<id>"
+	"destination": {"transformations"},
+	// connections resolve their destination endpoint (matcher);
+	// sources reference a tracking plan
+	"eventstream": {"destination", "datacatalog"},
+	// connections resolve their destination endpoint (matcher);
+	// sources reference an account: "#account:<id>"
+	"retl": {"destination", "account"},
 }
 
 func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider, error) {
@@ -275,7 +244,7 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	}
 
 	dcp := datacatalog.New(catalogClient)
-	retlp := retl.New(retlClient.NewRudderRETLStore(c))
+	retlp := retl.New(retlClient.NewRudderRETLStore(c), retlOptions(destRegistry)...)
 
 	esp := esProvider.New(esClient.NewRudderEventStreamStore(c), esProvider.WithDestinationRegistry(destRegistry))
 	trp := transformations.NewProvider(c)
@@ -308,166 +277,19 @@ func setupProviders(c *client.Client) (*Providers, map[string]provider.Provider,
 	return providers, providerMap, nil
 }
 
-// newDestinationRegistry builds the destination definition registry.
-// Verified definitions are always registered; unverified definitions still
-// require UnverifiedDestinations.
+// retlOptions returns the RETL provider options for the kinds beyond SQL models.
+func retlOptions(destRegistry *definitions.Registry) []retl.Option {
+	return []retl.Option{
+		retl.WithConnectionSupport(destRegistry),
+		retl.WithTableSupport(),
+	}
+}
+
+// newDestinationRegistry builds the destination definition registry from the
+// builtin table. Verified definitions are always registered; unverified
+// definitions still require UnverifiedDestinations.
 func newDestinationRegistry(cfg config.Config) (*definitions.Registry, error) {
-	registry := definitions.NewRegistry()
-
-	if err := registry.Register(bqstream.NewDefinition()); err != nil {
-		return nil, fmt.Errorf("registering bqstream destination definition: %w", err)
-	}
-	if err := registry.Register(s3.NewDefinition()); err != nil {
-		return nil, fmt.Errorf("registering s3 destination definition: %w", err)
-	}
-	if err := registry.Register(httpdest.NewDefinition()); err != nil {
-		return nil, fmt.Errorf("registering http destination definition: %w", err)
-	}
-	if err := registry.Register(activecampaign.NewDefinition()); err != nil {
-		return nil, fmt.Errorf("registering active_campaign destination definition: %w", err)
-	}
-	if err := registry.Register(attentivetag.NewDefinition()); err != nil {
-		return nil, fmt.Errorf("registering attentive_tag destination definition: %w", err)
-	}
-	if err := registry.Register(bq.NewDefinition()); err != nil {
-		return nil, fmt.Errorf("registering bq destination definition: %w", err)
-	}
-
-	if cfg.ExperimentalFlags.UnverifiedDestinations {
-		if err := registry.Register(adj.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering adj destination definition: %w", err)
-		}
-		if err := registry.Register(adobeanalytics.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering adobe_analytics destination definition: %w", err)
-		}
-		if err := registry.Register(am.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering am destination definition: %w", err)
-		}
-		if err := registry.Register(bingadsofflineconversions.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering bingads_offline_conversions destination definition: %w", err)
-		}
-		if err := registry.Register(braze.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering braze destination definition: %w", err)
-		}
-		if err := registry.Register(confluentcloud.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering confluent_cloud destination definition: %w", err)
-		}
-		if err := registry.Register(customerio.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering customerio destination definition: %w", err)
-		}
-		if err := registry.Register(customerioaudience.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering customerio_audience destination definition: %w", err)
-		}
-		if err := registry.Register(facebookconversions.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering facebook_conversions destination definition: %w", err)
-		}
-		if err := registry.Register(facebookpixel.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering facebook_pixel destination definition: %w", err)
-		}
-		if err := registry.Register(firebase.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering firebase destination definition: %w", err)
-		}
-		if err := registry.Register(ga.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering ga destination definition: %w", err)
-		}
-		if err := registry.Register(ga4.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering ga4 destination definition: %w", err)
-		}
-		if err := registry.Register(gcs.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering gcs destination definition: %w", err)
-		}
-		if err := registry.Register(googleadwordsofflineconversions.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering google_adwords_offline_conversions destination definition: %w", err)
-		}
-		if err := registry.Register(googleads.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering googleads destination definition: %w", err)
-		}
-		if err := registry.Register(googlepubsub.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering googlepubsub destination definition: %w", err)
-		}
-		if err := registry.Register(googlesheets.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering googlesheets destination definition: %w", err)
-		}
-		if err := registry.Register(gtm.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering gtm destination definition: %w", err)
-		}
-		if err := registry.Register(hs.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering hs destination definition: %w", err)
-		}
-		if err := registry.Register(intercom.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering intercom destination definition: %w", err)
-		}
-		if err := registry.Register(kinesis.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering kinesis destination definition: %w", err)
-		}
-		if err := registry.Register(iterable.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering iterable destination definition: %w", err)
-		}
-		if err := registry.Register(kafka.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering kafka destination definition: %w", err)
-		}
-		if err := registry.Register(linkedinads.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering linkedin_ads destination definition: %w", err)
-		}
-		if err := registry.Register(linkedininsighttag.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering linkedin_insight_tag destination definition: %w", err)
-		}
-		if err := registry.Register(marketo.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering marketo destination definition: %w", err)
-		}
-		if err := registry.Register(mp.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering mp destination definition: %w", err)
-		}
-		if err := registry.Register(postgres.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering postgres destination definition: %w", err)
-		}
-		if err := registry.Register(posthog.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering posthog destination definition: %w", err)
-		}
-		if err := registry.Register(qualtrics.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering qualtrics destination definition: %w", err)
-		}
-		if err := registry.Register(redis.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering redis destination definition: %w", err)
-		}
-		if err := registry.Register(rs.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering rs destination definition: %w", err)
-		}
-		if err := registry.Register(s3datalake.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering s3_datalake destination definition: %w", err)
-		}
-		if err := registry.Register(salesforce.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering salesforce destination definition: %w", err)
-		}
-		if err := registry.Register(sentry.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering sentry destination definition: %w", err)
-		}
-		if err := registry.Register(slack.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering slack destination definition: %w", err)
-		}
-		if err := registry.Register(snowflake.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering snowflake destination definition: %w", err)
-		}
-		if err := registry.Register(snowpipestreaming.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering snowpipe_streaming destination definition: %w", err)
-		}
-		if err := registry.Register(statsig.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering statsig destination definition: %w", err)
-		}
-		if err := registry.Register(tiktokads.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering tiktok_ads destination definition: %w", err)
-		}
-		if err := registry.Register(vwo.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering vwo destination definition: %w", err)
-		}
-		if err := registry.Register(webhook.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering webhook destination definition: %w", err)
-		}
-		if err := registry.Register(zendesk.NewDefinition()); err != nil {
-			return nil, fmt.Errorf("registering zendesk destination definition: %w", err)
-		}
-	}
-	return registry, nil
+	return builtin.NewRegistry(cfg.ExperimentalFlags.UnverifiedDestinations)
 }
 
 func SyncReporter() syncer.SyncReporter {

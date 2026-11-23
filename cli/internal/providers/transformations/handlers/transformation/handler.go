@@ -42,6 +42,8 @@ var HandlerMetadata = handler.HandlerMetadata{
 	ResourceType:     ttypes.TransformationResourceType,
 	SpecKind:         ttypes.TransformationSpecKind,
 	SpecMetadataName: ttypes.TransformationMetadataName,
+	// Destinations reference transformations as "#transformation:<id>".
+	ReferencedByKind: true,
 }
 
 // HandlerImpl implements the HandlerImpl interface for transformation resources

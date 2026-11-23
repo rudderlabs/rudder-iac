@@ -1,0 +1,10 @@
+version: rudder/v1
+kind: transformation
+metadata:
+  name: refused_link_transformation
+spec:
+  id: refused-link-tx
+  name: E2E Refused Link
+  language: javascript
+  code: |
+    export function transformEvent(event, metadata) { return event; }

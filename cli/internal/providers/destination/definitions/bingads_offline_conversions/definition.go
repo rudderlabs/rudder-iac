@@ -50,11 +50,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "bingads_offline_conversions",
-		APIType:    "BINGADS_OFFLINE_CONVERSIONS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{},
+		Type:        "bingads_offline_conversions",
+		DisplayName: "BingAds Offline Conversions",
+		APIType:     "BINGADS_OFFLINE_CONVERSIONS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{},
 		NewConfig: func() any {
 			return &bingAdsOfflineConversionsConfig{}
 		},

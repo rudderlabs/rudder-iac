@@ -18,6 +18,7 @@ var sourceTypes = []string{
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
 	common.SourceTypeCloud,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -30,6 +31,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeFlutter:       {"cloud", "device"},
 	common.SourceTypeCordova:       {"cloud"},
 	common.SourceTypeCloud:         {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // schema.json guards both sides with ^(.{0,100})$ — a pattern forbidding line
@@ -112,15 +114,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "adj",
-		APIType:    "ADJ",
-		Version:    1,
-		Properties: properties,
-		// db-config declares no secretKeys. Terraform marks app_token Sensitive, but
-		// db-config is authoritative for write-only values: the API returns app_token,
-		// so wrapping it as a secret would make the destination diff on every apply
-		// and export as a "{{ .VAR }}" the user has to fill in by hand.
-		SecretKeys: nil,
+		Type:        "adj",
+		DisplayName: "Adjust",
+		APIType:     "ADJ",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"app_token"},
 		NewConfig: func() any {
 			return &adjustConfig{}
 		},

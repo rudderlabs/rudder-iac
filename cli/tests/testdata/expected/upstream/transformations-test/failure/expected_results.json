@@ -77,7 +77,7 @@
       "handleName": "badPyLibrary",
       "versionId": "placeholder",
       "pass": false,
-      "message": "SyntaxError((\"Line 1: SyntaxError: '(' was never closed at statement: 'def broken_function('\",))\n   in base transformation"
+      "message": "placeholder"
     },
     {
       "id": "placeholder",

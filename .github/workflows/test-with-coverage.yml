@@ -4,10 +4,11 @@ on:
     branches:
       - main
       - "release/*"
-    # Docs cannot change Go behaviour. Safe only while this workflow is NOT a required
-    # status check: the org ruleset master-branch-protection (id 4378086) carries only
-    # deletion, non_fast_forward and pull_request rules. If it is ever made required, a
-    # skipped run leaves the PR pending forever and this must become a job-level gate.
+    # Docs cannot change Go behaviour, so a docs-only push skips the whole workflow.
+    # Pull requests can't: "unit tests" and "e2e tests (live control plane)" are
+    # required status checks on main, and a workflow that never runs never reports
+    # them, which leaves the pull request blocked. They gate the jobs instead; see the
+    # changes job.
     paths-ignore:
       - "**/*.md"
       - "docs/**"
@@ -16,19 +17,13 @@ on:
   pull_request:
     branches:
       - main
-    # Keep in sync with the push filter above; Actions does not support YAML anchors.
-    paths-ignore:
-      - "**/*.md"
-      - "docs/**"
-      - ".claude/**"
-      - ".agents/**"
 
 # Supersession, keyed per PR: a new commit cancels the older run of that same PR
 # instead of letting every intermediate commit spend a full e2e suite against the live
 # workspace. Cancelling mid-apply is safe because every e2e test opens with
 # `destroy --confirm=false`, and because each of them turns
 # RUDDERSTACK_X_UNVERIFIED_DESTINATIONS on for itself (see
-# allowUnverifiedDestinationResidue) — without that flag, destinations left behind
+# allowManagedResidue) — without that flag, destinations left behind
 # by a killed run make the next run's opening destroy fail on an unregistered type.
 #
 # Keyed on the PR number, not github.head_ref: head_ref is only a branch name, so two
@@ -43,8 +38,45 @@ permissions:
   contents: read
 
 jobs:
+  # A skipped job still reports its required check as passing; a skipped workflow
+  # reports nothing. So a docs-only pull request runs this job, and the test jobs
+  # below skip on its answer.
+  changes:
+    name: "detect code changes"
+    # A push run has already passed the workflow-level filter. With this job skipped,
+    # its output is empty and the test jobs below still run.
+    if: github.event_name == 'pull_request'
+    runs-on: "ubuntu-24.04"
+    permissions:
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      # The files API lists a rename under its new path only, so the old path is
+      # checked too: moving a Go file under docs/ still runs the tests. The patterns
+      # mirror the push filter; keep the two in sync.
+      - name: list changed files
+        id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)')
+          grep -qvE '(\.md$|^docs/|^\.claude/|^\.agents/)' <<< "$files" && code=true || code=false
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   unit:
     name: "unit tests"
+    needs: changes
+    # Skips only on an explicit "false". If the changes job fails, its output is empty
+    # and the tests still run, so a broken filter can't wave a pull request through.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: "ubuntu-24.04"
     steps:
       - name: Harden the runner (Audit all outbound calls)
@@ -86,7 +118,7 @@ jobs:
           RUDDERSTACK_ACCESS_TOKEN: ${{ secrets.RUDDERSTACK_ACCESS_TOKEN }}
 
       - name: upload unit coverage to Codecov
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: rudderlabs/rudder-iac
@@ -95,12 +127,17 @@ jobs:
           files: coverage-unit.out
 
   e2e:
-    name: "e2e tests (live control plane)"
+    # Internal name. The check people read is the `e2e-result` job below, which
+    # reports this one's outcome and distinguishes "failed" from "never got a turn".
+    name: "e2e tests (run)"
+    needs: changes
+    # Same gate as the unit job.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: "ubuntu-24.04"
     timeout-minutes: 30
     # Keep the push run as the final verification of the tree that actually landed.
-    # A pull request's merge ref can become stale when main advances, and this workflow
-    # is not a required status check, so its PR run cannot replace the post-merge run.
+    # A pull request's merge ref can become stale when main advances, so its PR run
+    # cannot replace the post-merge run.
     #
     # The mutex over the single shared workspace. These tests open with a workspace-wide
     # destroy and count-guard their snapshots over every managed resource, so two must
@@ -109,6 +146,14 @@ jobs:
     # cancel-in-progress stays false — supersession belongs to the workflow-level group
     # above, not here. Do not add `queue: max`: the default single-pending-slot
     # behaviour drops redundant queued runs, which is itself a saving.
+    #
+    # That single-pending-slot behaviour is also this group's one sharp edge, and the
+    # reason the `e2e-result` job exists. A concurrency group holds at most one running
+    # and one pending job: when a third arrives, the *pending* one is cancelled outright.
+    # With several PRs pushing at once that is routine — on 16 Sep, #847's queued job was
+    # evicted by runs from #849 and #851 ninety seconds later, and surfaced on #847 as a
+    # red check on a tree whose e2e had passed twice. Eviction is a scheduling outcome,
+    # not a test result, so it must not be reported as one.
     #
     # The group name is deliberately the one the pre-split workflow used. Renaming it
     # would open a window where a run on the old definition and a run on the new one
@@ -153,7 +198,7 @@ jobs:
           # destinations upstream, and with the flag off the next run's opening
           # destroy fails hard in destination LoadResources ("managed destination ...
           # has unregistered type"), which needs manual repair. Every e2e test already
-          # sets it for itself via allowUnverifiedDestinationResidue, so this is a
+          # sets it for itself via allowManagedResidue, so this is a
           # backstop for one that forgets and a way to flip it without a code change.
           # The variable does not exist yet; unset, this resolves to empty.
           RUDDERSTACK_X_UNVERIFIED_DESTINATIONS: ${{ vars.RUDDERSTACK_X_UNVERIFIED_DESTINATIONS }}
@@ -166,6 +211,19 @@ jobs:
           # destroy. Same rule: set the repository variable to 1 only while that
           # workspace is disposable.
           RUN_CONNECTION_E2E: ${{ vars.RUN_CONNECTION_E2E }}
+          # Gates the seven RETL suites. Passed as a literal rather than through a
+          # repository variable on purpose: RUN_CONNECTION_E2E above reads
+          # ${{ vars.RUN_CONNECTION_E2E }}, that variable has never been defined,
+          # and DEX-901 found the suite it gates has therefore never run. A gate
+          # wired to an undefined variable is silent disablement. The gate exists
+          # so a local `go test ./cli/...` does not apply to whatever workspace
+          # ~/.rudder/config.json names; in this lane it is always on.
+          RUN_RETL_E2E: "1"
+          # Gates TestImportReferencesManagedTransformation. A literal, not a
+          # repository variable: a gate wired to an undefined variable silently never
+          # runs. The gate only keeps a local `go test ./cli/...` off whatever
+          # workspace ~/.rudder/config.json names; this lane's workspace is disposable.
+          RUN_IMPORT_E2E: "1"
 
       # Only this job drives the binary, so only it produces CLI logs. upload-artifact
       # rejects a duplicate artifact name within a run, so the unit job must not also
@@ -179,10 +237,60 @@ jobs:
           if-no-files-found: ignore
 
       - name: upload e2e coverage to Codecov
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: rudderlabs/rudder-iac
           flags: e2e
           disable_search: true
           files: coverage-e2e.out
+
+  # The check the PR surface shows for e2e. It exists to tell two things apart that
+  # GitHub renders identically on the `e2e` job:
+  #
+  #   failure   — the suite ran and something broke. Red, and it should be.
+  #   cancelled — the job never started (0 steps): evicted from the shared-workspace
+  #               queue by a later run, so this tree got no e2e signal at all.
+  #
+  # The second is not a result about the code, so it does not fail the PR — but it is
+  # not silently green either: the job writes to the step summary and annotates the run,
+  # so "e2e did not run" is visible rather than inferred from a green tick.
+  #
+  # A cancellation of the whole workflow run (someone hits cancel, or the workflow-level
+  # per-PR group supersedes it) cancels this job too, so it cannot mask that case.
+  # `main`'s post-merge run remains the authority either way.
+  e2e-result:
+    name: "e2e tests (live control plane)"
+    runs-on: "ubuntu-24.04"
+    needs: [e2e]
+    if: always()
+    steps:
+      - name: report the e2e outcome
+        env:
+          RESULT: ${{ needs.e2e.result }}
+        run: |
+          case "$RESULT" in
+            success)
+              echo "e2e suite passed." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            skipped)
+              echo "e2e suite skipped for this run." >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            cancelled)
+              echo "::warning title=e2e did not run::Evicted from the shared-workspace queue by a later run, so this tree has no e2e signal. Re-run the job to get one; main's post-merge run is the authority."
+              {
+                echo "### e2e did not run"
+                echo
+                echo "The suite holds a mutex over a single shared workspace. A concurrency group"
+                echo "keeps at most one running and one pending job, so a later run evicted this"
+                echo "one before it started — **this is a scheduling outcome, not a test result**."
+                echo
+                echo "Re-run the \`e2e tests (run)\` job to get a signal for this tree."
+              } >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              echo "::error title=e2e failed::The e2e suite ran and failed. See the 'e2e tests (run)' job."
+              echo "### e2e suite failed" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+          esac

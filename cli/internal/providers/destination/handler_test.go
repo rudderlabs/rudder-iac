@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
@@ -21,6 +22,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/secret"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -50,8 +52,9 @@ func testRegistry(t *testing.T) *definitions.Registry {
 
 func eventFilteringTestDefinition() *definitions.DestinationDefinition {
 	return &definitions.DestinationDefinition{
-		Type:    "FILTERED",
-		Version: 1,
+		Type:        "FILTERED",
+		DisplayName: "Test",
+		Version:     1,
 		Properties: []converter.ConfigProperty{
 			converter.Simple("trackingID", "tracking_id"),
 			converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist"),
@@ -79,8 +82,9 @@ func eventFilteringTestDefinition() *definitions.DestinationDefinition {
 
 func webhookTestDefinition() *definitions.DestinationDefinition {
 	return &definitions.DestinationDefinition{
-		Type:    "WEBHOOK",
-		Version: 1,
+		Type:        "WEBHOOK",
+		DisplayName: "Test",
+		Version:     1,
 		Properties: []converter.ConfigProperty{
 			converter.Simple("webhookUrl", "webhook_url"),
 		},
@@ -100,8 +104,9 @@ func webhookTestDefinition() *definitions.DestinationDefinition {
 // local specs can be asserted independently of any real destination.
 func defaultsTestDefinition() *definitions.DestinationDefinition {
 	return &definitions.DestinationDefinition{
-		Type:    "DEFAULTED",
-		Version: 1,
+		Type:        "DEFAULTED",
+		DisplayName: "Test",
+		Version:     1,
 		Properties: []converter.ConfigProperty{
 			converter.Simple("apiSecret", "api_secret"),
 			converter.Simple("mode", "mode"),
@@ -124,8 +129,9 @@ func defaultsTestDefinition() *definitions.DestinationDefinition {
 
 func ga4TestDefinition() *definitions.DestinationDefinition {
 	return &definitions.DestinationDefinition{
-		Type:    "GA4",
-		Version: 1,
+		Type:        "GA4",
+		DisplayName: "Test",
+		Version:     1,
 		Properties: []converter.ConfigProperty{
 			converter.Simple("apiSecret", "api_secret"),
 			converter.Simple("measurementId", "measurement_id"),
@@ -165,6 +171,7 @@ func resolvedRef(urn, value string) *resources.PropertyRef {
 // urnResolver is a minimal URNResolver for MapRemoteToState tests.
 type urnResolver struct {
 	transformationURNByID map[string]string // remote ID -> URN
+	accountURNByID        map[string]string // remote ID -> URN
 }
 
 func (r urnResolver) GetURNByID(resourceType string, remoteID string) (string, error) {
@@ -173,6 +180,17 @@ func (r urnResolver) GetURNByID(resourceType string, remoteID string) (string, e
 			return urn, nil
 		}
 		return "", resources.ErrRemoteResourceExternalIdNotFound
+	}
+	if resourceType == accounts.AccountResourceType {
+		if urn, ok := r.accountURNByID[remoteID]; ok {
+			return urn, nil
+		}
+		// The real collection holds only accounts that already carry an
+		// external ID (LoadRemoteResources lists with WithHasExternalID(true)),
+		// so an unadopted account is missing outright rather than present
+		// without one. Answering ErrRemoteResourceExternalIdNotFound here would
+		// hide that the remote mapping has to tolerate both.
+		return "", resources.ErrRemoteResourceNotFound
 	}
 	return "", resources.ErrRemoteResourceExternalIdNotFound
 }
@@ -199,7 +217,7 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 			DisplayName:       "Production GA4",
 			Type:              "GA4",
 			Enabled:           true,
-			DefinitionVersion: 1,
+			DefinitionVersion: lo.ToPtr[int64](1),
 			Transformation:    "#transformation:my-transform",
 			Config: map[string]any{
 				"api_secret":     "secret",
@@ -236,7 +254,7 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 			ID:                "ga4-no-secret",
 			DisplayName:       "GA4",
 			Type:              "GA4",
-			DefinitionVersion: 1,
+			DefinitionVersion: lo.ToPtr[int64](1),
 			Config:            map[string]any{"measurement_id": "G-1"},
 		})
 		require.NoError(t, err)
@@ -259,7 +277,7 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 		extracted, err := h.Impl.ExtractResourcesFromSpec("destinations/defaulted.yaml", &destination.DestinationSpec{
 			ID:                "defaulted",
 			Type:              "DEFAULTED",
-			DefinitionVersion: 1,
+			DefinitionVersion: lo.ToPtr[int64](1),
 			Config: map[string]any{
 				"api_secret": "secret",
 				"debug_mode": true, // explicit value must survive
@@ -287,7 +305,7 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 			ID:                "bad",
 			DisplayName:       "Bad",
 			Type:              "GA4",
-			DefinitionVersion: 1,
+			DefinitionVersion: lo.ToPtr[int64](1),
 			Transformation:    "#source:my-source", // wrong kind
 			Config:            map[string]any{},
 		})
@@ -304,7 +322,7 @@ func TestHandlerImpl_ExtractResourcesFromSpec(t *testing.T) {
 			ID:                "ga4",
 			DisplayName:       "GA4",
 			Type:              "GA4",
-			DefinitionVersion: 1,
+			DefinitionVersion: lo.ToPtr[int64](1),
 			Config:            map[string]any{},
 		})
 		require.Error(t, err)
@@ -723,6 +741,57 @@ func TestHandlerImpl_Delete(t *testing.T) {
 		assert.True(t, deleteCalled)
 	})
 
+	// The backend refuses to delete a destination that still has connections, and
+	// says only that. When the blocking connection is a kind this run is not
+	// managing — rETL connections are behind an experimental flag — nothing in
+	// the plan mentions it, so the workspace becomes un-destroyable with no hint
+	// as to why. The wrapper adds the missing half.
+	t.Run("explains a delete blocked by connections", func(t *testing.T) {
+		t.Parallel()
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"The destination has active connections, please delete those first"}`))
+		}))
+		t.Cleanup(srv.Close)
+
+		h := destination.NewHandler(newTestClient(t, srv.URL), testRegistry(t))
+		err := h.Impl.Delete(context.Background(), "crm-http",
+			&destination.DestinationResource{ID: "crm-http", Type: "HTTP", DefinitionVersion: 1, Config: map[string]any{}},
+			&destination.DestinationState{ID: "dst-1"},
+		)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "The destination has active connections",
+			"the backend's own reason must survive")
+		assert.Contains(t, err.Error(), "Delete them in the workspace first")
+		var apiErr *client.APIError
+		require.ErrorAs(t, err, &apiErr)
+	})
+
+	// Only the connections refusal earns the extra guidance; every other failure
+	// is passed through, so an unrelated 400 does not acquire advice about a flag
+	// that has nothing to do with it.
+	t.Run("leaves an unrelated delete failure alone", func(t *testing.T) {
+		t.Parallel()
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"destination is referenced by a running job"}`))
+		}))
+		t.Cleanup(srv.Close)
+
+		h := destination.NewHandler(newTestClient(t, srv.URL), testRegistry(t))
+		err := h.Impl.Delete(context.Background(), "crm-http",
+			&destination.DestinationResource{ID: "crm-http", Type: "HTTP", DefinitionVersion: 1, Config: map[string]any{}},
+			&destination.DestinationState{ID: "dst-1"},
+		)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "referenced by a running job")
+		assert.NotContains(t, err.Error(), "RUDDERSTACK_X_RETL_CONNECTION_SUPPORT")
+	})
+
 	t.Run("deletes destination when no transformation", func(t *testing.T) {
 		t.Parallel()
 
@@ -895,11 +964,12 @@ func TestHandlerImpl_LoadRemoteResources(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/v2/destinations", r.URL.Path)
+		require.Equal(t, "true", r.URL.Query().Get("hasExternalId"))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{
 			"destinations": [
 				{"id":"dst-1","externalId":"ga4-prod","name":"GA4","type":"GA4","version":1,"config":{}},
-				{"id":"dst-2","name":"Unmanaged","type":"GA4","version":1,"config":{}}
+				{"id":"dst-2","name":"UI S3","type":"S3","version":1,"config":{}}
 			],
 			"paging": {"total": 2}
 		}`))
@@ -909,6 +979,8 @@ func TestHandlerImpl_LoadRemoteResources(t *testing.T) {
 	c := newTestClient(t, srv.URL)
 	h := destination.NewHandler(c, registry)
 
+	// dst-2 simulates a control plane that ignores hasExternalId: it must be
+	// skipped rather than fail on its unregistered type.
 	remotes, err := h.Impl.LoadRemoteResources(ctx)
 	require.NoError(t, err)
 	require.Len(t, remotes, 1)
@@ -952,16 +1024,16 @@ func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.
 	ctx := context.Background()
 	registry := testRegistry(t)
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "false", r.URL.Query().Get("hasExternalId"))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{
 			"destinations": [
 				{"id":"dst-1","name":"GA4-unmanaged","type":"GA4","version":1,"config":{}},
-				{"id":"dst-2","externalId":"ga4-managed","name":"GA4-managed","type":"GA4","version":1,"config":{}},
 				{"id":"dst-3","name":"S3-unmanaged","type":"S3","config":{}},
 				{"id":"dst-4","name":"GA4-unregistered-version","type":"GA4","version":2,"config":{}}
 			],
-			"paging": {"total": 4}
+			"paging": {"total": 3}
 		}`))
 	}))
 	t.Cleanup(srv.Close)
@@ -971,7 +1043,7 @@ func TestHandlerImpl_LoadImportableResourcesFiltersUnregisteredTypes(t *testing.
 
 	remotes, err := h.Impl.LoadImportableResources(ctx)
 	require.NoError(t, err)
-	require.Len(t, remotes, 1, "only unmanaged + registered (type, version) pairs pass")
+	require.Len(t, remotes, 1, "only registered (type, version) pairs pass")
 	assert.Equal(t, "dst-1", remotes[0].ID)
 	assert.Equal(t, "", remotes[0].ExternalID)
 }
@@ -1326,7 +1398,7 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		assert.Equal(t, "G-123", config["measurement_id"], "non-secret keys are left untouched")
 	})
 
-	t.Run("does not invent secret keys omitted by the API", func(t *testing.T) {
+	t.Run("writes a reference for a required secret the API omits", func(t *testing.T) {
 		h := destination.NewHandler(nil, registry)
 
 		collection := map[string]*destination.RemoteDestination{
@@ -1336,7 +1408,10 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 				Type:      "GA4",
 				Version:   1,
 				IsEnabled: true,
-				// API strips secrets; export must not scaffold placeholders for them.
+				// The API strips this secret from every response. The test
+				// definition requires api_secret, so export scaffolds a reference
+				// for it; an optional one stays out (see
+				// TestHandlerImpl_FormatForExport_RequiredSecretsTheAPIStrips).
 				Config: []byte(`{"measurementId":"G-123"}`),
 			}},
 		}
@@ -1349,7 +1424,7 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		require.True(t, ok)
 		config, ok := spec.Spec["config"].(map[string]any)
 		require.True(t, ok)
-		assert.NotContains(t, config, "api_secret")
+		assert.Equal(t, "{{ .GA4_PRODUCTION_API_SECRET }}", config["api_secret"])
 		assert.Equal(t, "G-123", config["measurement_id"])
 	})
 
@@ -1447,6 +1522,7 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 				Version:   1,
 				IsEnabled: true,
 				Config: []byte(`{
+					"apiSecret": "",
 					"measurementId": "G-123",
 					"blacklistedEvents": [{"eventName": ""}, {"eventName": null}],
 					"advancedOptions": {"provider": "", "categories": [], "overrides": {"enabledFor": null}}
@@ -1477,7 +1553,7 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 				Type:      "GA4",
 				Version:   1,
 				IsEnabled: true,
-				Config:    []byte(`{"blacklistedEvents":[{"eventName":""},{"eventName":"Order Completed"}]}`),
+				Config:    []byte(`{"apiSecret":"","blacklistedEvents":[{"eventName":""},{"eventName":"Order Completed"}]}`),
 			}},
 		}
 
@@ -1494,6 +1570,8 @@ func TestHandlerImpl_FormatForExport(t *testing.T) {
 		}, config, "emptiness is a property of the whole value, not of each member")
 	})
 
+	// The managed-transformation case, with the real ImportRefResolver and the
+	// export/load round trip, is in export_ref_test.go.
 	t.Run("resolves transformation reference", func(t *testing.T) {
 		t.Parallel()
 
@@ -1810,7 +1888,7 @@ func TestHandlerImpl_SecretOnlyDiff(t *testing.T) {
 		DisplayName:       "GA4",
 		Type:              "GA4",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Config: map[string]any{
 			"api_secret":     "local-secret",
 			"measurement_id": "G-123",
@@ -1887,7 +1965,7 @@ func TestHandlerImpl_Create_RevealsWrappedSecrets(t *testing.T) {
 		DisplayName:       "Production GA4",
 		Type:              "GA4",
 		Enabled:           true,
-		DefinitionVersion: 1,
+		DefinitionVersion: lo.ToPtr[int64](1),
 		Config: map[string]any{
 			"api_secret":     "secret-value",
 			"measurement_id": "G-123",

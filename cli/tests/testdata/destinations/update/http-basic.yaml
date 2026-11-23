@@ -11,7 +11,7 @@ spec:
   config:
     api_url: https://webhooks.example.com/rudder/events/v2
     auth: basicAuth
-    username: rudder
+    username: "{{ .HTTP_BASIC_USERNAME }}"
     password: "{{ .HTTP_BASIC_PASSWORD }}"
     method: POST
     format: JSON

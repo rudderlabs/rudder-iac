@@ -5,13 +5,13 @@ on:
       - main
       - "release/*"
     paths:
-      - "cli/internal/typer/generator/platforms/swift/**"
+      - "typer/generator/platforms/swift/**"
       - ".github/workflows/typer-swift-validate.yml"
   pull_request:
     branches:
       - main
     paths:
-      - "cli/internal/typer/generator/platforms/swift/**"
+      - "typer/generator/platforms/swift/**"
       - ".github/workflows/typer-swift-validate.yml"
 
 concurrency:
