@@ -40,11 +40,15 @@ func devRead(t *testing.T, args ...string) (string, string, int) {
 	return stdout.String(), stderr.String(), 0
 }
 
+// listenClient gives up after 30 s, so a listener that stops answering fails
+// the test instead of hanging it until go test's timeout.
+var listenClient = &http.Client{Timeout: 30 * time.Second}
+
 func curl(t *testing.T, url string) string {
 	t.Helper()
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	require.NoError(t, err)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := listenClient.Do(req)
 	require.NoError(t, err)
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
@@ -57,8 +61,12 @@ func post(t *testing.T, url, body string) int {
 	t.Helper()
 	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(body))
 	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json") // as the SDKs send it
 	req.SetBasicAuth("dev", "")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := listenClient.Do(req)
+	require.NoError(t, err)
+	// Draining the body lets the client reuse the connection.
+	_, err = io.Copy(io.Discard, resp.Body)
 	require.NoError(t, err)
 	require.NoError(t, resp.Body.Close())
 	return resp.StatusCode

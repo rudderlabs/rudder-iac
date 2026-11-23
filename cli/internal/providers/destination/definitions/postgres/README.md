@@ -433,5 +433,5 @@ config:
 Note that:
 
 - `gcs.credentials` is JSON, so write its reference in single quotes: `credentials: '{{ .PG_GCS_CREDENTIALS }}'`. See [Secrets](../README.md#secrets).
-- `client_key` and `client_cert` span several lines. Pass each with its line breaks written as `\n`, which the double-quoted reference turns back into line breaks: `export RUDDER_PG_CLIENT_KEY="$(awk '{printf "%s\\n", $0}' client-key.pem)"`.
+- `client_key`, `client_cert`, and `server_ca` span several lines. In a var file, write each as a YAML literal block; a reference that is the whole quoted value, such as `'{{ .PG_CLIENT_KEY }}'`, keeps the line breaks in either quote style, including the single-quoted references `import workspace` generates. An environment variable can carry a file's contents directly, for example `export RUDDER_PG_CLIENT_KEY="$(cat client-key.pem)"`.
 - `server_ca` isn't a secret — a CA certificate is public by design.

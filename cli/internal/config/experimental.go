@@ -9,6 +9,10 @@ import (
 	"github.com/spf13/viper"
 )
 
+// ExperimentalEnvVar turns experimental mode on. Without it every experimental
+// flag reads as false, whatever its own variable says.
+const ExperimentalEnvVar = "RUDDERSTACK_CLI_EXPERIMENTAL"
+
 // ExperimentalConfig defines all available experimental flags
 // All flags default to false for safety - explicit opt-in required
 type ExperimentalConfig struct {
@@ -23,19 +27,6 @@ type ExperimentalConfig struct {
 	// UnverifiedDestinations enables registration of destination definitions
 	// that still need the unverified gate.
 	UnverifiedDestinations bool `mapstructure:"unverifiedDestinations"`
-	// RetlConnectionSupport enables the rETL connection kind in the rETL
-	// provider: its spec kind, resource type, lifecycle and import matcher.
-	//
-	// Turning it on also puts retl-connections@rudder/v1 in scope for rule-doc
-	// generation, where no authored fragment covers it yet, so `make
-	// gen-rule-docs` and TestGenerateRuleCatalog_CompleteAndDriftFree fail until
-	// DEX-829 lands the fragments. CLI validation is unaffected either way.
-	RetlConnectionSupport bool `mapstructure:"retlConnectionSupport"`
-
-	// RETLTableSupport registers the retl-source-table spec kind with the RETL
-	// provider.
-	RETLTableSupport bool `mapstructure:"retlTableSupport"`
-
 	// SourcesListen shows and enables the `sources` command group: a local listener that
 	// captures the events an app sends, and the commands that read them.
 	SourcesListen bool `mapstructure:"sourcesListen"`

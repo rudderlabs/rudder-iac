@@ -62,9 +62,11 @@ func (r *specSyntaxValidRule) Examples() vrules.Examples {
 func (r *specSyntaxValidRule) Validate(ctx *vrules.ValidationContext) []vrules.ValidationResult {
 	spec, unknownKeys, err := decodeDestinationSpec(ctx.Spec)
 	if err != nil {
-		return prefixSpecReferences([]vrules.ValidationResult{{
-			Message: err.Error(),
-		}})
+		var results []vrules.ValidationResult
+		for _, decodeErr := range definitions.DecodeErrors(err, reflect.TypeFor[DestinationSpec](), "") {
+			results = append(results, vrules.ValidationResult{Reference: decodeErr.Path, Message: decodeErr.Message})
+		}
+		return prefixSpecReferences(results)
 	}
 
 	results := make([]vrules.ValidationResult, 0, len(unknownKeys))
@@ -98,7 +100,7 @@ func (r *specSyntaxValidRule) Validate(ctx *vrules.ValidationContext) []vrules.V
 		results = append(results, vrules.ValidationResult{Reference: "/type", Message: err.Error()})
 		return prefixSpecReferences(results)
 	}
-	if !slices.Contains(versions, spec.DefinitionVersion) {
+	if !slices.Contains(versions, *spec.DefinitionVersion) {
 		results = append(results, vrules.ValidationResult{
 			Reference: "/definition_version",
 			Message: fmt.Sprintf(
@@ -117,7 +119,7 @@ func (r *specSyntaxValidRule) Validate(ctx *vrules.ValidationContext) []vrules.V
 		})
 	}
 
-	def, err := r.registry.Get(spec.Type, spec.DefinitionVersion)
+	def, err := r.registry.Get(spec.Type, *spec.DefinitionVersion)
 	if err != nil {
 		results = append(results, vrules.ValidationResult{Reference: "/definition_version", Message: err.Error()})
 		return prefixSpecReferences(results)

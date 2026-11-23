@@ -215,10 +215,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "rs",
-		APIType:    "RS",
-		Version:    1,
-		Properties: properties,
+		Type:        "rs",
+		DisplayName: "Amazon Redshift",
+		APIType:     "RS",
+		Version:     1,
+		Properties:  properties,
 		SecretKeys: []string{
 			"password",
 			"access_key_id",

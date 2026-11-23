@@ -115,6 +115,12 @@ func WorkspaceImport(
 		return nil
 	}
 
+	// Checked before anything is written, so a refused import leaves no specs
+	// behind referencing a variable that would fill two secrets.
+	if err := checkVariableOwners(project.Location(), entities); err != nil {
+		return err
+	}
+
 	formatters := formatter.Setup(formatter.DefaultYAML, formatter.DefaultText)
 
 	location := project.Location()
@@ -150,6 +156,7 @@ func WorkspaceImport(
 		ui.PrintInfo(fmt.Sprintf("Imported specs reference variables for secret values.\n"+
 			"Fill in the placeholders in %s (keep it out of version control) and pass it to apply via --var-file.\n"+
 			"Wrap JSON values, such as a service account key, in single quotes, and double any single quote inside a value.\n"+
+			"Write a multi-line value, such as a PEM certificate or key, as a YAML literal block (KEY: |); the generated references keep its line breaks.\n"+
 			"See the header of that file for details.", varFile))
 	}
 

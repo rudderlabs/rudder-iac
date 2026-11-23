@@ -391,6 +391,60 @@ func TestToUpdateRequestObjectMapping(t *testing.T) {
 	}`, string(body))
 }
 
+// A visual-mapper-v2 connection carries no object and no constants, which is
+// exactly the shape that used to be mistaken for the JSON mapper: the PUT body
+// went out with `"constants": []` and the API answered
+// 400 validation/immutable-field: constants, because its VdmV2 mutable set has
+// no constants and it refuses any value that is not undefined. That broke every
+// enable, schedule change and mapping edit on a v2 connection, so assert the
+// serialized body rather than the struct — a nil *[]Constant and a pointer to
+// an empty slice differ only once marshalled.
+func TestToUpdateRequestVisualMapperV2OmitsConstants(t *testing.T) {
+	t.Parallel()
+
+	config := visualMapperV2Config()
+	config.Schedule = ScheduleSpec{Type: "basic", EveryMinutes: ptr(720)}
+
+	request, err := toUpdateRequest(graphData(t, config), graphData(t, visualMapperV2Config()))
+	require.NoError(t, err)
+	assert.Nil(t, request.Constants, "a v2 PUT must not name constants at all")
+
+	body, err := json.Marshal(request)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{
+		"enabled": true,
+		"schedule": {"type": "basic", "everyMinutes": 720},
+		"identifiers": [{"from": "id", "to": "user_id"}],
+		"mappings": [{"from": "email", "to": "traits.email"}]
+	}`, string(body))
+}
+
+// The narrower condition must not cost the JSON mapper its ability to clear
+// constants, which is the one reason the field is a pointer. Stored has some,
+// desired has none: the body still has to carry the empty array.
+func TestToUpdateRequestJSONMapperStillClearsConstants(t *testing.T) {
+	t.Parallel()
+
+	stored := jsonMapperConfig()
+	stored.Constants = []ConstantSpec{{Key: "source", Value: "warehouse"}}
+
+	request, err := toUpdateRequest(graphData(t, jsonMapperConfig()), graphData(t, stored))
+	require.NoError(t, err)
+	require.NotNil(t, request.Constants)
+	assert.Empty(t, *request.Constants)
+}
+
+// A JSON mapper connection that never had constants has nothing to clear, so
+// the key stays off the body. The API accepts it on this flow either way; the
+// point is that an absent object no longer decides the question by itself.
+func TestToUpdateRequestJSONMapperWithoutConstantsOmitsThem(t *testing.T) {
+	t.Parallel()
+
+	request, err := toUpdateRequest(graphData(t, jsonMapperConfig()), graphData(t, jsonMapperConfig()))
+	require.NoError(t, err)
+	assert.Nil(t, request.Constants)
+}
+
 func TestToUpdateRequestSyncSettings(t *testing.T) {
 	t.Parallel()
 
@@ -398,14 +452,14 @@ func TestToUpdateRequestSyncSettings(t *testing.T) {
 	nondefault.SyncSettings = &SyncSettingsSpec{FailedKeys: &FailedKeysSpec{Retry: ptr(false)}}
 
 	// Only the settings differ across the rows; the rest of the body has to
-	// stay put, constants included — those travel as [] on every row.
+	// stay put. Neither side of any row has constants, and nothing is stored to
+	// clear, so the field stays off the body on all three.
 	wantRequest := func(settings *retlClient.SyncSettings) *retlClient.UpdateRETLConnectionRequest {
 		return &retlClient.UpdateRETLConnectionRequest{
 			Enabled:      lo.ToPtr(true),
 			Schedule:     retlClient.Schedule{Type: retlClient.ScheduleTypeBasic, EveryMinutes: lo.ToPtr(30)},
 			Identifiers:  []retlClient.Mapping{{From: "id", To: "user_id"}},
 			Mappings:     lo.ToPtr([]retlClient.Mapping{{From: "email", To: "traits.email"}}),
-			Constants:    lo.ToPtr([]retlClient.Constant{}),
 			SyncSettings: settings,
 		}
 	}

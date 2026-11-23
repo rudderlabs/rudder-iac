@@ -178,9 +178,8 @@ func (m mapResolver) Resolve(name string) (string, bool) {
 	return v, ok
 }
 
-// The generated slot must survive substitution and YAML parsing as a string
-// for a JSON value, whether the var file holds it compact or pretty-printed.
-// Substitution inserts values verbatim, so this is the end-to-end contract.
+// The generated JSON secret slot must preserve the resolved string exactly
+// through substitution and YAML parsing, whether compact or pretty-printed.
 func TestYAMLFormatter_JSONSecretSlotParsesAsString(t *testing.T) {
 	t.Parallel()
 
@@ -356,11 +355,9 @@ func TestYAMLFormatter_NestedJSONSecretSlotParsesAsString(t *testing.T) {
 	}
 	require.NoError(t, yaml.Unmarshal(substituted, &parsed))
 
-	// A single-quoted scalar folds its line breaks into spaces, which is
-	// harmless between JSON tokens, so the value is compared as JSON.
 	creds, ok := parsed.Spec.Config.Credentials.(string)
 	require.True(t, ok, "credentials must parse as a string, got %T", parsed.Spec.Config.Credentials)
-	assert.JSONEq(t, key, creds)
+	assert.Equal(t, key, creds)
 }
 
 // Single-quoted slots break on a value containing a single quote, and work when

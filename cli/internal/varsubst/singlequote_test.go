@@ -22,6 +22,7 @@ func TestSubstituteBytes_SingleQuotedSlotRejectsALoneQuote(t *testing.T) {
 	}{
 		{name: "lone quote in a single-quoted slot", input: "password: '{{ .PW }}'\n", value: "it's-a-secret", wantErr: true},
 		{name: "three quotes in a row", input: "password: '{{ .PW }}'\n", value: "a'''b", wantErr: true},
+		{name: "lone quote in a multi-line value", input: "password: '{{ .PW }}'\n", value: "it's\nsecond", wantErr: true},
 		{name: "doubled quote is a valid escape", input: "password: '{{ .PW }}'\n", value: "it''s-a-secret", want: "password: 'it''s-a-secret'\n"},
 		{name: "no quote", input: "password: '{{ .PW }}'\n", value: "plain", want: "password: 'plain'\n"},
 		{name: "double-quoted slot is not checked", input: "password: \"{{ .PW }}\"\n", value: "it's-a-secret", want: "password: \"it's-a-secret\"\n"},

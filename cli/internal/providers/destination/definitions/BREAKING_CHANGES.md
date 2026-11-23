@@ -6,6 +6,42 @@ A destination type's history starts at the first release that made it available 
 
 ---
 
+## Upcoming (unreleased)
+
+### Empty enum values rejected
+
+**Scope:** spec
+
+**Types:** `am`, `bq`, `braze`, `customerio`, `facebook_conversions`, `facebook_pixel`, `ga4`, `hs`, `http`, `iterable`, `mp`, `postgres`, `posthog`, `rs`, `s3_datalake`, `snowflake`, `tiktok_ads`, `webhook`
+
+**Why:** An empty string on a key that takes one of a fixed set of values, written as `key: ""` or `key: ''`, now fails validation:
+
+```text
+'webhook_method' must be one of [POST PUT PATCH GET DELETE]
+```
+
+Earlier releases accepted it, and the API then rejected it on apply. A key whose upstream schema lists `""` as a value still accepts it: the `to` of an event mapping on `facebook_conversions`, `facebook_pixel`, `googleads` and `tiktok_ads`.
+
+**Migration:** Remove the key to leave it unset, or set one of the listed values.
+
+### Null config values rejected
+
+**Scope:** spec
+
+**Types:** `active_campaign`, `am`, `attentive_tag`, `bq`, `bqstream`, `braze`, `customerio`, `facebook_conversions`, `facebook_pixel`, `ga4`, `gcs`, `googleads`, `hs`, `http`, `iterable`, `mp`, `postgres`, `posthog`, `rs`, `s3`, `s3_datalake`, `snowflake`, `tiktok_ads`, `webhook`
+
+**Why:** A null in a destination's `config`, written as `key: null`, `key: ~` or `key:` with no value, now fails validation:
+
+```text
+'delay' must not be null; set a value or remove the key
+```
+
+Earlier releases accepted it. A null inside a list item reached the API and failed the apply, and a top-level null was dropped before sending but planned an update on every apply.
+
+**Migration:** Remove the key to leave it unset, or give it a value.
+
+---
+
 ## v0.28.0 — 2026-10-08
 
 ### Source type added: `warehouse`

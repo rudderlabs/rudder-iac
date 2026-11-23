@@ -135,6 +135,13 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 			},
 		},
 		{
+			// Mirror is in the enum again: which flows can use it is V-R2's to
+			// decide, and a syntax error here would stop the load before it runs.
+			name:     "mirror sync_behaviour",
+			mutate:   func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "mirror" },
+			expected: []rules.ValidationResult{},
+		},
+		{
 			name:   "no identifiers",
 			mutate: func(c *retlConnection.ConnectionSpec) { c.Config.Identifiers = nil },
 			expected: []rules.ValidationResult{
@@ -320,7 +327,7 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 		{
 			name: "cursor column outside an upsert sync",
 			mutate: func(c *retlConnection.ConnectionSpec) {
-				c.Config.SyncBehaviour = "mirror"
+				c.Config.SyncBehaviour = "full"
 				c.Config.CursorColumn = "updated_at"
 			},
 			expected: []rules.ValidationResult{
@@ -329,7 +336,7 @@ func TestConnectionSpecSyntaxValid(t *testing.T) {
 		},
 		{
 			name:     "no cursor column outside an upsert sync",
-			mutate:   func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "mirror" },
+			mutate:   func(c *retlConnection.ConnectionSpec) { c.Config.SyncBehaviour = "full" },
 			expected: []rules.ValidationResult{},
 		},
 		{

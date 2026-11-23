@@ -97,6 +97,13 @@ func TestHostCheck(t *testing.T) {
 		{bind: "127.0.0.1", host: "evil.example:4321"},
 		{bind: "127.0.0.1", host: "localhost.evil.example"},
 		{bind: "127.0.0.1", host: ""},
+		// Other spellings of a loopback address that a resolver or a browser
+		// may accept. Only the canonical forms pass.
+		{bind: "127.0.0.1", host: "127.0.0.1.:4321"},
+		{bind: "127.0.0.1", host: "2130706433:4321"},
+		{bind: "127.0.0.1", host: "0x7f.1:4321"},
+		{bind: "127.0.0.1", host: "127.1:4321"},
+		{bind: "127.0.0.1", host: "0.0.0.0:4321"},
 		{bind: "0.0.0.0", host: "evil.example"},
 		{bind: "0.0.0.0", host: "localhost:4321", allowed: true},
 		{bind: "0.0.0.0", host: "172.17.0.2:4321"},
