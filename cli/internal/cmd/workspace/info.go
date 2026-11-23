@@ -43,6 +43,7 @@ func NewCmdInfo() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
+			telemetry.SetWorkspace(workspace)
 
 			if jsonOutput {
 				return printWorkspaceInfoJSON(cmd, workspace)

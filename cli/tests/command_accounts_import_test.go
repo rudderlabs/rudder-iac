@@ -49,16 +49,11 @@ var varReference = regexp.MustCompile(`\{\{\s*\.([A-Za-z0-9_]+)\s*\}\}`)
 // importable resource in the workspace; without the prune, apply would reconcile
 // resources the test never asked for, and any one of them failing validation
 // upstream would fail this test for reasons unrelated to accounts.
-//
-// The import workspace path remains opt-in until it has a CI-proven run. The
-// accounts apply e2e covers normal CI account enforcement.
 func TestAccountsImportWorkspace(t *testing.T) {
-	if os.Getenv("RUN_ACCOUNT_E2E") != "1" {
-		t.Skip("set RUN_ACCOUNT_E2E=1 with a disposable live stack to run accounts import workspace e2e")
-	}
-
 	allowManagedResidue(t)
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
+	// pruneImport rewrites import-manifest.yaml, which import only emits under this flag.
+	t.Setenv("RUDDERSTACK_X_IMPORT_MERGE", "true")
 
 	executor, err := NewCmdExecutor("")
 	require.NoError(t, err)
@@ -84,6 +79,11 @@ func TestAccountsImportWorkspace(t *testing.T) {
 
 	specPath, spec := findImportedSpec(t, importedDir, "accounts", importedAccountName)
 	assert.Contains(t, spec, "SOURCE_BIGQUERY", "scaffolded spec must carry the account definition")
+
+	// With the manifest present its mapping wins on URN overlap, so a test that
+	// only ran with the flag on would stay green if the export stopped writing
+	// the inline metadata.import block, which is all a user without the flag has.
+	assertInlineImportMetadata(t, spec, seededID)
 
 	reference := varReference.FindStringSubmatch(spec)
 	require.NotNil(t, reference, "credentials must be exported as a {{ .VAR }} reference, got:\n%s", spec)
@@ -150,11 +150,56 @@ func newAccountsAPIClient(t testing.TB) *client.Client {
 	return apiClient
 }
 
+// removeLeakedSeed deletes any unmanaged account left under importedAccountName
+// by an earlier run that died between seeding and adopting it. The backend
+// rejects a second account with the same name, and destroy cannot remove one
+// that has no external id, so a single leak would fail every later run until
+// someone deleted it by hand.
+func removeLeakedSeed(t *testing.T, apiClient *client.Client) {
+	t.Helper()
+
+	ctx := context.Background()
+	unmanaged, err := apiClient.Accounts.ListAll(ctx, client.WithHasExternalID(false))
+	require.NoError(t, err, "listing unmanaged accounts")
+	for _, account := range unmanaged {
+		if account.Name != importedAccountName {
+			continue
+		}
+		require.NoError(t, apiClient.Accounts.Delete(ctx, account.ID),
+			"deleting the account %s a previous run left behind", account.ID)
+	}
+}
+
+// assertInlineImportMetadata checks that the exported spec ties itself to the
+// seeded remote account through its own metadata.import block.
+func assertInlineImportMetadata(t *testing.T, spec, remoteID string) {
+	t.Helper()
+
+	var parsed struct {
+		Metadata struct {
+			Import specs.WorkspacesImportMetadata `yaml:"import"`
+		} `yaml:"metadata"`
+	}
+	require.NoError(t, yaml.Unmarshal([]byte(spec), &parsed))
+
+	var remoteIDs []string
+	for _, workspace := range parsed.Metadata.Import.Workspaces {
+		for _, resource := range workspace.Resources {
+			remoteIDs = append(remoteIDs, resource.RemoteID)
+		}
+	}
+	assert.Contains(t, remoteIDs, remoteID,
+		"the exported spec must carry the remote id in its own metadata.import, got:\n%s", spec)
+}
+
 // seedUnmanagedAccount creates the account the import is meant to discover: no
 // externalId, so the provider sees it as importable. It is deleted on cleanup
-// whether or not the adoption succeeded.
+// whether or not the adoption succeeded, and a copy an earlier run leaked is
+// removed first.
 func seedUnmanagedAccount(t *testing.T, apiClient *client.Client) string {
 	t.Helper()
+
+	removeLeakedSeed(t, apiClient)
 
 	options, err := json.Marshal(map[string]any{"project": "acme-analytics-import", "location": "US"})
 	require.NoError(t, err)

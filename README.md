@@ -12,6 +12,7 @@
     - [Linux](#linux)
   - [Docker](#docker)
   - [Build from Source](#build-from-source)
+- [Telemetry](#telemetry)
 
 ## ⚠️ Work in Progress
 
@@ -119,3 +120,31 @@ To build the Docker image locally:
 ```sh
 make docker-build
 ```
+
+## Telemetry
+
+`rudder-cli` collects usage data to help us understand how the CLI is used and where it fails. Telemetry is on by default, and the CLI tells you so the first time it runs.
+
+### What we collect
+
+- The command you run, the flags you pass, and whether the command failed. Some flag values are paths or resource ids, such as the project location.
+- The CLI version and a random installation id, kept in `~/.rudder/config.json`.
+- The CI service the CLI runs in, if any.
+- The coding agent running the CLI, such as Claude Code or Cursor, and the agent skill it follows, if any. API requests also name these two in their `User-Agent` header.
+- Your RudderStack workspace id, on commands that sign in to RudderStack. This associates your CLI usage with your workspace.
+
+### What we don't collect
+
+- The contents of your spec files
+- Your access token
+- The values in your variable files, or any other secret
+
+### Opting out
+
+```sh
+rudder-cli telemetry disable
+```
+
+You can also set `RUDDERSTACK_CLI_TELEMETRY_DISABLED=true` or `DO_NOT_TRACK=1` in the environment. Check the current setting with `rudder-cli telemetry status`.
+
+Binaries built from source do not send usage events.
