@@ -265,6 +265,11 @@ jobs:
     needs: [e2e]
     if: always()
     steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@aebdcf6156ab6691adf63218240e476564a1ed4c # v2.23.0
+        with:
+          egress-policy: audit
+
       - name: report the e2e outcome
         env:
           RESULT: ${{ needs.e2e.result }}
