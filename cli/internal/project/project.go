@@ -1,10 +1,12 @@
 package project
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -14,6 +16,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/pathindex"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/renderer"
@@ -172,74 +175,131 @@ func (p *project) loadSpec(path string, spec *specs.Spec) error {
 	}
 }
 
+// ErrReported marks a load error that the renderer's output already holds. A
+// caller uses it to avoid printing the failure a second time. It does not say
+// why the load failed: under the JSON renderer a missing --location matches it,
+// while under the text renderer the same error does not, because the caller
+// still has to print it. Do not use it to classify a failure, for example to
+// pick an exit code.
+var ErrReported = errors.New("already reported")
+
+// reported is a load error the renderer already wrote out. It matches
+// ErrReported and still unwraps to the cause.
+type reported struct{ cause error }
+
+func (e reported) Error() string   { return e.cause.Error() }
+func (e reported) Unwrap() []error { return []error{ErrReported, e.cause} }
+
+// recordFailure renders the diagnostics carried so far and returns cause. A
+// renderer that implements FailureRenderer also records the cause in its
+// document, and the returned error then matches ErrReported. The text renderer
+// does not, because the caller prints the error.
+func (p *project) recordFailure(carried validation.Diagnostics, cause error) error {
+	failureRenderer, ok := p.renderer.(renderer.FailureRenderer)
+	if !ok {
+		if err := p.render(carried); err != nil {
+			return err
+		}
+		return cause
+	}
+
+	ui.StopSpinner()
+	carried.Sort()
+	if err := failureRenderer.RenderFailure(carried, cause); err != nil {
+		return fmt.Errorf("rendering diagnostics: %w", err)
+	}
+	return reported{cause: cause}
+}
+
 // Load loads the project specifications from the given location using the
-// configured SpecLoader, runs variable substitution if a substitutor is
-// configured, then runs the specs through the validation engine (syntax,
-// then semantic rules from RuleProvider).
+// configured SpecLoader, runs the rules that read specs as written, runs
+// variable substitution if a substitutor is configured, then runs the specs
+// through the validation engine (syntax, then semantic rules from
+// RuleProvider).
 func (p *project) Load(location string) error {
 	p.location = location
 
+	ui.StartSpinner("Loading project ...")
+	defer ui.StopSpinner()
+
 	rawSpecs, err := p.loader.Load(p.location)
 	if err != nil {
-		return fmt.Errorf("failed to load specs using specLoader: %w", err)
+		return p.recordFailure(nil, fmt.Errorf("failed to load specs using specLoader: %w", err))
+	}
+
+	registry, err := p.registry()
+	if err != nil {
+		return p.recordFailure(nil, fmt.Errorf("setting up registry: %w", err))
+	}
+
+	engine, err := validation.NewValidationEngine(registry, log)
+	if err != nil {
+		return p.recordFailure(nil, fmt.Errorf("initialising validation engine: %w", err))
+	}
+
+	// Rules about the variable references themselves read the specs as
+	// written, so they run before substitution replaces the references, and
+	// their diagnostics are rendered even when substitution then fails.
+	sourceDiags, err := engine.ValidateSources(context.Background(), rawSpecs)
+	if err != nil {
+		return p.recordFailure(nil, fmt.Errorf("source validation: %w", err))
 	}
 
 	if p.substitutor != nil {
 		substituted, subDiags, hasUndefined := p.substituteSpecs(rawSpecs)
 		if subDiags.HasErrors() {
-			if err := p.renderer.Render(subDiags); err != nil {
-				return fmt.Errorf("rendering diagnostics: %w", err)
+			if err := p.render(slices.Concat(sourceDiags, maskSensitiveLines(subDiags, sourceDiags))); err != nil {
+				return err
 			}
 			// An undefined variable almost always means a var file was not
 			// passed, not a broken spec, so point at the fix.
 			if hasUndefined {
 				return fmt.Errorf("variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file")
 			}
-			return fmt.Errorf("variable substitution failed")
+			return reported{cause: errors.New("variable substitution failed")}
 		}
 		rawSpecs = substituted
 	}
 
-	return p.handleValidation(rawSpecs)
+	return p.handleValidation(engine, rawSpecs, sourceDiags)
 }
 
 // handleValidation orchestrates the two-phase validation workflow:
 // syntactic validation runs first to catch structural issues, and only if that passes,
 // we proceed to build the resource graph and run semantic validation.
 // This approach avoids expensive graph building when specs have basic syntax errors.
-func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
+// sourceDiags come from the rules that read the specs before substitution, and
+// are reported with the syntactic diagnostics.
+func (p *project) handleValidation(engine validation.ValidationEngine, rawSpecs map[string]*specs.RawSpec, sourceDiags validation.Diagnostics) error {
 	ctx := context.Background()
 
 	// Parse the raw specs into structured form before syntactic validation.
 	parsedRawSpecs, specDiags := p.parseSpecs(rawSpecs)
 
-	registry, err := p.registry()
-	if err != nil {
-		return fmt.Errorf("setting up registry: %w", err)
-	}
-
-	engine, err := validation.NewValidationEngine(registry, log)
-	if err != nil {
-		return fmt.Errorf("initialising validation engine: %w", err)
-	}
-
 	// At this point, rawspecs are successfully parsed as well and information
 	// parsed gets augmented to the base struct
 	syntaxDiags, err := engine.ValidateSyntax(ctx, parsedRawSpecs)
 	if err != nil {
-		return fmt.Errorf("syntactic validation: %w", err)
+		return p.recordFailure(slices.Concat(sourceDiags, specDiags), fmt.Errorf("syntactic validation: %w", err))
 	}
+	syntaxDiags = slices.Concat(sourceDiags, syntaxDiags)
 
 	// If any spec or syntax diagnostic errors exist, render the diagnostics and return
 	// Both of them are part of the syntax validation although done at different places.
 	if specDiags.HasErrors() || syntaxDiags.HasErrors() {
-		if err := p.renderer.Render(append(
-			specDiags,
-			syntaxDiags...,
-		)); err != nil {
-			return fmt.Errorf("rendering diagnostics: %w", err)
+		if err := p.render(slices.Concat(specDiags, syntaxDiags)); err != nil {
+			return err
 		}
-		return fmt.Errorf("syntax validation failed")
+		return reported{cause: errors.New("syntax validation failed")}
+	}
+
+	// The syntax phase only stops the load on errors, so its warnings are carried
+	// past this gate. Every error return below goes through fail, which renders
+	// them first — returning bare would drop them, which is the drop this two-phase
+	// render exists to fix. The success path folds them into the single render at
+	// the end instead.
+	fail := func(err error) error {
+		return p.recordFailure(slices.Concat(specDiags, syntaxDiags), err)
 	}
 
 	for path, rawSpec := range parsedRawSpecs {
@@ -247,7 +307,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 			path,
 			rawSpec.Parsed(),
 		); err != nil {
-			return fmt.Errorf("loading spec %s: %w", path, err)
+			return fail(fmt.Errorf("loading spec %s: %w", path, err))
 		}
 	}
 
@@ -264,7 +324,7 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 			continue
 		}
 		if err := p.provider.LoadImportManifest(&ws); err != nil {
-			return fmt.Errorf("broadcasting import manifest: %w", err)
+			return fail(fmt.Errorf("broadcasting import manifest: %w", err))
 		}
 		break
 	}
@@ -272,29 +332,43 @@ func (p *project) handleValidation(rawSpecs map[string]*specs.RawSpec) error {
 	// Graph is built once here - single source of truth for all resource relationships.
 	graph, err := p.provider.ResourceGraph()
 	if err != nil {
-		return fmt.Errorf("building resource graph: %w", err)
+		return fail(fmt.Errorf("building resource graph: %w", err))
 	}
 
 	// Cycles make the graph unusable,
 	// so detect them before semantic validation
 	if _, err := graph.DetectCycles(); err != nil {
-		return fmt.Errorf("cycle detected in resource graph: %w", err)
+		return fail(fmt.Errorf("cycle detected in resource graph: %w", err))
 	}
 
 	// Specs which were parsed will now be validated against semantic rules.
 	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph, p.workspaceID)
 	if err != nil {
-		return fmt.Errorf("semantic validation: %w", err)
+		return fail(fmt.Errorf("semantic validation: %w", err))
 	}
 
-	if err := p.renderer.Render(semanticDiags); err != nil {
-		return fmt.Errorf("rendering diagnostics: %w", err)
+	// specDiags is error-only by construction today and is folded in only so
+	// every render path carries the same set.
+	if err := p.render(slices.Concat(specDiags, syntaxDiags, semanticDiags)); err != nil {
+		return err
 	}
 
 	if semanticDiags.HasErrors() {
-		return fmt.Errorf("semantic validation failed")
+		return reported{cause: errors.New("semantic validation failed")}
 	}
 
+	return nil
+}
+
+// render is the single exit for diagnostics, so both validation phases report
+// in the same file order whichever one reached the renderer. It also clears the
+// Load spinner, which would otherwise interleave with the printed diagnostics.
+func (p *project) render(diagnostics validation.Diagnostics) error {
+	ui.StopSpinner()
+	diagnostics.Sort()
+	if err := p.renderer.Render(diagnostics); err != nil {
+		return fmt.Errorf("rendering diagnostics: %w", err)
+	}
 	return nil
 }
 
@@ -319,6 +393,12 @@ func (p *project) substituteSpecs(raw map[string]*specs.RawSpec) (substituted ma
 				hasUndefined = hasUndefined || errors.Is(e.Err, varsubst.ErrUndefinedVariable)
 			}
 			diags = append(diags, substitutionDiagnostics(path, subErrs)...)
+			continue
+		}
+		// A spec substitution leaves unchanged keeps its RawSpec, and with it
+		// the parse the source rules already made of it.
+		if bytes.Equal(data, rawSpec.Data) {
+			substituted[path] = rawSpec
 			continue
 		}
 		substituted[path] = &specs.RawSpec{Data: data}

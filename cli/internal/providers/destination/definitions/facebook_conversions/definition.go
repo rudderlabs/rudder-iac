@@ -18,6 +18,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -31,6 +32,7 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 // facebookConversionsConfig is the local YAML config model. Field set mirrors
@@ -53,7 +55,7 @@ type facebookConversionsConfig struct {
 
 type eventMapping struct {
 	From string `mapstructure:"from" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_oneof=ViewContent Search AddToCart AddToWishlist InitiateCheckout AddPaymentInfo Purchase PageView Lead CompleteRegistration Contact CustomizeProduct Donate FindLocation Schedule StartTrial SubmitApplication Subscribe"`
+	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_oneof='' ViewContent Search AddToCart AddToWishlist InitiateCheckout AddPaymentInfo Purchase PageView Lead CompleteRegistration Contact CustomizeProduct Donate FindLocation Schedule StartTrial SubmitApplication Subscribe"`
 }
 
 type piiDenylistEntry struct {
@@ -91,11 +93,12 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "facebook_conversions",
-		APIType:    "FACEBOOK_CONVERSIONS",
-		Version:    1,
-		Properties: properties,
-		SecretKeys: []string{"access_token"},
+		Type:        "facebook_conversions",
+		DisplayName: "Facebook Conversions",
+		APIType:     "FACEBOOK_CONVERSIONS",
+		Version:     1,
+		Properties:  properties,
+		SecretKeys:  []string{"access_token", "dataset_id"},
 		NewConfig: func() any {
 			return &facebookConversionsConfig{}
 		},

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/writer"
+	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/handlers"
@@ -46,6 +48,10 @@ var HandlerMetadata = handler.HandlerMetadata{
 type HandlerImpl struct {
 	client   *client.Client
 	registry *definitions.Registry
+	// warehouseConnected holds the remote IDs of the destinations an import
+	// connects a warehouse (Reverse ETL) source to, set by Provider before it
+	// exports; see Provider.FormatForExport.
+	warehouseConnected map[string]bool
 }
 
 // NewHandler builds a *DestinationHandler wired to the given client and registry.
@@ -71,7 +77,7 @@ func (h *HandlerImpl) NewSpec() *DestinationSpec {
 // secret keys present in the spec are wrapped as *secret.String so the
 // differ's secret-aware branch owns comparison.
 func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) (map[string]*DestinationResource, error) {
-	registered, err := h.registry.Get(spec.Type, spec.DefinitionVersion)
+	registered, err := h.registry.Get(spec.Type, *spec.DefinitionVersion)
 	if err != nil {
 		return nil, fmt.Errorf("getting destination definition: %w", err)
 	}
@@ -85,7 +91,7 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) 
 		DisplayName:       spec.DisplayName,
 		Type:              spec.Type,
 		Enabled:           spec.Enabled,
-		DefinitionVersion: spec.DefinitionVersion,
+		DefinitionVersion: *spec.DefinitionVersion,
 		Config:            secret.WrapKnownSecrets(config, registered.SecretKeys()),
 	}
 
@@ -201,7 +207,7 @@ func (h *HandlerImpl) Delete(ctx context.Context, _ string, _ *DestinationResour
 	}
 
 	if err := h.client.Destinations.Delete(ctx, oldState.ID); err != nil {
-		return fmt.Errorf("deleting destination: %w", err)
+		return fmt.Errorf("deleting destination: %w", provider.ExplainBlockingConnections(err))
 	}
 
 	return nil
@@ -226,34 +232,16 @@ func (h *HandlerImpl) MapRemoteToState(
 		return nil, nil, errUnregisteredManagedType(remote.ID, remote.Type, remote.Version)
 	}
 
-	localConfig, err := h.apiConfigToLocal(
-		registered.Type,
-		version,
-		remote.Config,
-	)
+	resource, err := h.remoteResource(remote.Destination, registered, remote.ExternalID)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	// API responses omit secret values. Wrap only secret keys that are still
-	// present after conversion (defensive); absent keys stay absent so
-	// presence-based wrapping never invents conditional secrets.
-	localConfig = secret.WrapUnknownSecrets(localConfig, registered.SecretKeys())
 
 	transformationRef, transformationID, err := h.transformationRef(remote, urnResolver)
 	if err != nil {
 		return nil, nil, fmt.Errorf("resolving transformation reference: %w", err)
 	}
-
-	resource := &DestinationResource{
-		ID:                remote.ExternalID,
-		DisplayName:       remote.Name,
-		Type:              registered.Type,
-		Enabled:           remote.IsEnabled,
-		DefinitionVersion: version,
-		Transformation:    transformationRef,
-		Config:            localConfig,
-	}
+	resource.Transformation = transformationRef
 
 	state := &DestinationState{
 		ID:               remote.ID,
@@ -261,6 +249,26 @@ func (h *HandlerImpl) MapRemoteToState(
 	}
 
 	return resource, state, nil
+}
+
+// remoteResource reads a remote destination as the plan compares it with a
+// spec: local config, with the secret keys still present after conversion
+// wrapped as unknown (API responses omit secret values; absent keys stay
+// absent so presence-based wrapping never invents conditional secrets). The
+// transformation link is left for the caller.
+func (h *HandlerImpl) remoteResource(remote *client.Destination, registered *definitions.RegisteredDefinition, id string) (*DestinationResource, error) {
+	localConfig, err := h.apiConfigToLocal(registered.Type, remote.Version, remote.Config)
+	if err != nil {
+		return nil, err
+	}
+	return &DestinationResource{
+		ID:                id,
+		DisplayName:       remote.Name,
+		Type:              registered.Type,
+		Enabled:           remote.IsEnabled,
+		DefinitionVersion: remote.Version,
+		Config:            secret.WrapUnknownSecrets(localConfig, registered.SecretKeys()),
+	}, nil
 }
 
 // errUnregisteredManagedType reports a managed destination the CLI has no
@@ -289,7 +297,7 @@ func errUnregisteredManagedType(id, apiType string, version int64) error {
 // LoadRemoteResources returns only managed destinations (ExternalID set). An
 // unregistered type on a managed resource indicates corrupted state and errors.
 func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestination, error) {
-	all, err := h.client.Destinations.GetAll(ctx)
+	all, err := h.client.Destinations.GetAll(ctx, client.WithDestinationsHasExternalID(true))
 	if err != nil {
 		return nil, fmt.Errorf("listing destinations: %w", err)
 	}
@@ -297,12 +305,11 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestina
 	result := make([]*RemoteDestination, 0, len(all))
 	for i := range all {
 		d := &all[i]
-		// TODO: Move the filtering logic to the API client. Remove
-		// this check and comment once we have API filtering support.
+		// Server-side hasExternalId is authoritative; this only stops an older
+		// control plane that ignores the param from failing every apply below.
 		if d.ExternalID == "" {
 			continue
 		}
-
 		if _, err := h.registry.GetByAPIType(d.Type, d.Version); err != nil {
 			return nil, errUnregisteredManagedType(d.ID, d.Type, d.Version)
 		}
@@ -315,7 +322,7 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*RemoteDestina
 // silently skips destinations whose (Type, Version) pair isn't registered —
 // import can only target definitions the CLI knows how to convert.
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDestination, error) {
-	all, err := h.client.Destinations.GetAll(ctx)
+	all, err := h.client.Destinations.GetAll(ctx, client.WithDestinationsHasExternalID(false))
 	if err != nil {
 		return nil, fmt.Errorf("listing destinations: %w", err)
 	}
@@ -323,11 +330,6 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*RemoteDes
 	result := make([]*RemoteDestination, 0, len(all))
 	for i := range all {
 		d := &all[i]
-		// TODO: Move the filtering logic to the API client. Remove
-		// this check and comment once we have API filtering support.
-		if d.ExternalID != "" {
-			continue
-		}
 		if _, err := h.registry.GetByAPIType(d.Type, d.Version); err != nil {
 			// Only destinations whose exact (apiType, version) is registered
 			// in the CLI are considered importable.
@@ -395,7 +397,8 @@ func (h *HandlerImpl) Import(ctx context.Context, data *DestinationResource, rem
 // FormatForExport converts unmanaged remote destinations into importable YAML
 // specs: config is converted to local snake_case, empty values are pruned,
 // registered secret keys that are present are masked with per-resource
-// placeholders (absent secrets are not invented), and a linked transformation
+// placeholders, a secret key the API leaves out gets one only when the config
+// requires it (see requiredSecretKeys), and a linked transformation
 // resolves to a "#transformation:<id>" reference (failing the export if the link
 // can't be resolved — mirrors the source handler, no silent fallback to a raw ID).
 func (h *HandlerImpl) FormatForExport(
@@ -412,7 +415,8 @@ func (h *HandlerImpl) FormatForExport(
 		entries  []importmanifest.ImportEntry
 	)
 
-	for externalID, remote := range collection {
+	for _, externalID := range slices.Sorted(maps.Keys(collection)) {
+		remote := collection[externalID]
 		specMap, err := h.toExportSpecMap(externalID, remote, inputResolver)
 		if err != nil {
 			return nil, nil, err
@@ -473,7 +477,15 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 
 	// Prune before masking: an empty secret would otherwise become a "{{ .VAR }}"
 	// reference, asking the user to supply a credential the destination does not use.
+	// Secrets the API never returns are told apart from ones it returns empty
+	// before pruning: only the absent ones can get a reference below.
+	absent := absentSecretKeys(registered, localConfig)
+
 	pruneEmptyValues(localConfig, registered.SelectedKeyRoots(apiConfig)...)
+
+	for _, key := range requiredSecretKeys(registered, localConfig, absent, h.warehouseConnected[remote.ID]) {
+		localConfig[key] = ""
+	}
 
 	if err := secret.MaskSecrets(localConfig, externalID, registered.SecretKeys()); err != nil {
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)

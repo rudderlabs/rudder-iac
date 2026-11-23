@@ -2,11 +2,12 @@
   "config": {
     "apiUrl": "https://webhooks.example.com/rudder/events/v2",
     "auth": "basicAuth",
+    "eventFilteringOption": "disable",
     "format": "JSON",
     "isBatchingEnabled": false,
     "isDefaultMapping": true,
     "method": "POST",
-    "username": "rudder"
+    "username": "rudderCliE2eHttpBasicUsername"
   },
   "createdAt": "<ignored>",
   "enabled": true,

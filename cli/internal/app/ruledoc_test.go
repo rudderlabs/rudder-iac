@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,11 +22,6 @@ func TestGenerateRuleCatalog_CompleteAndDriftFree(t *testing.T) {
 	// Hermetic config: defaults only, written under a temp dir so the suite
 	// never touches the developer's ~/.rudder config.
 	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
-	prevExp := viper.Get("experimental")
-	viper.Set("experimental", true)
-	t.Cleanup(func() {
-		viper.Set("experimental", prevExp)
-	})
 
 	doc, verrs, err := GenerateRuleCatalog("2026-01-01T00:00:00Z")
 	require.NoError(t, err)

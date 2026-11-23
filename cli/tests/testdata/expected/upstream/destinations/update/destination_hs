@@ -11,6 +11,9 @@
       "web": "cloud",
       "androidKotlin": "cloud"
     },
+    "useNativeSDK": {
+      "web": false
+    },
     "apiVersion": "legacyApi",
     "blacklistedEvents": [
       {
@@ -37,7 +40,7 @@
     },
     "doAssociation": false,
     "eventFilteringOption": "blacklistedEvents",
-    "hubID": "87654321"
+    "hubID": "rudderCliE2eHubIdUpdated"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"

@@ -424,10 +424,11 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "postgres",
-		APIType:    "POSTGRES",
-		Version:    1,
-		Properties: properties,
+		Type:        "postgres",
+		DisplayName: "PostgreSQL",
+		APIType:     "POSTGRES",
+		Version:     1,
+		Properties:  properties,
 		SecretKeys: []string{
 			"password",
 			"access_key_id",
@@ -436,6 +437,10 @@ func NewDefinition() *definitions.DestinationDefinition {
 			"azure.sas_token",
 			"gcs.credentials",
 			"minio.secret_access_key",
+			"client_cert",
+			"client_key",
+			"user",
+			"ssh.user",
 		},
 		NewConfig: func() any {
 			return &postgresConfig{}

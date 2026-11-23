@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -112,15 +114,8 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 		}
 		return fmt.Sprintf("'%s' does not match the required pattern", fieldName)
 
-	case "oneof":
-		return fmt.Sprintf("'%s' must be one of [%s]", fieldName, err.Param())
-
-	case "dynamic_or_oneof":
-		return fmt.Sprintf(
-			"'%s' must be one of [%s] or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})",
-			fieldName,
-			err.Param(),
-		)
+	case "oneof", "dynamic_or_oneof":
+		return OneOfMessage(fieldName, OneOfMembers(err.Param()), err.ActualTag() == "dynamic_or_oneof")
 
 	case "dynamic_or_pattern":
 		if msg, ok := getPatternErrorMessage(err.Param()); ok {
@@ -174,6 +169,9 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 	case "eq":
 		return fmt.Sprintf("'%s' must equal '%s'", fieldName, err.Param())
 
+	case "ne":
+		return fmt.Sprintf("'%s' must not equal '%s'", fieldName, err.Param())
+
 	case "array_item_types":
 		return fmt.Sprintf("'%s' values must be one of [%s]", fieldName, err.Param())
 
@@ -184,6 +182,14 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 		}
 		otherField := resolveFieldDisplayName(params[0], err, rootType, resolveTag)
 		return fmt.Sprintf("'%s' is required when '%s' is %s", fieldName, otherField, params[1])
+
+	case "required_unless":
+		params := strings.Fields(err.Param())
+		if len(params) < 2 {
+			return fmt.Sprintf("'%s' is required", fieldName)
+		}
+		otherField := resolveFieldDisplayName(params[0], err, rootType, resolveTag)
+		return fmt.Sprintf("'%s' is required unless '%s' is %s", fieldName, otherField, params[1])
 
 	case "excluded_if":
 		params := strings.Fields(err.Param())
@@ -199,7 +205,7 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 
 		// We need to resolve the "Type"
 		otherField := resolveFieldDisplayName(params[0], err, rootType, resolveTag)
-		return fmt.Sprintf("'%s' is not allowed unless '%s %s'", fieldName, otherField, params[1])
+		return fmt.Sprintf("'%s' is not allowed unless '%s' is %s", fieldName, otherField, params[1])
 
 	case "required_without":
 		otherField := resolveFieldDisplayName(err.Param(), err, rootType, resolveTag)
@@ -212,6 +218,37 @@ func getErrorMessage(err validator.FieldError, rootType reflect.Type, resolveTag
 	default:
 		return fmt.Sprintf("'%s' is not valid: %s", fieldName, err.Error())
 	}
+}
+
+// OneOfMembers splits a oneof or dynamic_or_oneof parameter the way
+// go-playground's oneof does: a member in single quotes may hold spaces, and
+// a pair of quotes with nothing between them is the empty string.
+func OneOfMembers(param string) []string {
+	members := oneOfMemberPattern.FindAllString(param, -1)
+	for i, member := range members {
+		members[i] = strings.ReplaceAll(member, "'", "")
+	}
+	return members
+}
+
+var oneOfMemberPattern = regexp.MustCompile(`'[^']*'|\S+`)
+
+// OneOfMessage is the message for a value outside an enum, shared so every
+// check words it alike. A member that is empty or holds a space is quoted, so
+// each reads as one member.
+func OneOfMessage(field string, members []string, dynamic bool) string {
+	shown := make([]string, len(members))
+	for i, member := range members {
+		shown[i] = member
+		if member == "" || strings.ContainsFunc(member, unicode.IsSpace) {
+			shown[i] = strconv.Quote(member)
+		}
+	}
+	message := fmt.Sprintf("'%s' must be one of [%s]", field, strings.Join(shown, " "))
+	if dynamic {
+		message += " or a dynamic config value (env.VAR, {{ path || fallback }}, or {{ .VAR }})"
+	}
+	return message
 }
 
 // resolveFieldDisplayName is a helper function to help resolve the field display name

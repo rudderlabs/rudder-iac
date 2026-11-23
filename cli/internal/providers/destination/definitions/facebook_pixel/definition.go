@@ -23,6 +23,7 @@ var sourceTypes = []string{
 	common.SourceTypeReactNative,
 	common.SourceTypeFlutter,
 	common.SourceTypeCordova,
+	common.SourceTypeWarehouse,
 }
 
 var connectionModes = map[string][]string{
@@ -36,11 +37,12 @@ var connectionModes = map[string][]string{
 	common.SourceTypeReactNative:   {"cloud"},
 	common.SourceTypeFlutter:       {"cloud"},
 	common.SourceTypeCordova:       {"cloud"},
+	common.SourceTypeWarehouse:     {"cloud"},
 }
 
 type eventMapping struct {
 	From string `mapstructure:"from" validate:"omitempty,dynamic_or_pattern=single_line_100"`
-	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_oneof=ViewContent Search AddToCart AddToWishlist InitiateCheckout AddPaymentInfo Purchase PageView Lead CompleteRegistration Contact CustomizeProduct Donate FindLocation Schedule StartTrial SubmitApplication Subscribe"`
+	To   string `mapstructure:"to" validate:"omitempty,dynamic_or_oneof='' ViewContent Search AddToCart AddToWishlist InitiateCheckout AddPaymentInfo Purchase PageView Lead CompleteRegistration Contact CustomizeProduct Donate FindLocation Schedule StartTrial SubmitApplication Subscribe"`
 }
 
 type piiDenylistEntry struct {
@@ -135,6 +137,7 @@ var connectionRequiredKeys = map[string]map[string][]string{
 	common.SourceTypeFlutter:       {"cloud": {"access_token"}},
 	common.SourceTypeCordova:       {"cloud": {"access_token"}},
 	common.SourceTypeCloud:         {"cloud": {"access_token"}},
+	common.SourceTypeWarehouse:     {"cloud": {"access_token"}},
 }
 
 // NewDefinition returns the Facebook Pixel destination definition.
@@ -183,14 +186,15 @@ func NewDefinition() *definitions.DestinationDefinition {
 	properties = append(properties, common.Properties(sourceTypes)...)
 
 	return &definitions.DestinationDefinition{
-		Type:       "facebook_pixel",
-		APIType:    "FACEBOOK_PIXEL",
-		Version:    1,
-		Properties: properties,
+		Type:        "facebook_pixel",
+		DisplayName: "Facebook Pixel",
+		APIType:     "FACEBOOK_PIXEL",
+		Version:     1,
+		Properties:  properties,
 		ConfigValidateFuncs: []rules.CustomValidateFunc{
 			{Tag: "facebook_pixel_access_token_required", Func: accessTokenConditional},
 		},
-		SecretKeys: []string{"access_token"},
+		SecretKeys: []string{"access_token", "legacy_conversion_pixel_id.to", "pixel_id"},
 		NewConfig: func() any {
 			return &facebookPixelConfig{}
 		},

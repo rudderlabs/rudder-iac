@@ -9,10 +9,10 @@ spec:
   enabled: true
   definition_version: 1
   config:
-    container_id: GTM-E2EUPDATE
+    container_id: "{{ .GTM_CONTAINER_ID_UPDATED }}"
     server_url: sgtm-updated.rudder-cli-e2e.com/collect
     environment_id: env-9
-    authorization_token: rudderCliE2eGtmAuthTokenUpdated
+    authorization_token: "{{ .GTM_AUTHORIZATION_TOKEN_UPDATED }}"
     event_filtering:
       blacklist:
         - Application Opened

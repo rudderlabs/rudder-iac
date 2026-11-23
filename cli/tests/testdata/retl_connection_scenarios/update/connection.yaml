@@ -1,0 +1,62 @@
+version: rudder/v1
+kind: retl-connections
+metadata:
+  name: e2e-scn-connections
+spec:
+  connections:
+    # cron -> manual, the reverse of the column connection's move. enabled goes
+    # false, and the partial sync_settings block names one non-default field:
+    # the CLI fills the rest from the backend's defaults before sending, so the
+    # stored false/0/0 are replaced rather than merged into. The field has to be
+    # non-default — an all-default block normalizes to nothing and takes the
+    # drop path below.
+    - id: e2e-scn-orders-track
+      source: "#retl-source-sql-model:e2e-scn-model"
+      destination: "#destination:e2e-scn-http-track"
+      enabled: false
+      config:
+        sync_behaviour: upsert
+        cursor_column: updated_at
+        schedule:
+          type: manual
+        identifiers:
+          - from: id
+            to: user_id
+        mappings:
+          - from: email
+            to: properties.email
+          - from: plan
+            to: properties.plan
+        constants:
+          - key: properties.origin
+            value: rudder-cli-e2e-v2
+          - key: properties.team
+            value: dex
+        event:
+          type: track
+          name: Order Synced
+        sync_settings:
+          sync_logs:
+            retention_days: 7
+    # manual -> cron: a manual connection carries no interval, so the move has to
+    # add one rather than clear one. Omitting sync_settings drops the
+    # non-default block the create step stored, which the CLI has to spell out
+    # as the defaults a fresh create would have filled in — omission alone
+    # leaves the backend holding the old values.
+    - id: e2e-scn-customers-full
+      source: "#retl-source-table:e2e-scn-table"
+      destination: "#destination:e2e-scn-http-column"
+      config:
+        sync_behaviour: full
+        schedule:
+          type: cron
+          cron_expression: "0 */6 * * *"
+        identifiers:
+          - from: id
+            to: anonymous_id
+        mappings:
+          - from: email
+            to: properties.email
+        event:
+          type: track
+          name_column: event_name

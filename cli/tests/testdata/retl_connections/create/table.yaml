@@ -1,0 +1,13 @@
+version: rudder/v1
+kind: retl-source-table
+metadata:
+  name: customers-table
+spec:
+  id: customers-table
+  display_name: Customers Table
+  account: "#account:retl-pg"
+  primary_key: id
+  source_definition: postgres
+  schema: analytics
+  table: customers
+  enabled: true

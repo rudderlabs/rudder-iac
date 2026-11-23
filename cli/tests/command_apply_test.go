@@ -36,7 +36,7 @@ func TestProjectApply(t *testing.T) {
 	//     var wins, resolving to "API Tracking" (the var file value is ignored).
 	// Both resolve to the values already in the snapshots, so a precedence
 	// regression — env losing to the file — would fail the snapshot comparison.
-	allowUnverifiedDestinationResidue(t)
+	allowManagedResidue(t)
 	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "true")
 	t.Setenv("RUDDER_API_TRACKING_NAME", "API Tracking")
 
@@ -100,22 +100,20 @@ func verifyNoChangesToApply(t *testing.T, executor *CmdExecutor, path string) {
 
 	// The var file is passed so the {{ .VAR }} placeholders resolve to the same values that were
 	// applied; otherwise the file-only variable would be undefined and the dry run would error.
+	verifyNoChangesToApplyWithArgs(t, executor, path, "--var-file", varFilePath)
+}
+
+func verifyNoChangesToApplyWithArgs(t *testing.T, executor *CmdExecutor, path string, extraArgs ...string) {
+	t.Helper()
+
 	var (
 		output []byte
 		err    error
+		args   = append([]string{"apply", "-l", path, "--dry-run", "--confirm=false"}, extraArgs...)
 	)
 	deadline := time.Now().Add(upstreamConsistencyTimeout)
 	for {
-		output, err = executor.Execute(
-			cliBinPath,
-			"apply",
-			"-l",
-			path,
-			"--var-file",
-			varFilePath,
-			"--dry-run",
-			"--confirm=false",
-		)
+		output, err = executor.Execute(cliBinPath, args...)
 		if err == nil && strings.Contains(string(output), "No changes to apply") {
 			return
 		}

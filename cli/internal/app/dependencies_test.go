@@ -1,8 +1,12 @@
 package app
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -10,6 +14,8 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/connection"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/table"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,6 +37,55 @@ func TestComposeProvidersIncludesGAProviders(t *testing.T) {
 	assert.Same(t, providers.DataGraph, cp.Providers["datagraph"])
 	assert.Same(t, providers.Account, cp.Providers["account"])
 	assert.Same(t, providers.Destination, cp.Providers["destination"])
+	assert.Equal(t, providerOrder, cp.Order)
+}
+
+// A provider whose matchers consult another provider's matches, or whose
+// specs reference its resources, must come after it in providerOrder.
+func TestProviderOrderSatisfiesProviderEdges(t *testing.T) {
+	t.Parallel()
+
+	for dependent, dependencies := range providerEdges {
+		for _, dependency := range dependencies {
+			var (
+				at     = slices.Index(providerOrder, dependent)
+				before = slices.Index(providerOrder, dependency)
+			)
+			require.NotEqual(t, -1, at, "%s is not in providerOrder", dependent)
+			require.NotEqual(t, -1, before, "%s is not in providerOrder", dependency)
+			assert.Less(t, before, at, "%s must precede %s in providerOrder", dependency, dependent)
+		}
+	}
+}
+
+// The recording server stands in for the backend so the remote load is
+// observable without credentials. Experimental mode is off: the table and
+// connection kinds must register without any flag. InitConfig mutates
+// process-global viper, so later tests that read config must re-init.
+func TestComposeProvidersRegistersRETLTableAndConnection(t *testing.T) {
+	t.Setenv("RUDDERSTACK_CLI_EXPERIMENTAL", "false")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+
+	var hitConnections atomic.Bool
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/v2/retl-connections") {
+			hitConnections.Store(true)
+		}
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(server.Close)
+
+	c, err := client.New("test-token", client.WithBaseURL(server.URL))
+	require.NoError(t, err)
+
+	_, providers, err := composeProviders(c)
+	require.NoError(t, err)
+	assert.Contains(t, providers.RETL.SupportedKinds(), connection.ResourceKind)
+	assert.Contains(t, providers.RETL.SupportedKinds(), table.ResourceKind)
+
+	_, err = providers.RETL.LoadResourcesFromRemote(t.Context())
+	require.NoError(t, err)
+	assert.True(t, hitConnections.Load())
 }
 
 func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
@@ -44,12 +99,12 @@ func TestNewDestinationRegistryFlagMatrix(t *testing.T) {
 		{
 			name:                   "unverifiedDestinations disabled registers verified destinations",
 			unverifiedDestinations: false,
-			wantTypes:              []string{"active_campaign", "attentive_tag", "bq", "bqstream", "http", "s3"},
+			wantTypes:              []string{"active_campaign", "adj", "adobe_analytics", "am", "attentive_tag", "bq", "bqstream", "braze", "confluent_cloud", "customerio", "facebook_conversions", "facebook_pixel", "firebase", "ga", "ga4", "gcs", "googleads", "googlepubsub", "googlesheets", "gtm", "hs", "http", "intercom", "iterable", "kafka", "kinesis", "linkedin_insight_tag", "marketo", "mp", "postgres", "posthog", "qualtrics", "redis", "rs", "s3", "s3_datalake", "salesforce", "sentry", "slack", "snowflake", "snowpipe_streaming", "statsig", "tiktok_ads", "vwo", "webhook", "zendesk"},
 		},
 		{
 			name:                   "unverifiedDestinations enabled registers verified and unverified destinations",
 			unverifiedDestinations: true,
-			wantTypes:              []string{"active_campaign", "adj", "adobe_analytics", "am", "attentive_tag", "bingads_offline_conversions", "bq", "bqstream", "braze", "confluent_cloud", "customerio", "customerio_audience", "facebook_conversions", "facebook_pixel", "firebase", "ga", "ga4", "gcs", "google_adwords_offline_conversions", "googleads", "googlepubsub", "googlesheets", "gtm", "hs", "http", "intercom", "iterable", "kafka", "kinesis", "linkedin_ads", "linkedin_insight_tag", "marketo", "mp", "postgres", "posthog", "qualtrics", "redis", "rs", "s3", "s3_datalake", "salesforce", "sentry", "slack", "snowflake", "snowpipe_streaming", "statsig", "tiktok_ads", "vwo", "webhook", "zendesk"},
+			wantTypes:              []string{"active_campaign", "adj", "adobe_analytics", "am", "attentive_tag", "bingads_offline_conversions", "bq", "bqstream", "braze", "confluent_cloud", "customerio", "customerio_audience", "facebook_conversions", "facebook_pixel", "fb_custom_audience", "firebase", "ga", "ga4", "gcs", "google_adwords_offline_conversions", "google_adwords_remarketing_lists", "googleads", "googlepubsub", "googlesheets", "gtm", "hs", "http", "intercom", "iterable", "iterable_audience", "kafka", "kinesis", "linkedin_ads", "linkedin_insight_tag", "marketo", "mp", "postgres", "posthog", "qualtrics", "redis", "rs", "s3", "s3_datalake", "salesforce", "sentry", "slack", "snowflake", "snowpipe_streaming", "statsig", "tiktok_ads", "vwo", "webhook", "zendesk"},
 		},
 	}
 
@@ -129,4 +184,15 @@ func modelsConnectionMode(def *definitions.RegisteredDefinition) bool {
 		}
 	}
 	return true
+}
+
+func TestNewOfflineDepsNeedsNoToken(t *testing.T) {
+	t.Setenv("RUDDERSTACK_ACCESS_TOKEN", "")
+	config.InitConfig(filepath.Join(t.TempDir(), "config.json"))
+
+	_, err := NewDeps()
+	require.ErrorContains(t, err, "access token is required")
+
+	_, err = NewOfflineDeps()
+	require.NoError(t, err)
 }

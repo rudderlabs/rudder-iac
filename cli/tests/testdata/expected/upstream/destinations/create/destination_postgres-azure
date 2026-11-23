@@ -25,7 +25,7 @@
     "useRudderStorage": false,
     "useSASTokens": false,
     "useSSH": false,
-    "user": "rudder"
+    "user": "rudderCliE2ePostgresAzureUser"
   },
   "createdAt": "<ignored>",
   "updatedAt": "<ignored>"
