@@ -260,6 +260,7 @@ func (h *HandlerImpl) MapRemoteToState(
 	state := &DestinationState{
 		ID:               remote.ID,
 		TransformationID: transformationID,
+		RemoteConfig:     remote.Config,
 	}
 
 	return resource, state, nil

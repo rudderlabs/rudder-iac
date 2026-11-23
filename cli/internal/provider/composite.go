@@ -430,8 +430,8 @@ func (p *CompositeProvider) CheckPlan(ctx context.Context, plan *planner.Plan, s
 	return nil
 }
 
-// PreviewImports gathers each child provider's import preview into one map.
-// Every importable URN belongs to one provider, so the results never overlap.
+// PreviewImports gathers each child provider's preview into one map. Every URN
+// belongs to one provider, so the results never overlap.
 func (p *CompositeProvider) PreviewImports(ctx context.Context, plan *planner.Plan, st *state.State) (map[string]differ.ResourceDiff, error) {
 	result := map[string]differ.ResourceDiff{}
 	for _, name := range p.Order {
@@ -441,7 +441,7 @@ func (p *CompositeProvider) PreviewImports(ctx context.Context, plan *planner.Pl
 		}
 		diffs, err := previewer.PreviewImports(ctx, plan, st)
 		if err != nil {
-			return nil, fmt.Errorf("previewing imports for provider %s: %w", name, err)
+			return nil, fmt.Errorf("previewing changes for provider %s: %w", name, err)
 		}
 		maps.Copy(result, diffs)
 	}

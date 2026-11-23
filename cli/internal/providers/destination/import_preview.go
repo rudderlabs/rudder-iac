@@ -82,19 +82,56 @@ func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResour
 	if err != nil {
 		return nil, false, err
 	}
-	// One line per removed path, named in full, so the path reads as the
-	// README writes it rather than as a quoted map key.
-	for path, summary := range removed {
-		name := removedFieldsProperty + "." + path
-		diffs[name] = differ.PropertyDiff{Property: name, SourceValue: summary}
+	if len(removed) > 0 {
+		addRemovalLines(diffs, importRemovesProperty, removed)
 		secretOnly = false
 	}
 	return diffs, secretOnly, nil
 }
 
-// removedFieldsProperty names the preview entry for remote config the import
-// drops that the local comparison cannot show.
-const removedFieldsProperty = "Config (API keys the import removes)"
+// previewUpdate names the remote keys an update of a managed destination
+// removes. Update writes the spec's config alone, and the plan's own comparison
+// never sees these keys: MapRemoteToState converted them away. It reads the
+// config this plan was built from, so it makes no API call. It previews nothing
+// without one, or when the spec changes the type, which Update refuses.
+func (h *HandlerImpl) previewUpdate(data *DestinationResource, stored *state.ResourceState) (map[string]differ.PropertyDiff, error) {
+	if stored == nil {
+		return nil, nil
+	}
+	current, isResource := stored.InputRaw.(*DestinationResource)
+	remote, isState := stored.OutputRaw.(*DestinationState)
+	if !isResource || !isState || remote == nil || len(remote.RemoteConfig) == 0 || current.Type != data.Type {
+		return nil, nil
+	}
+
+	registered, err := h.registry.Get(data.Type, data.DefinitionVersion)
+	if err != nil {
+		return nil, fmt.Errorf("getting destination definition: %w", err)
+	}
+	removed, err := h.removedAPIKeys(registered, remote.RemoteConfig, data)
+	if err != nil {
+		return nil, err
+	}
+	diffs := map[string]differ.PropertyDiff{}
+	addRemovalLines(diffs, updateRemovesProperty, removed)
+	return diffs, nil
+}
+
+// Labels for the preview entries naming remote config a write drops that the
+// local comparison cannot show.
+const (
+	importRemovesProperty = "Config (API keys the import removes)"
+	updateRemovesProperty = "Config (API keys the update removes)"
+)
+
+// addRemovalLines adds one line per removed path, named in full, so the path
+// reads as the README writes it rather than as a quoted map key.
+func addRemovalLines(diffs map[string]differ.PropertyDiff, label string, removed map[string]any) {
+	for path, summary := range removed {
+		name := label + "." + path
+		diffs[name] = differ.PropertyDiff{Property: name, SourceValue: summary}
+	}
+}
 
 // backendDerivedKeys are config keys the backend sets from connectionMode on
 // every write, per source type: useNativeSDK and useNativeSDKToSend. The CLI
@@ -102,6 +139,11 @@ const removedFieldsProperty = "Config (API keys the import removes)"
 // after a CLI write (cli/tests/command_destinations_apply_test.go), so an
 // entry whose source type the payload's connectionMode names is rederived, not
 // removed.
+//
+// The backend also stamps schema.json defaults on every write (config-backend
+// v2.83.0). Those are modelled with a default in their definition instead, as BQ
+// auth_method is, so they round-trip; TestRemovedAPIKeys_NoneRightAfterACLIWrite
+// names any that isn't.
 var backendDerivedKeys = map[string]bool{
 	"useNativeSDK":       true,
 	"useNativeSDKToSend": true,

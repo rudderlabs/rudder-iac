@@ -707,7 +707,7 @@ func TestCompositeProvider_PreviewImports(t *testing.T) {
 
 		_, err = cp.(provider.ImportPreviewer).PreviewImports(context.Background(), &planner.Plan{}, state.EmptyState())
 
-		assert.EqualError(t, err, "previewing imports for provider a: preview failed")
+		assert.EqualError(t, err, "previewing changes for provider a: preview failed")
 		assert.ErrorIs(t, err, failure)
 	})
 }

@@ -107,6 +107,10 @@ GCP service account JSON key. The account needs BigQuery dataset, table, and job
 
 Supply it as a `{{ .VAR }}` reference rather than a literal — see [Secrets](#secrets).
 
+#### `auth_method` — string, default `serviceAccountKey`
+
+How BigQuery authenticates. The only accepted value is `serviceAccountKey`, which uses `credentials`. You can leave it out: the backend stores this default on every write, and Rudder CLI fills it in so the stored value matches the spec.
+
 ### Sync scheduling
 
 #### `sync_frequency` — string, required
