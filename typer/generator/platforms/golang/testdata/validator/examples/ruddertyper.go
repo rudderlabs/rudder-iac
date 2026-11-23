@@ -2168,7 +2168,11 @@ type (
 // the stack.
 const maxDepth = 1000
 
-var errTooDeep = fmt.Errorf("%w: value nests more than %d levels deep or contains itself", ErrInvalidValue, maxDepth)
+// errTooDeep is a function because the three sentinels are the only package
+// variables a generated file may declare.
+func errTooDeep() error {
+	return fmt.Errorf("%w: value nests more than %d levels deep or contains itself", ErrInvalidValue, maxDepth)
+}
 
 // snapshot converts v into what the SDK receives: new maps and slices holding
 // strings, bools, numbers and nil. The SDK serializes later on another
@@ -2199,7 +2203,7 @@ func marshal(v any) ([]byte, error) {
 // invalid Nullable.
 func wire(rv reflect.Value, depth int) (any, error) {
 	if depth > maxDepth {
-		return nil, errTooDeep
+		return nil, errTooDeep()
 	}
 	depth++
 	if !rv.IsValid() {
@@ -2329,7 +2333,7 @@ func foreign(rv reflect.Value, depth int) (any, error) {
 // omitempty leaves out.
 func walkFields(rv reflect.Value, depth int) error {
 	if depth > maxDepth {
-		return errTooDeep
+		return errTooDeep()
 	}
 	for i := 0; i < rv.NumField(); i++ {
 		f, fv := rv.Type().Field(i), rv.Field(i)

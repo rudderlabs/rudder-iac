@@ -32,9 +32,16 @@ func sendAndChange(t *testing.T, client analytics.Client) {
 	var (
 		unicode = "a"
 		props   = ruddertyper.TrackUserSignedUpProperties{
-			ArrayOfAny:     []any{"x", []any{"y"}},
+			ArrayOfAny: []any{"x", []any{"y"}},
+			Context: &ruddertyper.TrackUserSignedUpPropertiesContext{
+				IPAddress: "10.0.0.1",
+				NestedContext: ruddertyper.TrackUserSignedUpPropertiesContextNestedContext{
+					Profile: &ruddertyper.CustomTypeUserProfile{Email: "a@b.c"},
+				},
+			},
 			MixedUnicode:   &unicode,
 			ObjectProperty: map[string]any{"nested": map[string]any{"k": "v"}},
+			ProfileList:    ruddertyper.PropertyProfileList{{Email: "a@b.c"}},
 			PropertyOfAny:  []string{"z"},
 		}
 		open = map[string]any{"list": []any{"x"}}
@@ -53,8 +60,10 @@ func sendAndChange(t *testing.T, client analytics.Client) {
 	unicode = "changed"
 	props.ArrayOfAny[0] = "changed"
 	props.ArrayOfAny[1].([]any)[0] = "changed"
+	props.Context.NestedContext.Profile.Email = "changed"
 	props.ObjectProperty["nested"].(map[string]any)["k"] = "changed"
 	props.ObjectProperty["added"] = true
+	props.ProfileList[0].Email = "changed"
 	props.PropertyOfAny.([]string)[0] = "changed"
 
 	require.NoError(t, rt.TrackEmptyEventWithAdditionalProps(identity, open, opts...))
@@ -91,11 +100,16 @@ func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
 			UserId: "user-123",
 			Event:  "User Signed Up",
 			Properties: analytics.Properties{
-				"active":          false,
-				"array_of_any":    []any{"x", []any{"y"}},
+				"active":       false,
+				"array_of_any": []any{"x", []any{"y"}},
+				"context": map[string]any{
+					"ip_address":     "10.0.0.1",
+					"nested_context": map[string]any{"profile": map[string]any{"email": "a@b.c", "first_name": ""}},
+				},
 				"mixed_unicode":   "a",
 				"object_property": map[string]any{"nested": map[string]any{"k": "v"}},
 				"profile":         map[string]any{"email": "", "first_name": ""},
+				"profile_list":    []any{map[string]any{"email": "a@b.c", "first_name": ""}},
 				"property_of_any": []any{"z"},
 			},
 			Context:      context,
@@ -122,9 +136,11 @@ func TestSDKSendsInputsAsPassed(t *testing.T) {
 		"properties": {
 			"active": false,
 			"array_of_any": ["x", ["y"]],
+			"context": {"ip_address": "10.0.0.1", "nested_context": {"profile": {"email": "a@b.c", "first_name": ""}}},
 			"mixed_unicode": "a",
 			"object_property": {"nested": {"k": "v"}},
 			"profile": {"email": "", "first_name": ""},
+			"profile_list": [{"email": "a@b.c", "first_name": ""}],
 			"property_of_any": ["z"]
 		},
 		"context": {"ip": "127.0.0.1", "custom": {"k": "v"}, "traits": {"plan": ["pro"]}, "ruddertyper": `+refMeta+`},
