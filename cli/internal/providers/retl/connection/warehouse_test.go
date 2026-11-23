@@ -30,6 +30,7 @@ func TestSourceWarehouseMetadata(t *testing.T) {
 		{sourceDefinition: "s3", want: WarehouseMetadata{SyncBehaviours: []string{"upsert"}}},
 		{sourceDefinition: "sftp", want: WarehouseMetadata{SyncBehaviours: []string{"upsert"}}},
 		{sourceDefinition: "clickhouse", want: WarehouseMetadata{SyncBehaviours: []string{"upsert", "mirror", "full"}}},
+		{sourceDefinition: "maxcompute", want: WarehouseMetadata{SyncBehaviours: []string{"upsert"}, SupportsSQLModel: true, SupportsSyncSettings: true}},
 	}
 
 	for _, test := range tests {
