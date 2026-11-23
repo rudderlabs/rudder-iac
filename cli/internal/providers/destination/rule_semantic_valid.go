@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	vrules "github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -14,8 +15,9 @@ const SemanticValidRuleID = "destination/semantic-valid"
 type semanticValidRule struct{}
 
 // NewSemanticValidRule validates cross-resource concerns: the referenced
-// transformation exists in the project and display_name is unique across all
-// destinations. Envelope/config shape errors are owned by the syntactic rule.
+// transformation and account exist in the project, and display_name is unique
+// across all destinations. Envelope/config shape errors are owned by the
+// syntactic rule.
 func NewSemanticValidRule() vrules.Rule {
 	return &semanticValidRule{}
 }
@@ -29,7 +31,7 @@ func (r *semanticValidRule) Severity() vrules.Severity {
 }
 
 func (r *semanticValidRule) Description() string {
-	return "destination transformation reference must resolve to a project transformation and display_name must be unique across destinations"
+	return "destination transformation and account references must resolve to project resources and display_name must be unique across destinations"
 }
 
 func (r *semanticValidRule) AppliesTo() []vrules.MatchPattern {
@@ -60,6 +62,21 @@ func (r *semanticValidRule) Validate(ctx *vrules.ValidationContext) []vrules.Val
 			results = append(results, vrules.ValidationResult{
 				Reference: "/transformation",
 				Message:   fmt.Sprintf("transformation '%s' not found in the project", transformationID),
+			})
+		}
+	}
+
+	// An account reference resolves against project state at apply time, which
+	// would otherwise report a bare "referred resource does not exist" after
+	// the plan is already running. Mirror the transformation check above.
+	if accountID, isRef := accountRefID(spec.Config); isRef {
+		urn := resources.URN(accountID, accounts.AccountResourceType)
+		if _, exists := ctx.Graph.GetResource(urn); !exists {
+			results = append(results, vrules.ValidationResult{
+				Reference: "/config/" + accountConfigKey,
+				Message: fmt.Sprintf(
+					"account '%s' not found in the project. Adopt it with 'rudder-cli import workspace', or write the account's ID here instead of a reference",
+					accountID),
 			})
 		}
 	}

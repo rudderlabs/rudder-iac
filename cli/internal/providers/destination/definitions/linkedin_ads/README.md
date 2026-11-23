@@ -61,10 +61,11 @@ The above example deduplicates conversions on `properties.eventId` rather than t
 ID of the RudderStack account that holds the OAuth connection to LinkedIn. RudderStack authenticates every request with that account, so the destination config carries no LinkedIn credentials of its own.
 
 > [!NOTE]
-> Rudder CLI can't create this account. It's an OAuth connection, made by signing in to LinkedIn from the RudderStack dashboard: create it there, then write its ID here. `rudder-cli workspace accounts list` lists the workspace's accounts with their IDs.
+> Rudder CLI can't create this account, and can't adopt it into the project either. It's an OAuth connection, made by signing in to LinkedIn from the RudderStack dashboard: create it there, then write its ID here. `rudder-cli workspace accounts list` lists the workspace's accounts with their IDs.
 
 - The LinkedIn user who authorizes the account needs one of these ad account roles: `ACCOUNT_BILLING_ADMIN`, `ACCOUNT_MANAGER`, `CAMPAIGN_MANAGER`, or `CREATIVE_MANAGER`.
 - Rudder CLI doesn't check the value — neither that the account exists nor that it's a LinkedIn account.
+- This key takes a literal ID only. A `#account:<id>` reference to an [`account` spec](../../../accounts/docs) isn't available for LinkedIn Ads: `linkedin_ads` has no account definition, so its accounts come from an older OAuth flow and carry no definition name for `import workspace` to match on. Whether this key takes a reference is a property of the destination type: Google Ads Offline Conversions is the one account-taking destination whose account can be adopted, so it's the one imported as a reference. A reference written here fails validation.
 
 #### `hash_data` — boolean, required
 
