@@ -1,17 +1,27 @@
 {{ comment .Doc }}
-func (r *RudderTyperAnalytics) {{ .Name }}(identity Identity{{ with .Payload }}, props {{ .Name }}{{ end }}, opts ...Option) error {
-{{- if not .Payload }}
-	return r.track(identity, {{ quote .Event }}, nil, opts)
-{{- else }}
-{{- if .Payload.Variant }}
-	if isNil(props) {
-		return fmt.Errorf("%w: {{ .Name }} needs a {{ .Payload.Name }} case", ErrNilPayload)
+func (r *RudderTyperAnalytics) {{ .Name }}(identity Identity{{ range .Params }}, {{ . }}{{ end }}, opts ...Option) error {
+{{- with .Payload }}
+{{- if .Variant }}
+	if isNil({{ $.Param }}) {
+		return {{ $.OnNil }}
 	}
 {{- end }}
-	p, err := {{ if .Payload.MapAlias }}snapshot(props){{ else }}props.ToProperties(){{ end }}
+{{- if $.Pointer }}
+	var {{ $.Var }} analytics.{{ .Noun }}
+	if {{ $.Param }} != nil {
+		var err error
+		if {{ $.Var }}, err = {{ $.Param }}.To{{ .Noun }}(); err != nil {
+			return err
+		}
+	}
+{{- else }}
+	{{ $.Var }}, err := {{ if .MapAlias }}snapshot({{ $.Param }}){{ else }}{{ $.Param }}.To{{ .Noun }}(){{ end }}
 	if err != nil {
 		return err
 	}
-	return r.track(identity, {{ quote .Event }}, p, opts)
+{{- end }}
+	return {{ $.Send }}
+{{- else }}
+	return {{ .OnNil }}
 {{- end }}
 }

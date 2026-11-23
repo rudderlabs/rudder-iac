@@ -62,13 +62,16 @@ func resolveOptions(defaults GoOptions, platformOptions any) (GoOptions, error) 
 	return opts, nil
 }
 
-// trackRule is a track rule kept for generation.
-type trackRule struct {
+// eventRule is an event rule kept for generation.
+type eventRule struct {
 	key    string
 	rule   *plan.EventRule
 	schema *objectSchema
 	// variant is set when the rule has variants; schema is then their base.
 	variant *variantSchema
+	// paired is set on the identify and group rules of an event that has a
+	// rule on each section, which are named by section.
+	paired bool
 }
 
 // objectSchema is an object schema with its fields in byte order of their wire
@@ -127,10 +130,11 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 		PlanURL:          p.Metadata.URL,
 		PlanID:           p.Metadata.TrackingPlanID,
 		PlanVersion:      p.Metadata.TrackingPlanVersion,
+		Helpers:          map[string]bool{},
 	}
 
 	registry := core.NewNameRegistry(core.DefaultCollisionHandler)
-	rules, customTypes, err := trackRules(p)
+	rules, customTypes, err := eventRules(p)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +180,7 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 	}
 	ctx.out = &ctx.Payloads
 	for _, r := range rules {
-		if err := addTrackRule(ctx, r, propertyTypes, registry); err != nil {
+		if err := addRule(ctx, r, propertyTypes, registry); err != nil {
 			return nil, err
 		}
 	}
@@ -190,57 +194,53 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 	return ctx, nil
 }
 
-// quickStart picks the method the package doc calls: the first whose payload
-// declares a property, else the first method.
+// quickStart picks the method the package doc calls: the first track method
+// whose payload declares a property, else the first method.
 func quickStart(methods []GoMethod) *GoMethod {
 	if len(methods) == 0 {
 		return nil
 	}
-	if i := slices.IndexFunc(methods, func(m GoMethod) bool { return m.Payload != nil && !m.Payload.MapAlias }); i >= 0 {
+	if i := slices.IndexFunc(methods, func(m GoMethod) bool {
+		return m.Type == plan.EventTypeTrack && m.Payload != nil && !m.Payload.MapAlias
+	}); i >= 0 {
 		return &methods[i]
 	}
 	return &methods[0]
 }
 
-// trackRules returns the plan's track rules in rule-key order, and the custom
+// eventRules returns the plan's event rules in rule-key order, and the custom
 // types their fields reference, sorted by name. Rules the generator does not
-// support yet are left out with a warning, never silently.
-func trackRules(p *plan.TrackingPlan) ([]trackRule, []*customType, error) {
-	all := make([]trackRule, len(p.Rules))
+// generate are left out with a warning, never silently.
+func eventRules(p *plan.TrackingPlan) ([]eventRule, []*customType, error) {
+	all := make([]eventRule, len(p.Rules))
 	for i := range p.Rules {
 		rule := &p.Rules[i]
-		all[i] = trackRule{
+		all[i] = eventRule{
 			key:  string(rule.Event.EventType) + ":" + rule.Event.Name + ":" + string(rule.Section),
 			rule: rule,
 		}
 	}
-	slices.SortStableFunc(all, func(a, b trackRule) int { return strings.Compare(a.key, b.key) })
+	slices.SortStableFunc(all, func(a, b eventRule) int { return strings.Compare(a.key, b.key) })
 
 	var (
 		res    = &resolver{customTypes: map[string]*customType{}}
 		cycles = &cycleCheck{visited: map[string]bool{}}
-		rules  []trackRule
+		rules  []eventRule
 	)
 	for _, r := range all {
 		// The resolver relies on the cycle check to end. It runs before the
-		// skip check, so a rule left out for now still fails generation on a
-		// custom type that refers to itself.
+		// event type and section checks, so a rule left out still fails
+		// generation on a custom type that refers to itself.
 		if err := cycles.rule(r.rule); err != nil {
 			return nil, nil, err
 		}
 
-		event := r.rule.Event
-		if event.EventType != plan.EventTypeTrack {
-			core.Warn(fmt.Sprintf("skipping the %s rule (section %q): Go generation does not support %s events yet", event.EventType, r.rule.Section, event.EventType))
+		if msg := skipWarning(r.rule); msg != "" {
+			core.Warn(msg)
 			continue
 		}
-		if r.rule.Section != plan.IdentitySectionProperties {
-			core.Warn(fmt.Sprintf("skipping track event %q: section %q is not valid for track events", event.Name, r.rule.Section))
-			continue
-		}
-
 		var (
-			where = fmt.Sprintf("track event %q", event.Name)
+			where = strings.TrimPrefix(eventLabel(r.rule.Event), "the ")
 			err   error
 		)
 		if r.schema, err = res.schema(&r.rule.Schema, where, ""); err != nil {
@@ -253,6 +253,23 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, []*customType, error) {
 		rules = append(rules, r)
 	}
 
+	// Only identify and group take two sections, so an event whose kept rules
+	// have two is a pair.
+	type eventID struct {
+		typ  plan.EventType
+		name string
+	}
+	sections := map[eventID][]plan.IdentitySection{}
+	for _, r := range rules {
+		id := eventID{r.rule.Event.EventType, r.rule.Event.Name}
+		if !slices.Contains(sections[id], r.rule.Section) {
+			sections[id] = append(sections[id], r.rule.Section)
+		}
+	}
+	for i, r := range rules {
+		rules[i].paired = len(sections[eventID{r.rule.Event.EventType, r.rule.Event.Name}]) > 1
+	}
+
 	// Like property types, only the custom types an emitted field needs are
 	// generated.
 	var customTypes []*customType
@@ -262,7 +279,7 @@ func trackRules(p *plan.TrackingPlan) ([]trackRule, []*customType, error) {
 	return rules, customTypes, nil
 }
 
-// resolver resolves the fields of track rules and of the custom types they
+// resolver resolves the fields of event rules and of the custom types they
 // reference, resolving each custom type once per name.
 type resolver struct {
 	customTypes map[string]*customType
@@ -788,13 +805,13 @@ func addCustomTypes(ctx *GoContext, customTypes []*customType, propertyTypes map
 		ct := c.ct
 		lead := fmt.Sprintf("%s represents the custom type %s", c.name, strconv.Quote(ct.Name))
 		if c.variant != nil {
-			if _, err := addVariant(ctx, registry, propertyTypes, c.name, lead, ct.Description, c.variant, false); err != nil {
+			if _, err := addVariant(ctx, registry, propertyTypes, c.name, lead, ct.Description, c.variant, ""); err != nil {
 				return err
 			}
 			continue
 		}
 		if c.schema != nil {
-			if _, err := addStruct(ctx, registry, propertyTypes, c.name, withDescription(lead+".", ct.Description), c.schema, false); err != nil {
+			if _, err := addStruct(ctx, registry, propertyTypes, c.name, withDescription(lead+".", ct.Description), c.schema, ""); err != nil {
 				return err
 			}
 			continue
@@ -818,55 +835,74 @@ func addCustomTypes(ctx *GoContext, customTypes []*customType, propertyTypes map
 	return nil
 }
 
-// addTrackRule adds the payload type and method of one track rule.
-func addTrackRule(ctx *GoContext, r trackRule, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) error {
-	event := r.rule.Event
-	base, err := trackBase(event)
-	if err != nil {
-		return err
+// ruleNames returns the method and payload type names rule r requests. Names
+// take the event type as prefix ({Type}{Event}, {Type}{Event}{Payload}),
+// except the identify and group methods, which keep their type's name as on
+// the other platforms. A pair of rules, one per section, is named by section
+// instead ({Type}OnTraits with {Type}{Event}Traits, {Type}OnContextTraits with
+// {Type}{Event}ContextTraits) and neither takes the bare name, so the names do
+// not depend on rule-key order, and adding or removing either rule fails the
+// callers of the other to compile instead of sending their traits elsewhere.
+func ruleNames(r eventRule) (method, payload string, err error) {
+	var (
+		event  = r.rule.Event
+		typ    = string(event.EventType)
+		prefix = strings.ToUpper(typ[:1]) + typ[1:]
+		base   string
+	)
+	// Only a track event must have a name; the type names the others.
+	if event.Name != "" || event.EventType == plan.EventTypeTrack {
+		if base, err = pascalCase(event.Name); err != nil {
+			return "", "", fmt.Errorf("naming %s event %q: %w", typ, event.Name, err)
+		}
 	}
 
-	payload, err := addPayload(ctx, r, propertyTypes, registry)
-	if err != nil {
-		return err
-	}
-
-	method, err := registry.RegisterName("method:"+r.key, methodScope, "Track"+base)
-	if err != nil {
-		return fmt.Errorf("registering the method of track event %q: %w", event.Name, err)
-	}
-	summary := fmt.Sprintf("%s sends the track event %s.", method, strconv.Quote(event.Name))
 	switch {
-	case payload == nil:
-		summary = fmt.Sprintf("%s sends the track event %s, which has no properties.", method, strconv.Quote(event.Name))
-	case payload.MapAlias:
-		summary += " props may be nil; it is copied, so it can be reused after the call."
-	case payload.Variant != nil:
-		summary += " props must hold one of the case structs; nil, including a nil pointer, returns ErrNilPayload."
+	case r.paired:
+		section := "Traits"
+		if r.rule.Section == plan.IdentitySectionContextTraits {
+			section = "ContextTraits"
+		}
+		return prefix + "On" + section, prefix + base + section, nil
+	case event.EventType == plan.EventTypeIdentify || event.EventType == plan.EventTypeGroup:
+		return prefix, prefix + base + payloadNoun(event.EventType), nil
 	}
-	ctx.Methods = append(ctx.Methods, GoMethod{
-		Name:    method,
-		Doc:     withDescription(summary, event.Description),
-		Event:   event.Name,
-		Payload: payload,
-	})
+	return prefix + base, prefix + base + payloadNoun(event.EventType), nil
+}
+
+// addRule adds the payload type and method of one event rule.
+func addRule(ctx *GoContext, r eventRule, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) error {
+	var (
+		event = r.rule.Event
+		typ   = string(event.EventType)
+	)
+	name, _, err := ruleNames(r)
+	if err != nil {
+		return err
+	}
+	st, err := addPayload(ctx, r, propertyTypes, registry)
+	if err != nil {
+		return err
+	}
+
+	method, err := registry.RegisterName("method:"+r.key, methodScope, name)
+	if err != nil {
+		return fmt.Errorf("registering the method of %s event %q: %w", typ, event.Name, err)
+	}
+	m := eventMethod(ctx.PackageName, r, method, st)
+	if m.CategoryMode != "" && st != nil && st.Variant != nil {
+		addCategoryModes(*ctx.out, st.Variant)
+	}
+	ctx.Methods = append(ctx.Methods, m)
+	ctx.Helpers[typ] = true
 	return nil
 }
 
-// trackBase returns a track event's name in PascalCase, which its payload and
-// method names build on.
-func trackBase(event plan.Event) (string, error) {
-	base, err := pascalCase(event.Name)
-	if err != nil {
-		return "", fmt.Errorf("naming track event %q: %w", event.Name, err)
-	}
-	return base, nil
-}
-
-// payloadName registers the payload type name of a track rule and returns
-// it, or returns "" when the rule's schema is empty and closed, so it has no
-// payload. A rule's name is registered once; later calls return it.
-func payloadName(registry *core.NameRegistry, r trackRule) (string, error) {
+// payloadName registers the payload type name ruleNames requests for rule r
+// and returns it, or returns "" when the rule's schema is empty and closed,
+// so it has no payload. A rule's name is registered once; later calls return
+// it.
+func payloadName(registry *core.NameRegistry, r eventRule) (string, error) {
 	var (
 		event  = r.rule.Event
 		schema = r.rule.Schema
@@ -874,51 +910,63 @@ func payloadName(registry *core.NameRegistry, r trackRule) (string, error) {
 	if len(schema.Properties) == 0 && !schema.AdditionalProperties {
 		return "", nil
 	}
-	base, err := trackBase(event)
+	_, requested, err := ruleNames(r)
 	if err != nil {
 		return "", err
 	}
-	name, err := registry.RegisterName("payload:"+r.key, packageScope, "Track"+base+"Properties")
+	name, err := registry.RegisterName("payload:"+r.key, packageScope, requested)
 	if err != nil {
-		return "", fmt.Errorf("registering the payload of track event %q: %w", event.Name, err)
+		return "", fmt.Errorf("registering the payload of %s event %q: %w", event.EventType, event.Name, err)
 	}
 	return name, nil
 }
 
-// addPayload adds the payload type of a track rule, or returns nil when the
-// rule's schema is empty and closed.
-func addPayload(ctx *GoContext, r trackRule, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) (*GoStruct, error) {
-	event := r.rule.Event
+// addPayload adds the payload type of a rule, which holds its payload
+// (Properties or Traits), or returns nil when the rule's schema is empty and
+// closed.
+func addPayload(ctx *GoContext, r eventRule, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) (*GoStruct, error) {
+	var (
+		event   = r.rule.Event
+		payload = payloadNoun(event.EventType)
+		label   = eventLabel(event)
+		noun    = strings.ToLower(payload)
+	)
 	name, err := payloadName(registry, r)
 	if name == "" || err != nil {
 		return nil, err
 	}
+	// A track payload's doc names the event alone, as it always has a name.
+	if event.EventType == plan.EventTypeTrack {
+		label = strconv.Quote(event.Name)
+	}
 	if r.variant != nil {
-		v, err := addVariant(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the properties of %s", name, strconv.Quote(event.Name)), "", r.variant, true)
+		v, err := addVariant(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the %s of %s", name, noun, label), "", r.variant, payload)
 		if err != nil {
 			return nil, err
 		}
-		return &GoStruct{Name: name, Variant: v}, nil
+		return &GoStruct{Name: name, Noun: payload, Variant: v}, nil
 	}
 	if len(r.rule.Schema.Properties) > 0 {
-		return addStruct(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the properties of %s.", name, strconv.Quote(event.Name)), r.schema, true)
+		return addStruct(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the %s of %s.", name, noun, label), r.schema, payload)
 	}
-	payload := &GoStruct{
+	st := &GoStruct{
 		Name:     name,
-		Doc:      fmt.Sprintf("%s holds the properties of %s. The tracking plan declares no properties and allows any.", name, strconv.Quote(event.Name)),
+		Doc:      fmt.Sprintf("%s holds the %s of %s. The tracking plan declares no %s and allows any.", name, noun, label, noun),
 		MapAlias: true,
+		Noun:     payload,
 	}
-	ctx.add(GoDecl{Struct: payload})
-	return payload, nil
+	ctx.add(GoDecl{Struct: st})
+	return st, nil
 }
 
 // addStruct adds the struct name of the fields of s, then the types its
 // hoisted fields need, depth-first in wire-key order, so each follows its
 // parent. Fields are named in byte order of their wire keys, after the names
 // the struct's own methods and its AdditionalProperties field already hold.
-// A payload struct also has ToProperties.
-func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, doc string, s *objectSchema, payload bool) (*GoStruct, error) {
-	st := &GoStruct{Name: name, Doc: doc, Payload: payload, Open: s.open, DeclaredKeys: s.declared}
+// A payload struct, whose payload is Properties or Traits, also has
+// To{payload}.
+func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, doc string, s *objectSchema, payload string) (*GoStruct, error) {
+	st := &GoStruct{Name: name, Doc: doc, Noun: payload, Open: s.open, DeclaredKeys: s.declared}
 	ctx.add(GoDecl{Struct: st})
 	ctx.UsesWithAdditional = ctx.UsesWithAdditional || s.open
 
@@ -926,8 +974,8 @@ func addStruct(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[pr
 		scope    = "struct:" + name + ":fields"
 		reserved = []string{"MarshalJSON"}
 	)
-	if payload {
-		reserved = append(reserved, "ToProperties")
+	if payload != "" {
+		reserved = append(reserved, "To"+payload)
 	}
 	if s.open {
 		reserved = append(reserved, "AdditionalProperties")
@@ -1003,7 +1051,7 @@ func addNested(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[pr
 		}
 	}
 	doc := withDescription(fmt.Sprintf("%s is the object in %s.", object, in), description)
-	if _, err := addStruct(ctx, registry, propertyTypes, object, doc, f.nested, false); err != nil {
+	if _, err := addStruct(ctx, registry, propertyTypes, object, doc, f.nested, ""); err != nil {
 		return "", err
 	}
 

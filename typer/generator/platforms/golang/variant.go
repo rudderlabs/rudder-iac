@@ -295,9 +295,10 @@ func isVariant(p plan.Property) bool {
 // each followed by the types it hoists: the structs the base schema hoists,
 // Absent, the cases in match order, and Default. A case with several match
 // values hoists its own types after its first struct. lead starts the
-// interface's doc comment; a payload interface also lists ToProperties.
-func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, lead, description string, v *variantSchema, payload bool) (*GoVariant, error) {
-	iface := &GoVariant{Name: name, Key: v.key, Payload: payload}
+// interface's doc comment; a payload interface, whose payload is Properties
+// or Traits, also lists To{payload}.
+func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[propertyKey]propertyType, name, lead, description string, v *variantSchema, payload string) (*GoVariant, error) {
+	iface := &GoVariant{Name: name, Key: v.key, Noun: payload}
 	ctx.add(GoDecl{Variant: iface})
 
 	// Absent, the cases and Default take their names before any type the base

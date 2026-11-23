@@ -49,6 +49,7 @@ type callOptions struct {
 	integrations analytics.Integrations
 	timestamp    time.Time
 	messageID    string
+	category     *string // nil when WithCategory is not used
 }
 
 // WithAnalyticsContext sets the event context. Everything reachable from ctx
@@ -74,4 +75,15 @@ func WithTimestamp(t time.Time) Option {
 // WithMessageID sets the message ID. The SDK generates one when it is not set.
 func WithMessageID(id string) Option {
 	return func(o *callOptions) { o.messageID = id }
+}
+
+// WithCategory sets properties.category on page and screen calls; other calls
+// ignore it. If the payload holds a category, the option must equal it.
+// Otherwise the option is rejected when the schema declares category or is
+// closed, and added only when category is undeclared and the schema is open.
+// For variants, the selected struct's schema decides. A rejected option fails
+// the call with ErrCategoryConflict. An empty category counts as supplied and
+// is sent like any other value.
+func WithCategory(category string) Option {
+	return func(o *callOptions) { o.category = &category }
 }
