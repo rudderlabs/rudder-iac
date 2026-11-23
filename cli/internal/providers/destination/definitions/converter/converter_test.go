@@ -275,6 +275,27 @@ func TestArrayWithStrings(t *testing.T) {
 	assert.JSONEq(t, `{ "event_filtering": { "whitelist": [ "a", "b" ] } }`, s)
 }
 
+// An empty list is sent as [], so the backend stores it and the spec's []
+// reads back unchanged instead of diffing on every plan. An absent key stays
+// absent.
+func TestArrayWithStringsKeepsAnEmptyList(t *testing.T) {
+	t.Parallel()
+
+	p := converter.ArrayWithStrings("whitelistedEvents", "eventName", "event_filtering.whitelist")
+
+	api, err := p.FromLocalFunc(`{}`, `{ "event_filtering": { "whitelist": [] } }`)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{ "whitelistedEvents": [] }`, api)
+
+	local, err := p.ToLocalFunc(`{}`, api)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{ "event_filtering": { "whitelist": [] } }`, local)
+
+	absent, err := p.FromLocalFunc(`{}`, `{}`)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{}`, absent)
+}
+
 func TestArrayWithObjects(t *testing.T) {
 	t.Parallel()
 
