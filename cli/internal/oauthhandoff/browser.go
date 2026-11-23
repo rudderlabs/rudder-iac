@@ -36,14 +36,16 @@ func canOpenBrowser(goos string, env func(string) string) bool {
 // ponytail: three exec lines and no dependency. The URL is printed before this
 // runs, so a failed launch is a message rather than a failed command.
 func OpenBrowser(url string) error {
-	if !CanOpenBrowser() {
-		return errors.New("no browser on this host")
-	}
 	// Every URL that reaches here has been through safeWebURL. This is the
 	// second belt: each opener below takes its argument as a scheme handler to
-	// launch, so a caller that skipped the check must not reach exec.
+	// launch, so a caller that skipped the check must not reach exec. Checked
+	// before the host has an opener at all, so the refusal does not depend on
+	// where this runs.
 	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") {
 		return fmt.Errorf("refusing to open %q: not an http URL", url)
+	}
+	if !CanOpenBrowser() {
+		return errors.New("no browser on this host")
 	}
 
 	switch runtime.GOOS {
