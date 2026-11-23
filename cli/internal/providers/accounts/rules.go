@@ -28,6 +28,20 @@ func validateAccountSpec(_, _ string, _ map[string]any, spec AccountSpec) []rule
 	}
 
 	var results []rules.ValidationResult
+	// An OAuth account's credentials are not the CLI's to hold and its
+	// definition declares no option fields, so config here is always a mistake.
+	// Saying so at validate time beats silently dropping it on apply.
+	if isOAuthDefinition(spec.AccountDefinitionName) {
+		if len(spec.Config) > 0 {
+			results = append(results, rules.ValidationResult{
+				Reference: "/config",
+				Message: fmt.Sprintf(
+					"'config' is not allowed for %s accounts: they carry no options, and their credentials are held by RudderStack's auth service",
+					spec.AccountDefinitionName),
+			})
+		}
+		return results
+	}
 	if key, allowed, unknown := unknownAuthMode(spec.AccountDefinitionName, spec.Config); unknown {
 		results = append(results, rules.ValidationResult{
 			Reference: "/config/" + key,

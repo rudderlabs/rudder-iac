@@ -29,6 +29,9 @@ type mockStore struct {
 	externalIDSet  [2]string // {id, externalID}
 	createReturnID string
 	deleteErr      error
+	// getAccount overrides what Get returns, so a test can hand Import an
+	// account of a particular definition.
+	getAccount *client.Account
 }
 
 func (m *mockStore) Create(_ context.Context, req *client.CreateAccountRequest) (*client.Account, error) {
@@ -41,6 +44,9 @@ func (m *mockStore) Update(_ context.Context, id string, req *client.UpdateAccou
 }
 func (m *mockStore) Delete(context.Context, string) error { return m.deleteErr }
 func (m *mockStore) Get(context.Context, string) (*client.Account, error) {
+	if m.getAccount != nil {
+		return m.getAccount, nil
+	}
 	return &client.Account{ID: "remote-1"}, nil
 }
 func (m *mockStore) ListAll(context.Context, ...client.ListAccountsOption) ([]client.Account, error) {
