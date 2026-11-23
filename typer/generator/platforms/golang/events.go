@@ -9,18 +9,34 @@ import (
 	"github.com/rudderlabs/rudder-iac/typer/plan"
 )
 
-// validSection reports whether the rule's section is one its event type
-// takes, as on every platform: properties for track, page and screen, traits
-// or context.traits for identify and group. Ported from the Kotlin
-// generator's validateEventRuleSection.
-func validSection(rule *plan.EventRule) bool {
-	switch rule.Event.EventType {
+// skipWarning returns the warning rule is left out with, or "" when it is
+// generated. An event type other than the five analytics-go sends, such as
+// alias, is checked first, as in TypeScript and Swift. Otherwise the section
+// must be one the event type takes, as on every platform: properties for
+// track, page and screen, traits or context.traits for identify and group.
+// The section check is ported from the Kotlin generator's
+// validateEventRuleSection, and both warnings are Kotlin's, word for word.
+func skipWarning(rule *plan.EventRule) string {
+	var (
+		event = rule.Event
+		valid bool
+	)
+	switch event.EventType {
 	case plan.EventTypeTrack, plan.EventTypePage, plan.EventTypeScreen:
-		return rule.Section == plan.IdentitySectionProperties
+		valid = rule.Section == plan.IdentitySectionProperties
 	case plan.EventTypeIdentify, plan.EventTypeGroup:
-		return rule.Section == plan.IdentitySectionTraits || rule.Section == plan.IdentitySectionContextTraits
+		valid = rule.Section == plan.IdentitySectionTraits || rule.Section == plan.IdentitySectionContextTraits
+	default:
+		return fmt.Sprintf("unsupported event type: %q", event.EventType)
 	}
-	return false
+	if valid {
+		return ""
+	}
+	msg := fmt.Sprintf("invalid section %q for event type %q", rule.Section, event.EventType)
+	if event.Name != "" {
+		msg += fmt.Sprintf(" and event name %q", event.Name)
+	}
+	return msg
 }
 
 // payloadNoun is what an event type's payload holds, which ends its type's

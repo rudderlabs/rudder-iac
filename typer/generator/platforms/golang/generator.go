@@ -222,24 +222,18 @@ func eventRules(p *plan.TrackingPlan) ([]eventRule, []*customType, error) {
 	)
 	for _, r := range all {
 		// The resolver relies on the cycle check to end. It runs before the
-		// section check, so a rule left out still fails generation on a custom
-		// type that refers to itself.
+		// event type and section checks, so a rule left out still fails
+		// generation on a custom type that refers to itself.
 		if err := cycles.rule(r.rule); err != nil {
 			return nil, nil, err
 		}
 
-		event := r.rule.Event
-		if !validSection(r.rule) {
-			// Kotlin's warning, word for word.
-			msg := fmt.Sprintf("invalid section %q for event type %q", r.rule.Section, event.EventType)
-			if event.Name != "" {
-				msg += fmt.Sprintf(" and event name %q", event.Name)
-			}
+		if msg := skipWarning(r.rule); msg != "" {
 			core.Warn(msg)
 			continue
 		}
 		var (
-			where = strings.TrimPrefix(eventLabel(event), "the ")
+			where = strings.TrimPrefix(eventLabel(r.rule.Event), "the ")
 			err   error
 		)
 		if r.schema, err = res.schema(&r.rule.Schema, where, ""); err != nil {

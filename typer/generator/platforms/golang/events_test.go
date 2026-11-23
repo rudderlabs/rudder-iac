@@ -185,9 +185,9 @@ func TestGenerateEventTypes(t *testing.T) {
 			wantWarnings: []string{`invalid section "context.traits" for event type "screen"`},
 		},
 		{
-			name:         "alias, which takes no section",
+			name:         "alias, which is not generated on any section",
 			rules:        []plan.EventRule{rule("alias", "", plan.IdentitySectionTraits)},
-			wantWarnings: []string{`invalid section "traits" for event type "alias"`},
+			wantWarnings: []string{`unsupported event type: "alias"`},
 		},
 		{
 			name: "two group rules of a named event, one per section: the types keep the name",
