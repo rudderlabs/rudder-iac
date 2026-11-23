@@ -2,6 +2,7 @@ package golang_test
 
 import (
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
@@ -204,7 +205,8 @@ func TestGenerateReservesPayloadMethodNames(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, files, 1)
 
-	assert.Contains(t, files[0].Content, "\tMarshalJSON1 *PropertyMarshalJSON // optional\n")
+	decl := regexp.MustCompile(`(?s)type TrackSomeEventProperties struct \{.*?\n\}`).FindString(files[0].Content)
+	assert.Equal(t, "type TrackSomeEventProperties struct {\n\tMarshalJSON1 *PropertyMarshalJSON // optional\n}", decl)
 }
 
 func captureWarnings(t *testing.T) *[]string {
