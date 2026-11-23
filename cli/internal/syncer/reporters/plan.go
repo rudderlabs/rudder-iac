@@ -31,7 +31,16 @@ func (r *planReporter) getWriter() io.Writer {
 }
 
 func (r *planReporter) ReportPlan(plan *planner.Plan) {
-	fmt.Fprint(r.getWriter(), renderDiff(plan.Diff))
+	// Gating on the rendered output rather than on len(Operations) keeps the two
+	// in step: every operation the planner emits comes from a diff section this
+	// renders.
+	rendered := renderDiff(plan.Diff)
+	if rendered == "" {
+		fmt.Fprintln(r.getWriter(), "No changes to apply")
+		return
+	}
+
+	fmt.Fprint(r.getWriter(), rendered)
 }
 
 func renderDiff(diff *differ.Diff) string {
