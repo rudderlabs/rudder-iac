@@ -245,5 +245,7 @@ func checkAdoptedAccountLiterals(plan *planner.Plan, st *state.State) error {
 	}
 	return fmt.Errorf("a destination names an account this project manages by its remote ID. "+
 		"Reference the account spec instead, or the destination is rewritten with an identical "+
-		"config on every apply:\n  %s", strings.Join(refused, "\n  "))
+		"config on every apply:\n  %s\n"+
+		"A reference resolves only against an account spec in this project carrying that external ID, "+
+		"so add one if the spec that adopted the account is gone.", strings.Join(refused, "\n  "))
 }

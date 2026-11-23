@@ -495,3 +495,84 @@ func TestCheckPlan_AllowsALiteralOnATypeThatCannotAdopt(t *testing.T) {
 	assert.NoError(t, p.CheckPlan(context.Background(), plan,
 		stateWithAdoptedAccount("google-ads-prod", "remote-acct-1")))
 }
+
+// The import preview reads the remote through remoteResource, which keeps the
+// literal account id, while the spec side carries an unresolved PropertyRef.
+// Compared as they are, that is a Config change on every import of a
+// destination referencing an account, which the preview would report as the
+// import rewriting a config it does not touch.
+func TestPreviewImports_ResolvesTheAccountReference(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v2/destinations/dst-in-state":
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-in-state","name":"Ads","type":"ADS","version":1,"enabled":true,` +
+				`"config":{"rudderAccountId":"remote-acct-1","customerId":"cust-1"}}}`))
+		case "/v2/destinations/dst-adopting":
+			_, _ = w.Write([]byte(`{"destination":{"id":"dst-adopting","name":"Ads","type":"ADS","version":1,"enabled":true,` +
+				`"config":{"rudderAccountId":"remote-acct-2","customerId":"cust-2"}}}`))
+		case "/v2/destinations/dst-in-state/transformation", "/v2/destinations/dst-adopting/transformation":
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	spec := func(id, accountExternalID, customerID string) *destination.DestinationResource {
+		return &destination.DestinationResource{
+			ID:                id,
+			DisplayName:       "Ads",
+			Type:              "google_adwords_offline_conversions",
+			Enabled:           true,
+			DefinitionVersion: 1,
+			Config: map[string]any{
+				"rudder_account_id": accountRef(accountExternalID),
+				"customer_id":       customerID,
+			},
+		}
+	}
+	importing := func(id, remoteID string, dest *destination.DestinationResource) *planner.Operation {
+		return &planner.Operation{Type: planner.Import, Resource: resources.NewResource(
+			id, destination.DestinationResourceType, resources.ResourceData{}, nil,
+			resources.WithRawData(dest), resources.WithResourceImportMetadata(remoteID, "ws-1"),
+		)}
+	}
+	// The account the second destination names is adopted by this same plan,
+	// so it is not in state and resolves through its import's remote ID.
+	adoptingAccount := &planner.Operation{Type: planner.Import, Resource: resources.NewResource(
+		"google-ads-new", accounts.AccountResourceType, resources.ResourceData{}, nil,
+		resources.WithResourceImportMetadata("remote-acct-2", "ws-1"),
+	)}
+
+	plan := &planner.Plan{Operations: []*planner.Operation{
+		importing("ads-in-state", "dst-in-state", spec("ads-in-state", "google-ads-prod", "cust-1")),
+		importing("ads-adopting", "dst-adopting", spec("ads-adopting", "google-ads-new", "cust-2")),
+		adoptingAccount,
+	}}
+
+	p := destination.NewProvider(newTestClient(t, srv.URL), adsRegistry(t))
+	diffs, err := p.PreviewImports(context.Background(), plan,
+		stateWithAdoptedAccount("google-ads-prod", "remote-acct-1"))
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]differ.ResourceDiff{}, diffs,
+		"a spec matching the remote destination it adopts has nothing to preview")
+}
+
+// accountRef is the spec-side reference as extraction leaves it: unresolved,
+// resolving an account's remote ID out of its state.
+func accountRef(externalID string) *resources.PropertyRef {
+	return &resources.PropertyRef{
+		URN:      resources.URN(externalID, accounts.AccountResourceType),
+		Property: "id",
+		Resolve: func(output any) (string, error) {
+			accountState, ok := output.(*accounts.AccountState)
+			if !ok {
+				return "", errors.New("not an account state")
+			}
+			return accountState.ID, nil
+		},
+	}
+}

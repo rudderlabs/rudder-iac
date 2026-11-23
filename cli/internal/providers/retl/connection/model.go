@@ -89,6 +89,12 @@ type RemoteConnection struct {
 	DestinationExternalID string
 }
 
+// WarehouseDestinationID names the destination this connection delivers to. A
+// destination being imported reads it, through an interface since that
+// package cannot import this one, to tell which destinations a warehouse
+// source connects to.
+func (r *RemoteConnection) WarehouseDestinationID() string { return r.DestinationID }
+
 // ConnectionsSpec mirrors the YAML spec structure: the body is a list of
 // connection entries. JSON tags enable the typed rule engine's
 // json.Marshal/Unmarshal round-trip and name the JSON Pointer references it

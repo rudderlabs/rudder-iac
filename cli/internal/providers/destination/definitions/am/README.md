@@ -449,7 +449,7 @@ destination 'amplitude-prod' config has no 'connection_mode' entry for source ty
 
 Amplitude needs no additional config keys to connect a source of any type, in any mode.
 
-A Reverse ETL connection reaches this destination as source type `warehouse` and is checked against the same rules, so the config needs a `connection_mode.warehouse: cloud` entry for it.
+A Reverse ETL connection reaches this destination as source type `warehouse`. It needs no `connection_mode` entry, since `cloud` is the only mode a warehouse source runs in; `connection_mode.warehouse: cloud` is accepted but optional.
 
 ## Secrets
 

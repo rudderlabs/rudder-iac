@@ -89,7 +89,7 @@ func TestAcceptedSyncBehavioursStayWithinTheSpecTag(t *testing.T) {
 
 	// Every warehouse the CLI knows, offered everything any destination could
 	// accept, on every flow: the widest set the helper can ever hand out.
-	for _, sourceDefinition := range []string{"bigquery", "clickhouse", "databricks", "mysql", "postgres", "redshift", "s3", "sftp", "snowflake", "trino"} {
+	for _, sourceDefinition := range []string{"bigquery", "clickhouse", "databricks", "maxcompute", "mysql", "postgres", "redshift", "s3", "sftp", "snowflake", "trino"} {
 		for _, flow := range []Flow{FlowJSONMapper, FlowObjectMapping} {
 			accepted, known := AcceptedSyncBehaviours(sourceDefinition, []string{"upsert", "mirror", "full"}, flow)
 			require.True(t, known, "source definition %q is in the metadata table", sourceDefinition)
@@ -294,4 +294,22 @@ func TestSyncBehaviourNotSharedNamesWhatIsLeft(t *testing.T) {
 		"and this destination together, which share only [upsert] on JSON mapping; "+
 		"the connection stays in the workspace unchanged: connection config cannot be represented as a spec")
 	assert.ErrorIs(t, err, ErrUnrepresentableConfig)
+}
+
+// The visual-mapper-v2 flow is the one flow a spec can carry mirror on, and
+// every other mirror case in this file asserts a refusal. Without this, a
+// narrowing of specSupportsSyncBehaviour back to "mirror is never
+// representable" would pass the whole suite while silently dropping every
+// vdm-next row at import. No fixture destination carries the v2 flag, so drive
+// the gate directly. Raised by @arpl on #1027.
+func TestVisualMapperV2MirrorRowSurvivesImport(t *testing.T) {
+	t.Parallel()
+
+	conn := syncBehaviourRow("conn-mirror-v2", "dst-1", retlClient.SyncBehaviourMirror, "")
+	require.NoError(t, syncBehaviourRepresentable(conn, "snowflake", []string{"mirror"}, FlowVisualMapperV2))
+
+	// The same row on the two generic flows is still refused, so this cannot
+	// pass by making the gate inert.
+	require.Error(t, syncBehaviourRepresentable(conn, "snowflake", []string{"mirror"}, FlowJSONMapper))
+	require.Error(t, syncBehaviourRepresentable(conn, "snowflake", []string{"mirror"}, FlowObjectMapping))
 }
