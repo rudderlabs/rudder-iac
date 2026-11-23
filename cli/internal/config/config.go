@@ -34,6 +34,9 @@ type Config = struct {
 		AnonymousID  string `mapstructure:"anonymousId"`
 		WriteKey     string `mapstructure:"writeKey"`
 		DataplaneURL string `mapstructure:"dataplaneURL"`
+		// Notice is the version of the telemetry notice this install has
+		// been shown, 0 for none.
+		Notice int `mapstructure:"notice"`
 	} `mapstructure:"telemetry"`
 	ExperimentalFlags ExperimentalConfig `mapstructure:"flags"`
 	Concurrency       struct {
@@ -87,7 +90,9 @@ func InitConfig(cfgFile string) {
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
 	viper.BindEnv("telemetry.writeKey", "RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY")
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
-	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED")
+	// DO_NOT_TRACK is the opt-out several tools share (consoledonottrack.com).
+	// Ours is read first, so it can turn telemetry back on for one tool.
+	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED", "DO_NOT_TRACK")
 	viper.BindEnv("debug", "RUDDERSTACK_CLI_DEBUG")
 	viper.BindEnv("experimental", ExperimentalEnvVar)
 	viper.BindEnv("concurrency.syncer", "RUDDERSTACK_CLI_CONCURRENCY_SYNCER")
@@ -131,6 +136,12 @@ func SetAccessToken(accessToken string) {
 func SetTelemetryDisabled(disabled bool) {
 	updateConfig(func(data []byte) ([]byte, error) {
 		return sjson.SetBytes(data, "telemetry.disabled", disabled)
+	})
+}
+
+func SetTelemetryNotice(version int) {
+	updateConfig(func(data []byte) ([]byte, error) {
+		return sjson.SetBytes(data, "telemetry.notice", version)
 	})
 }
 

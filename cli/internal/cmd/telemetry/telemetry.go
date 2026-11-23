@@ -19,18 +19,21 @@ var telemetryCmd = &cobra.Command{
 		Manage telemetry settings for the CLI.
 		
 		Telemetry helps us understand how the CLI is being used and helps us improve it.
-		No sensitive information is collected. The data collected includes:
-		- Command usage statistics
-		- Error occurrences (without sensitive details)
-		- Basic system information
+		It is on until you turn it off. The CLI sends:
+		- The command, its flags and their values, and whether it failed
+		- The CLI version and a telemetry id made on this machine
+		- The CI service, when the CLI runs in one
 		- The coding agent running the CLI, when one is
 		- The skill the agent follows, when the skill names itself
 
-		While telemetry is enabled, API calls also carry those two names and the
-		telemetry id in their User-Agent, so usage can be counted per workspace.
+		While telemetry is enabled, API calls also carry the agent, the skill and
+		the telemetry id in their User-Agent. That ties this usage to your
+		workspace. Spec contents, access tokens and secrets are never sent.
+		The full list: https://github.com/rudderlabs/rudder-iac#telemetry
 		
 		Use 'status' to check current telemetry settings
 		Use 'enable' or 'disable' to modify telemetry collection
+		RUDDERSTACK_CLI_TELEMETRY_DISABLED=true or DO_NOT_TRACK=1 also turns it off
 	`),
 }
 
