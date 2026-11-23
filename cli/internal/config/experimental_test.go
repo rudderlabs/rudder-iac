@@ -163,3 +163,10 @@ func TestIsValidExperimentalFlag_SourcesListen(t *testing.T) {
 	assert.True(t, IsValidExperimentalFlag("sourcesListen"))
 	assert.Equal(t, "RUDDERSTACK_X_SOURCES_LISTEN", GetEnvironmentVariableName("sourcesListen"))
 }
+
+func TestIsValidExperimentalFlag_OAuthAccounts(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsValidExperimentalFlag("oauthAccounts"))
+	assert.Equal(t, "RUDDERSTACK_X_OAUTH_ACCOUNTS", GetEnvironmentVariableName("oauthAccounts"))
+}

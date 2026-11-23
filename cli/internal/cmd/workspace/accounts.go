@@ -17,7 +17,26 @@ func NewCmdAccounts() *cobra.Command {
 
 	cmd.AddCommand(newCmdListAccounts())
 
+	// Both browser-handoff commands are hidden until the experimental flag is
+	// on, like the sources group: they cannot work against production yet.
+	oauthAccountCmds = []*cobra.Command{newCmdCreateAccount(), newCmdReauthorizeAccount()}
+	for _, c := range oauthAccountCmds {
+		cmd.AddCommand(c)
+	}
+
 	return cmd
+}
+
+// oauthAccountCmds is the commands UnhideOAuthAccounts shows. Config is read
+// after the tree is built, so the flag cannot be checked where they are made.
+var oauthAccountCmds []*cobra.Command
+
+// UnhideOAuthAccounts lists the browser-handoff commands in --help. Called from
+// the root command once the experimental flag has been read.
+func UnhideOAuthAccounts() {
+	for _, cmd := range oauthAccountCmds {
+		cmd.Hidden = false
+	}
 }
 
 func newCmdListAccounts() *cobra.Command {

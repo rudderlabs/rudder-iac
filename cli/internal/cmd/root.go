@@ -132,6 +132,10 @@ func initConfig() {
 	if config.GetConfig().ExperimentalFlags.SourcesListen {
 		devCmd.Hidden = false
 	}
+
+	if config.GetConfig().ExperimentalFlags.OAuthAccounts {
+		workspace.UnhideOAuthAccounts()
+	}
 }
 
 func initLogger() {
@@ -172,7 +176,9 @@ var trackedCommands = []string{
 	"typer generate",
 	"typer snapshot",
 	"validate",
+	"workspace accounts create",
 	"workspace accounts list",
+	"workspace accounts reauthorize",
 	"workspace event-stream-sources list",
 	"workspace info",
 	"workspace retl-sources list",
