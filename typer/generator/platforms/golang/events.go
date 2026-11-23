@@ -9,18 +9,34 @@ import (
 	"github.com/rudderlabs/rudder-iac/typer/plan"
 )
 
-// validSection reports whether the rule's section is one its event type
-// takes, as on every platform: properties for track, page and screen, traits
-// or context.traits for identify and group. Ported from the Kotlin
-// generator's validateEventRuleSection.
-func validSection(rule *plan.EventRule) bool {
-	switch rule.Event.EventType {
+// skipWarning returns the warning rule is left out with, or "" when it is
+// generated. An event type other than the five analytics-go sends, such as
+// alias, is checked first, as in TypeScript and Swift. Otherwise the section
+// must be one the event type takes, as on every platform: properties for
+// track, page and screen, traits or context.traits for identify and group.
+// The section check is ported from the Kotlin generator's
+// validateEventRuleSection, and both warnings are Kotlin's, word for word.
+func skipWarning(rule *plan.EventRule) string {
+	var (
+		event = rule.Event
+		valid bool
+	)
+	switch event.EventType {
 	case plan.EventTypeTrack, plan.EventTypePage, plan.EventTypeScreen:
-		return rule.Section == plan.IdentitySectionProperties
+		valid = rule.Section == plan.IdentitySectionProperties
 	case plan.EventTypeIdentify, plan.EventTypeGroup:
-		return rule.Section == plan.IdentitySectionTraits || rule.Section == plan.IdentitySectionContextTraits
+		valid = rule.Section == plan.IdentitySectionTraits || rule.Section == plan.IdentitySectionContextTraits
+	default:
+		return fmt.Sprintf("unsupported event type: %q", event.EventType)
 	}
-	return false
+	if valid {
+		return ""
+	}
+	msg := fmt.Sprintf("invalid section %q for event type %q", rule.Section, event.EventType)
+	if event.Name != "" {
+		msg += fmt.Sprintf(" and event name %q", event.Name)
+	}
+	return msg
 }
 
 // payloadNoun is what an event type's payload holds, which ends its type's
@@ -104,8 +120,8 @@ func eventMethod(packageName string, r eventRule, name string, payload *GoStruct
 		m.Pointer = true
 		notes = append(notes, fmt.Sprintf("%s may be nil, which sends no %s.", m.Param, noun))
 	}
-	if payload != nil && r.rule.Section == plan.IdentitySectionContextTraits && event.EventType == plan.EventTypeIdentify {
-		notes = append(notes, "The traits are sent as context.traits, where they win over the traits WithAnalyticsContext sets.")
+	if payload != nil && noun == "traits" {
+		notes = append(notes, traitsNote(event.EventType, r.rule.Section))
 	}
 	if m.CategoryMode != "" {
 		notes = append(notes, categoryNote(event.EventType, m.CategoryMode, payload))
@@ -128,6 +144,19 @@ func eventMethod(packageName string, r eventRule, name string, payload *GoStruct
 	}
 	m.Doc = withDescription(strings.Join(append([]string{summary + "."}, notes...), " "), event.Description)
 	return m
+}
+
+// traitsNote tells an identify or group method's caller which key of the
+// message its traits are sent in, which the rule's section alone does not
+// tell: group sends the message's traits from either section.
+func traitsNote(t plan.EventType, section plan.IdentitySection) string {
+	switch {
+	case section != plan.IdentitySectionContextTraits:
+		return "The traits are sent as the message's traits."
+	case t == plan.EventTypeIdentify:
+		return "The traits are sent as context.traits, where they win over the traits WithAnalyticsContext sets."
+	}
+	return "The traits are sent as the message's traits; context.traits holds the user's traits, not the group's."
 }
 
 // The categoryMode constants of the generated code.

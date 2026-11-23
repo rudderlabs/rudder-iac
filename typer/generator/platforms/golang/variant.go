@@ -135,6 +135,11 @@ func (res *resolver) mergeVariant(s *plan.ObjectSchema, base *objectSchema, vari
 			vc    = &vr.Cases[i]
 			label = "case " + jsonText(vc.Match)
 		)
+		// Such a case would generate no struct and drop its schema silently. The
+		// CLI rejects it locally; a remote plan can still hold one.
+		if len(vc.Match) == 0 {
+			return nil, fmt.Errorf("case at index %d has no match values", i)
+		}
 		schema, err := res.branch(s, &vc.Schema, label, where)
 		if err != nil {
 			return nil, err
@@ -296,6 +301,37 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	iface := &GoVariant{Name: name, Key: v.key, Noun: payload}
 	ctx.add(GoDecl{Variant: iface})
 
+	// Absent, the cases and Default take their names before any type the base
+	// or a case hoists, so a base property named default cannot push Default
+	// to Default1.
+	register := func(id, suffix string) (string, error) {
+		structName, err := registry.RegisterName(id, packageScope, name+suffix)
+		if err != nil {
+			return "", fmt.Errorf("registering %s%s: %w", name, suffix, err)
+		}
+		return structName, nil
+	}
+	var (
+		absentName, defaultName string
+		caseNames               = make([]string, len(v.cases))
+		err                     error
+	)
+	if v.absent != nil {
+		if absentName, err = register("absent:"+name, "Absent"); err != nil {
+			return nil, err
+		}
+	}
+	for i, c := range v.cases {
+		if caseNames[i], err = register("case:"+name+":"+c.text, "Case"+c.name); err != nil {
+			return nil, err
+		}
+	}
+	if v.dflt != nil {
+		if defaultName, err = register("default:"+name, "Default"); err != nil {
+			return nil, err
+		}
+	}
+
 	// Every branch holds the base's fields, so all share what the base hoists.
 	hoisted := map[string]string{}
 	for _, f := range v.base.fields {
@@ -329,11 +365,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	}
 
 	// shared maps a wire key of s to the type already hoisted for it.
-	addImplementation := func(id, suffix string, s *objectSchema, shared map[string]string) (*GoStruct, error) {
-		structName, err := registry.RegisterName(id, packageScope, name+suffix)
-		if err != nil {
-			return nil, fmt.Errorf("registering %s%s: %w", name, suffix, err)
-		}
+	addImplementation := func(structName string, s *objectSchema, shared map[string]string) (*GoStruct, error) {
 		// A property named discriminator would clash with the method.
 		if _, err := registry.RegisterName("reserved:Discriminator", "struct:"+structName+":fields", "Discriminator"); err != nil {
 			return nil, fmt.Errorf("reserving Discriminator in %s: %w", structName, err)
@@ -351,7 +383,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	}
 
 	if v.absent != nil {
-		st, err := addImplementation("absent:"+name, "Absent", v.absent, hoisted)
+		st, err := addImplementation(absentName, v.absent, hoisted)
 		if err != nil {
 			return nil, err
 		}
@@ -363,12 +395,12 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	// The structs of one case share its schema, so they also share what the
 	// first of them hoists.
 	caseHoisted := map[*plan.VariantCase]map[string]string{}
-	for _, c := range v.cases {
+	for i, c := range v.cases {
 		shared, seen := caseHoisted[c.vc]
 		if !seen {
 			shared = hoisted
 		}
-		st, err := addImplementation("case:"+name+":"+c.text, "Case"+c.name, c.schema, shared)
+		st, err := addImplementation(caseNames[i], c.schema, shared)
 		if err != nil {
 			return nil, err
 		}
@@ -409,7 +441,7 @@ func addVariant(ctx *GoContext, registry *core.NameRegistry, propertyTypes map[p
 	}
 
 	if v.dflt != nil {
-		st, err := addImplementation("default:"+name, "Default", v.dflt, hoisted)
+		st, err := addImplementation(defaultName, v.dflt, hoisted)
 		if err != nil {
 			return nil, err
 		}
