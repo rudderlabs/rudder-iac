@@ -253,6 +253,11 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			plan:         variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{AdditionalProperties: true})),
 			wantWarnings: []string{`generating case ["a"] of the variants of track event "Some Event" closed: its base schema does not allow additional properties`},
 		},
+		{
+			name:    "a case without match values",
+			plan:    variantPlan(typed(onlyString...), discriminate([]any{"a"}, []any{})),
+			wantErr: `mapping the variants of track event "Some Event": case at index 1 has no match values`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -485,4 +490,34 @@ func TestGenerateVariantCaseSharesHoistedTypes(t *testing.T) {
 	}, structs)
 	field := GoField{Name: "Geo", Key: "geo", Type: "*TrackSomeEventPropertiesCaseAGeo", Pointer: true}
 	assert.Equal(t, []GoField{field, field}, geo)
+}
+
+// Absent, the cases and Default keep their names when a base property hoists
+// a struct under the same name: the hoisted struct takes the suffix.
+func TestGenerateVariantStructsNameBeforeHoistedTypes(t *testing.T) {
+	p := variantPlan(typed(onlyString...), discriminate([]any{"a"}))
+	kind := p.Rules[0].Schema.Properties["kind"]
+	kind.Required = false
+	p.Rules[0].Schema.Properties["kind"] = kind
+	for _, key := range []string{"absent", "case_a", "default"} {
+		p.Rules[0].Schema.Properties[key] = plan.PropertySchema{
+			Property: plan.Property{Name: key, Types: []plan.PropertyType{plan.PrimitiveTypeObject}},
+			Schema:   &plan.ObjectSchema{Properties: map[string]plan.PropertySchema{"x": {Property: plan.Property{Name: "x", Types: onlyString}}}},
+		}
+	}
+	ctx, err := newContext(p, "", "ruddertyper")
+	require.NoError(t, err)
+
+	var implementations, hoisted []string
+	for _, d := range ctx.Payloads {
+		switch {
+		case d.Struct == nil:
+		case d.Struct.Variant != nil:
+			implementations = append(implementations, d.Struct.Name)
+		default:
+			hoisted = append(hoisted, d.Struct.Name)
+		}
+	}
+	assert.Equal(t, []string{"TrackSomeEventPropertiesAbsent", "TrackSomeEventPropertiesCaseA", "TrackSomeEventPropertiesDefault"}, implementations)
+	assert.Equal(t, []string{"TrackSomeEventPropertiesAbsent1", "TrackSomeEventPropertiesCaseA1", "TrackSomeEventPropertiesDefault1"}, hoisted)
 }

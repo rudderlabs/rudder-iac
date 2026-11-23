@@ -14,12 +14,13 @@ import (
 )
 
 // wireRow is one call of a type-system wire test. A call that succeeds must
-// send want, a whole message; one that fails must return an error wrapping
-// errIs and send nothing.
+// send want, a whole message; one that fails must return an error equal to
+// err, or one wrapping errIs, and send nothing.
 type wireRow struct {
 	name  string
 	call  func() error
 	want  string
+	err   error
 	errIs error
 }
 
@@ -51,6 +52,10 @@ func assertWireRows(t *testing.T, start func(analytics.Client), rows []wireRow) 
 			msg, wire = wire[0], wire[1:]
 		}
 		t.Run(row.name, func(t *testing.T) {
+			if row.err != nil {
+				assert.Equal(t, row.err, errs[i])
+				return
+			}
 			if row.errIs != nil {
 				assert.ErrorIs(t, errs[i], row.errIs)
 				return
@@ -304,6 +309,46 @@ func TestExamplesTypesWire(t *testing.T) {
 				return ex.TrackSomeNestedObjectEvent(id, p)
 			},
 			want: trackJSON(exMeta, "Some Nested Object Event", `{"location": {"lat": 1.5}, "foo": {"barBaz": {}}, "fooBar": {"baz": {}}}`),
+		},
+		{
+			name: "custom type: an array of array custom types sends nested arrays, a nil item as []",
+			call: func() error {
+				p := custom
+				p.Grid = examples.PropertyGrid{{"a", "b"}, nil}
+				return ex.TrackSomeCustomTypeEvent(id, p)
+			},
+			want: trackJSON(exMeta, "Some Custom Type Event", `{"someObject": {"someCustomString": "c"}, "grid": [["a", "b"], []]}`),
+		},
+		{
+			name: "union: a string-or-object property sends its String member",
+			call: func() error {
+				p := nested
+				p.ObjectOrString = examples.Ptr(examples.NewPropertyObjectOrStringString("s"))
+				return ex.TrackSomeNestedObjectEvent(id, p)
+			},
+			want: trackJSON(exMeta, "Some Nested Object Event", `{"location": {"lat": 1.5}, "objectOrString": "s"}`),
+		},
+		{
+			name: "union: a string-or-object property built from a nil map sends {}",
+			call: func() error {
+				p := nested
+				p.ObjectOrString = examples.Ptr(examples.NewPropertyObjectOrStringObject(nil))
+				return ex.TrackSomeNestedObjectEvent(id, p)
+			},
+			want: trackJSON(exMeta, "Some Nested Object Event", `{"location": {"lat": 1.5}, "objectOrString": {}}`),
+		},
+		{
+			name: "custom type: an object nested in a custom type sends its undeclared AdditionalProperties keys only",
+			call: func() error {
+				p := custom
+				p.UserProfile = &examples.CustomTypeUserProfile{Address: &examples.CustomTypeUserProfileAddress{
+					Street:               "Main St",
+					AdditionalProperties: map[string]any{"unit": "4B", "street": "Other St"},
+				}}
+				return ex.TrackSomeCustomTypeEvent(id, p)
+			},
+			want: trackJSON(exMeta, "Some Custom Type Event",
+				`{"someObject": {"someCustomString": "c"}, "userProfile": {"address": {"street": "Main St", "unit": "4B"}}}`),
 		},
 	}
 
