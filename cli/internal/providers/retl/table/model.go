@@ -2,6 +2,7 @@ package table
 
 import (
 	"fmt"
+	"strings"
 
 	retlClient "github.com/rudderlabs/rudder-iac/api/client/retl"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/retl/sqlmodel"
@@ -56,13 +57,24 @@ type TableSpec struct {
 	DisplayName      string `json:"display_name"      mapstructure:"display_name"      validate:"required"`
 	AccountID        string `json:"account_id"        mapstructure:"account_id"        validate:"required_without=Account,excluded_with=Account"`
 	Account          string `json:"account"           mapstructure:"account"           validate:"omitempty,pattern=account_ref"`
-	SourceDefinition string `json:"source_definition" mapstructure:"source_definition" validate:"required,oneof=postgres redshift snowflake bigquery mysql databricks trino s3"`
+	SourceDefinition string `json:"source_definition" mapstructure:"source_definition" validate:"required,oneof=postgres redshift snowflake bigquery mysql databricks trino maxcompute s3"`
 	PrimaryKey       string `json:"primary_key"       mapstructure:"primary_key"       validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`
 	Schema           string `json:"schema"            mapstructure:"schema"            validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`
 	Table            string `json:"table"             mapstructure:"table"             validate:"required_unless=SourceDefinition s3,excluded_if=SourceDefinition s3"`
 	BucketName       string `json:"bucket_name"       mapstructure:"bucket_name"       validate:"required_if=SourceDefinition s3,excluded_unless=SourceDefinition s3"`
 	ObjectPrefix     string `json:"object_prefix"     mapstructure:"object_prefix"     validate:"required_if=SourceDefinition s3,excluded_unless=SourceDefinition s3"`
 	Enabled          bool   `json:"enabled"           mapstructure:"enabled"`
+}
+
+// MaxComputeNameError explains why name cannot be a MaxCompute schema or table
+// name, or returns "" when it can. MaxCompute has no escape inside backticks and
+// refuses a dot or a backtick in a name, as sqlconnect-go's maxcompute dialect
+// does, so such a name could never be quoted. Validation and preview share it.
+func MaxComputeNameError(name string) string {
+	if name == "" || strings.ContainsAny(name, "`.\x00") {
+		return "cannot be empty or contain a backtick, a dot or a NUL byte"
+	}
+	return ""
 }
 
 func (t TableSpec) isS3() bool {
