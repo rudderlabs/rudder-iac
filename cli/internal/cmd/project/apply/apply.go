@@ -57,6 +57,7 @@ func NewCmdApply() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
+			telemetry.SetWorkspace(workspace)
 
 			printWorkspaceBanner(workspace)
 

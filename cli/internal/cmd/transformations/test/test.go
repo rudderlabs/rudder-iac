@@ -122,6 +122,7 @@ func NewCmdTest() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
+			telemetry.SetWorkspace(workspace)
 
 			// Get resource graph
 			graph, err := p.ResourceGraph()

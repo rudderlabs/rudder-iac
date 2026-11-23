@@ -25,6 +25,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/ruledoc"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/reporters"
+	"github.com/rudderlabs/rudder-iac/cli/internal/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
@@ -176,7 +177,7 @@ func setupClient(token, version string) (*client.Client, error) {
 	return client.New(
 		token,
 		client.WithBaseURL(cfg.APIURL),
-		client.WithUserAgent("rudder-cli/"+version),
+		client.WithUserAgent(telemetry.UserAgent(version)),
 	)
 }
 
