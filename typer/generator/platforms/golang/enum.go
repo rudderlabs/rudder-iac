@@ -94,7 +94,7 @@ func resolveEnum(p plan.Property) (*effectiveEnum, error) {
 			v = GoEnumValue{Name: valueName(text), Text: text}
 		case *big.Rat:
 			var err error
-			if v, err = numberValue(n, raw[i], e.base, literals); err != nil {
+			if v, err = numberValue(n, raw[i], e.base, integerOnly(p.Types), literals); err != nil {
 				return nil, err
 			}
 		}
@@ -111,13 +111,16 @@ func resolveEnum(p plan.Property) (*effectiveEnum, error) {
 // the plan value behind each number already named, since two values named
 // alike would become duplicate constants: one float64 can represent two
 // values, and in a mixed enum an int64 and a float64 can be the same number.
-func numberValue(r *big.Rat, raw any, base string, literals map[string]any) (GoEnumValue, error) {
+// With intOnly (integerOnly of the declared types) a value beyond int64
+// fails, in a mixed enum too, instead of becoming a float64 for a property
+// that does not declare number.
+func numberValue(r *big.Rat, raw any, base string, intOnly bool, literals map[string]any) (GoEnumValue, error) {
 	var (
 		v       GoEnumValue
 		isInt64 = r.IsInt() && r.Num().IsInt64()
 	)
 	switch {
-	case base == "int64" && !isInt64:
+	case intOnly && !isInt64:
 		return v, fmt.Errorf("enum value %s does not fit in int64", jsonText(raw))
 	case isInt64 && base != "float64":
 		v.Name = r.Num().String()
@@ -224,10 +227,16 @@ func enumBase(types []plan.PropertyType, values []any) string {
 		}
 		base = b
 	}
-	if base == "float64" && declares(types, plan.PrimitiveTypeInteger) && !declares(types, plan.PrimitiveTypeNumber) {
+	if base == "float64" && integerOnly(types) {
 		return "int64"
 	}
 	return base
+}
+
+// integerOnly reports whether the declared numbers are integers: integer is
+// declared and number is not.
+func integerOnly(types []plan.PropertyType) bool {
+	return declares(types, plan.PrimitiveTypeInteger) && !declares(types, plan.PrimitiveTypeNumber)
 }
 
 // addEnum adds the type of prop, whose effective enum is e: the defined enum

@@ -138,6 +138,14 @@ func TestResolveEnum(t *testing.T) {
 				{Name: "9007199254740992", Text: "9007199254740992", Expr: "int64(9007199254740992)"},
 			}},
 		},
+		{
+			name:     "integral number beyond int64 in a mixed enum with number declared",
+			property: enumProperty("p", []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeNumber}, "a", json.Number("9223372036854775808")),
+			want: &effectiveEnum{signature: `["a",9.223372036854776e+18]`, values: []GoEnumValue{
+				{Name: "A", Text: `"a"`, Expr: `"a"`},
+				{Name: "9223372036854776000", Text: "9.223372036854776e+18", Expr: "float64(9.223372036854776e+18)"},
+			}},
+		},
 	}
 
 	for _, tt := range tests {
@@ -322,6 +330,11 @@ func TestGenerateRejectsInvalidEnums(t *testing.T) {
 			name:     "number beyond float64",
 			property: enumProperty("kind", onlyNumber, json.Number("1e400")),
 			wantErr:  `mapping property "kind" of track event "Some Event": enum value 1e400 does not fit in float64`,
+		},
+		{
+			name:     "integer beyond int64 in a mixed enum",
+			property: enumProperty("kind", []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeInteger}, "a", json.Number("9223372036854775808")),
+			wantErr:  `mapping property "kind" of track event "Some Event": enum value 9223372036854775808 does not fit in int64`,
 		},
 	}
 
