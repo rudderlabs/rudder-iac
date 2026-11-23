@@ -17,7 +17,7 @@ import (
 //     capitalise only the first letter of acronyms in identifiers (XmlParser),
 //     so the core behaviour would be semantically wrong here anyway.
 //  2. Special-character handling: core does not strip special chars — Kotlin
-//     pre-processes with sanitizeForIdentifier (replacing them with spaces) so
+//     pre-processes with core.SanitizeForIdentifier (replacing them with spaces) so
 //     they become word boundaries. Swift instead trims them from token edges;
 //     characters in the middle of a token (e.g. "@") are preserved as-is, which
 //     can produce invalid identifiers for unusual inputs.
