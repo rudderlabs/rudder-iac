@@ -14,12 +14,13 @@ import (
 )
 
 // wireRow is one call of a type-system wire test. A call that succeeds must
-// send want, a whole message; one that fails must return an error wrapping
-// errIs and send nothing.
+// send want, a whole message; one that fails must return an error equal to
+// err, or one wrapping errIs, and send nothing.
 type wireRow struct {
 	name  string
 	call  func() error
 	want  string
+	err   error
 	errIs error
 }
 
@@ -51,6 +52,10 @@ func assertWireRows(t *testing.T, start func(analytics.Client), rows []wireRow) 
 			msg, wire = wire[0], wire[1:]
 		}
 		t.Run(row.name, func(t *testing.T) {
+			if row.err != nil {
+				assert.Equal(t, row.err, errs[i])
+				return
+			}
 			if row.errIs != nil {
 				assert.ErrorIs(t, errs[i], row.errIs)
 				return
