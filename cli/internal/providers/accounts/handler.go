@@ -728,6 +728,15 @@ func IsOAuthDefinition(accountDefinitionName string) bool {
 	return isOAuthDefinition(accountDefinitionName)
 }
 
+// IsRegisteredDefinition reports whether the CLI has an entry for a definition
+// at all. A command that refuses an account needs the difference: an
+// unregistered definition may well be an OAuth one, since integrations-config
+// carries several this registry has no entry for.
+func IsRegisteredDefinition(accountDefinitionName string) bool {
+	_, ok := registeredAccounts[accountDefinitionName]
+	return ok
+}
+
 // OAuthDefinitionNames lists every OAuth account definition the CLI knows,
 // sorted, so a command can name the ones it accepts.
 func OAuthDefinitionNames() []string {

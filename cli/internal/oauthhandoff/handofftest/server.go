@@ -1,11 +1,13 @@
 // Package handofftest serves the OAuth account browser handoff API that
 // docs/oauth-account-handoff.md specifies, so the CLI half can be driven end to
-// end by go test. None of this exists in the control plane yet: the shapes here
-// are the proposal, and this server is the only implementation of them.
+// end by go test. The session endpoints are not in any environment yet:
+// rudder-config-backend#6972 implements them and is still open, so the shapes
+// here are read from that PR rather than from a running service.
 //
-// It also answers the account endpoints the CLI calls around the handoff (the
-// external-id claim, the account list and get) and /v2/workspace, so a whole
-// command can run against one base URL.
+// It also answers the account endpoints the CLI and the adopt path call around
+// the handoff (the account list and get, and the external-id claim with its
+// unique-index 409) and /v2/workspace, so a whole command can run against one
+// base URL.
 package handofftest
 
 import (
@@ -93,9 +95,6 @@ func Start(t *testing.T) *Server {
 	// Proposed handoff API, workspace access token auth: what the CLI calls.
 	mux.HandleFunc("POST /v2/oauth/cli-sessions", s.openSession)
 	mux.HandleFunc("GET /v2/oauth/cli-sessions/{id}", s.pollSession)
-	// Proposed webapp page and its report, user session auth: what the browser calls.
-	mux.HandleFunc("GET /oauth/cli/{id}", s.consentPage)
-	mux.HandleFunc("POST /oauth/cli-sessions/{id}/result", s.reportResult)
 	// Existing public account API.
 	mux.HandleFunc("PUT /v2/accounts/{id}/external-id", s.setExternalID)
 	mux.HandleFunc("GET /v2/accounts/{id}", s.getAccount)
@@ -318,57 +317,6 @@ func (s *Server) pollSession(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// reportResult is what the webapp page calls. First writer wins, and a second
-// call against a resolved session is a no-op, so a double-submitted page cannot
-// create two accounts.
-func (s *Server) reportResult(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		AccountID string `json:"accountId"`
-		Error     string `json:"error"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		apiError(w, http.StatusBadRequest, "malformed request body")
-		return
-	}
-
-	id := r.PathValue("id")
-	s.mu.Lock()
-	_, ok := s.sessions[id]
-	s.mu.Unlock()
-	if !ok {
-		apiError(w, http.StatusNotFound, "no such handoff session")
-		return
-	}
-
-	if req.Error != "" {
-		s.Deny(id, req.Error)
-	} else {
-		s.Consent(id)
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// consentPage stands in for the webapp route, collapsing the real page's
-// oauth/url, provider consent, redirect and oauth/callback into two buttons. It
-// is here so the flow can be walked by hand against this server, not just by a
-// test.
-func (s *Server) consentPage(w http.ResponseWriter, r *http.Request) {
-	s.mu.Lock()
-	session, ok := s.sessions[r.PathValue("id")]
-	s.mu.Unlock()
-	if !ok {
-		http.Error(w, "no such handoff session", http.StatusNotFound)
-		return
-	}
-
-	action, subject := "Authorize", session.AccountDefinitionName
-	if session.Reauth {
-		action, subject = "Re-authorize", session.AccountID
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintf(w, consentHTML, action, subject, session.ID, session.ID)
-}
-
 func (s *Server) setExternalID(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ExternalID string `json:"externalId"`
@@ -457,35 +405,3 @@ func orDefault(value, fallback string) string {
 	}
 	return value
 }
-
-const consentHTML = `<!doctype html>
-<meta charset="utf-8"><title>RudderStack: authorize</title>
-<style>
- body{font:16px/1.5 system-ui,sans-serif;max-width:34rem;margin:4rem auto;padding:0 1rem}
- code{background:#f1f1f3;padding:.1rem .3rem;border-radius:3px}
- button{font:inherit;padding:.6rem 1.1rem;border-radius:6px;border:1px solid #ccc;cursor:pointer}
- .go{background:#4f46e5;color:#fff;border-color:#4f46e5}
- .note{color:#666;font-size:.85rem;margin-top:2rem}
- .done{color:#117a39;font-weight:600}
-</style>
-<h2>%s this integration account</h2>
-<p><b>%s</b> &middot; session <code>%s</code></p>
-<p>The real page posts <code>oauth/url</code> under your dashboard session,
-sends you to the provider's consent screen, takes the redirect back from
-rudder-auth, posts <code>oauth/callback</code>, and reports the account id.</p>
-<p id="act">
- <button class="go" onclick="report(null)">Authorize</button>
- <button onclick="report('Your RudderStack user can&#39;t create accounts in this workspace.')">Deny</button>
-</p>
-<p class="note">Test double. There is no provider, no rudder-auth and no
-consent screen behind these buttons.</p>
-<script>
-async function report(error){
-  await fetch('/oauth/cli-sessions/%s/result',{method:'POST',
-    headers:{'content-type':'application/json'},
-    body:JSON.stringify(error?{error}:{accountId:null})});
-  document.getElementById('act').innerHTML =
-    '<span class="done">Done. Go back to your terminal.</span>';
-}
-</script>
-`

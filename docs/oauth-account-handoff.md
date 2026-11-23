@@ -3,10 +3,12 @@
 This document is the contract between `rudder-cli` and the control plane for
 creating and re-authorizing an OAuth integration account. The CLI half is
 built (`cli/internal/oauthhandoff`, `rudder-cli workspace accounts create`,
-`rudder-cli workspace accounts reauthorize`). **The server half is not
-released.** It is open as rudder-config-backend#6972, rudder-control-plane#2806
-and rudder-webapp#10426. Until it ships, both commands fail against production,
-which is why they sit behind an experimental flag.
+`rudder-cli workspace accounts reauthorize`). **The server half is not released
+yet.** rudder-control-plane#2806 and rudder-webapp#10426 have merged;
+rudder-config-backend#6972, which holds the session itself, is still open. Until
+all three ship, both commands fail against production, which is why they sit
+behind an experimental flag. The consent page is also behind the webapp's own
+`enable-cli-account-handoff` flag, which no CLI setting turns on.
 
 Read this as the specification to implement. Every request, response, status
 value and timeout the CLI depends on is stated here. Nothing in it requires
@@ -18,9 +20,8 @@ The usual CLI OAuth dance starts a loopback listener on `127.0.0.1` and makes
 it the OAuth `redirect_uri`. That cannot work here.
 
 `rudder-auth` owns the `redirect_uri` sent to the provider. The config
-backend's `oauth.service.ts` takes the `Location` of rudder-auth's 302 as the
-authorize URL (`:577` and `:584`) and never chooses the redirect target
-itself. A URL on the user's machine can therefore not be the redirect target
+backend's `OAuthService.getOAuthURLV1` takes the `Location` of rudder-auth's 302
+as the authorize URL and never chooses the redirect target itself. A URL on the user's machine can therefore not be the redirect target
 without a change in rudder-auth and in every provider's registered redirect
 list.
 
@@ -48,7 +49,8 @@ CLI                         config backend                 browser (user session
  |                               |<--- POST .../{id}/result -------|
  |  200 {status: complete, ...}  |  status=complete                |
  |<------------------------------|                                 |
- |  PUT /v2/accounts/{id}/external-id  (already exists today)      |
+ |  writes the account spec, naming the new account as its remote id
+ |  ('rudder-cli apply' then adopts it, which is what claims the id)
 ```
 
 ## Endpoints
@@ -160,7 +162,7 @@ Response `200 OK`:
 | --- | --- |
 | `status` | `pending`, `complete`, `denied` or `expired`. An unknown value is an error to the CLI, so new statuses are a breaking change. |
 | `accountId` | the account's remote id once `status` is `complete`; empty otherwise. On a re-authorize session it is the incoming account id from the start, and it does not change. |
-| `accountDefinitionName` | echoed from the opening request, so `--resume` needs no local state |
+| `accountDefinitionName` | echoed from the opening request, so a caller that has lost track of what it asked for can still name it |
 | `name` | echoed from the opening request, same reason |
 | `error` | on `denied`, a sentence to show the user; empty otherwise |
 
@@ -171,7 +173,7 @@ not yours" is more than the caller should learn. The CLI treats both alike.
 
 The session must be readable by any valid access token for its workspace, not
 only by the exact token that opened it: a user may re-run the command in
-another shell to `--resume`.
+another shell.
 
 ### 3. Report the result (webapp to backend)
 
@@ -219,20 +221,30 @@ pending  ───────────────────────�
 ```
 
 `complete`, `denied` and `expired` are terminal. No transition leaves a
-terminal state, and a terminal state's fields never change afterwards. That
-stickiness is what makes `--resume` work: a user who finishes consent after the
-CLI stopped waiting re-runs the command with `--resume <sessionId>`, reads the
-same `complete` state, and claims the account the browser already created,
-instead of creating a second one.
+terminal state, and a terminal state's fields never change afterwards.
+
+The CLI does not re-read a session it has stopped waiting for. A consent that
+finishes late has created an account that nothing manages, and the ordinary
+import path adopts it: `rudder-cli import workspace` writes its spec and
+`rudder-cli apply` claims the id. The stickiness still matters to the server
+half, which has to answer a second report against a resolved session without
+creating a second account.
 
 ## Timeouts and retention
 
 | Bound | Value | Why |
 | --- | --- | --- |
 | Session TTL while `pending` | 10 minutes, reported as `expiresAt` | long enough for a provider consent screen with a sign-in and an MFA prompt |
-| Retention after a terminal status | at least 1 hour; the implementation keeps a day | the window in which `--resume` can still read the result |
-| Long-poll `wait` | `0s`–`2m0s`, default `30s` | the default stays under a typical 60s proxy idle timeout; the CLI re-requests, so a cut poll costs one request rather than the whole wait. Confirm the ingress idle timeout before raising it past 60s: Node's own `keepAliveTimeout` and `headersTimeout` do not bound a response in progress, so the edge is what decides |
-| CLI wait, end to end | `--timeout`, default 5 minutes | the CLI stops waiting, prints the `--resume` line, and exits non-zero; the session stays claimable until it expires |
+| Retention after a terminal status | at least 1 hour; the implementation keeps a day | the window in which a result can still be read, by a second report or by an operator |
+| Long-poll `wait` | `0s`–`2m0s`, default `30s` | the default stays under a typical 60s proxy idle timeout. Confirm the ingress idle timeout before raising it past 60s: Node's own `keepAliveTimeout` and `headersTimeout` do not bound a response in progress, so the edge is what decides |
+| Gap between two polls | at least 500ms, enforced by the CLI | the server answers `pending` at once when less than its own re-read interval is left of `wait`, so without a floor the tail of a wait would be back-to-back session reads |
+| CLI wait, end to end | `--timeout`, default 5 minutes | the CLI stops waiting and exits non-zero, saying how to adopt an account a finished consent may have created; the session is untouched |
+
+**A failed poll ends the wait.** One non-JSON `503`, one `429` or one dropped
+connection stops the CLI waiting, rather than being retried: before consent
+nothing exists and the command can simply be run again, and after consent the
+account exists and the import path adopts it. There is no state the CLI has to
+get back to, so there is no retry loop here to get wrong.
 
 The CLI's `--timeout` is independent of the session TTL. A CLI timeout does not
 cancel the session.
@@ -240,33 +252,69 @@ cancel the session.
 ## What the CLI does that needs nothing new
 
 Claiming the account under its spec id is `PUT /v2/accounts/{id}/external-id`,
-which is already open to the CLI and already idempotent
-(`account/index.ts:1191`). The public account API refuses `POST` create and
-`PUT` update for an OAuth account (`account/index.ts:1332` and `:1474`), which
-is why the create path has to go through this handoff at all.
+which is already open to the CLI and already idempotent (`setExternalId` in the
+config backend's account service). The public account API refuses `POST` create
+and `PUT` update for an OAuth account (`createNonOAuthAccount` and
+`editAccount`), which is why the create path has to go through this handoff at
+all.
+
+`workspace accounts create` does not call it. The account it creates belongs to
+no project, exactly as an account made in the dashboard does, and the claim
+happens where every other adoption happens: in `apply`. With `--write-spec` the
+command writes the spec that names the new account, carrying the same import
+metadata `import workspace` writes:
+
+```yaml
+version: "rudder/v1"
+kind: "account"
+metadata:
+  import:
+    workspaces:
+      - resources:
+          - remote_id: "2abcDEFghiJKL"
+            urn: "account:google-ads-prod"
+        workspace_id: "2xyzWORKSPACE"
+  name: "account"
+spec:
+  account_definition_name: "DESTINATION_GOOGLE_ADWORDS_OFFLINE_CONVERSIONS_OAUTH"
+  id: "google-ads-prod"
+  name: "Google Ads (prod)"
+```
+
+That block is what makes the next `apply` adopt the account rather than try to
+create it: the differ treats a local resource with import metadata for this
+workspace as importable, and the accounts handler's import of an OAuth account
+is the external-id claim alone. Without `--write-spec`, `import workspace`
+writes the same spec, and its id comes from the same kebab-case namer, so both
+routes end in the same place.
+
+The ordering matters for what a failure leaves behind. Nothing the CLI does
+after consent changes the workspace, so a failed spec write, a lost connection
+or a Ctrl-C leaves an unmanaged account and nothing else, which the import path
+picks up. An account claimed with no spec beside it would instead be a managed
+resource the project does not declare, which `apply` plans to delete.
 
 ## Where the server half is
 
-Both services are implemented, in two open pull requests.
+All three services are implemented. Two have merged.
 
-rudderlabs/rudder-config-backend#6972 holds the session itself: the four
-endpoints, a Postgres `oauth_cli_sessions` table, the TTLs, the terminal
+rudderlabs/rudder-config-backend#6972, still open, holds the session itself: the
+four endpoints, a Postgres `oauth_cli_sessions` table, the TTLs, the terminal
 statuses, first-call-wins on the result, and the webapp twin of the external-id
-route the dashboard needs. rudderlabs/rudder-control-plane#2806 proxies the two
-public ones from `/v2` onto it.
+route the dashboard needs. rudderlabs/rudder-control-plane#2806, merged, proxies
+the two public ones from `/v2` onto it. rudderlabs/rudder-webapp#10426, merged,
+serves the consent page.
 
-Neither changes an existing OAuth path. The create and re-auth flows behind the
-webapp's calls are reused as they are: `callBackV1`'s re-auth branch
-(`oauth.service.ts:728`) already updates an existing account's secret in place
-and returns the same account id, so re-authorize is a payload difference rather
-than a new mechanism.
+None of them changes an existing OAuth path. The create and re-auth flows behind
+the webapp's calls are reused as they are: the re-auth branch of `callBackV1`
+already updates an existing account's secret in place and returns the same
+account id, so re-authorize is a payload difference rather than a new mechanism.
 
-What is not yet proven is the chain end to end. Each half is covered by its own
-tests and by this document's test double, but no run has gone CLI to rudder-api
-to config backend against a real consent screen, because the local stack would
-not come up in either session (an expired registry token in one, a full Docker
-disk in the other). That is the first thing to do once a local stack is
-available.
+What is not yet proven is the chain end to end against a real consent screen.
+Each half is covered by its own tests and by this document's test double, and
+earlier heads of the CLI have been run against a local stack, but no run has
+gone CLI to rudder-api to config backend at this head, because #6972 is not in
+any environment yet. That is the first thing to do once it merges.
 
 ### The poll does not have to wake on an event
 

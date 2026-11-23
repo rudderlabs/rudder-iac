@@ -4,16 +4,18 @@
 //
 // A CLI loopback listener cannot be the OAuth redirect target: rudder-auth owns
 // the redirect_uri, and the config backend takes the authorize URL from
-// rudder-auth's 302 rather than choosing it (oauth.service.ts:577 and :584).
+// rudder-auth's 302 rather than choosing it (OAuthService.getOAuthURLV1 and
+// its redirect handling in oauth.service.ts).
 // Creating an OAuth account is also user-attributed, needing a userId and the
 // credentialsManagement role that a workspace access token does not carry. So
 // the browser runs the whole consent exchange under the user's dashboard
 // session and the CLI watches a session the server holds.
 //
-// The server half is not released: it is open as rudder-config-backend#6972,
-// rudder-control-plane#2806 and rudder-webapp#10426. docs/oauth-account-handoff.md
-// is the contract; the types and verbs here match it exactly, and handofftest
-// serves it for tests.
+// The server half is not released yet: rudder-control-plane#2806 and
+// rudder-webapp#10426 have merged, and rudder-config-backend#6972, which holds
+// the session, is still open. docs/oauth-account-handoff.md is the contract;
+// the types and verbs here match it exactly, and handofftest serves it for
+// tests.
 package oauthhandoff
 
 import (
@@ -23,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/url"
 	"strings"
 	"time"
@@ -52,6 +55,11 @@ const (
 	// request is abandoned, so a server that never answers cannot hang the CLI
 	// past the overall timeout.
 	pollSlack = 10 * time.Second
+	// minPollInterval floors the gap between two poll starts. A pending answer
+	// is normally a held request, but the server answers at once when less than
+	// its own re-read interval is left of wait, so without a floor the tail of
+	// every wait that times out is back-to-back requests.
+	minPollInterval = 500 * time.Millisecond
 
 	sessionsPath = "/v2/oauth/cli-sessions"
 )
@@ -74,14 +82,17 @@ func (e *DeniedError) Error() string {
 	if e.Reason == "" {
 		return "authorization was refused"
 	}
-	return stripControl(e.Reason)
+	return Printable(e.Reason)
 }
 
-// stripControl drops control characters, so a reason the server controls cannot
-// move the cursor or recolour the terminal it is printed to.
-func stripControl(s string) string {
+// Printable is a server-controlled string made safe to print. It drops control
+// characters, newlines included, and the invisible format characters, so a
+// value the CLI did not choose cannot move the cursor, recolour the terminal,
+// add a line of its own or reorder the line it sits on through a bidi
+// override. Every remote string the CLI prints goes through it.
+func Printable(s string) string {
 	return strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) && r != '\n' {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) || unicode.Is(unicode.Co, r) {
 			return -1
 		}
 		return r
@@ -89,9 +100,9 @@ func stripControl(s string) string {
 }
 
 // OpenRequest opens a session. Exactly one of its two shapes is valid, and the
-// discriminator is AccountID, mirroring the backend's own isCreateOAuthAccountRequest
-// (oauth.service.ts:61): a definition and a name create an account, an account
-// id re-authorizes one.
+// discriminator is AccountID, mirroring the backend's own
+// isCreateOAuthAccountRequest in oauth.service.ts: a definition and a name
+// create an account, an account id re-authorizes one.
 type OpenRequest struct {
 	AccountDefinitionName string `json:"accountDefinitionName,omitempty"`
 	Name                  string `json:"name,omitempty"`
@@ -123,8 +134,8 @@ type Session struct {
 }
 
 // State is one poll's answer. AccountDefinitionName and Name are echoed from
-// the opening request, which is what lets --resume rebuild a spec with no local
-// state to carry between runs.
+// the opening request, so a caller that has lost track of what it asked for can
+// still name the account the consent produced.
 type State struct {
 	Status                Status `json:"status"`
 	AccountID             string `json:"accountId"`
@@ -180,7 +191,35 @@ func (c *Client) Open(ctx context.Context, req OpenRequest) (*Session, error) {
 	if session.ID == "" || session.WebURL == "" {
 		return nil, fmt.Errorf("the handoff session is missing its id or URL")
 	}
+	if session.WebURL, err = safeWebURL(session.WebURL); err != nil {
+		return nil, err
+	}
 	return session, nil
+}
+
+// safeWebURL vets the consent URL before anything prints it or hands it to the
+// host's browser opener. The server builds it from its own dashboard URL, so
+// this guards against an API host that has been compromised or swapped: an
+// opener reads "-aCalculator" as an option and "file:///..." as a local
+// handler, and either would turn a session open into a launch on this machine.
+func safeWebURL(raw string) (string, error) {
+	if raw != Printable(raw) {
+		return "", errors.New("the handoff session's URL contains control characters")
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("the handoff session's URL does not parse: %w", err)
+	}
+	loopback := u.Hostname() == "localhost" || net.ParseIP(u.Hostname()).IsLoopback()
+	switch {
+	case u.Scheme != "https" && !(u.Scheme == "http" && loopback):
+		return "", fmt.Errorf("the handoff session's URL is not https: %q", raw)
+	case u.Host == "":
+		return "", fmt.Errorf("the handoff session's URL names no host: %q", raw)
+	case u.User != nil:
+		return "", fmt.Errorf("the handoff session's URL carries a user: %q", raw)
+	}
+	return u.String(), nil
 }
 
 func (c *Client) Poll(ctx context.Context, sessionID string, wait time.Duration) (*State, error) {
@@ -255,6 +294,9 @@ func Wait(ctx context.Context, api API, sessionID string, opts WaitOptions) (*St
 		deadline = started.Add(opts.Timeout)
 		polls    = make(chan result, 1)
 		inFlight bool
+		// Zero starts the first poll at once; every later one waits out
+		// minPollInterval from the previous start.
+		nextPoll time.Time
 	)
 
 	// Ends at the deadline, and is cancelled on return so a poll still in
@@ -273,11 +315,16 @@ func Wait(ctx context.Context, api API, sessionID string, opts WaitOptions) (*St
 			if remaining <= 0 {
 				return nil, ErrTimedOut
 			}
-			inFlight = true
-			go func(wait time.Duration) {
-				state, err := api.Poll(pollCtx, sessionID, wait)
-				polls <- result{state: state, err: err}
-			}(min(pollWait, remaining))
+			// The ticker brings the loop back here, so the floor needs no
+			// timer of its own.
+			if !time.Now().Before(nextPoll) {
+				inFlight = true
+				nextPoll = time.Now().Add(minPollInterval)
+				go func(wait time.Duration) {
+					state, err := api.Poll(pollCtx, sessionID, wait)
+					polls <- result{state: state, err: err}
+				}(min(pollWait, remaining))
+			}
 		}
 
 		if opts.Tick != nil {
@@ -303,6 +350,12 @@ func Wait(ctx context.Context, api API, sessionID string, opts WaitOptions) (*St
 			switch polled.state.Status {
 			case StatusPending:
 			case StatusComplete:
+				// The server names the account it created on every complete.
+				// Without one there is nothing to write a spec against, and
+				// reporting success would print "Account created:" with no id.
+				if polled.state.AccountID == "" {
+					return nil, errors.New("the handoff session completed without naming an account")
+				}
 				return polled.state, nil
 			case StatusDenied:
 				return nil, &DeniedError{Reason: polled.state.Error}

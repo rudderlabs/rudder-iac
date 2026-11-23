@@ -3,6 +3,7 @@ package accounts
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -227,4 +228,33 @@ func TestOAuthUnmanagedAccountIsExportedForAdoption(t *testing.T) {
 		URN:         resources.URN("google-ads-prod", AccountResourceType),
 		RemoteID:    "remote-oauth-1",
 	}}, entries)
+}
+
+// OAuthDefinitionNames is what the create command prints when it refuses a
+// definition, so it must list every OAuth definition and nothing else, in a
+// stable order.
+func TestOAuthDefinitionNames(t *testing.T) {
+	t.Parallel()
+
+	names := OAuthDefinitionNames()
+	require.NotEmpty(t, names)
+	assert.Equal(t, slices.Sorted(slices.Values(names)), names, "the list is sorted")
+	for _, name := range names {
+		assert.True(t, IsOAuthDefinition(name), name)
+	}
+	assert.NotContains(t, names, "SOURCE_POSTGRES", "a warehouse account is not an OAuth one")
+	assert.Len(t, names, 1, "every entry with OAuth: true, and no other")
+}
+
+// A definition the registry has no entry for is neither OAuth nor registered.
+// The reauthorize command needs the difference: integrations-config carries
+// OAuth definitions this registry does not list, so "not OAuth" would be a
+// guess for one of those.
+func TestIsRegisteredDefinition(t *testing.T) {
+	t.Parallel()
+
+	assert.True(t, IsRegisteredDefinition("SOURCE_POSTGRES"))
+	assert.True(t, IsRegisteredDefinition("DESTINATION_GOOGLE_ADWORDS_OFFLINE_CONVERSIONS_OAUTH"))
+	assert.False(t, IsRegisteredDefinition("DESTINATION_GOOGLE_ADWORDS_ENHANCED_CONVERSIONS_OAUTH"))
+	assert.False(t, IsRegisteredDefinition(""))
 }

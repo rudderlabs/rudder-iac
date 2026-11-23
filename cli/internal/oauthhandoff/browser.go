@@ -2,9 +2,11 @@ package oauthhandoff
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 )
 
 // CanOpenBrowser reports whether this host has a browser to open. It is false
@@ -36,6 +38,12 @@ func canOpenBrowser(goos string, env func(string) string) bool {
 func OpenBrowser(url string) error {
 	if !CanOpenBrowser() {
 		return errors.New("no browser on this host")
+	}
+	// Every URL that reaches here has been through safeWebURL. This is the
+	// second belt: each opener below takes its argument as a scheme handler to
+	// launch, so a caller that skipped the check must not reach exec.
+	if !strings.HasPrefix(url, "https://") && !strings.HasPrefix(url, "http://") {
+		return fmt.Errorf("refusing to open %q: not an http URL", url)
 	}
 
 	switch runtime.GOOS {

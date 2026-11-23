@@ -132,6 +132,10 @@ func initConfig() {
 	if config.GetConfig().ExperimentalFlags.SourcesListen {
 		devCmd.Hidden = false
 	}
+
+	if config.GetConfig().ExperimentalFlags.OAuthAccounts {
+		workspace.UnhideOAuthAccounts()
+	}
 }
 
 func initLogger() {

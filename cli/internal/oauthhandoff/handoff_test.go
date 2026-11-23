@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -146,8 +147,8 @@ func TestWaitRefusesAnUnknownStatus(t *testing.T) {
 	assert.ErrorContains(t, err, `unexpected handoff session status "revoked"`)
 }
 
-// A failed poll ends the wait rather than being retried: the session stays
-// claimable, so the recovery is --resume.
+// A failed poll ends the wait rather than being retried. The session is
+// untouched, so the caller's own recovery applies.
 func TestWaitStopsOnAPollFailure(t *testing.T) {
 	api := &fakeAPI{err: errors.New("connection reset")}
 
@@ -156,7 +157,7 @@ func TestWaitStopsOnAPollFailure(t *testing.T) {
 }
 
 func TestWaitCapsThePollAtTheRemainingTime(t *testing.T) {
-	api := &fakeAPI{state: &State{Status: StatusComplete}}
+	api := &fakeAPI{state: &State{Status: StatusComplete, AccountID: "acc-1"}}
 
 	_, err := Wait(context.Background(), api, "sess", WaitOptions{Timeout: 50 * time.Millisecond})
 	require.NoError(t, err)
@@ -325,4 +326,152 @@ func TestWaitReportsACallerCancellationAsCancelled(t *testing.T) {
 func TestDeniedErrorDropsControlCharacters(t *testing.T) {
 	err := &DeniedError{Reason: "\x1b[31mdenied\x1b[0m\rby role"}
 	assert.Equal(t, "[31mdenied[0mby role", err.Error())
+}
+
+// A complete session always names the account the consent created. Without one
+// there is nothing to write a spec against, and the CLI would print "Account
+// created:" with no id after it. The real server never sends this.
+func TestWaitRefusesACompleteSessionWithNoAccount(t *testing.T) {
+	api := &fakeAPI{state: &State{Status: StatusComplete}}
+
+	_, err := Wait(context.Background(), api, "sess", waitOpts(time.Second))
+	assert.ErrorContains(t, err, "completed without naming an account")
+}
+
+// countingAPI answers pending at once, like the real server does when less
+// than its own re-read interval is left of the requested wait.
+type countingAPI struct {
+	mu    sync.Mutex
+	polls int
+}
+
+func (c *countingAPI) Open(context.Context, OpenRequest) (*Session, error) {
+	return &Session{ID: "sess", WebURL: "https://example.invalid/oauth/cli/sess"}, nil
+}
+
+func (c *countingAPI) Poll(context.Context, string, time.Duration) (*State, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.polls++
+	return &State{Status: StatusPending}, nil
+}
+
+// Nothing but the server's hold paced the polls, so a server that answers
+// pending immediately turned the tail of every wait into thousands of session
+// reads. The floor is what bounds it.
+func TestWaitPacesPollsThatReturnAtOnce(t *testing.T) {
+	api := &countingAPI{}
+
+	_, err := Wait(context.Background(), api, "sess", WaitOptions{Timeout: 1200 * time.Millisecond})
+	assert.ErrorIs(t, err, ErrTimedOut)
+
+	api.mu.Lock()
+	defer api.mu.Unlock()
+	// One at the start, then one per floor. The ticker resolution adds slack,
+	// so this is a ceiling rather than an equality.
+	assert.LessOrEqual(t, api.polls, 4, "a wait of 1.2s must not poll more than once per 500ms")
+	assert.GreaterOrEqual(t, api.polls, 2, "it must still poll")
+}
+
+// stubDoer answers one fixed body, for the session shapes the test server
+// cannot be made to produce.
+type stubDoer struct{ body string }
+
+func (d stubDoer) Do(context.Context, string, string, io.Reader) ([]byte, error) {
+	return []byte(d.body), nil
+}
+
+// The URL the server returns is printed and handed to the host's browser
+// opener, which reads its argument as something to launch: macOS open takes a
+// leading -a as an application option, and a file:// or javascript: URL names
+// a local handler. The real server builds the URL from its own dashboard
+// address, so this guards against an API host that has been compromised or
+// swapped out.
+func TestOpenRefusesAWebURLItWillNotOpen(t *testing.T) {
+	t.Parallel()
+
+	for name, body := range map[string]string{
+		"an application option": `{"sessionId":"s","webUrl":"-aCalculator"}`,
+		"a local file":          `{"sessionId":"s","webUrl":"file:///Applications/Calculator.app"}`,
+		"a script":              `{"sessionId":"s","webUrl":"javascript:alert(1)"}`,
+		"no host":               `{"sessionId":"s","webUrl":"https:///oauth/cli/s"}`,
+		"a user":                `{"sessionId":"s","webUrl":"https://someone@example.invalid/oauth/cli/s"}`,
+		"plain http":            `{"sessionId":"s","webUrl":"http://example.invalid/oauth/cli/s"}`,
+		"an escape sequence":    `{"sessionId":"s","webUrl":"https://example.invalid/\u001b[31m"}`,
+		"a relative path":       `{"sessionId":"s","webUrl":"/oauth/cli/s"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			client := NewClient(stubDoer{body: body})
+
+			_, err := client.Open(context.Background(), OpenRequest{AccountDefinitionName: "DEF", Name: "n"})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "the handoff session's URL")
+		})
+	}
+}
+
+// http is allowed on a loopback host, which is what a local stack serves.
+func TestOpenAcceptsLoopbackHTTP(t *testing.T) {
+	t.Parallel()
+
+	for _, url := range []string{
+		"http://localhost:5555/oauth/cli/s",
+		"http://127.0.0.1:5555/oauth/cli/s",
+		"https://app.rudderstack.com/oauth/cli/s",
+	} {
+		client := NewClient(stubDoer{body: `{"sessionId":"s","webUrl":"` + url + `"}`})
+
+		session, err := client.Open(context.Background(), OpenRequest{AccountDefinitionName: "DEF", Name: "n"})
+		require.NoError(t, err)
+		assert.Equal(t, url, session.WebURL)
+	}
+}
+
+// Every opener below takes its argument as a scheme handler to launch, so a
+// caller that skipped safeWebURL must not reach exec.
+func TestOpenBrowserRefusesANonHTTPURL(t *testing.T) {
+	t.Parallel()
+
+	for _, url := range []string{"file:///Applications/Calculator.app", "-aCalculator", "javascript:alert(1)", ""} {
+		assert.ErrorContains(t, OpenBrowser(url), "refusing to open")
+	}
+}
+
+// A session with no id or no URL is not usable, and the CLI says so rather
+// than printing an empty link.
+func TestOpenRefusesASessionWithNoIDOrURL(t *testing.T) {
+	t.Parallel()
+
+	for _, body := range []string{
+		`{"webUrl":"https://example.invalid/oauth/cli/s"}`,
+		`{"sessionId":"s"}`,
+		`{}`,
+	} {
+		client := NewClient(stubDoer{body: body})
+
+		_, err := client.Open(context.Background(), OpenRequest{AccountDefinitionName: "DEF", Name: "n"})
+		assert.ErrorContains(t, err, "missing its id or URL")
+	}
+}
+
+// Printable is what every server-controlled string goes through before it is
+// printed: a reason, an account id, a URL. Newlines go too, so a reason cannot
+// add a line of its own to the CLI's output, and so do the invisible format
+// characters that would reorder the line it sits on.
+func TestPrintable(t *testing.T) {
+	t.Parallel()
+
+	for name, test := range map[string]struct{ in, want string }{
+		"colour codes":    {"\x1b[31mdenied\x1b[0m", "[31mdenied[0m"},
+		"carriage return": {"denied\rby role", "deniedby role"},
+		"newline":         {"denied\nAccount created: acc-1", "deniedAccount created: acc-1"},
+		"bidi override":   {"ads\u202egnp.exe", "adsgnp.exe"},
+		"zero width":      {"a\u200bb", "ab"},
+		"plain text":      {"Your user can't create accounts.", "Your user can't create accounts."},
+		"non-ascii":       {"Anzeigen für Kunden", "Anzeigen für Kunden"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.want, Printable(test.in))
+		})
+	}
 }
