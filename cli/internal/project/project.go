@@ -67,6 +67,24 @@ type project struct {
 	ignoreUnknownKinds     bool
 }
 
+// ErrValidationFailed marks any failure to validate the project's specs, as
+// opposed to a failure to reach the API or to authenticate. Callers classify on
+// it to decide whether the fix is "correct the specs and retry".
+var ErrValidationFailed = errors.New("validation failed")
+
+// validationFailure tags err as a validation failure without changing the
+// message. Wrapping with a "%w: " prefix would work for errors.Is but would
+// print "validation failed: syntax validation failed" to the user, so the
+// sentinel is joined out of band instead.
+type validationFailure struct{ err error }
+
+func (e validationFailure) Error() string   { return e.err.Error() }
+func (e validationFailure) Unwrap() []error { return []error{ErrValidationFailed, e.err} }
+
+func newValidationFailure(format string, args ...any) error {
+	return validationFailure{fmt.Errorf(format, args...)}
+}
+
 // ProjectOption defines a functional option for configuring a Project.
 type ProjectOption func(*project)
 
@@ -254,9 +272,9 @@ func (p *project) Load(location string) error {
 			// An undefined variable almost always means a var file was not
 			// passed, not a broken spec, so point at the fix.
 			if hasUndefined {
-				return fmt.Errorf("variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file")
+				return newValidationFailure("variable substitution failed: make sure undefined variables are defined in a variable file and passed with --var-file")
 			}
-			return reported{cause: errors.New("variable substitution failed")}
+			return reported{cause: newValidationFailure("variable substitution failed")}
 		}
 		rawSpecs = substituted
 	}
@@ -290,7 +308,7 @@ func (p *project) handleValidation(engine validation.ValidationEngine, rawSpecs 
 		if err := p.render(slices.Concat(specDiags, syntaxDiags)); err != nil {
 			return err
 		}
-		return reported{cause: errors.New("syntax validation failed")}
+		return reported{cause: newValidationFailure("syntax validation failed")}
 	}
 
 	// The syntax phase only stops the load on errors, so its warnings are carried
@@ -354,7 +372,7 @@ func (p *project) handleValidation(engine validation.ValidationEngine, rawSpecs 
 	}
 
 	if semanticDiags.HasErrors() {
-		return reported{cause: errors.New("semantic validation failed")}
+		return reported{cause: newValidationFailure("semantic validation failed")}
 	}
 
 	return nil
