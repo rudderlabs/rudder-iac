@@ -69,6 +69,9 @@ type eventRule struct {
 	schema *objectSchema
 	// variant is set when the rule has variants; schema is then their base.
 	variant *variantSchema
+	// paired is set on the identify and group rules of an event that has a
+	// rule on each section, which are named by section.
+	paired bool
 }
 
 // objectSchema is an object schema with its fields in byte order of their wire
@@ -247,6 +250,23 @@ func eventRules(p *plan.TrackingPlan) ([]eventRule, []*customType, error) {
 			return nil, nil, err
 		}
 		rules = append(rules, r)
+	}
+
+	// Only identify and group take two sections, so an event whose kept rules
+	// have two is a pair.
+	type eventID struct {
+		typ  plan.EventType
+		name string
+	}
+	sections := map[eventID][]plan.IdentitySection{}
+	for _, r := range rules {
+		id := eventID{r.rule.Event.EventType, r.rule.Event.Name}
+		if !slices.Contains(sections[id], r.rule.Section) {
+			sections[id] = append(sections[id], r.rule.Section)
+		}
+	}
+	for i, r := range rules {
+		rules[i].paired = len(sections[eventID{r.rule.Event.EventType, r.rule.Event.Name}]) > 1
 	}
 
 	// Like property types, only the custom types an emitted field needs are
@@ -814,35 +834,56 @@ func addCustomTypes(ctx *GoContext, customTypes []*customType, propertyTypes map
 	return nil
 }
 
-// addRule adds the payload type and method of one event rule. Names take the
-// event type as prefix ({Type}{Event}, {Type}{Event}{Payload}), except the
-// identify and group methods, which keep their type's name as on the other
-// platforms.
-func addRule(ctx *GoContext, r eventRule, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) error {
+// ruleNames returns the method and payload type names rule r requests. Names
+// take the event type as prefix ({Type}{Event}, {Type}{Event}{Payload}),
+// except the identify and group methods, which keep their type's name as on
+// the other platforms. A pair of rules, one per section, is named by section
+// instead ({Type}OnTraits with {Type}{Event}Traits, {Type}OnContextTraits with
+// {Type}{Event}ContextTraits) and neither takes the bare name, so the names do
+// not depend on rule-key order, and adding or removing either rule fails the
+// callers of the other to compile instead of sending their traits elsewhere.
+func ruleNames(r eventRule) (method, payload string, err error) {
 	var (
-		event   = r.rule.Event
-		typ     = string(event.EventType)
-		prefix  = strings.ToUpper(typ[:1]) + typ[1:]
-		payload = payloadNoun(event.EventType)
-		base    string
+		event  = r.rule.Event
+		typ    = string(event.EventType)
+		prefix = strings.ToUpper(typ[:1]) + typ[1:]
+		base   string
 	)
 	// Only a track event must have a name; the type names the others.
 	if event.Name != "" || event.EventType == plan.EventTypeTrack {
-		var err error
 		if base, err = pascalCase(event.Name); err != nil {
-			return fmt.Errorf("naming %s event %q: %w", typ, event.Name, err)
+			return "", "", fmt.Errorf("naming %s event %q: %w", typ, event.Name, err)
 		}
 	}
 
-	st, err := addPayload(ctx, r, prefix+base+payload, payload, propertyTypes, registry)
+	switch {
+	case r.paired:
+		section := "Traits"
+		if r.rule.Section == plan.IdentitySectionContextTraits {
+			section = "ContextTraits"
+		}
+		return prefix + "On" + section, prefix + base + section, nil
+	case event.EventType == plan.EventTypeIdentify || event.EventType == plan.EventTypeGroup:
+		return prefix, prefix + base + payloadNoun(event.EventType), nil
+	}
+	return prefix + base, prefix + base + payloadNoun(event.EventType), nil
+}
+
+// addRule adds the payload type and method of one event rule.
+func addRule(ctx *GoContext, r eventRule, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) error {
+	var (
+		event = r.rule.Event
+		typ   = string(event.EventType)
+	)
+	name, requested, err := ruleNames(r)
+	if err != nil {
+		return err
+	}
+	st, err := addPayload(ctx, r, requested, payloadNoun(event.EventType), propertyTypes, registry)
 	if err != nil {
 		return err
 	}
 
-	name := prefix + base
-	if event.EventType == plan.EventTypeIdentify || event.EventType == plan.EventTypeGroup {
-		name = prefix
-	}
 	method, err := registry.RegisterName("method:"+r.key, methodScope, name)
 	if err != nil {
 		return fmt.Errorf("registering the method of %s event %q: %w", typ, event.Name, err)

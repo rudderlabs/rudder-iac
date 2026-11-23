@@ -145,18 +145,18 @@ func TestGenerateEventTypes(t *testing.T) {
 			want:  []string{"type PageProductPageProperties struct", method("PageProductPage(identity Identity, name string, props *PageProductPageProperties, opts ...Option)")},
 		},
 		{
-			// The shapes differ so that the row fails if the suffix follows
-			// the plan's order instead.
-			name: "two identify rules, one per section: traits, second in rule-key order, takes the suffix",
+			// The shapes differ so that the row fails if the names swap
+			// sections.
+			name: "two identify rules, one per section: each named by its section, and neither takes Identify",
 			rules: append(
 				open(rule(plan.EventTypeIdentify, "", plan.IdentitySectionTraits)),
 				declared(rule(plan.EventTypeIdentify, "", plan.IdentitySectionContextTraits))...,
 			),
 			want: []string{
-				"type IdentifyTraits struct",
-				"type IdentifyTraits1 = map[string]any",
-				method("Identify(identity Identity, traits *IdentifyTraits, opts ...Option)"),
-				method("Identify1(identity Identity, traits IdentifyTraits1, opts ...Option)"),
+				"type IdentifyContextTraits struct",
+				"type IdentifyTraits = map[string]any",
+				method("IdentifyOnContextTraits(identity Identity, traits *IdentifyContextTraits, opts ...Option)"),
+				method("IdentifyOnTraits(identity Identity, traits IdentifyTraits, opts ...Option)"),
 			},
 		},
 		{
@@ -188,6 +188,24 @@ func TestGenerateEventTypes(t *testing.T) {
 			name:         "alias, which takes no section",
 			rules:        []plan.EventRule{rule("alias", "", plan.IdentitySectionTraits)},
 			wantWarnings: []string{`invalid section "traits" for event type "alias"`},
+		},
+		{
+			name: "two group rules of a named event, one per section: the types keep the name",
+			rules: append(
+				declared(rule(plan.EventTypeGroup, "Company", plan.IdentitySectionTraits)),
+				open(rule(plan.EventTypeGroup, "Company", plan.IdentitySectionContextTraits))...,
+			),
+			want: []string{
+				"type GroupCompanyContextTraits = map[string]any",
+				"type GroupCompanyTraits struct",
+				method("GroupOnContextTraits(identity Identity, groupID string, traits GroupCompanyContextTraits, opts ...Option)"),
+				method("GroupOnTraits(identity Identity, groupID string, traits *GroupCompanyTraits, opts ...Option)"),
+			},
+		},
+		{
+			name:  "identify on context.traits alone keeps Identify",
+			rules: declared(rule(plan.EventTypeIdentify, "", plan.IdentitySectionContextTraits)),
+			want:  []string{"type IdentifyTraits struct", method("Identify(identity Identity, traits *IdentifyTraits, opts ...Option)")},
 		},
 	}
 
