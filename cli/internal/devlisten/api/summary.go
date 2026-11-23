@@ -80,8 +80,9 @@ func (h *Handler) summary(w http.ResponseWriter, r *http.Request, q *eventsQuery
 	win := h.window(q.since)
 	var waited time.Duration
 	if q.wait > 0 {
-		ctx, cancel := context.WithTimeout(r.Context(), q.wait)
+		// Include timeout creation so waitedMs covers the whole deadline.
 		began := time.Now()
+		ctx, cancel := context.WithTimeout(r.Context(), q.wait)
 		_, err := h.wait(ctx, win.since, q.min, q.acceptedMatches(win))
 		cancel()
 		waited = time.Since(began)

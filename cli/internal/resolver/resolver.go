@@ -1,10 +1,13 @@
 package resolver
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 )
+
+var ErrResourceNotInCollection = errors.New("resource not present in resources collection")
 
 type ReferenceResolver interface {
 	ResolveToReference(entityType string, remoteID string) (string, error)
@@ -31,7 +34,7 @@ func (i *ImportRefResolver) ResolveToReference(entityType string, remoteID strin
 
 	resource, ok = i.Remote.GetByID(entityType, remoteID)
 	if !ok {
-		return "", fmt.Errorf("resource not present in resources collection")
+		return "", fmt.Errorf("resolving %s %s: %w", entityType, remoteID, ErrResourceNotInCollection)
 	}
 
 	graphResource, ok := i.Graph.GetResource(

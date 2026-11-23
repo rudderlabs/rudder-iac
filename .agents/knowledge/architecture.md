@@ -352,3 +352,9 @@
 ## DEX-1079 — Destination Spec Dereference Relies On The Syntax Gate
 <!-- ticket:DEX-1079 -->
 - `HandlerImpl.ExtractResourcesFromSpec` (`cli/internal/providers/destination/handler.go`) dereferences `*spec.DefinitionVersion` without a nil check. That is safe only because `project.handleValidation` runs `ValidateSyntax`, where `destination/spec-syntax-valid` enforces `required`, before any `loadSpec`, and destination `Provider.LoadLegacySpec` rejects legacy specs, so `BaseProvider.LoadLegacySpec`'s fallback to `LoadSpec` cannot deliver a spec the V1-only rule never saw. A new path that calls `LoadSpec` without the syntax phase must validate first or nil-check.
+
+## DEX-1150 — Unresolvable Source Governance During Workspace Import
+
+- If a source links to a tracking plan absent from the importable resource collection, source export omits `governance` rather than aborting the workspace import. The source import path warns in the CLI log (`logger.New("event-stream-source")`), identifying the source name, source ID and tracking plan ID and stating that governance was not imported and the link remains unmanaged; it does not write warnings to machine-readable import output.
+- Omitted governance is unmanaged during adoption: source `MapRemoteToState` excludes missing or non-external-ID tracking-plan links from comparison, so a later plan does not propose removing the link and unrelated source updates preserve it. Explicit governance remains managed through ordinary connection reconciliation (`cli/internal/providers/event-stream/source`).
+- `resolver.ErrResourceNotInCollection` distinguishes an absent remote resource in the import resolver from other reference errors; source export falls back only for `errors.Is(err, resolver.ErrResourceNotInCollection)`. Missing graph nodes or file metadata must still fail, rather than being silently treated as absent tracking plans (`cli/internal/resolver/resolver.go`).
