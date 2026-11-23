@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -44,6 +45,7 @@ func (h *HandlerImpl) previewImport(ctx context.Context, data *DestinationResour
 	}
 	wanted := *data
 	wanted.Transformation = nil
+	wanted.Config = previewAccountConfig(wanted.Config, st, adopted)
 
 	link, err := h.client.Destinations.GetTransformation(ctx, remoteID)
 	if err != nil && !errors.Is(err, client.ErrResourceNotFound) {
@@ -292,6 +294,34 @@ func plural(n int, word string) string {
 	return word + "s"
 }
 
+// previewAccountConfig returns config with an account reference replaced by the
+// remote ID it resolves to, so it compares with the literal the remote holds.
+// MapRemoteToState maps a managed account to a reference, but the preview reads
+// the remote through remoteResource, which does not, because the account being
+// adopted has no URN to point at yet.
+//
+// An account already in state resolves from st; one the same plan imports keeps
+// its remote ID (adopted). Neither having it means the account is created by
+// this apply, and the unresolved reference is then what the comparison should
+// show.
+func previewAccountConfig(config map[string]any, st *state.State, adopted map[string]string) map[string]any {
+	ref, ok := config[accountConfigKey].(*resources.PropertyRef)
+	if !ok {
+		return config
+	}
+	id, resolved := resolvedRefID(ref, st)
+	if !resolved {
+		if id, resolved = adopted[ref.URN]; !resolved {
+			return config
+		}
+	}
+	// Copied rather than mutated: config is the graph's own, and the apply
+	// reads it again after the preview.
+	flattened := maps.Clone(config)
+	flattened[accountConfigKey] = id
+	return flattened
+}
+
 // transformationChange compares the remote transformation link with the one the
 // spec names, as Import's syncTransformationLink will: by remote ID.
 func transformationChange(remoteID string, ref *resources.PropertyRef, st *state.State, adopted map[string]string) (differ.PropertyDiff, bool) {
@@ -303,7 +333,7 @@ func transformationChange(remoteID string, ref *resources.PropertyRef, st *state
 		return line, remoteID != ""
 	}
 
-	wantedID, resolved := resolvedTransformationID(ref, st)
+	wantedID, resolved := resolvedRefID(ref, st)
 	if resolved {
 		line.TargetValue = wantedID + " (" + ref.URN + ")"
 		return line, wantedID != remoteID
@@ -318,9 +348,9 @@ func transformationChange(remoteID string, ref *resources.PropertyRef, st *state
 	return line, adoptedID != remoteID
 }
 
-// resolvedTransformationID resolves a copy of ref against st, leaving the
-// plan's reference untouched for the apply to resolve.
-func resolvedTransformationID(ref *resources.PropertyRef, st *state.State) (string, bool) {
+// resolvedRefID resolves a copy of ref against st, leaving the plan's
+// reference untouched for the apply to resolve.
+func resolvedRefID(ref *resources.PropertyRef, st *state.State) (string, bool) {
 	if ref.IsResolved {
 		return ref.Value, ref.Value != ""
 	}

@@ -74,6 +74,18 @@ func dereferenceByReflectionValue(val reflect.Value, state *State) error {
 				return err
 			}
 		}
+
+	case reflect.Interface:
+		// A map[string]any or []any hands its elements over as interface
+		// values. Without this the walk descends into the container and then
+		// stops, leaving a *PropertyRef held in a config map unresolved — while
+		// the non-reflection Dereference path resolves exactly that case
+		// (state.go dereferenceValue). The two paths are meant to agree, so
+		// this closes the gap rather than widening either.
+		if val.IsNil() {
+			return nil
+		}
+		return dereferenceByReflectionValue(val.Elem(), state)
 	}
 
 	return nil
