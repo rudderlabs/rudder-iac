@@ -99,6 +99,18 @@ typer-typescript-update-testdata: ## Update test data for TypeScript code genera
 	go run ./typer/generator/platforms/typescript/testutils/empty_identity \
 	  > typer/generator/platforms/typescript/testdata/EmptyIdentity.ts
 
+# gofmt's output is assigned before it is tested, so a gofmt that cannot run
+# or cannot parse a file fails the target instead of printing nothing. The
+# wire tests flush only on Close, so a short timeout fails a hung Close fast
+# instead of after go test's 10-minute default.
+.PHONY: typer-go-validate
+typer-go-validate: ## Validate generated Go code against the RudderStack Go SDK
+	cd typer/generator/platforms/golang/testdata/validator && \
+	  go vet ./... && \
+	  unformatted="$$("$$(go env GOROOT)/bin/gofmt" -l .)" && \
+	  { test -z "$$unformatted" || { echo "$$unformatted" >&2; false; }; } && \
+	  go test -race -timeout 30s ./...
+
 .PHONY: typer-swift-validate
 typer-swift-validate: ## Validate generated Swift code against the RudderStack Swift SDK
 	mkdir -p typer/generator/platforms/swift/testdata/validator/Sources/RudderTyper
