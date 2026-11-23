@@ -81,6 +81,10 @@ typer-kotlin-validate: ## Validate generated Kotlin code inside a Kotlin project
 typer-kotlin-update-testdata: ## Update test data for Kotlin code generation
 	go run typer/generator/platforms/kotlin/testutils/generate_reference_plan.go
 
+.PHONY: typer-go-update-testdata
+typer-go-update-testdata: ## Update test data for Go code generation
+	go run ./typer/generator/platforms/golang/testutils/generate_reference_plan
+
 .PHONY: typer-swift-update-testdata
 typer-swift-update-testdata: ## Update test data for Swift code generation
 	go run typer/generator/platforms/swift/testutils/generate_reference_plan.go \
@@ -94,6 +98,18 @@ typer-typescript-update-testdata: ## Update test data for TypeScript code genera
 	  > typer/generator/platforms/typescript/testdata/IdentitySections.ts
 	go run ./typer/generator/platforms/typescript/testutils/empty_identity \
 	  > typer/generator/platforms/typescript/testdata/EmptyIdentity.ts
+
+# gofmt's output is assigned before it is tested, so a gofmt that cannot run
+# or cannot parse a file fails the target instead of printing nothing. The
+# wire tests flush only on Close, so a short timeout fails a hung Close fast
+# instead of after go test's 10-minute default.
+.PHONY: typer-go-validate
+typer-go-validate: ## Validate generated Go code against the RudderStack Go SDK
+	cd typer/generator/platforms/golang/testdata/validator && \
+	  go vet ./... && \
+	  unformatted="$$("$$(go env GOROOT)/bin/gofmt" -l .)" && \
+	  { test -z "$$unformatted" || { echo "$$unformatted" >&2; false; }; } && \
+	  go test -race -timeout 30s ./...
 
 .PHONY: typer-swift-validate
 typer-swift-validate: ## Validate generated Swift code against the RudderStack Swift SDK

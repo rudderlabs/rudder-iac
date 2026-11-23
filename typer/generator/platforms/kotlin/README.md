@@ -83,7 +83,7 @@ All Kotlin identifiers (class names, method names, property names) must be valid
 3. Format: `ProductPremiumClicked` (PascalCase)
 4. Use in identifier: `class TrackProductPremiumClickedProperties`
 
-**Sanitization rules** (`sanitizeForIdentifier`):
+**Sanitization rules** (`core.SanitizeForIdentifier`):
 
 - Keep: Letters, digits, `_`, `-`, space, `.`
 - Replace with space: All other characters (quotes, backslashes, etc.)
