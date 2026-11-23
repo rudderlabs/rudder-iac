@@ -30,7 +30,7 @@ func handleStartingCharacter(name string) string {
 // Returns empty string if input is empty. If prefix is provided, it's prepended to the formatted name.
 func FormatClassName(prefix, name string) string {
 	formatted := strings.TrimSpace(name)
-	formatted = sanitizeForIdentifier(formatted)
+	formatted = core.SanitizeForIdentifier(formatted)
 	if prefix != "" {
 		formatted = fmt.Sprintf("%s_%s", prefix, formatted)
 	}
@@ -44,37 +44,18 @@ func FormatClassName(prefix, name string) string {
 // Returns empty string if input is empty.
 func FormatPropertyName(name string) string {
 	formatted := strings.TrimSpace(name)
-	formatted = sanitizeForIdentifier(formatted)
+	formatted = core.SanitizeForIdentifier(formatted)
 	formatted = core.ToCamelCase(formatted)
 	formatted = handleStartingCharacter(formatted)
 	formatted = handleReservedKeyword(formatted)
 	return formatted
 }
 
-// sanitizeForIdentifier removes or replaces characters that are invalid in Kotlin identifiers
-// Invalid characters are replaced with spaces so they become word boundaries in PascalCase conversion
-func sanitizeForIdentifier(s string) string {
-	var result strings.Builder
-	result.Grow(len(s))
-
-	for _, ch := range s {
-		if unicode.IsLetter(ch) || unicode.IsDigit(ch) || ch == '_' || ch == '-' || ch == ' ' || ch == '.' {
-			// Keep valid characters and common word separators
-			result.WriteRune(ch)
-		} else {
-			// Replace invalid characters with space to create word boundary
-			result.WriteRune(' ')
-		}
-	}
-
-	return result.String()
-}
-
 // FormatMethodName converts a name to camelCase suitable for Kotlin method names
 // If prefix is provided, it's prepended to the formatted name with proper casing
 func FormatMethodName(prefix, name string) string {
 	formatted := strings.TrimSpace(name)
-	formatted = sanitizeForIdentifier(formatted)
+	formatted = core.SanitizeForIdentifier(formatted)
 	if prefix != "" {
 		formatted = core.ToCamelCase(prefix) + core.ToPascalCase(formatted)
 	} else {

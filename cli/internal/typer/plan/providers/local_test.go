@@ -322,20 +322,24 @@ func TestLocalAndRemoteProduceEquivalentPlan(t *testing.T) {
 	// "could be extracted from metadata if available"). Local is the richer side
 	// here; rather than degrade it to match, we blank these two fields on both
 	// sides before comparing, so the test still guards every structural field.
+	//
+	// Second asymmetry: the remote side keeps enum and match numbers exact as
+	// json.Number, while the local specs give float64 (see plan.PropertyConfig).
+	// Both sides compare as the float64 the other generators write.
 	// Everything else must be byte-identical.
-	blankVariantLabels(localPlan.Rules)
-	blankVariantLabels(remotePlan.Rules)
+	normalizeAsymmetries(localPlan.Rules)
+	normalizeAsymmetries(remotePlan.Rules)
 
 	assert.Equal(t, remotePlan.Rules, localPlan.Rules)
 }
 
-// blankVariantLabels clears the two variant-case fields the remote wire format
-// cannot carry (DisplayName, Description) everywhere they can appear — event-rule
-// variants and variants nested inside object custom types — so the equivalence
-// assertion compares only what both paths can represent. See the call site for
-// the rationale. Custom types are pointer-shared and can be cyclic, so a visited
-// set bounds the walk.
-func blankVariantLabels(rules []plan.EventRule) {
+// normalizeAsymmetries clears the two variant-case fields the remote wire format
+// cannot carry (DisplayName, Description) and turns enum and match numbers into
+// float64, everywhere they can appear — event-rule properties and variants, and
+// those nested inside custom types — so the equivalence assertion compares only
+// what both paths can represent. See the call site for the rationale. Custom
+// types are pointer-shared and can be cyclic, so a visited set bounds the walk.
+func normalizeAsymmetries(rules []plan.EventRule) {
 	seen := map[*plan.CustomType]bool{}
 	var walkSchema func(*plan.ObjectSchema)
 	var walkVariants func([]plan.Variant)
@@ -347,6 +351,9 @@ func blankVariantLabels(rules []plan.EventRule) {
 			return
 		}
 		seen[ct] = true
+		if ct.Config != nil {
+			ct.Config.Enum = plan.Float64Numbers(ct.Config.Enum)
+		}
 		walkSchema(ct.Schema)
 		walkType(ct.ItemType)
 		walkVariants(ct.Variants)
@@ -356,6 +363,9 @@ func blankVariantLabels(rules []plan.EventRule) {
 			return
 		}
 		for _, ps := range s.Properties {
+			if ps.Property.Config != nil {
+				ps.Property.Config.Enum = plan.Float64Numbers(ps.Property.Config.Enum)
+			}
 			for _, t := range ps.Property.Types {
 				walkType(t)
 			}
@@ -370,6 +380,7 @@ func blankVariantLabels(rules []plan.EventRule) {
 			for j := range vs[i].Cases {
 				vs[i].Cases[j].DisplayName = ""
 				vs[i].Cases[j].Description = ""
+				vs[i].Cases[j].Match = plan.Float64Numbers(vs[i].Cases[j].Match)
 				walkSchema(&vs[i].Cases[j].Schema)
 			}
 			walkSchema(vs[i].DefaultSchema)
