@@ -13,9 +13,9 @@
 
 ## DEX-623 — Accounts Import E2E First CI Failure
 <!-- ticket:DEX-623 -->
-- CI proved `TestAccountsApply` can run ungated, but `TestAccountsImportWorkspace` failed on its first completion attempt at `cli/tests/command_accounts_import_test.go:230` because `/tmp/.../imported/import-manifest.yaml` was missing.
+- CI proved `TestAccountsApply` can run ungated, but `TestAccountsImportWorkspace` failed on its first completion attempt, while rewriting the manifest, because `/tmp/.../imported/import-manifest.yaml` was missing.
 - Root cause: `cli/internal/project/importer/importer.go` writes `import-manifest.yaml` only when the `importMerge` experimental flag is on (`RUDDERSTACK_X_IMPORT_MERGE`). The test now sets it via `t.Setenv` and runs ungated in the e2e lane; the `RUN_ACCOUNT_E2E` gate is gone.
-- Durable mitigation: any e2e that reads or rewrites the import manifest must set `RUDDERSTACK_X_IMPORT_MERGE=true`.
+- Durable mitigation: any e2e that reads or rewrites the import manifest must set `RUDDERSTACK_X_IMPORT_MERGE=true`. That variable does nothing unless `RUDDERSTACK_CLI_EXPERIMENTAL=true` is also set, so set both.
 
 ## DEX-498 — Transformation Fixture Default-Events CI Failure
 <!-- ticket:DEX-498 -->
@@ -37,7 +37,7 @@
 - Durable mitigation: poll catalog-backed snapshot and no-diff dry-run assertions for a short consistency window after apply, preserving the original drift signal if eventual consistency does not settle.
 - CI E2E dry-runs can fail when shared disposable workspaces contain managed unverified destinations but the global apply/destroy/dry-run path does not enable unverified destinations; the observed error was an unregistered `ATTENTIVE_TAG` destination type during destination remote loading.
 - Durable mitigation: e2e tests that may run against a shared workspace enable `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` through `allowUnverifiedDestinationResidue` in `cli/tests/main_test.go`, so remote state loading can decode unverified managed destinations left by destination e2e.
-- The unverified-destination decode risk applies to `AccountsApply`, `ProjectApply`, `TransformationsTest`, `ConnectionsApply` and opt-in `AccountsImportWorkspace`, not only destination-specific tests. Set the gate in the tests that need it rather than as a `test-with-coverage` repository variable, so the requirement travels with the code instead of living in CI settings nothing in the repo records; the workflow no longer passes `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` at all.
+- The unverified-destination decode risk applies to `AccountsApply`, `ProjectApply`, `TransformationsTest`, `ConnectionsApply` and `AccountsImportWorkspace`, not only destination-specific tests. Set the gate in the tests that need it rather than as a `test-with-coverage` repository variable, so the requirement travels with the code instead of living in CI settings nothing in the repo records; the workflow no longer passes `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` at all.
 - `RUDDERSTACK_X_UNVERIFIED_DESTINATIONS` is inert without `RUDDERSTACK_CLI_EXPERIMENTAL`, because `GetConfig` zeroes the whole flag struct when the umbrella switch is off. Keep the umbrella switch set explicitly in each test rather than folding it into a narrower helper, so removing that helper can never silently disable an unrelated flag the test does depend on.
 - Keep the production destination handler strict on unknown managed types; fix shared-workspace E2E setup so it can decode unverified destination residue instead of weakening production unknown-type errors. Because destinations are GA the provider loads remote state on every apply and destroy, so the strict error must name the `unverifiedDestinations` flag that unblocks a user whose workspace holds residue they never opted into.
 
