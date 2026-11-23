@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
@@ -20,13 +22,9 @@ func operation(t planner.OperationType, urn, kind string) *planner.Operation {
 	}
 }
 
-func decode(t *testing.T, buf *bytes.Buffer) jsonSyncOutput {
-	t.Helper()
-
-	var out jsonSyncOutput
-	require.NoError(t, json.Unmarshal(buf.Bytes(), &out), "output must be a single valid JSON document")
-	return out
-}
+// The document is a contract for agents, so these tests compare the wire format
+// against a literal. Decoding into the reporter's own types would keep passing
+// after a field was renamed or an omitempty dropped.
 
 // A dry run returns from the syncer before SyncCompleted is ever reached, which
 // is why the command flushes explicitly rather than relying on the lifecycle.
@@ -59,22 +57,58 @@ func TestJSONSyncReporter_DryRunPlan(t *testing.T) {
 		},
 	})
 
-	require.NoError(t, r.Flush())
+	require.NoError(t, r.Flush(nil))
 
-	assert.Equal(t, jsonSyncOutput{
-		DryRun: true,
-		Plan: jsonPlan{
-			Operations: []jsonOperation{
-				{Type: "create", URN: "property:fresh"},
-				// Property names are sorted and carry no values — a diff can hold secrets.
-				{Type: "update", URN: "property:renamed", Properties: []string{"description", "name"}},
-				{Type: "update", URN: "destination:creds", Properties: []string{"apiKey"}, SecretOnly: true},
-				{Type: "delete", URN: "property:gone"},
-			},
-			Summary: map[string]int{"create": 1, "update": 2, "delete": 1, "import": 0},
+	// Property names are sorted and carry no values: a diff can hold secrets.
+	assert.JSONEq(t, `{
+		"dryRun": true,
+		"plan": {
+			"operations": [
+				{"type": "create", "urn": "property:fresh"},
+				{"type": "update", "urn": "property:renamed", "properties": ["description", "name"]},
+				{"type": "update", "urn": "destination:creds", "properties": ["apiKey"], "secretOnly": true},
+				{"type": "delete", "urn": "property:gone"}
+			],
+			"summary": {"create": 1, "update": 2, "delete": 1, "import": 0}
 		},
-		Results: []jsonTaskResult{},
-	}, decode(t, &buf))
+		"results": []
+	}`, buf.String())
+}
+
+// An import keeps its changes in ImportableDiffs. One that overwrites remote
+// fields must not look like one that only adopts.
+func TestJSONSyncReporter_ImportListsTheFieldsItOverwrites(t *testing.T) {
+	var buf bytes.Buffer
+
+	r := NewJSONSyncReporter(&buf, true)
+	r.ReportPlan(&planner.Plan{
+		Diff: &differ.Diff{
+			ImportableDiffs: map[string]differ.ResourceDiff{
+				"source:overwrites": {
+					URN:   "source:overwrites",
+					Diffs: map[string]differ.PropertyDiff{"name": {Property: "name"}, "enabled": {Property: "enabled"}},
+				},
+			},
+		},
+		Operations: []*planner.Operation{
+			operation(planner.Import, "overwrites", "source"),
+			operation(planner.Import, "adopts", "source"),
+		},
+	})
+
+	require.NoError(t, r.Flush(nil))
+
+	assert.JSONEq(t, `{
+		"dryRun": true,
+		"plan": {
+			"operations": [
+				{"type": "import", "urn": "source:overwrites", "properties": ["enabled", "name"]},
+				{"type": "import", "urn": "source:adopts"}
+			],
+			"summary": {"create": 0, "update": 0, "delete": 0, "import": 2}
+		},
+		"results": []
+	}`, buf.String())
 }
 
 // An empty plan must still produce a document: silence cannot distinguish
@@ -85,13 +119,13 @@ func TestJSONSyncReporter_EmptyPlanStillEmitsDocument(t *testing.T) {
 	r := NewJSONSyncReporter(&buf, false)
 	r.ReportPlan(&planner.Plan{Diff: &differ.Diff{}})
 
-	require.NoError(t, r.Flush())
+	require.NoError(t, r.Flush(nil))
 
-	assert.Equal(t, jsonSyncOutput{
-		DryRun:  false,
-		Plan:    jsonPlan{Operations: []jsonOperation{}, Summary: map[string]int{"create": 0, "update": 0, "delete": 0, "import": 0}},
-		Results: []jsonTaskResult{},
-	}, decode(t, &buf))
+	assert.JSONEq(t, `{
+		"dryRun": false,
+		"plan": {"operations": [], "summary": {"create": 0, "update": 0, "delete": 0, "import": 0}},
+		"results": []
+	}`, buf.String())
 }
 
 func TestJSONSyncReporter_RecordsTaskOutcomes(t *testing.T) {
@@ -105,19 +139,74 @@ func TestJSONSyncReporter_RecordsTaskOutcomes(t *testing.T) {
 	r.TaskCompleted("property:ok", "Create property:ok", nil)
 	r.TaskCompleted("property:bad", "Create property:bad", errors.New("upstream rejected the request"))
 
-	require.NoError(t, r.Flush())
+	require.NoError(t, r.Flush(errors.New("syncing resources: 1 task failed")))
 
-	assert.Equal(t, []jsonTaskResult{
-		{URN: "property:ok", Status: "ok"},
-		{URN: "property:bad", Status: "failed", Error: "upstream rejected the request"},
-	}, decode(t, &buf).Results)
+	assert.JSONEq(t, `{
+		"dryRun": false,
+		"plan": {
+			"operations": [{"type": "create", "urn": "property:ok"}],
+			"summary": {"create": 1, "update": 0, "delete": 0, "import": 0}
+		},
+		"results": [
+			{"urn": "property:ok", "status": "ok"},
+			{"urn": "property:bad", "status": "failed", "error": "upstream rejected the request"}
+		],
+		"error": "syncing resources: 1 task failed"
+	}`, buf.String())
 }
 
-// Flush with no plan at all — the syncer failed before planning — must not panic
-// and must still hand the caller a parseable document.
-func TestJSONSyncReporter_FlushWithoutPlan(t *testing.T) {
+// A run that failed before it had a plan must not write the document of a run
+// with nothing to change: plan is null and the error says why.
+func TestJSONSyncReporter_FailureBeforeAPlanIsNotTheNoChangesDocument(t *testing.T) {
 	var buf bytes.Buffer
 
-	require.NoError(t, NewJSONSyncReporter(&buf, false).Flush())
-	assert.Empty(t, decode(t, &buf).Plan.Operations)
+	require.NoError(t, NewJSONSyncReporter(&buf, false).Flush(errors.New("syncing resources: 401 unauthorized")))
+
+	assert.JSONEq(t, `{
+		"dryRun": false,
+		"plan": null,
+		"results": [],
+		"error": "syncing resources: 401 unauthorized"
+	}`, buf.String())
+}
+
+// The syncer reports task results from many goroutines. Under -race this fails
+// on an unguarded append, and the count catches results lost to it.
+func TestJSONSyncReporter_ConcurrentTaskResultsAreAllKept(t *testing.T) {
+	const tasks = 200
+
+	var buf bytes.Buffer
+	r := NewJSONSyncReporter(&buf, false)
+
+	var wg sync.WaitGroup
+	for i := range tasks {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var err error
+			if i%2 == 0 {
+				err = errors.New("failed")
+			}
+			r.TaskCompleted(fmt.Sprintf("property:p%d", i), "", err)
+		}()
+	}
+	wg.Wait()
+
+	require.NoError(t, r.Flush(nil))
+
+	var out struct {
+		Results []struct {
+			Status string `json:"status"`
+		} `json:"results"`
+	}
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &out))
+	assert.Len(t, out.Results, tasks)
+
+	failed := 0
+	for _, result := range out.Results {
+		if result.Status == "failed" {
+			failed++
+		}
+	}
+	assert.Equal(t, tasks/2, failed, "a failed operation must not be lost")
 }

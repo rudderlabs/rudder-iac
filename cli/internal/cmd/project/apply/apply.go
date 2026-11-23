@@ -3,12 +3,15 @@ package apply
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/cmderrors"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -59,6 +62,12 @@ func NewCmdApply() *cobra.Command {
 			$ rudder-cli apply --dry-run --json
 		`),
 		PreRunE: func(cmd *cobra.Command, args []string) (err error) {
+			// The JSON reporter always declines a confirmation, so without one of
+			// these the command would plan, apply nothing and exit 0.
+			if jsonOutput && !dryRun && confirm {
+				return errors.New("--json needs --dry-run to preview the plan, or --confirm=false to apply it")
+			}
+
 			deps, err = app.NewDeps()
 			if err != nil {
 				return fmt.Errorf("initialising dependencies: %w", err)
@@ -69,7 +78,12 @@ func NewCmdApply() *cobra.Command {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
 
-			printWorkspaceBanner(workspace)
+			// stdout holds only the JSON document, so the banner goes to stderr.
+			if jsonOutput {
+				fmt.Fprintln(cmd.ErrOrStderr(), workspaceBanner(workspace))
+			} else {
+				ui.Printf("%s\n", workspaceBanner(workspace))
+			}
 
 			projectOpts, err := app.NewProjectOptions(varFiles)
 			if err != nil {
@@ -89,22 +103,40 @@ func NewCmdApply() *cobra.Command {
 
 			// Load and validate the project configuration
 			if err := p.Load(location); err != nil {
+				wrapped := fmt.Errorf("loading and validating project: %w", err)
 				if jsonOutput {
 					if _, copyErr := io.Copy(cmd.OutOrStdout(), &diagnostics); copyErr != nil {
 						applyLog.Error("writing json diagnostics", "error", copyErr)
 					}
+					// The document already holds the failure, so stderr does not
+					// repeat it. What the document lacks, such as the --var-file
+					// hint, keeps its message.
+					if errors.Is(err, project.ErrReported) {
+						return &cmderrors.SilentError{Err: wrapped}
+					}
 				}
-				return fmt.Errorf("loading and validating project: %w", err)
+				return wrapped
 			}
 
-			if project.HasLegacySpecs(p.Specs()) && !jsonOutput {
+			if jsonOutput {
+				// A clean load leaves the plan as the only document on stdout, so
+				// warnings and the legacy notice go to stderr, as validate does.
+				if hasWarnings(diagnostics.Bytes()) {
+					if _, copyErr := io.Copy(cmd.ErrOrStderr(), &diagnostics); copyErr != nil {
+						applyLog.Error("writing json warnings", "error", copyErr)
+					}
+				}
+				if project.HasLegacySpecs(p.Specs()) {
+					fmt.Fprintln(cmd.ErrOrStderr(), ui.Warning(project.LegacySpecDeprecationWarning))
+				}
+			} else if project.HasLegacySpecs(p.Specs()) {
 				ui.PrintDeprecationWarning(project.LegacySpecDeprecationWarning)
 			}
 
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			applyLog.Debug("apply", "location", location, "dryRun", dryRun, "confirm", confirm)
+			applyLog.Debug("apply", "location", location, "dryRun", dryRun, "confirm", confirm, "json", jsonOutput)
 			applyLog.Debug("identifying changes for the upstream catalog")
 
 			defer func() {
@@ -112,6 +144,7 @@ func NewCmdApply() *cobra.Command {
 					{K: "location", V: location},
 					{K: "dryRun", V: dryRun},
 					{K: "confirm", V: confirm},
+					{K: "json", V: jsonOutput},
 				}...)
 			}()
 
@@ -124,12 +157,10 @@ func NewCmdApply() *cobra.Command {
 			reporter := app.SyncReporter()
 			if jsonOutput {
 				jsonReporter := reporters.NewJSONSyncReporter(cmd.OutOrStdout(), dryRun)
-				// Deferred rather than flushed at the end of RunE: a dry run, an
-				// empty plan, a declined confirmation and a failed operation all
-				// leave by different paths, and every one of them still owes the
-				// caller a document.
+				// Deferred so every exit path writes the document, and err is the
+				// named return, so a failure is recorded in it.
 				defer func() {
-					if flushErr := jsonReporter.Flush(); flushErr != nil {
+					if flushErr := jsonReporter.Flush(err); flushErr != nil {
 						applyLog.Error("flushing json report", "error", flushErr)
 					}
 				}()
@@ -168,19 +199,29 @@ func NewCmdApply() *cobra.Command {
 	cmd.Flags().StringVarP(&location, "location", "l", ".", "Path to the directory containing the project files or a specific file")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Only show the changes without applying them")
 	cmd.Flags().BoolVar(&confirm, "confirm", true, "Confirm changes before applying them")
-	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output the plan and results as JSON")
+	cmd.Flags().BoolVarP(&jsonOutput, "json", "j", false, "Output the plan and results as JSON (needs --dry-run or --confirm=false)")
 	cmd.Flags().StringArrayVar(&varFiles, "var-file", nil, "Path to a variable file ending in .vars.yaml or .vars.yml (repeatable; later files take priority)")
 
 	return cmd
 }
 
-// printWorkspaceBanner names the workspace the apply is about to touch, so a run
+// workspaceBanner names the workspace the apply is about to touch, so a run
 // against the wrong token is visible before any change is planned.
-func printWorkspaceBanner(workspace *client.Workspace) {
-	ui.Printf(
-		"%s %s %s\n",
+func workspaceBanner(workspace *client.Workspace) string {
+	return fmt.Sprintf(
+		"%s %s %s",
 		ui.Color("Workspace:", ui.ColorBlue),
 		ui.Bold(workspace.Name),
 		ui.GreyedOut("("+workspace.ID+")"),
 	)
+}
+
+// hasWarnings reports whether the JSON diagnostics document holds any warning.
+func hasWarnings(document []byte) bool {
+	var doc struct {
+		Summary struct {
+			Warnings int `json:"warnings"`
+		} `json:"summary"`
+	}
+	return json.Unmarshal(document, &doc) == nil && doc.Summary.Warnings > 0
 }
