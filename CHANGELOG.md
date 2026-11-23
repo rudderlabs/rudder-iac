@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.4.0](https://github.com/rudderlabs/rudder-iac/compare/v1.3.0...v1.4.0) (2026-11-23)
+
+
+### Features
+
+* **accounts:** adopt OAuth integration accounts and reference them from destinations ([#1042](https://github.com/rudderlabs/rudder-iac/issues/1042)) ([331a643](https://github.com/rudderlabs/rudder-iac/commit/331a64300753cd5d88a275b620f4e1562fb6c85f))
+* **accounts:** create and re-authorize OAuth accounts through a browser handoff ([#1043](https://github.com/rudderlabs/rudder-iac/issues/1043)) ([1feb9d1](https://github.com/rudderlabs/rudder-iac/commit/1feb9d11c57046c3e851e949bd6b3cc4e4133362))
+* **retl:** accept maxcompute in SQL model and table source specs ([#1048](https://github.com/rudderlabs/rudder-iac/issues/1048)) ([5c71996](https://github.com/rudderlabs/rudder-iac/commit/5c7199657983cc324012e596a896be2463c8745f))
+* **telemetry:** name the coding agent and tie command events to a workspace ([#1054](https://github.com/rudderlabs/rudder-iac/issues/1054)) ([eb563e3](https://github.com/rudderlabs/rudder-iac/commit/eb563e33d5c2b0155aa42df42a5e1084473855a9))
+* **typer:** add Go generator skeleton with track events ([#945](https://github.com/rudderlabs/rudder-iac/issues/945)) ([cbc4f13](https://github.com/rudderlabs/rudder-iac/commit/cbc4f134da98c4e26838ec38f1a6106fc868d55d))
+* **typer:** add Go serialization runtime with deep-copy snapshots, nil rules and synchronous errors ([#946](https://github.com/rudderlabs/rudder-iac/issues/946)) ([0563f55](https://github.com/rudderlabs/rudder-iac/commit/0563f5516d12e4eac88d8a64318465fae7ee338b))
+* **typer:** generate Go custom types and hoisted nested objects ([#965](https://github.com/rudderlabs/rudder-iac/issues/965)) ([5330726](https://github.com/rudderlabs/rudder-iac/commit/533072668565799f43bdaf1e9ef85306005e71af))
+* **typer:** generate Go enums as defined types with constants, Values and IsValid ([#964](https://github.com/rudderlabs/rudder-iac/issues/964)) ([785f702](https://github.com/rudderlabs/rudder-iac/commit/785f7026e3f222556b5af16520faff3a09994ee7))
+* **typer:** generate Go identify, group, page and screen events with WithCategory ([#969](https://github.com/rudderlabs/rudder-iac/issues/969)) ([8f29c9b](https://github.com/rudderlabs/rudder-iac/commit/8f29c9bb10500e175a3fa5ae5f83af07e981e5a9))
+* **typer:** generate Go multi-type unions, Nullable, Null and typed arrays ([#957](https://github.com/rudderlabs/rudder-iac/issues/957)) ([4c03659](https://github.com/rudderlabs/rudder-iac/commit/4c03659a4700ab5a244f48184e0a26d25595f96c))
+* **typer:** generate Go variants as sealed interfaces with case, Absent and Default structs ([#967](https://github.com/rudderlabs/rudder-iac/issues/967)) ([1ad8eb2](https://github.com/rudderlabs/rudder-iac/commit/1ad8eb2455d3ac577d99674001dba65e5ac9eb6e))
+
+
+### Bug Fixes
+
+* **ci:** stop reporting an evicted e2e job as a test failure ([#873](https://github.com/rudderlabs/rudder-iac/issues/873)) ([ce8ea09](https://github.com/rudderlabs/rudder-iac/commit/ce8ea093b6e65643feabedcb6e0abc712b2af9e5))
+* **devlisten:** start the summary wait clock before the timeout ([#992](https://github.com/rudderlabs/rudder-iac/issues/992)) ([3a92c14](https://github.com/rudderlabs/rudder-iac/commit/3a92c14a595ab11c10ca30ad6ad39e9ca827981e))
+* **telemetry:** name the CI service when the workflow does not set it ([#996](https://github.com/rudderlabs/rudder-iac/issues/996)) ([77838e0](https://github.com/rudderlabs/rudder-iac/commit/77838e0c7feabb93642031928efa05abf55d5ea7))
+
+
+### Miscellaneous
+
+* **accounts:** run TestAccountsImportWorkspace in the e2e lane ([#923](https://github.com/rudderlabs/rudder-iac/issues/923)) ([b676c43](https://github.com/rudderlabs/rudder-iac/commit/b676c437fb449b5f751db7f8582efb96261c7aae))
+* **typer:** add core track and serialization validator coverage ([#956](https://github.com/rudderlabs/rudder-iac/issues/956)) ([d4f004f](https://github.com/rudderlabs/rudder-iac/commit/d4f004f582b34cae19a5e52d11869b5802ca3f8c))
+* **typer:** add Go type-system validator coverage for unions, nullables, enums, custom types and nested objects ([#966](https://github.com/rudderlabs/rudder-iac/issues/966)) ([9ac72ef](https://github.com/rudderlabs/rudder-iac/commit/9ac72efc04d003e3a82f1cb7d6c68b3fdeb8ba7a))
+* **typer:** add Go validator module with a track smoke test ([#947](https://github.com/rudderlabs/rudder-iac/issues/947)) ([81f2666](https://github.com/rudderlabs/rudder-iac/commit/81f2666e2a32a7e583447e215254b3b71b23a8b5))
+* **typer:** add Go validator workflow ([#948](https://github.com/rudderlabs/rudder-iac/issues/948)) ([e9adf20](https://github.com/rudderlabs/rudder-iac/commit/e9adf2082305ed0ee703bca3d25e27ef9112826d))
+* **typer:** cover Go identify, group, page and screen on the wire ([#970](https://github.com/rudderlabs/rudder-iac/issues/970)) ([fa0861b](https://github.com/rudderlabs/rudder-iac/commit/fa0861bbbf99155e61d8cd56c22a64a275f4a5ec))
+* **typer:** pin Go variant cases, Defaults, nil shapes and open branches on the wire ([#968](https://github.com/rudderlabs/rudder-iac/issues/968)) ([dfd34de](https://github.com/rudderlabs/rudder-iac/commit/dfd34dec926b113c4e919d7651209056d20b9102))
+* **typer:** walk the Go Validation Checklist and Parity Matrix and add the rows it found missing ([#972](https://github.com/rudderlabs/rudder-iac/issues/972)) ([65aa8ea](https://github.com/rudderlabs/rudder-iac/commit/65aa8eaa0bc290b5798d8d8d9d61fc76122242d9))
+
 ## [1.3.0](https://github.com/rudderlabs/rudder-iac/compare/v1.2.0...v1.3.0) (2026-11-19)
 
 
