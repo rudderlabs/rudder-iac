@@ -3,6 +3,7 @@ package apply
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,4 +72,25 @@ func TestApplyJSONNeedsDryRunOrConfirmFalse(t *testing.T) {
 	err := telemetrytest.Execute(NewCmdApply(), nil, []string{"--location", t.TempDir(), "--json"})
 
 	assert.ErrorContains(t, err, "--json needs --dry-run")
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("stdout closed") }
+
+// A document that cannot be written must fail the command. Exiting 0 would
+// leave the caller with no document, or a truncated one, and no error to see.
+func TestApplyJSONFailsWhenTheDocumentCannotBeWritten(t *testing.T) {
+	testutils.UseFakeAPI(t)
+	calls := telemetrytest.Record(t)
+
+	cmd := NewCmdApply()
+	cmd.SetOut(failingWriter{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	err := telemetrytest.Execute(cmd, nil, []string{"--location", t.TempDir(), "--json", "--dry-run"})
+
+	assert.ErrorContains(t, err, "stdout closed")
+	require.Len(t, *calls, 1)
+	assert.True(t, (*calls)[0].Errored)
 }
