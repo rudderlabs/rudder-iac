@@ -26,8 +26,7 @@ func operation(opType planner.OperationType, id, kind string) *planner.Operation
 // against a literal. Decoding into the reporter's own types would keep passing
 // after a field was renamed or an omitempty dropped.
 
-// A dry run returns from the syncer before SyncCompleted is ever reached, which
-// is why the command flushes explicitly rather than relying on the lifecycle.
+// A dry run reports a plan and no task results.
 func TestJSONSyncReporter_DryRunPlan(t *testing.T) {
 	var buf bytes.Buffer
 
