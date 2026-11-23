@@ -83,7 +83,9 @@ func capture(t *testing.T, send func(analytics.Client)) ([]map[string]any, []ana
 // messageId, originalTimestamp, sentAt, anonymousId and channel are ignored
 // unless wantJSON asserts them, so WithMessageID and WithTimestamp stay
 // testable. context.library is always ignored: the SDK overwrites it on every
-// message.
+// message. The wire cannot tell an SDK-filled value from one the generated
+// code invented; TestGeneratedMethodsOwnTheirInputs checks the message the
+// generated code hands the SDK.
 func assertMessage(t *testing.T, wantJSON string, got map[string]any) {
 	t.Helper()
 	var want map[string]any
