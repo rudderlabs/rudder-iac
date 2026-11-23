@@ -4,12 +4,14 @@ import (
 	"fmt"
 
 	"github.com/rudderlabs/rudder-iac/typer/generator/core"
+	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang"
 	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/kotlin"
 	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/swift"
 	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/typescript"
 )
 
 var platforms = map[string]core.Generator{
+	"go":         &golang.Generator{},
 	"kotlin":     &kotlin.Generator{},
 	"swift":      &swift.Generator{},
 	"typescript": &typescript.Generator{},

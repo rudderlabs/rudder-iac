@@ -1,0 +1,507 @@
+package validator
+
+import (
+	"encoding/json"
+	"io"
+	"maps"
+	"math"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	analytics "github.com/rudderlabs/analytics-go/v4"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang/testdata/validator/examples"
+	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang/testdata/validator/ruddertyper"
+)
+
+// recorder is both the data plane and the Config.Callback of a capture.
+type recorder struct {
+	t         *testing.T
+	mu        sync.Mutex
+	batches   [][]map[string]any
+	succeeded []analytics.Message
+}
+
+func (r *recorder) ServeHTTP(_ http.ResponseWriter, req *http.Request) {
+	var body struct {
+		Batch []map[string]any `json:"batch"`
+	}
+	assert.NoError(r.t, decode(req.Body, &body))
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.batches = append(r.batches, body.Batch)
+}
+
+func (r *recorder) Success(msg analytics.Message) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.succeeded = append(r.succeeded, msg)
+}
+
+func (r *recorder) Failure(msg analytics.Message, err error) {
+	assert.NoError(r.t, err, "SDK failed to send %#v", msg)
+}
+
+// capture runs send against a real SDK client and returns the messages of the
+// one batch the SDK sent, in send order, and the messages it handed to
+// Config.Callback.
+func capture(t *testing.T, send func(analytics.Client)) ([]map[string]any, []analytics.Message) {
+	t.Helper()
+	var (
+		rec = &recorder{t: t}
+		srv = httptest.NewServer(rec)
+	)
+	defer srv.Close()
+
+	client, err := analytics.NewWithConfig("write-key", analytics.Config{
+		DataPlaneUrl: srv.URL,
+		DisableGzip:  true,
+		// Only Close flushes while a capture stays under the default ~500 KB
+		// MaxBatchBytes, so every call lands in one batch in send order;
+		// smaller batches are sent concurrently and can arrive in any order.
+		BatchSize: 1000,
+		Interval:  time.Hour,
+		Callback:  rec,
+	})
+	require.NoError(t, err)
+	send(client)
+	require.NoError(t, client.Close())
+
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	require.Len(t, rec.batches, 1)
+	return rec.batches[0], rec.succeeded
+}
+
+// assertMessage compares got whole with wantJSON, a JSON object. The SDK-filled
+// messageId, originalTimestamp, sentAt, anonymousId and channel are ignored
+// unless wantJSON asserts them, so WithMessageID and WithTimestamp stay
+// testable. context.library is always ignored: the SDK overwrites it on every
+// message. The wire cannot tell an SDK-filled value from one the generated
+// code invented; TestGeneratedMethodsOwnTheirInputs checks the message the
+// generated code hands the SDK.
+func assertMessage(t *testing.T, wantJSON string, got map[string]any) {
+	t.Helper()
+	var want map[string]any
+	require.NoError(t, decode(strings.NewReader(wantJSON), &want))
+
+	got = maps.Clone(got)
+	for _, key := range []string{"messageId", "originalTimestamp", "sentAt", "anonymousId", "channel"} {
+		if _, ok := want[key]; !ok {
+			delete(got, key)
+		}
+	}
+	if gotContext, ok := got["context"].(map[string]any); ok {
+		gotContext = maps.Clone(gotContext)
+		delete(gotContext, "library")
+		got["context"] = gotContext
+	}
+	assert.Equal(t, want, got)
+}
+
+// decode keeps numbers as their JSON text, so an int64 beyond 2^53 cannot
+// match a rounded one.
+func decode(r io.Reader, v any) error {
+	d := json.NewDecoder(r)
+	d.UseNumber()
+	return d.Decode(v)
+}
+
+// assertPlain fails on any value in v that the spec does not allow in a
+// snapshot, such as an int or a generated type.
+func assertPlain(t *testing.T, v any) {
+	t.Helper()
+	switch v := v.(type) {
+	case nil, string, bool, int64, uint64, float64, float32, json.Number:
+	case map[string]any:
+		for _, e := range v {
+			assertPlain(t, e)
+		}
+	case []any:
+		for _, e := range v {
+			assertPlain(t, e)
+		}
+	default:
+		assert.Failf(t, "snapshot holds a non-plain value", "%T %v", v, v)
+	}
+}
+
+// The context.ruddertyper objects of the goldens.
+const (
+	exMeta            = `{"platform": "go", "rudderCLIVersion": "1.0.0", "trackingPlanId": "plan_examples", "trackingPlanVersion": 0}`
+	refMeta           = `{"platform": "go", "rudderCLIVersion": "1.0.0", "trackingPlanId": "plan_12345", "trackingPlanVersion": 13}`
+	sectionsMeta      = `{"platform": "go", "rudderCLIVersion": "1.0.0", "trackingPlanId": "plan_identity_sections", "trackingPlanVersion": 1}`
+	emptyIdentityMeta = `{"platform": "go", "rudderCLIVersion": "1.0.0", "trackingPlanId": "plan_empty_identity", "trackingPlanVersion": 1}`
+)
+
+func TestTrackWire(t *testing.T) {
+	var (
+		ex            *examples.RudderTyperAnalytics
+		ref           *ruddertyper.RudderTyperAnalytics
+		id            = examples.Identity{UserID: "user-123"}
+		refID         = ruddertyper.Identity{UserID: "user-123"}
+		someTrack     = examples.TrackSomeTrackEventProperties{SomeString: "hello", SomeInteger: 42, SomeBoolean: examples.Ptr(false)}
+		someTrackJSON = `{"someString": "hello", "someInteger": 42, "someBoolean": false}`
+		closed        = analytics.New("write-key", "http://127.0.0.1")
+		msgID         string
+	)
+	require.NoError(t, closed.Close())
+
+	// The wide slice row's item count: twice maxDepth (1000) plus one, so a
+	// bound that counted siblings or every visit, not the path, would fail it.
+	const width = 2001
+
+	// The rows share one capture, which sets ex and ref when it starts and msgID
+	// to each row's name before its call. A row that sends passes msgID to
+	// WithMessageID, and its messages are looked up by that ID, not by position:
+	// the SDK does not promise the order of Config.Callback calls.
+	tests := []struct {
+		name  string
+		call  func() error
+		want  string
+		err   error                // the call must return an error equal to this one
+		same  error                // the call must return this very error, such as an SDK sentinel
+		errIs error                // the call must return an error wrapping this one
+		props analytics.Properties // when set, the Config.Callback message must hold exactly these properties
+	}{
+		{
+			// TestTrackSmoke's call, so it keeps that test's identity with both IDs.
+			name: "a set optional field sends its value, even false",
+			call: func() error {
+				return ex.TrackSomeTrackEvent(examples.Identity{UserID: "user-123", AnonymousID: "anon-123"}, someTrack, examples.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Track Event", "userId": "user-123", "anonymousId": "anon-123",
+				"properties": ` + someTrackJSON + `,
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
+			name: "a nil optional field omits its key and an unset required field sends its zero value",
+			call: func() error {
+				return ex.TrackSomeTrackEvent(id, examples.TrackSomeTrackEventProperties{}, examples.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Track Event", "userId": "user-123",
+				"properties": {"someString": "", "someInteger": 0},
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
+			name: "an empty closed event sends no properties",
+			call: func() error { return ref.TrackEmptyEventNoAdditionalProps(refID, ruddertyper.WithMessageID(msgID)) },
+			want: `{"type": "track", "channel": "server", "event": "Empty Event No Additional Props", "userId": "user-123",
+				"context": {"ruddertyper": ` + refMeta + `}}`,
+		},
+		{
+			name: "an empty open event sends no properties for nil",
+			call: func() error {
+				return ref.TrackEmptyEventWithAdditionalProps(refID, nil, ruddertyper.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Empty Event With Additional Props", "userId": "user-123",
+				"context": {"ruddertyper": ` + refMeta + `}}`,
+		},
+		{
+			name: "an empty open event sends no properties for an empty map",
+			call: func() error {
+				return ref.TrackEmptyEventWithAdditionalProps(refID, map[string]any{}, ruddertyper.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Empty Event With Additional Props", "userId": "user-123",
+				"context": {"ruddertyper": ` + refMeta + `}}`,
+		},
+		{
+			name: "an empty open event sends a non-empty map, with nil slices and maps inside it as [] and {}",
+			call: func() error {
+				return ref.TrackEmptyEventWithAdditionalProps(refID, map[string]any{
+					"plan":   "pro",
+					"nested": map[string]any{"list": []string(nil), "object": map[string]any(nil)},
+				}, ruddertyper.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Empty Event With Additional Props", "userId": "user-123",
+				"properties": {"plan": "pro", "nested": {"list": [], "object": {}}},
+				"context": {"ruddertyper": ` + refMeta + `}}`,
+		},
+		{
+			// active and profile are required custom types, so their zero values are sent.
+			name: "untyped fields send numbers, bools and objects at depth",
+			call: func() error {
+				return ref.TrackUserSignedUp(refID, ruddertyper.TrackUserSignedUpProperties{
+					ArrayOfAny:    []any{"string item", 42, true, map[string]any{"nested": "object", "count": 100}},
+					PropertyOfAny: map[string]any{"custom_field_1": "value1", "custom_field_2": 999, "nested_object": map[string]any{"deep_field": "deep_value"}},
+					UntypedArray:  []any{3.14159, "mixed", false, map[string]any{"id": 123, "name": "test"}},
+					UntypedField:  map[string]any{"arbitrary_key": "arbitrary_value", "number": 42.5},
+				}, ruddertyper.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "User Signed Up", "userId": "user-123",
+				"properties": {
+					"active": false,
+					"profile": {"email": "", "first_name": ""},
+					"array_of_any": ["string item", 42, true, {"nested": "object", "count": 100}],
+					"property_of_any": {"custom_field_1": "value1", "custom_field_2": 999, "nested_object": {"deep_field": "deep_value"}},
+					"untyped_array": [3.14159, "mixed", false, {"id": 123, "name": "test"}],
+					"untyped_field": {"arbitrary_key": "arbitrary_value", "number": 42.5}
+				},
+				"context": {"ruddertyper": ` + refMeta + `}}`,
+		},
+		{
+			// productId is required, so the open rule's empty case cannot be reached. The
+			// collision pair's closed structs below show the SDK omitting an empty map instead.
+			name: "the open rule's struct with nothing set sends only its required key",
+			call: func() error {
+				return ex.TrackSomeOpenTrackEvent(id, examples.TrackSomeOpenTrackEventProperties{}, examples.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Open Track Event", "userId": "user-123",
+				"properties": {"productId": ""},
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
+			// amount as a number: half of the same-name, different-type pair with Name Collisions.
+			name: "AdditionalProperties: undeclared keys pass as plain values, declared ones ignored",
+			call: func() error {
+				return ex.TrackSomeOpenTrackEvent(id, examples.TrackSomeOpenTrackEventProperties{
+					ProductID: "p1",
+					Amount:    examples.Ptr(9.5),
+					AdditionalProperties: map[string]any{
+						"coupon": "SAVE", "productId": "override", "productName": "fill", "additionalProperties": "x",
+						"count": 3, "user": examples.TrackUserProperties{User: examples.Ptr("u")},
+					},
+				}, examples.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Open Track Event", "userId": "user-123",
+				"properties": {"productId": "p1", "amount": 9.5, "coupon": "SAVE", "count": 3, "user": {"user": "u"}},
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+			props: analytics.Properties{
+				"productId": "p1", "amount": 9.5, "coupon": "SAVE",
+				"count": int64(3), "user": map[string]any{"user": "u"},
+			},
+		},
+		{
+			name: "quotes and backslashes in the event name and a value are sent unchanged",
+			call: func() error {
+				return ref.TrackProductPremiumClicked(refID, ruddertyper.TrackProductPremiumClickedProperties{
+					SpecialField: "value with \"quotes\" and \\path",
+				}, ruddertyper.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Product \"Premium\" Clicked", "userId": "user-123",
+				"properties": {"special_field": "value with \"quotes\" and \\path"},
+				"context": {"ruddertyper": ` + refMeta + `}}`,
+		},
+		{
+			name: "the collision pair's first event sends its own name",
+			call: func() error {
+				return ex.TrackEventWithNameCamelCase(id, examples.TrackEventWithNameCamelCaseProperties{}, examples.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "$eventWithNameCamelCase$!", "userId": "user-123",
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
+			name: "the collision pair's second event sends its own name",
+			call: func() error {
+				return ex.TrackEventWithNameCamelCase1(id, examples.TrackEventWithNameCamelCaseProperties1{}, examples.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "eventWithNameCamelCase", "userId": "user-123",
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
+			name: "amount as a string and the other colliding names send under their plan keys",
+			call: func() error {
+				return ex.TrackNameCollisions(id, examples.TrackNameCollisionsProperties{
+					X1stPlace:     examples.Ptr[int64](1),
+					Amount:        "ten",
+					ToProperties1: examples.Ptr("t"),
+					UserID:        "u1",
+					UserID1:       examples.Ptr("u2"),
+				}, examples.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Name Collisions", "userId": "user-123",
+				"properties": {"1st_place": 1, "amount": "ten", "toProperties": "t", "userId": "u1", "user_id": "u2"},
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
+			name: "Identity.AnonymousID sends anonymousId",
+			call: func() error {
+				return ex.TrackSomeEmptyTrackEvent(examples.Identity{AnonymousID: "anon-1"}, examples.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event", "anonymousId": "anon-1",
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
+			// Found by msgID, so the lookup checks messageId.
+			name: "options send integrations, originalTimestamp and messageId",
+			call: func() error {
+				return ex.TrackSomeEmptyTrackEvent(id,
+					examples.WithIntegrations(analytics.Integrations{"All": false, "Amplitude": map[string]any{"sessionId": 1}}),
+					examples.WithTimestamp(time.Date(2026, 9, 29, 10, 0, 0, 0, time.UTC)),
+					examples.WithMessageID(msgID),
+				)
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event", "userId": "user-123",
+				"integrations": {"All": false, "Amplitude": {"sessionId": 1}},
+				"originalTimestamp": "2026-09-29T10:00:00Z",
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
+			name: "WithAnalyticsContext keeps caller keys and ruddertyper wins",
+			call: func() error {
+				return ex.TrackSomeEmptyTrackEvent(id, examples.WithAnalyticsContext(analytics.Context{
+					Locale: "en-US",
+					Traits: analytics.Traits{"plan": "pro", "seats": 2},
+					Extra:  map[string]any{"custom": 1, "ruddertyper": "overwritten"},
+				}), examples.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event", "userId": "user-123",
+				"context": {"locale": "en-US", "traits": {"plan": "pro", "seats": 2}, "custom": 1, "ruddertyper": ` + exMeta + `}}`,
+		},
+		{
+			// Found by msgID, so the lookup checks that the later WithMessageID won.
+			name: "a later option overrides an earlier one and nil options are skipped",
+			call: func() error {
+				return ex.TrackSomeEmptyTrackEvent(id,
+					examples.WithMessageID("first"), nil, examples.WithMessageID(msgID),
+					examples.WithIntegrations(analytics.Integrations{"All": false}),
+					examples.WithIntegrations(analytics.Integrations{"Amplitude": true}),
+				)
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event", "userId": "user-123",
+				"integrations": {"Amplitude": true},
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
+			name: "no identity returns the SDK's FieldError",
+			call: func() error { return ex.TrackSomeEmptyTrackEvent(examples.Identity{}) },
+			err:  analytics.FieldError{Type: "analytics.Track", Name: "UserId", Value: ""},
+		},
+		{
+			name: "a closed client returns the SDK's ErrClosed",
+			call: func() error { return examples.New(closed).TrackSomeEmptyTrackEvent(id) },
+			same: analytics.ErrClosed,
+		},
+		{
+			name: "the depth bound is per path, so a slice wider than maxDepth is sent whole",
+			call: func() error {
+				wide := make([]any, width)
+				for i := range wide {
+					wide[i] = map[string]any{"k": "x"}
+				}
+				return ex.TrackSomeEmptyTrackEventWithAdditionalProperties(id, map[string]any{"wide": wide}, examples.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event With Additional Properties", "userId": "user-123",
+				"properties": {"wide": [` + strings.TrimSuffix(strings.Repeat(`{"k": "x"}, `, width), ", ") + `]},
+				"context": {"ruddertyper": ` + exMeta + `}}`,
+		},
+		{
+			name: "a self-containing map is invalid",
+			call: func() error {
+				m := map[string]any{}
+				m["self"] = m
+				return ex.TrackSomeEmptyTrackEventWithAdditionalProperties(id, m)
+			},
+			errIs: examples.ErrInvalidValue,
+		},
+		{
+			name: "NaN in the payload is invalid",
+			call: func() error {
+				return ex.TrackSomeOpenTrackEvent(id, examples.TrackSomeOpenTrackEventProperties{Amount: examples.Ptr(math.NaN())})
+			},
+			errIs: examples.ErrInvalidValue,
+		},
+		{
+			name: "NaN in WithIntegrations is invalid",
+			call: func() error {
+				return ex.TrackSomeEmptyTrackEvent(id, examples.WithIntegrations(analytics.Integrations{"x": math.NaN()}))
+			},
+			errIs: examples.ErrInvalidValue,
+		},
+		{
+			name: "NaN in WithAnalyticsContext is invalid",
+			call: func() error {
+				return ex.TrackSomeEmptyTrackEvent(id, examples.WithAnalyticsContext(analytics.Context{Extra: map[string]any{"x": math.NaN()}}))
+			},
+			errIs: examples.ErrInvalidValue,
+		},
+		{
+			name: "a WithTimestamp after year 9999 is invalid",
+			call: func() error {
+				return ex.TrackSomeEmptyTrackEvent(id, examples.WithTimestamp(time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)))
+			},
+			errIs: examples.ErrInvalidValue,
+		},
+	}
+
+	errs := make([]error, len(tests))
+	wire, succeeded := capture(t, func(client analytics.Client) {
+		ex, ref = examples.New(client), ruddertyper.New(client)
+		for i, tt := range tests {
+			msgID = tt.name
+			errs[i] = tt.call()
+		}
+	})
+
+	// Rows find their messages by name, so two rows with one name would share a
+	// message ID and one row's message would stand in for the other's.
+	var (
+		sent  int
+		names = make(map[string]bool, len(tests))
+	)
+	for _, tt := range tests {
+		require.False(t, names[tt.name], "two rows are named %q", tt.name)
+		names[tt.name] = true
+		if tt.want != "" {
+			sent++
+		}
+	}
+	assert.Len(t, wire, sent, "a failed call sent a message, or a call sent none; errors: %v", errs)
+	assert.Len(t, succeeded, sent)
+
+	wireByID := make(map[any]map[string]any, len(wire))
+	for _, msg := range wire {
+		wireByID[msg["messageId"]] = msg
+	}
+	callbackByID := make(map[string]analytics.Track, len(succeeded))
+	for _, msg := range succeeded {
+		require.IsType(t, analytics.Track{}, msg)
+		track := msg.(analytics.Track)
+		callbackByID[track.MessageId] = track
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			switch {
+			case tt.err != nil:
+				assert.Equal(t, tt.err, errs[i])
+			case tt.same != nil:
+				assert.Same(t, tt.same, errs[i])
+			case tt.errIs != nil:
+				assert.ErrorIs(t, errs[i], tt.errIs)
+			default:
+				require.NoError(t, errs[i])
+				msg, ok := wireByID[tt.name]
+				require.True(t, ok, "no message on the wire has this row's ID")
+				assertMessage(t, tt.want, msg)
+
+				// Config.Callback receives the snapshot itself, so its Go value
+				// types show what the wire JSON cannot. context.ruddertyper is
+				// skipped: it is generated constant metadata, not caller data, and
+				// the spec writes its trackingPlanVersion as an untyped constant, a Go int.
+				track, ok := callbackByID[tt.name]
+				require.True(t, ok, "Config.Callback received no message with this row's ID")
+				if tt.props != nil {
+					assert.Equal(t, tt.props, track.Properties)
+				}
+				require.NotNil(t, track.Context)
+				extra := maps.Clone(track.Context.Extra)
+				delete(extra, "ruddertyper")
+				for _, m := range []map[string]any{track.Properties, track.Integrations, track.Context.Traits, extra} {
+					assertPlain(t, m)
+				}
+			}
+		})
+	}
+
+	// The first row sends someTrackJSON, so json.Marshal of its payload must match it.
+	b, err := json.Marshal(someTrack)
+	require.NoError(t, err)
+	assert.JSONEq(t, someTrackJSON, string(b))
+}

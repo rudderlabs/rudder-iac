@@ -1,5 +1,25 @@
 package plan
 
+import (
+	"encoding/json"
+	"slices"
+	"strconv"
+)
+
+// Float64Numbers returns a copy of enum or match values with each json.Number
+// replaced by its nearest float64, for generators that write numbers as
+// float64. A number beyond the float64 range would become ±Inf; the remote
+// plan provider rejects one.
+func Float64Numbers(values []any) []any {
+	values = slices.Clone(values)
+	for i, v := range values {
+		if n, ok := v.(json.Number); ok {
+			values[i], _ = strconv.ParseFloat(string(n), 64)
+		}
+	}
+	return values
+}
+
 // ExtractAllCustomTypes extracts all custom types from a tracking plan
 // Returns a map of custom type name to CustomType
 func (tp *TrackingPlan) ExtractAllCustomTypes() map[string]*CustomType {
@@ -69,36 +89,22 @@ func (tp *TrackingPlan) ExtractAllProperties() map[string]*Property {
 	return properties
 }
 
-// extractCustomTypesFromSchema recursively extracts custom types from an ObjectSchema
-// The customTypes map is modified in place to accumulate results
+// extractCustomTypesFromSchema extracts the custom types an ObjectSchema and
+// its nested property schemas reference. It does not descend into the custom
+// types, so a recursive one terminates: ExtractAllCustomTypes visits each of
+// them once. The customTypes map is modified in place to accumulate results
 func extractCustomTypesFromSchema(schema *ObjectSchema, customTypes map[string]*CustomType) {
 	for _, propSchema := range schema.Properties {
 		for _, t := range propSchema.Property.Types {
-			if IsCustomType(t) {
-				customType := AsCustomType(t)
-				if customType != nil {
-					customTypes[customType.Name] = customType
-
-					// Recursively process referenced by object custom types
-					if customType.Schema != nil {
-						extractCustomTypesFromSchema(customType.Schema, customTypes)
-					}
-				}
+			if customType := AsCustomType(t); customType != nil {
+				customTypes[customType.Name] = customType
 			}
 		}
 
 		// Also extract custom types from array item types
 		for _, itemType := range propSchema.Property.ItemTypes {
-			if IsCustomType(itemType) {
-				customType := AsCustomType(itemType)
-				if customType != nil {
-					customTypes[customType.Name] = customType
-
-					// Recursively process referenced custom types
-					if customType.Schema != nil {
-						extractCustomTypesFromSchema(customType.Schema, customTypes)
-					}
-				}
+			if customType := AsCustomType(itemType); customType != nil {
+				customTypes[customType.Name] = customType
 			}
 		}
 
