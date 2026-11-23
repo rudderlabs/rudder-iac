@@ -156,6 +156,13 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 		return nil, err
 	}
 
+	// Every payload name is registered before the structs payloads hoist, so
+	// an event's payload type keeps its name whatever the other events hoist.
+	for _, r := range rules {
+		if _, err := payloadName(registry, r); err != nil {
+			return nil, err
+		}
+	}
 	ctx.out = &ctx.Payloads
 	for _, r := range rules {
 		if err := addTrackRule(ctx, r, propertyTypes, registry); err != nil {
@@ -784,12 +791,12 @@ func addCustomTypes(ctx *GoContext, customTypes []*customType, propertyTypes map
 // addTrackRule adds the payload type and method of one track rule.
 func addTrackRule(ctx *GoContext, r trackRule, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) error {
 	event := r.rule.Event
-	base, err := pascalCase(event.Name)
+	base, err := trackBase(event)
 	if err != nil {
-		return fmt.Errorf("naming track event %q: %w", event.Name, err)
+		return err
 	}
 
-	payload, err := addPayload(ctx, r, base, propertyTypes, registry)
+	payload, err := addPayload(ctx, r, propertyTypes, registry)
 	if err != nil {
 		return err
 	}
@@ -814,23 +821,47 @@ func addTrackRule(ctx *GoContext, r trackRule, propertyTypes map[propertyKey]pro
 	return nil
 }
 
-// addPayload adds the payload type of a track rule whose event name
-// pascal-cases to base, or returns nil when the rule's schema is empty and
-// closed.
-func addPayload(ctx *GoContext, r trackRule, base string, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) (*GoStruct, error) {
+// trackBase returns a track event's name in PascalCase, which its payload and
+// method names build on.
+func trackBase(event plan.Event) (string, error) {
+	base, err := pascalCase(event.Name)
+	if err != nil {
+		return "", fmt.Errorf("naming track event %q: %w", event.Name, err)
+	}
+	return base, nil
+}
+
+// payloadName registers the payload type name of a track rule and returns
+// it, or returns "" when the rule's schema is empty and closed, so it has no
+// payload. A rule's name is registered once; later calls return it.
+func payloadName(registry *core.NameRegistry, r trackRule) (string, error) {
 	var (
 		event  = r.rule.Event
 		schema = r.rule.Schema
 	)
 	if len(schema.Properties) == 0 && !schema.AdditionalProperties {
-		return nil, nil
+		return "", nil
 	}
-
+	base, err := trackBase(event)
+	if err != nil {
+		return "", err
+	}
 	name, err := registry.RegisterName("payload:"+r.key, packageScope, "Track"+base+"Properties")
 	if err != nil {
-		return nil, fmt.Errorf("registering the payload of track event %q: %w", event.Name, err)
+		return "", fmt.Errorf("registering the payload of track event %q: %w", event.Name, err)
 	}
-	if len(schema.Properties) > 0 {
+	return name, nil
+}
+
+// addPayload adds the payload type of a track rule, or returns nil when the
+// rule's schema is empty and closed.
+func addPayload(ctx *GoContext, r trackRule, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) (*GoStruct, error) {
+	event := r.rule.Event
+	name, err := payloadName(registry, r)
+	if name == "" || err != nil {
+		return nil, err
+	}
+	if len(r.rule.Schema.Properties) > 0 {
 		return addStruct(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the properties of %s.", name, strconv.Quote(event.Name)), r.schema, true)
 	}
 	payload := &GoStruct{

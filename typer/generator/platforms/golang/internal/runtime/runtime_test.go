@@ -82,6 +82,12 @@ type callerStruct struct {
 
 type callerNode struct{ Next *callerNode }
 
+// callerLoop embeds a pointer to its own type.
+type callerLoop struct {
+	*callerLoop
+	Name string
+}
+
 // callerFields promotes Tags from an embedded pointer to an unexported type,
 // as encoding/json does.
 type (
@@ -105,6 +111,12 @@ type (
 		callerHooks `json:"-"`
 	}
 	callerHooks struct{ OnSend func() }
+	// encoding/json never encodes an unexported field that is not embedded,
+	// even of a struct type.
+	callerPrivate struct {
+		Name  string
+		hooks callerHooks
+	}
 )
 
 type (
@@ -125,7 +137,24 @@ type (
 		embeddedPayload
 		Payload int `json:"other"`
 	}
+	// encoding/json encodes an embedded struct with a JSON name as one
+	// field, even of an unexported type.
+	callerNamed struct {
+		embeddedPayload `json:"named"`
+	}
+	// Both embedded fields have a MarshalJSON, so neither is promoted. With a
+	// JSON name, encoding/json encodes each as one field by its own
+	// MarshalJSON and never sees the functions.
+	callerTwoMarshalers struct {
+		HooksA `json:"a"`
+		HooksB `json:"b"`
+	}
+	HooksA struct{ OnSend func() }
+	HooksB struct{ OnSend func() }
 )
+
+func (HooksA) MarshalJSON() ([]byte, error) { return []byte(`"from A"`), nil }
+func (HooksB) MarshalJSON() ([]byte, error) { return []byte(`"from B"`), nil }
 
 // ptrText and ptrJSON marshal through pointer receivers, which encoding/json
 // calls only on addressable values, such as slice elements and values behind
@@ -199,6 +228,8 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		cyclicSame   = testPayload{AdditionalProperties: map[string]any{}}
 		cyclicShadow = testPayload{AdditionalProperties: map[string]any{}}
 		cyclicCaller = testPayload{AdditionalProperties: map[string]any{}}
+		cyclicNamed  = testPayload{AdditionalProperties: map[string]any{}}
+		cyclicLoop   = &callerLoop{Name: "a"}
 	)
 	cyclicMap["self"] = cyclicMap
 	cyclicObj.AdditionalProperties["self"] = cyclicObj
@@ -210,6 +241,8 @@ func TestSnapshotAndMarshal(t *testing.T) {
 	cyclicSame.AdditionalProperties["same"] = callerSameName{otherPayload: otherPayload{Payload: cyclicSame}}
 	cyclicShadow.AdditionalProperties["shadowed"] = callerShadowed{embeddedPayload: embeddedPayload{Payload: cyclicShadow}}
 	cyclicCaller.AdditionalProperties["caller"] = callerPayload{cyclicCaller}
+	cyclicNamed.AdditionalProperties["named"] = callerNamed{embeddedPayload{Payload: cyclicNamed}}
+	cyclicLoop.callerLoop = cyclicLoop
 
 	tests := []struct {
 		name    string
@@ -454,6 +487,29 @@ func TestSnapshotAndMarshal(t *testing.T) {
 		{name: "channel", in: map[string]any{"c": make(chan int)}, wantErr: true},
 		{name: "function", in: map[string]any{"f": func() {}}, wantErr: true},
 		{name: "complex number", in: map[string]any{"c": complex(1, 2)}, wantErr: true},
+		{
+			// encoding/json sends {"Name":"a"}, skipping the embedded copy
+			// whose fields the outer ones shadow. The walk follows it, and
+			// stops at the depth bound rather than overflowing the stack.
+			name:    "caller struct that embeds a pointer to itself",
+			in:      map[string]any{"loop": cyclicLoop},
+			wantErr: true,
+		},
+		{
+			name: "embedded structs with a JSON name use their own MarshalJSON, as in encoding/json",
+			in:   map[string]any{"s": callerTwoMarshalers{HooksA{OnSend: func() {}}, HooksB{OnSend: func() {}}}},
+			want: map[string]any{"s": map[string]any{"a": "from A", "b": "from B"}},
+		},
+		{
+			name:    "generated value that contains itself through an embedded struct of an unexported type with a JSON name",
+			in:      cyclicNamed,
+			wantErr: true,
+		},
+		{
+			name: "unexported fields that are not embedded are skipped, as in encoding/json",
+			in:   map[string]any{"s": callerPrivate{Name: "a", hooks: callerHooks{OnSend: func() {}}}},
+			want: map[string]any{"s": map[string]any{"Name": "a"}},
+		},
 	}
 
 	for _, tt := range tests {
