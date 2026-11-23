@@ -7,6 +7,7 @@
     "apiKeyName": "X-Api-Key",
     "apiUrl": "https://webhooks.example.com/rudder/events",
     "auth": "apiKeyAuth",
+    "eventFilteringOption": "disable",
     "format": "JSON",
     "headers": [
       {

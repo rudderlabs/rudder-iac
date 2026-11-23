@@ -106,7 +106,7 @@ func TestSQLModelSpecSyntaxValidRule_AllSourceDefinitions(t *testing.T) {
 	t.Parallel()
 
 	sourceDefinitions := []sqlmodel.SourceDefinition{
-		"postgres", "redshift", "snowflake", "bigquery", "mysql", "databricks", "trino",
+		"postgres", "redshift", "snowflake", "bigquery", "mysql", "databricks", "trino", "maxcompute",
 	}
 
 	for _, sd := range sourceDefinitions {
@@ -200,7 +200,7 @@ func TestSQLModelSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 				SQL:              ptr("SELECT 1"),
 			},
 			wantMessages: []string{
-				"'source_definition' must be one of [postgres redshift snowflake bigquery mysql databricks trino]",
+				"'source_definition' must be one of [postgres redshift snowflake bigquery mysql databricks trino maxcompute]",
 			},
 		},
 		{
@@ -338,7 +338,7 @@ func TestSQLModelV1SpecValidation_AllSourceDefinitions(t *testing.T) {
 	t.Parallel()
 
 	sourceDefinitions := []sqlmodel.SourceDefinition{
-		"postgres", "redshift", "snowflake", "bigquery", "mysql", "databricks", "trino",
+		"postgres", "redshift", "snowflake", "bigquery", "mysql", "databricks", "trino", "maxcompute",
 	}
 
 	for _, sd := range sourceDefinitions {
@@ -432,7 +432,7 @@ func TestSQLModelV1SpecValidation_InvalidSpecs(t *testing.T) {
 				SQL:              ptr("SELECT 1"),
 			},
 			wantMessages: []string{
-				"'source_definition' must be one of [postgres redshift snowflake bigquery mysql databricks trino]",
+				"'source_definition' must be one of [postgres redshift snowflake bigquery mysql databricks trino maxcompute]",
 			},
 		},
 		{

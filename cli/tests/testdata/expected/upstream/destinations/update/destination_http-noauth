@@ -2,6 +2,7 @@
   "config": {
     "apiUrl": "https://webhooks.example.com/rudder/events",
     "auth": "noAuth",
+    "eventFilteringOption": "disable",
     "format": "JSON",
     "isBatchingEnabled": true,
     "isDefaultMapping": true,

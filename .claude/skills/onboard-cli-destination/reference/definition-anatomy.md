@@ -132,7 +132,10 @@ Violations fail `newDestinationRegistry` and thus every `cli/internal/app` test:
   optional per source type and per mode.
 - `SyncBehaviours` entries ⊆ {`upsert`, `mirror`, `full`}, and any rETL
   metadata (`SyncBehaviours`, including an empty list, or
-  `SupportsVisualMapper`) requires `warehouse` ∈ `SourceTypes`.
+  `SupportsVisualMapper` / `SupportsVisualMapperV2`) requires `warehouse` ∈
+  `SourceTypes`. The two mapper flags are exclusive upstream: a vdm-next
+  destination carries `SupportsVisualMapperV2` alone, and its connections take
+  their field set from the destination's own config rather than an object.
 - A `consent_management` config field must be `common.ConsentManagement`, and a
   `connection_mode` field must be `common.ConnectionMode`. A bespoke type for
   either is rejected at registration: it would silently opt the key out of the

@@ -15,6 +15,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/importmatcher"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources/state"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/planner"
 	"github.com/rudderlabs/rudder-iac/cli/internal/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/docs"
@@ -657,5 +658,56 @@ func TestCompositeProvider_CheckPlan(t *testing.T) {
 		assert.ErrorIs(t, err, refusal)
 		assert.Same(t, st, a.gotSt)
 		assert.Same(t, st, b.gotSt)
+	})
+}
+
+type importPreviewingProvider struct {
+	*testutils.MockProvider
+	diffs map[string]differ.ResourceDiff
+	err   error
+	gotSt *state.State
+}
+
+func (p *importPreviewingProvider) PreviewImports(_ context.Context, _ *planner.Plan, st *state.State) (map[string]differ.ResourceDiff, error) {
+	p.gotSt = st
+	return p.diffs, p.err
+}
+
+func TestCompositeProvider_PreviewImports(t *testing.T) {
+	t.Parallel()
+
+	t.Run("merges every previewer's diffs and passes the state on", func(t *testing.T) {
+		t.Parallel()
+		a := &importPreviewingProvider{MockProvider: testutils.NewMockProvider([]string{"kindA"}, nil),
+			diffs: map[string]differ.ResourceDiff{"a:one": {URN: "a:one"}}}
+		b := &importPreviewingProvider{MockProvider: testutils.NewMockProvider([]string{"kindB"}, nil),
+			diffs: map[string]differ.ResourceDiff{"b:two": {URN: "b:two"}}}
+		// c has no ImportPreviewer and must be skipped.
+		c := testutils.NewMockProvider([]string{"kindC"}, nil)
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{"a": a, "b": b, "c": c})
+		require.NoError(t, err)
+		previewer, ok := cp.(provider.ImportPreviewer)
+		require.True(t, ok)
+		st := state.EmptyState()
+
+		diffs, err := previewer.PreviewImports(context.Background(), &planner.Plan{}, st)
+
+		require.NoError(t, err)
+		assert.Equal(t, map[string]differ.ResourceDiff{"a:one": {URN: "a:one"}, "b:two": {URN: "b:two"}}, diffs)
+		assert.Same(t, st, a.gotSt)
+		assert.Same(t, st, b.gotSt)
+	})
+
+	t.Run("names the provider whose preview failed", func(t *testing.T) {
+		t.Parallel()
+		failure := errors.New("preview failed")
+		a := &importPreviewingProvider{MockProvider: testutils.NewMockProvider([]string{"kindA"}, nil), err: failure}
+		cp, err := provider.NewCompositeProvider(map[string]provider.Provider{"a": a})
+		require.NoError(t, err)
+
+		_, err = cp.(provider.ImportPreviewer).PreviewImports(context.Background(), &planner.Plan{}, state.EmptyState())
+
+		assert.EqualError(t, err, "previewing imports for provider a: preview failed")
+		assert.ErrorIs(t, err, failure)
 	})
 }

@@ -41,14 +41,14 @@ func TestConnectionSpecSyntaxValidRule_ValidSpecs(t *testing.T) {
 			},
 		},
 		{
-			name: "connection with enabled set",
+			name: "connection explicitly enabled",
 			spec: esConnection.ConnectionsSpec{
 				Connections: []esConnection.ConnectionSpec{
 					{
 						LocalID:     "conn-1",
 						Source:      "#event-stream-source:src-1",
 						Destination: "#destination:dest-1",
-						Enabled:     boolPtr(false),
+						Enabled:     boolPtr(true),
 					},
 				},
 			},
@@ -308,6 +308,25 @@ func TestConnectionSpecSyntaxValidRule_InvalidSpecs(t *testing.T) {
 				{
 					Reference: "/connections/0/destination",
 					Message:   "'destination' must reference a destination (#destination:<id>), got a 'event-stream-source' reference",
+				},
+			},
+		},
+		{
+			name: "connection disabled",
+			spec: esConnection.ConnectionsSpec{
+				Connections: []esConnection.ConnectionSpec{
+					{
+						LocalID:     "conn-1",
+						Source:      "#event-stream-source:src-1",
+						Destination: "#destination:dest-1",
+						Enabled:     boolPtr(false),
+					},
+				},
+			},
+			wantResults: []rules.ValidationResult{
+				{
+					Reference: "/connections/0/enabled",
+					Message:   "'enabled' cannot be false: event stream connections cannot be disabled",
 				},
 			},
 		},

@@ -81,12 +81,9 @@ func validateConsentEntriesShape(basePath string, raw any) []ConfigError {
 }
 
 func validateConsentEntryShape(basePath string, raw any) []ConfigError {
-	if raw == nil {
-		return []ConfigError{{Path: basePath, Message: "consent entry must be an object"}}
-	}
 	entry, ok := raw.(map[string]any)
 	if !ok {
-		return nil
+		return []ConfigError{{Path: basePath, Message: "consent entry must be an object"}}
 	}
 
 	var errors []ConfigError

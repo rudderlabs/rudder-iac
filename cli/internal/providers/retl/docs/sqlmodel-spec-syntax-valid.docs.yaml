@@ -62,7 +62,7 @@ match_behavior:
           - file: "spec.yaml"
             reference: "/source_definition"
             severity: "error"
-            message_contains: "'source_definition' must be one of [postgres redshift snowflake bigquery mysql databricks trino]"
+            message_contains: "'source_definition' must be one of [postgres redshift snowflake bigquery mysql databricks trino maxcompute]"
   # Current spec version (rudder/v1).
   - applies_to:
       - kind: "retl-source-sql-model"
