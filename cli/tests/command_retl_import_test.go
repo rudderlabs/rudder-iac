@@ -41,7 +41,7 @@ const (
 //   - The table source has no single-source import command; `import workspace`
 //     is its only exporter. That command scaffolds every importable resource in
 //     the workspace, so it is not run here (see TestAccountsImportWorkspace for
-//     why that stays opt-in). The test writes an import spec by hand instead: it
+//     why that needs a disposable workspace). The test writes an import spec by hand instead: it
 //     names the account by id rather than by the #account: reference the
 //     exporter emits, since the account is not in the project, but the import
 //     metadata and so the claim on apply are the same. The spec's table differs
