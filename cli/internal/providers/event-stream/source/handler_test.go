@@ -1516,6 +1516,30 @@ func TestEventStreamSourceHandler(t *testing.T) {
 		})
 	})
 
+	t.Run("LoadManaged", func(t *testing.T) {
+		t.Parallel()
+		mockClient := source.NewMockSourceClient()
+		mockClient.SetGetSourcesFunc(func(ctx context.Context) ([]sourceClient.EventStreamSource, error) {
+			return []sourceClient.EventStreamSource{
+				{ID: "remote123", ExternalID: "web-source", Name: "Web Source", Type: "javascript"},
+			}, nil
+		})
+		handler := source.NewHandler(mockClient, importDir)
+
+		collection, err := handler.LoadManaged(context.Background())
+
+		require.NoError(t, err)
+		assert.Equal(t, []sourceClient.ListSourcesOptions{{HasExternalID: boolPtr(true)}}, mockClient.GetSourcesCalls())
+		assert.Equal(t, map[string]*resources.RemoteResource{
+			"remote123": {
+				ID:         "remote123",
+				ExternalID: "web-source",
+				Reference:  "#event-stream-source:web-source",
+				Data:       &sourceClient.EventStreamSource{ID: "remote123", ExternalID: "web-source", Name: "Web Source", Type: "javascript"},
+			},
+		}, collection.GetAll(source.ResourceType))
+	})
+
 	t.Run("LoadImportable", func(t *testing.T) {
 		t.Parallel()
 		mockClient := source.NewMockSourceClient()
