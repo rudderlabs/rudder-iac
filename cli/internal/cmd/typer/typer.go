@@ -57,6 +57,7 @@ func newCmdGenerate() *cobra.Command {
 			$ rudder-cli typer generate --local --location ./project --platform kotlin
 			$ rudder-cli typer generate --tracking-plan-id <id> --tracking-plan-version 3 --platform kotlin
 			$ rudder-cli typer generate --snapshot ./tracking-plan.snapshot.json --platform kotlin
+			$ rudder-cli typer generate --tracking-plan-id <id> --platform go -o internal/ruddertyper
 		`),
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 			defer func() {
