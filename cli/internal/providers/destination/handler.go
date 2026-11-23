@@ -86,6 +86,12 @@ func (h *HandlerImpl) ExtractResourcesFromSpec(_ string, spec *DestinationSpec) 
 	// backend persists (see ApplyDefaults).
 	config := registered.ApplyDefaults(spec.Config)
 
+	// A "#account:<id>" value becomes a PropertyRef the apply framework
+	// resolves; a literal account id is left as written.
+	if err := withAccountRef(spec.Type, config); err != nil {
+		return nil, fmt.Errorf("destination %q: %w", spec.ID, err)
+	}
+
 	resource := &DestinationResource{
 		ID:                spec.ID,
 		DisplayName:       spec.DisplayName,
@@ -234,6 +240,14 @@ func (h *HandlerImpl) MapRemoteToState(
 
 	resource, err := h.remoteResource(remote.Destination, registered, remote.ExternalID)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	// Mirror the spec side: a remote account the CLI manages becomes the same
+	// PropertyRef the spec produces, so the two compare equal. Applied here
+	// rather than in remoteResource because the import preview shares that
+	// reader and resolves the account on the spec side instead.
+	if err := remoteAccountRef(registered.Type, resource.Config, urnResolver); err != nil {
 		return nil, nil, err
 	}
 
@@ -491,6 +505,13 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 		return nil, fmt.Errorf("masking destination %s secrets: %w", remote.ID, err)
 	}
 
+	// A type whose account the CLI can adopt names it by reference, so the
+	// written spec points at the account spec import writes beside it instead of
+	// carrying an opaque id.
+	if err := exportAccountRef(registered.Type, localConfig, inputResolver); err != nil {
+		return nil, fmt.Errorf("resolving account reference for destination %s: %w", remote.ID, err)
+	}
+
 	specMap := map[string]any{
 		"id":                 externalID,
 		"display_name":       remote.Name,
@@ -565,6 +586,13 @@ func (h *HandlerImpl) localConfigToAPI(destType string, version int64, local map
 	registered, err := h.registry.Get(destType, version)
 	if err != nil {
 		return nil, fmt.Errorf("getting destination definition: %w", err)
+	}
+
+	// An account reference is a PropertyRef in the graph; the API wants the
+	// remote id it resolved to.
+	local, err = flattenAccountRef(local)
+	if err != nil {
+		return nil, err
 	}
 
 	// Reveal before conversion: LocalToAPI json.Marshals the map, and a
