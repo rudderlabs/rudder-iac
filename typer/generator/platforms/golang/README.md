@@ -6,10 +6,10 @@ Generates a type-safe Go package for a tracking plan on top of analytics-go. Eac
 
 - `rudder-cli typer generate --platform go --tracking-plan-id <id>` generates from your workspace's tracking plan. `rudder-cli typer generate --platform go --local --location <project>` generates from local specs; with `--local`, `--tracking-plan-id` takes the plan's local id and can be left out when the project has one plan ([Target Versions][spec]).
 - `rudder-cli typer options --platform go` lists the options; set one with `--option name=value` ([Generator Options][spec]).
-- The output is one file, `ruddertyper.go` in package `ruddertyper`; the `outputFileName` and `packageName` options rename them ([Generator Options][spec]). `--output` (`-o`) sets its directory, `.` by default: point it at the package's own directory, such as `-o internal/ruddertyper`.
+- The output is one file, `ruddertyper.go` in package `ruddertyper`; the `outputFileName` and `packageName` options rename them ([Generator Options][spec]). `--output` (`-o`) sets its directory, `.` by default: point it at the package's own directory, such as `-o internal/ruddertyper`. Keep the file alone in its package: it declares unexported helpers with generic names, such as `snapshot`, `marshal` and `wire`, that another file there could also declare ([Generated File Structure][spec]).
 - Never edit the file; regenerate it after every tracking plan change ([Generated File Structure][spec]).
 - It needs Go 1.21 or later and analytics-go v4.2.2 or later, imported as `analytics "github.com/rudderlabs/analytics-go/v4"` ([Target Versions][spec]).
-- Go fails generation on some plan shapes that other platforms accept, such as one match value in two cases of a variant ([Plan Shapes That Fail Generation][appendix]).
+- Go fails generation on some plan shapes that other platforms accept, such as one match value in two cases of a variant, or an explicit `enum: []` ([Plan Shapes That Fail Generation][appendix]).
 
 ## Wiring
 
@@ -29,7 +29,7 @@ user := ruddertyper.Identity{UserID: "user-123"}
 
 - Every method takes an `Identity` first. Set `UserID`, `AnonymousID` or both: the SDK keeps no current user and rejects a call that sets neither ([Generated File Structure][spec]).
 - Payloads are generated types. For a struct payload, track takes a value and page, screen, identify and group take a pointer (`nil` sends no payload); variant and open-map payloads are passed as is. An event whose rule allows no properties has no payload parameter ([Event Types][spec]).
-- Generated names come from the plan: `Track{Event}` takes a `Track{Event}Properties`, custom types are `CustomType{Name}` and variant cases `{Type}Case{Match}`. A name already taken gets a numeric suffix, such as `Identify1` for a second identify rule ([Naming Conventions][spec]).
+- Generated names come from the plan: `Track{Event}` takes a `Track{Event}Properties`, custom types are `CustomType{Name}` and variant cases `{Type}Case{Match}`. A name already taken gets a numeric suffix, such as `TrackEventWithNameCamelCase1` for the event `eventWithNameCamelCase` when `$eventWithNameCamelCase$!` has taken `TrackEventWithNameCamelCase` ([Naming Conventions][spec]).
 - Required fields hold values, and optional fields pointers (or `nil`-able slices, maps and interfaces). Set an optional scalar with `Ptr`; integer fields need `ruddertyper.Ptr[int64](2)`, because `Ptr(2)` is an `*int` ([Required and Optional Fields][spec]).
 
 ```go
@@ -106,7 +106,8 @@ err = rt.Page(
 - Go cannot force a field to be set, so an unset required field is sent as its zero value (`""`, `0`, `false`, `[]`). Unions without a `null` member, mixed enums and variants have no valid zero value, so an unset one fails the call with `ErrInvalidValue` ([Required and Optional Fields][spec], [Plan Shapes That Fail Generation][appendix]).
 - To catch unset required fields at lint time, enable the `exhaustruct` linter for the packages that build payloads ([Required and Optional Fields][spec]).
 - Generated code checks shapes, not values: an enum accepts any value of its type, and so does a variant's `Default` (see Calling). Check untrusted input with the enum's `IsValid()` ([Errors][spec], [Enums][spec]).
-- Identify traits go where the rule's identity section says, `traits` or `context.traits`, while analytics.js always sends them in `context.traits`. Group traits always go to `traits` ([Identity Sections][spec]).
+- A value that contains itself fails the call with `ErrInvalidValue`, except for a cycle that runs through your own type's `MarshalJSON` or `MarshalText`. The check cannot see inside those methods, so that cycle overflows the stack and crashes the program ([Serialization Internals][appendix]).
+- Identify traits go where the rule's identity section says, `traits` or `context.traits`, while analytics.js always sends them in `context.traits`. Group traits always go to `traits`, even for a `context.traits` rule: TypeScript does the same, while Kotlin and Swift send them in `context.traits` ([Identity Sections][spec]).
 - Nothing carries over between calls: an event sent after `Identify` has no `context.traits` unless you pass them ([Identify Events][spec]):
 
 ```go
