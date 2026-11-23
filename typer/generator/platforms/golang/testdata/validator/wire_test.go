@@ -153,6 +153,10 @@ func TestTrackWire(t *testing.T) {
 	)
 	require.NoError(t, closed.Close())
 
+	// The wide slice row's item count: twice maxDepth (1000) plus one, so a
+	// bound that counted siblings or every visit, not the path, would fail it.
+	const width = 2001
+
 	// The rows share one capture, which sets ex and ref when it starts and msgID
 	// to each row's name before its call. A row that sends passes msgID to
 	// WithMessageID, and its messages are looked up by that ID, not by position:
@@ -373,6 +377,19 @@ func TestTrackWire(t *testing.T) {
 			name: "a closed client returns the SDK's ErrClosed",
 			call: func() error { return examples.New(closed).TrackSomeEmptyTrackEvent(id) },
 			same: analytics.ErrClosed,
+		},
+		{
+			name: "the depth bound is per path, so a slice wider than maxDepth is sent whole",
+			call: func() error {
+				wide := make([]any, width)
+				for i := range wide {
+					wide[i] = map[string]any{"k": "x"}
+				}
+				return ex.TrackSomeEmptyTrackEventWithAdditionalProperties(id, map[string]any{"wide": wide}, examples.WithMessageID(msgID))
+			},
+			want: `{"type": "track", "channel": "server", "event": "Some Empty Track Event With Additional Properties", "userId": "user-123",
+				"properties": {"wide": [` + strings.TrimSuffix(strings.Repeat(`{"k": "x"}, `, width), ", ") + `]},
+				"context": {"ruddertyper": ` + exMeta + `}}`,
 		},
 		{
 			name: "a self-containing map is invalid",
