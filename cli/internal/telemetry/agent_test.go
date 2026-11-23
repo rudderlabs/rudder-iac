@@ -3,94 +3,161 @@ package telemetry
 import (
 	"testing"
 
-	"github.com/spf13/viper"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
-// clearAgentEnv empties every variable Agent reads, so the tests pass the same
-// way from a coding agent's shell as from a person's.
+// clearAgentEnv empties every variable Agent and Skill read, so the tests pass
+// the same way from a coding agent's shell as from a person's.
 func clearAgentEnv(t *testing.T) {
 	t.Helper()
-	t.Setenv(AgentEnvVar, "")
-	t.Setenv("AI_AGENT", "")
-	t.Setenv(SkillEnvVar, "")
+	for _, env := range []string{agentEnvVar, aiAgentEnvVar, skillEnvVar} {
+		t.Setenv(env, "")
+	}
 	for _, a := range agentEnv {
 		t.Setenv(a.env, "")
 	}
 }
 
 func TestAgent(t *testing.T) {
-	cases := []struct {
+	tests := []struct {
 		name string
 		env  map[string]string
 		want string
 	}{
-		{"nothing set", nil, ""},
-		{"claude code", map[string]string{"CLAUDECODE": "1"}, "claude-code"},
-		{"cursor agent", map[string]string{"CURSOR_AGENT": "1"}, "cursor"},
-		{"codex", map[string]string{"CODEX_THREAD_ID": "abc"}, "codex"},
-		{"copilot", map[string]string{"COPILOT_MODEL": "gpt"}, "copilot"},
-		{"a person in Cursor's terminal", map[string]string{"CURSOR_TRACE_ID": "abc"}, ""},
-		{"AI_AGENT names it", map[string]string{"AI_AGENT": "Amp"}, "amp"},
-		{"our variable wins", map[string]string{AgentEnvVar: "rudder-setup", "AI_AGENT": "amp", "CLAUDECODE": "1"}, "rudder-setup"},
-		{"an unusable name falls through", map[string]string{AgentEnvVar: " ;()", "CLAUDECODE": "1"}, "claude-code"},
-		{"a name is cleaned and cut", map[string]string{AgentEnvVar: "My Agent\r\nX-Evil: 1 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "myagentx-evil1aaaaaaaaaaaaaaaaaa"},
+		{name: "nothing set", want: ""},
+		{
+			name: "a person in Cursor's terminal",
+			env:  map[string]string{"CURSOR_TRACE_ID": "abc"},
+			want: "",
+		},
+		{
+			name: "a person with Copilot settings exported",
+			env:  map[string]string{"COPILOT_MODEL": "gpt", "COPILOT_ALLOW_ALL": "1"},
+			want: "",
+		},
+		{
+			name: "AI_AGENT names it",
+			env:  map[string]string{aiAgentEnvVar: "Amp"},
+			want: "amp",
+		},
+		{
+			name: "AI_AGENT is kept as Claude Code writes it, version included",
+			env:  map[string]string{"CLAUDECODE": "1", aiAgentEnvVar: "claude-code_2-1-330_agent"},
+			want: "claude-code_2-1-330_agent",
+		},
+		{
+			name: "our variable wins",
+			env:  map[string]string{agentEnvVar: "rudder-setup", aiAgentEnvVar: "amp", "CLAUDECODE": "1"},
+			want: "rudder-setup",
+		},
+		{
+			name: "a name with a space matches the detected one",
+			env:  map[string]string{agentEnvVar: " Claude Code "},
+			want: "claude-code",
+		},
+		{
+			name: "an unusable name falls through",
+			env:  map[string]string{agentEnvVar: ";()", "CLAUDECODE": "1"},
+			want: "claude-code",
+		},
+		{
+			name: "a name is cleaned and cut",
+			env:  map[string]string{agentEnvVar: "My Agent\r\nX-Evil: 1 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+			want: "my-agentx-evil-1-aaaaaaaaaaaaaaa",
+		},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			clearAgentEnv(t)
-			for k, v := range tc.env {
+			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
-			assert.Equal(t, tc.want, Agent())
+			assert.Equal(t, tt.want, Agent())
 		})
 	}
 }
 
-func TestUserAgent(t *testing.T) {
-	set := func(t *testing.T, disabled bool, id string) {
-		t.Helper()
-		viper.Set("telemetry.disabled", disabled)
-		viper.Set("telemetry.anonymousId", id)
-		t.Cleanup(func() {
-			viper.Set("telemetry.disabled", nil)
-			viper.Set("telemetry.anonymousId", nil)
+// Every row of agentEnv names its agent when its variable is the only one set.
+func TestAgentFromEachVariable(t *testing.T) {
+	for _, a := range agentEnv {
+		t.Run(a.env, func(t *testing.T) {
+			clearAgentEnv(t)
+			t.Setenv(a.env, "1")
+			assert.Equal(t, a.name, Agent())
 		})
 	}
+}
 
-	t.Run("agent and telemetry id", func(t *testing.T) {
+func TestAgentProps(t *testing.T) {
+	t.Run("a person sends neither", func(t *testing.T) {
+		clearAgentEnv(t)
+		assert.Empty(t, AgentProps())
+	})
+
+	t.Run("agent and skill", func(t *testing.T) {
 		clearAgentEnv(t)
 		t.Setenv("CLAUDECODE", "1")
-		set(t, false, "0b0e7a1c-id")
-		assert.Equal(t, "rudder-cli/1.2.3 (agent=claude-code; telemetry-id=0b0e7a1c-id)", UserAgent("1.2.3"))
+		t.Setenv(skillEnvVar, "Rudder-Setup")
+		assert.Equal(t, map[string]any{"agent": "claude-code", "skill": "rudder-setup"}, AgentProps())
 	})
+}
 
-	t.Run("agent, skill and telemetry id", func(t *testing.T) {
-		clearAgentEnv(t)
-		t.Setenv("CLAUDECODE", "1")
-		t.Setenv(SkillEnvVar, "Rudder-Setup")
-		set(t, false, "0b0e7a1c-id")
-		assert.Equal(t, "rudder-setup", Skill())
-		assert.Equal(t, "rudder-cli/1.2.3 (agent=claude-code; skill=rudder-setup; telemetry-id=0b0e7a1c-id)", UserAgent("1.2.3"))
-	})
+func TestUserAgent(t *testing.T) {
+	// A real id, at its real length: the header must carry all of it.
+	id := uuid.New().String()
 
-	t.Run("a person, telemetry on", func(t *testing.T) {
-		clearAgentEnv(t)
-		set(t, false, "0b0e7a1c-id")
-		assert.Equal(t, "rudder-cli/1.2.3 (telemetry-id=0b0e7a1c-id)", UserAgent("1.2.3"))
-	})
+	tests := []struct {
+		name     string
+		env      map[string]string
+		disabled bool
+		id       string
+		want     string
+	}{
+		{
+			name: "agent and telemetry id",
+			env:  map[string]string{"CLAUDECODE": "1"},
+			id:   id,
+			want: "rudder-cli/1.2.3 (agent=claude-code; telemetry-id=" + id + ")",
+		},
+		{
+			name: "agent, skill and telemetry id",
+			env:  map[string]string{"CLAUDECODE": "1", skillEnvVar: "rudder-setup"},
+			id:   id,
+			want: "rudder-cli/1.2.3 (agent=claude-code; skill=rudder-setup; telemetry-id=" + id + ")",
+		},
+		{
+			name: "a person, telemetry on",
+			id:   id,
+			want: "rudder-cli/1.2.3 (telemetry-id=" + id + ")",
+		},
+		{
+			name:     "telemetry off sends the version alone",
+			env:      map[string]string{"CLAUDECODE": "1"},
+			disabled: true,
+			id:       id,
+			want:     "rudder-cli/1.2.3",
+		},
+		{
+			name: "no id yet and no agent",
+			want: "rudder-cli/1.2.3",
+		},
+		{
+			name: "an id that is not a UUID is left out",
+			id:   "x\r\nX-Evil: 1",
+			want: "rudder-cli/1.2.3",
+		},
+	}
 
-	t.Run("telemetry off sends the version alone", func(t *testing.T) {
-		clearAgentEnv(t)
-		t.Setenv("CLAUDECODE", "1")
-		set(t, true, "0b0e7a1c-id")
-		assert.Equal(t, "rudder-cli/1.2.3", UserAgent("1.2.3"))
-	})
-
-	t.Run("no id yet and no agent", func(t *testing.T) {
-		clearAgentEnv(t)
-		set(t, false, "")
-		assert.Equal(t, "rudder-cli/1.2.3", UserAgent("1.2.3"))
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearAgentEnv(t)
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+			setTelemetry(t, tt.disabled, tt.id)
+			assert.Equal(t, tt.want, UserAgent("1.2.3"))
+		})
+	}
 }
