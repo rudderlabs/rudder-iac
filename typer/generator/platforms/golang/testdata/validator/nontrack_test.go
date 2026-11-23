@@ -348,6 +348,26 @@ func TestNonTrackWire(t *testing.T) {
 			},
 			want: messageJSON(exMeta, "group", `, "groupId": "g1"`),
 		},
+		{
+			name: "examples: identify with no identity returns the SDK's FieldError",
+			call: func() error { return ex.Identify(examples.Identity{}, nil) },
+			err:  analytics.FieldError{Type: "analytics.Identify", Name: "UserId", Value: ""},
+		},
+		{
+			name: "examples: group with no identity returns the SDK's FieldError",
+			call: func() error { return ex.Group(examples.Identity{}, "g1", nil) },
+			err:  analytics.FieldError{Type: "analytics.Group", Name: "UserId", Value: ""},
+		},
+		{
+			name: "examples: page with no identity returns the SDK's FieldError",
+			call: func() error { return ex.Page(examples.Identity{}, "", nil) },
+			err:  analytics.FieldError{Type: "analytics.Page", Name: "UserId", Value: ""},
+		},
+		{
+			name: "examples: screen with no identity returns the SDK's FieldError",
+			call: func() error { return ex.Screen(examples.Identity{}, "", nil) },
+			err:  analytics.FieldError{Type: "analytics.Screen", Name: "UserId", Value: ""},
+		},
 	}
 
 	assertWireRows(t, func(client analytics.Client) {

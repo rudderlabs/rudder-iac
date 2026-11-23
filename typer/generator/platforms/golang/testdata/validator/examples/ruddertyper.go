@@ -607,7 +607,12 @@ type PropertyCleared = Null
 
 // PropertyCode represents the property "code", whose allowed values have different JSON types.
 // Values can only be obtained from the functions below; the zero value cannot be sent.
-type PropertyCode struct{ value any }
+type PropertyCode struct {
+	// A field type unique to this enum, so another enum cannot be converted
+	// to it. It comes first because a zero-size last field adds padding.
+	_     [0]*PropertyCode
+	value any
+}
 
 // PropertyCodeA returns the allowed value "a".
 func PropertyCodeA() PropertyCode { return PropertyCode{value: "a"} }
@@ -2653,7 +2658,7 @@ func (v TrackEventWithNameCamelCaseProperties1) MarshalJSON() ([]byte, error) {
 
 // --- Events ---
 
-// Group sends the group event. traits may be nil, which sends no traits.
+// Group sends the group event. traits may be nil, which sends no traits. The traits are sent as the message's traits.
 //
 // Associates user with their company.
 func (r *RudderTyperAnalytics) Group(identity Identity, groupID string, traits *GroupTraits, opts ...Option) error {
@@ -2667,7 +2672,7 @@ func (r *RudderTyperAnalytics) Group(identity Identity, groupID string, traits *
 	return r.group(identity, groupID, t, opts)
 }
 
-// Group1 sends the group event "Open". traits may be nil; it is copied, so it can be reused after the call.
+// Group1 sends the group event "Open". traits may be nil; it is copied, so it can be reused after the call. The traits are sent as the message's traits.
 func (r *RudderTyperAnalytics) Group1(identity Identity, groupID string, traits GroupOpenTraits, opts ...Option) error {
 	t, err := snapshot(traits)
 	if err != nil {
@@ -2676,7 +2681,7 @@ func (r *RudderTyperAnalytics) Group1(identity Identity, groupID string, traits 
 	return r.group(identity, groupID, t, opts)
 }
 
-// Group2 sends the group event "Variant". traits may be nil, including a nil pointer, which sends no traits.
+// Group2 sends the group event "Variant". traits may be nil, including a nil pointer, which sends no traits. The traits are sent as the message's traits; context.traits holds the user's traits, not the group's.
 func (r *RudderTyperAnalytics) Group2(identity Identity, groupID string, traits GroupVariantTraits, opts ...Option) error {
 	if isNil(traits) {
 		return r.group(identity, groupID, nil, opts)
@@ -2688,7 +2693,7 @@ func (r *RudderTyperAnalytics) Group2(identity Identity, groupID string, traits 
 	return r.group(identity, groupID, t, opts)
 }
 
-// Identify sends the identify event. traits may be nil, which sends no traits.
+// Identify sends the identify event. traits may be nil, which sends no traits. The traits are sent as the message's traits.
 //
 // Identifies a user with their traits.
 func (r *RudderTyperAnalytics) Identify(identity Identity, traits *IdentifyTraits, opts ...Option) error {
@@ -2702,7 +2707,7 @@ func (r *RudderTyperAnalytics) Identify(identity Identity, traits *IdentifyTrait
 	return r.identify(identity, t, false, opts)
 }
 
-// Identify1 sends the identify event "Open". traits may be nil; it is copied, so it can be reused after the call.
+// Identify1 sends the identify event "Open". traits may be nil; it is copied, so it can be reused after the call. The traits are sent as the message's traits.
 func (r *RudderTyperAnalytics) Identify1(identity Identity, traits IdentifyOpenTraits, opts ...Option) error {
 	t, err := snapshot(traits)
 	if err != nil {
@@ -3170,7 +3175,11 @@ type (
 // the stack.
 const maxDepth = 1000
 
-var errTooDeep = fmt.Errorf("%w: value nests more than %d levels deep or contains itself", ErrInvalidValue, maxDepth)
+// errTooDeep is a function because the three sentinels are the only package
+// variables a generated file may declare.
+func errTooDeep() error {
+	return fmt.Errorf("%w: value nests more than %d levels deep or contains itself", ErrInvalidValue, maxDepth)
+}
 
 // snapshot converts v into what the SDK receives: new maps and slices holding
 // strings, bools, numbers and nil. The SDK serializes later on another
@@ -3201,7 +3210,7 @@ func marshal(v any) ([]byte, error) {
 // invalid Nullable.
 func wire(rv reflect.Value, depth int) (any, error) {
 	if depth > maxDepth {
-		return nil, errTooDeep
+		return nil, errTooDeep()
 	}
 	depth++
 	if !rv.IsValid() {
@@ -3331,7 +3340,7 @@ func foreign(rv reflect.Value, depth int) (any, error) {
 // omitempty leaves out.
 func walkFields(rv reflect.Value, depth int) error {
 	if depth > maxDepth {
-		return errTooDeep
+		return errTooDeep()
 	}
 	for i := 0; i < rv.NumField(); i++ {
 		f, fv := rv.Type().Field(i), rv.Field(i)

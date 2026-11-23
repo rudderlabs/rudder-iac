@@ -69,6 +69,9 @@ type eventRule struct {
 	schema *objectSchema
 	// variant is set when the rule has variants; schema is then their base.
 	variant *variantSchema
+	// paired is set on the identify and group rules of an event that has a
+	// rule on each section, which are named by section.
+	paired bool
 }
 
 // objectSchema is an object schema with its fields in byte order of their wire
@@ -168,6 +171,13 @@ func newContext(p *plan.TrackingPlan, version, packageName string) (*GoContext, 
 		return nil, err
 	}
 
+	// Every payload name is registered before the structs payloads hoist, so
+	// an event's payload type keeps its name whatever the other events hoist.
+	for _, r := range rules {
+		if _, err := payloadName(registry, r); err != nil {
+			return nil, err
+		}
+	}
 	ctx.out = &ctx.Payloads
 	for _, r := range rules {
 		if err := addRule(ctx, r, propertyTypes, registry); err != nil {
@@ -219,24 +229,18 @@ func eventRules(p *plan.TrackingPlan) ([]eventRule, []*customType, error) {
 	)
 	for _, r := range all {
 		// The resolver relies on the cycle check to end. It runs before the
-		// section check, so a rule left out still fails generation on a custom
-		// type that refers to itself.
+		// event type and section checks, so a rule left out still fails
+		// generation on a custom type that refers to itself.
 		if err := cycles.rule(r.rule); err != nil {
 			return nil, nil, err
 		}
 
-		event := r.rule.Event
-		if !validSection(r.rule) {
-			// Kotlin's warning, word for word.
-			msg := fmt.Sprintf("invalid section %q for event type %q", r.rule.Section, event.EventType)
-			if event.Name != "" {
-				msg += fmt.Sprintf(" and event name %q", event.Name)
-			}
+		if msg := skipWarning(r.rule); msg != "" {
 			core.Warn(msg)
 			continue
 		}
 		var (
-			where = strings.TrimPrefix(eventLabel(event), "the ")
+			where = strings.TrimPrefix(eventLabel(r.rule.Event), "the ")
 			err   error
 		)
 		if r.schema, err = res.schema(&r.rule.Schema, where, ""); err != nil {
@@ -247,6 +251,23 @@ func eventRules(p *plan.TrackingPlan) ([]eventRule, []*customType, error) {
 			return nil, nil, err
 		}
 		rules = append(rules, r)
+	}
+
+	// Only identify and group take two sections, so an event whose kept rules
+	// have two is a pair.
+	type eventID struct {
+		typ  plan.EventType
+		name string
+	}
+	sections := map[eventID][]plan.IdentitySection{}
+	for _, r := range rules {
+		id := eventID{r.rule.Event.EventType, r.rule.Event.Name}
+		if !slices.Contains(sections[id], r.rule.Section) {
+			sections[id] = append(sections[id], r.rule.Section)
+		}
+	}
+	for i, r := range rules {
+		rules[i].paired = len(sections[eventID{r.rule.Event.EventType, r.rule.Event.Name}]) > 1
 	}
 
 	// Like property types, only the custom types an emitted field needs are
@@ -814,35 +835,56 @@ func addCustomTypes(ctx *GoContext, customTypes []*customType, propertyTypes map
 	return nil
 }
 
-// addRule adds the payload type and method of one event rule. Names take the
-// event type as prefix ({Type}{Event}, {Type}{Event}{Payload}), except the
-// identify and group methods, which keep their type's name as on the other
-// platforms.
-func addRule(ctx *GoContext, r eventRule, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) error {
+// ruleNames returns the method and payload type names rule r requests. Names
+// take the event type as prefix ({Type}{Event}, {Type}{Event}{Payload}),
+// except the identify and group methods, which keep their type's name as on
+// the other platforms. A pair of rules, one per section, is named by section
+// instead ({Type}OnTraits with {Type}{Event}Traits, {Type}OnContextTraits with
+// {Type}{Event}ContextTraits) and neither takes the bare name, so the names do
+// not depend on rule-key order, and adding or removing either rule fails the
+// callers of the other to compile instead of sending their traits elsewhere.
+func ruleNames(r eventRule) (method, payload string, err error) {
 	var (
-		event   = r.rule.Event
-		typ     = string(event.EventType)
-		prefix  = strings.ToUpper(typ[:1]) + typ[1:]
-		payload = payloadNoun(event.EventType)
-		base    string
+		event  = r.rule.Event
+		typ    = string(event.EventType)
+		prefix = strings.ToUpper(typ[:1]) + typ[1:]
+		base   string
 	)
 	// Only a track event must have a name; the type names the others.
 	if event.Name != "" || event.EventType == plan.EventTypeTrack {
-		var err error
 		if base, err = pascalCase(event.Name); err != nil {
-			return fmt.Errorf("naming %s event %q: %w", typ, event.Name, err)
+			return "", "", fmt.Errorf("naming %s event %q: %w", typ, event.Name, err)
 		}
 	}
 
-	st, err := addPayload(ctx, r, prefix+base+payload, payload, propertyTypes, registry)
+	switch {
+	case r.paired:
+		section := "Traits"
+		if r.rule.Section == plan.IdentitySectionContextTraits {
+			section = "ContextTraits"
+		}
+		return prefix + "On" + section, prefix + base + section, nil
+	case event.EventType == plan.EventTypeIdentify || event.EventType == plan.EventTypeGroup:
+		return prefix, prefix + base + payloadNoun(event.EventType), nil
+	}
+	return prefix + base, prefix + base + payloadNoun(event.EventType), nil
+}
+
+// addRule adds the payload type and method of one event rule.
+func addRule(ctx *GoContext, r eventRule, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) error {
+	var (
+		event = r.rule.Event
+		typ   = string(event.EventType)
+	)
+	name, _, err := ruleNames(r)
+	if err != nil {
+		return err
+	}
+	st, err := addPayload(ctx, r, propertyTypes, registry)
 	if err != nil {
 		return err
 	}
 
-	name := prefix + base
-	if event.EventType == plan.EventTypeIdentify || event.EventType == plan.EventTypeGroup {
-		name = prefix
-	}
 	method, err := registry.RegisterName("method:"+r.key, methodScope, name)
 	if err != nil {
 		return fmt.Errorf("registering the method of %s event %q: %w", typ, event.Name, err)
@@ -856,27 +898,46 @@ func addRule(ctx *GoContext, r eventRule, propertyTypes map[propertyKey]property
 	return nil
 }
 
-// addPayload adds the payload type requested of a rule, which holds its
-// payload (Properties or Traits), or returns nil when the rule's schema is
-// empty and closed.
-func addPayload(ctx *GoContext, r eventRule, requested, payload string, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) (*GoStruct, error) {
+// payloadName registers the payload type name ruleNames requests for rule r
+// and returns it, or returns "" when the rule's schema is empty and closed,
+// so it has no payload. A rule's name is registered once; later calls return
+// it.
+func payloadName(registry *core.NameRegistry, r eventRule) (string, error) {
 	var (
 		event  = r.rule.Event
 		schema = r.rule.Schema
-		label  = eventLabel(event)
-		noun   = strings.ToLower(payload)
 	)
 	if len(schema.Properties) == 0 && !schema.AdditionalProperties {
-		return nil, nil
+		return "", nil
+	}
+	_, requested, err := ruleNames(r)
+	if err != nil {
+		return "", err
+	}
+	name, err := registry.RegisterName("payload:"+r.key, packageScope, requested)
+	if err != nil {
+		return "", fmt.Errorf("registering the payload of %s event %q: %w", event.EventType, event.Name, err)
+	}
+	return name, nil
+}
+
+// addPayload adds the payload type of a rule, which holds its payload
+// (Properties or Traits), or returns nil when the rule's schema is empty and
+// closed.
+func addPayload(ctx *GoContext, r eventRule, propertyTypes map[propertyKey]propertyType, registry *core.NameRegistry) (*GoStruct, error) {
+	var (
+		event   = r.rule.Event
+		payload = payloadNoun(event.EventType)
+		label   = eventLabel(event)
+		noun    = strings.ToLower(payload)
+	)
+	name, err := payloadName(registry, r)
+	if name == "" || err != nil {
+		return nil, err
 	}
 	// A track payload's doc names the event alone, as it always has a name.
 	if event.EventType == plan.EventTypeTrack {
 		label = strconv.Quote(event.Name)
-	}
-
-	name, err := registry.RegisterName("payload:"+r.key, packageScope, requested)
-	if err != nil {
-		return nil, fmt.Errorf("registering the payload of %s event %q: %w", event.EventType, event.Name, err)
 	}
 	if r.variant != nil {
 		v, err := addVariant(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the %s of %s", name, noun, label), "", r.variant, payload)
@@ -885,7 +946,7 @@ func addPayload(ctx *GoContext, r eventRule, requested, payload string, property
 		}
 		return &GoStruct{Name: name, Noun: payload, Variant: v}, nil
 	}
-	if len(schema.Properties) > 0 {
+	if len(r.rule.Schema.Properties) > 0 {
 		return addStruct(ctx, registry, propertyTypes, name, fmt.Sprintf("%s holds the %s of %s.", name, noun, label), r.schema, payload)
 	}
 	st := &GoStruct{

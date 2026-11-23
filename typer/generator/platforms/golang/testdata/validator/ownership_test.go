@@ -5,11 +5,13 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"time"
 
 	analytics "github.com/rudderlabs/analytics-go/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang/testdata/validator/examples"
 	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang/testdata/validator/ruddertyper"
 )
 
@@ -32,9 +34,16 @@ func sendAndChange(t *testing.T, client analytics.Client) {
 	var (
 		unicode = "a"
 		props   = ruddertyper.TrackUserSignedUpProperties{
-			ArrayOfAny:     []any{"x", []any{"y"}},
+			ArrayOfAny: []any{"x", []any{"y"}},
+			Context: &ruddertyper.TrackUserSignedUpPropertiesContext{
+				IPAddress: "10.0.0.1",
+				NestedContext: ruddertyper.TrackUserSignedUpPropertiesContextNestedContext{
+					Profile: &ruddertyper.CustomTypeUserProfile{Email: "a@b.c"},
+				},
+			},
 			MixedUnicode:   &unicode,
 			ObjectProperty: map[string]any{"nested": map[string]any{"k": "v"}},
+			ProfileList:    ruddertyper.PropertyProfileList{{Email: "a@b.c"}},
 			PropertyOfAny:  []string{"z"},
 		}
 		open = map[string]any{"list": []any{"x"}}
@@ -53,8 +62,10 @@ func sendAndChange(t *testing.T, client analytics.Client) {
 	unicode = "changed"
 	props.ArrayOfAny[0] = "changed"
 	props.ArrayOfAny[1].([]any)[0] = "changed"
+	props.Context.NestedContext.Profile.Email = "changed"
 	props.ObjectProperty["nested"].(map[string]any)["k"] = "changed"
 	props.ObjectProperty["added"] = true
+	props.ProfileList[0].Email = "changed"
 	props.PropertyOfAny.([]string)[0] = "changed"
 
 	require.NoError(t, rt.TrackEmptyEventWithAdditionalProps(identity, open, opts...))
@@ -91,11 +102,16 @@ func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
 			UserId: "user-123",
 			Event:  "User Signed Up",
 			Properties: analytics.Properties{
-				"active":          false,
-				"array_of_any":    []any{"x", []any{"y"}},
+				"active":       false,
+				"array_of_any": []any{"x", []any{"y"}},
+				"context": map[string]any{
+					"ip_address":     "10.0.0.1",
+					"nested_context": map[string]any{"profile": map[string]any{"email": "a@b.c", "first_name": ""}},
+				},
 				"mixed_unicode":   "a",
 				"object_property": map[string]any{"nested": map[string]any{"k": "v"}},
 				"profile":         map[string]any{"email": "", "first_name": ""},
+				"profile_list":    []any{map[string]any{"email": "a@b.c", "first_name": ""}},
 				"property_of_any": []any{"z"},
 			},
 			Context:      context,
@@ -111,6 +127,59 @@ func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
 	}, client.messages)
 }
 
+// The SDK fills messageId, originalTimestamp and, except on identify,
+// anonymousId before the wire, so only the message handed to Enqueue shows
+// that the options reach it and that the generated code invents none of them.
+func TestNonTrackMethodsPassOptions(t *testing.T) {
+	var (
+		client       = &fakeClient{}
+		ex           = examples.New(client)
+		id           = examples.Identity{UserID: "user-123"}
+		integrations = analytics.Integrations{"All": false, "Amplitude": true}
+		timestamp    = time.Date(2026, 9, 29, 10, 0, 0, 0, time.UTC)
+		opts         = func(messageID string) []examples.Option {
+			return []examples.Option{
+				examples.WithIntegrations(integrations), examples.WithTimestamp(timestamp), examples.WithMessageID(messageID),
+			}
+		}
+	)
+
+	require.NoError(t, ex.Identify(id, nil))
+	require.NoError(t, ex.Identify(id, nil, opts("identify-1")...))
+	require.NoError(t, ex.Group(id, "g1", nil))
+	require.NoError(t, ex.Group(id, "g1", nil, opts("group-1")...))
+	require.NoError(t, ex.Page(id, "Home", nil))
+	require.NoError(t, ex.Page(id, "Home", nil, opts("page-1")...))
+	require.NoError(t, ex.Screen(id, "Home", nil))
+	require.NoError(t, ex.Screen(id, "Home", nil, opts("screen-1")...))
+
+	// Without WithIntegrations the copy of the nil map is empty, which the SDK
+	// omits from the wire.
+	none := analytics.Integrations{}
+	context := &analytics.Context{Extra: map[string]any{
+		"ruddertyper": map[string]any{
+			"platform":            "go",
+			"rudderCLIVersion":    "1.0.0",
+			"trackingPlanId":      "plan_examples",
+			"trackingPlanVersion": 0,
+		},
+	}}
+	assert.Equal(t, []analytics.Message{
+		analytics.Identify{UserId: "user-123", Context: context, Integrations: none},
+		analytics.Identify{UserId: "user-123", Context: context,
+			Integrations: integrations, OriginalTimestamp: timestamp, MessageId: "identify-1"},
+		analytics.Group{UserId: "user-123", GroupId: "g1", Context: context, Integrations: none},
+		analytics.Group{UserId: "user-123", GroupId: "g1", Context: context,
+			Integrations: integrations, OriginalTimestamp: timestamp, MessageId: "group-1"},
+		analytics.Page{UserId: "user-123", Name: "Home", Context: context, Integrations: none},
+		analytics.Page{UserId: "user-123", Name: "Home", Context: context,
+			Integrations: integrations, OriginalTimestamp: timestamp, MessageId: "page-1"},
+		analytics.Screen{UserId: "user-123", Name: "Home", Context: context, Integrations: none},
+		analytics.Screen{UserId: "user-123", Name: "Home", Context: context,
+			Integrations: integrations, OriginalTimestamp: timestamp, MessageId: "screen-1"},
+	}, client.messages)
+}
+
 // The real SDK serializes each message on its own goroutine right after
 // Enqueue, so the changes race with it unless the call copied its inputs,
 // and -race reports that.
@@ -122,9 +191,11 @@ func TestSDKSendsInputsAsPassed(t *testing.T) {
 		"properties": {
 			"active": false,
 			"array_of_any": ["x", ["y"]],
+			"context": {"ip_address": "10.0.0.1", "nested_context": {"profile": {"email": "a@b.c", "first_name": ""}}},
 			"mixed_unicode": "a",
 			"object_property": {"nested": {"k": "v"}},
 			"profile": {"email": "", "first_name": ""},
+			"profile_list": [{"email": "a@b.c", "first_name": ""}],
 			"property_of_any": ["z"]
 		},
 		"context": {"ip": "127.0.0.1", "custom": {"k": "v"}, "traits": {"plan": ["pro"]}, "ruddertyper": `+refMeta+`},

@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"go/types"
 	"os"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -34,6 +35,34 @@ func TestGenerateGoldens(t *testing.T) {
 			// The runtime package's tests cover the generated runtime only
 			// while it is emitted unchanged.
 			assert.Contains(t, files[0].Content, golang.RuntimeSource)
+		})
+	}
+}
+
+// The spec allows no package variables in a generated file but the three
+// sentinels.
+func TestGenerateDeclaresOnlyTheSentinelsAsPackageVariables(t *testing.T) {
+	for _, golden := range testutils.Goldens {
+		t.Run(golden.Path, func(t *testing.T) {
+			captureWarnings(t)
+
+			files, err := (&golang.Generator{}).Generate(golden.Plan(), core.GenerateOptions{}, golden.Options)
+			require.NoError(t, err)
+			require.Len(t, files, 1)
+
+			file, err := parser.ParseFile(token.NewFileSet(), files[0].Path, files[0].Content, 0)
+			require.NoError(t, err)
+			var names []string
+			for _, decl := range file.Decls {
+				if d, ok := decl.(*ast.GenDecl); ok && d.Tok == token.VAR {
+					for _, spec := range d.Specs {
+						for _, name := range spec.(*ast.ValueSpec).Names {
+							names = append(names, name.Name)
+						}
+					}
+				}
+			}
+			assert.Equal(t, []string{"ErrNilPayload", "ErrInvalidValue", "ErrCategoryConflict"}, names)
 		})
 	}
 }
@@ -229,7 +258,8 @@ func TestGenerateReservesPayloadMethodNames(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, files, 1)
 
-	assert.Contains(t, files[0].Content, "\tMarshalJSON1 *PropertyMarshalJSON // optional\n")
+	decl := regexp.MustCompile(`(?s)type TrackSomeEventProperties struct \{.*?\n\}`).FindString(files[0].Content)
+	assert.Equal(t, "type TrackSomeEventProperties struct {\n\tMarshalJSON1 *PropertyMarshalJSON // optional\n}", decl)
 }
 
 func captureWarnings(t *testing.T) *[]string {
@@ -492,31 +522,67 @@ func TestGenerateValueHelpers(t *testing.T) {
 	}
 }
 
-// Every union is its own type, though each holds a value any. Converting one
-// union to another would build a union holding a value that is not a member,
-// so the conversion must not compile.
+// Every union and every mixed-type enum is its own type, though each holds a
+// value any. Converting one to another would build a value the target does not
+// allow, so the conversion must not compile.
 func TestGenerateUnionsAreNotConvertible(t *testing.T) {
-	files, err := (&golang.Generator{}).Generate(golang.TrackPlan(
-		plan.Property{Name: "a", Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeArray}},
-		plan.Property{Name: "b", Types: []plan.PropertyType{plan.PrimitiveTypeInteger, plan.PrimitiveTypeBoolean}},
-	), core.GenerateOptions{}, nil)
-	require.NoError(t, err)
-	require.Len(t, files, 1)
-
 	var (
+		union     = []plan.PropertyType{plan.PrimitiveTypeInteger, plan.PrimitiveTypeBoolean}
+		mixedEnum = func(name string, values ...any) plan.Property {
+			return plan.Property{Name: name, Config: &plan.PropertyConfig{Enum: values}}
+		}
 		fset = token.NewFileSet()
-		errs []string
+		// Shared, so analytics-go is type-checked once for every row.
+		imp = importer.ForCompiler(fset, "source", nil)
 	)
-	file, err := parser.ParseFile(fset, "ruddertyper.go", files[0].Content+"\nvar _ = PropertyA(NewPropertyBBoolean(true))\n", 0)
-	require.NoError(t, err)
-	conf := types.Config{
-		// The source importer also checks the calls into analytics-go, so the
-		// conversion is the only error.
-		Importer: importer.ForCompiler(fset, "source", nil),
-		Error:    func(err error) { errs = append(errs, err.Error()) },
+	tests := []struct {
+		name       string
+		properties []plan.Property
+		conversion string
+		wantErr    string
+	}{
+		{
+			name: "union to union",
+			properties: []plan.Property{
+				{Name: "a", Types: []plan.PropertyType{plan.PrimitiveTypeString, plan.PrimitiveTypeArray}},
+				{Name: "b", Types: union},
+			},
+			conversion: "PropertyA(NewPropertyBBoolean(true))",
+			wantErr:    "cannot convert NewPropertyBBoolean(true)",
+		},
+		{
+			name:       "mixed enum to mixed enum",
+			properties: []plan.Property{mixedEnum("a", "x", 1), mixedEnum("b", "x", true)},
+			conversion: "PropertyA(PropertyBX())",
+			wantErr:    "cannot convert PropertyBX()",
+		},
+		{
+			name:       "union to mixed enum",
+			properties: []plan.Property{mixedEnum("a", "x", 1), {Name: "b", Types: union}},
+			conversion: "PropertyA(NewPropertyBBoolean(true))",
+			wantErr:    "cannot convert NewPropertyBBoolean(true)",
+		},
 	}
-	_, _ = conf.Check("ruddertyper", fset, []*ast.File{file}, nil)
 
-	require.Len(t, errs, 1)
-	assert.Contains(t, errs[0], "cannot convert NewPropertyBBoolean(true)")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files, err := (&golang.Generator{}).Generate(golang.TrackPlan(tt.properties...), core.GenerateOptions{}, nil)
+			require.NoError(t, err)
+			require.Len(t, files, 1)
+
+			file, err := parser.ParseFile(fset, "ruddertyper.go", files[0].Content+"\nvar _ = "+tt.conversion+"\n", 0)
+			require.NoError(t, err)
+			var errs []string
+			conf := types.Config{
+				// The source importer also checks the calls into analytics-go, so the
+				// conversion is the only error.
+				Importer: imp,
+				Error:    func(err error) { errs = append(errs, err.Error()) },
+			}
+			_, _ = conf.Check("ruddertyper", fset, []*ast.File{file}, nil)
+
+			require.Len(t, errs, 1)
+			assert.Contains(t, errs[0], tt.wantErr)
+		})
+	}
 }
