@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/MakeNowJust/heredoc/v2"
 	"github.com/rudderlabs/rudder-iac/api/client"
@@ -105,7 +104,7 @@ func NewCmdApply() *cobra.Command {
 			if err := p.Load(location); err != nil {
 				wrapped := fmt.Errorf("loading and validating project: %w", err)
 				if jsonOutput {
-					if _, copyErr := io.Copy(cmd.OutOrStdout(), &diagnostics); copyErr != nil {
+					if _, copyErr := diagnostics.WriteTo(cmd.OutOrStdout()); copyErr != nil {
 						applyLog.Error("writing json diagnostics", "error", copyErr)
 					}
 					// The document already holds the failure, so stderr does not
@@ -122,7 +121,7 @@ func NewCmdApply() *cobra.Command {
 				// A clean load leaves the plan as the only document on stdout, so
 				// warnings and the legacy notice go to stderr, as validate does.
 				if hasWarnings(diagnostics.Bytes()) {
-					if _, copyErr := io.Copy(cmd.ErrOrStderr(), &diagnostics); copyErr != nil {
+					if _, copyErr := diagnostics.WriteTo(cmd.ErrOrStderr()); copyErr != nil {
 						applyLog.Error("writing json warnings", "error", copyErr)
 					}
 				}
@@ -160,8 +159,11 @@ func NewCmdApply() *cobra.Command {
 				// Deferred so every exit path writes the document, and err is the
 				// named return, so a failure is recorded in it.
 				defer func() {
+					// A document that could not be written is a failure: exiting 0
+					// would leave the caller with none, or a truncated one.
 					if flushErr := jsonReporter.Flush(err); flushErr != nil {
 						applyLog.Error("flushing json report", "error", flushErr)
+						err = errors.Join(err, flushErr)
 					}
 				}()
 				reporter = jsonReporter

@@ -28,6 +28,19 @@ type JSONSyncReporter struct {
 	out jsonSyncOutput
 }
 
+// Task result statuses and plan operation types, as they appear in the document.
+const (
+	resultOK     = "ok"
+	resultFailed = "failed"
+
+	opCreate = "create"
+	opUpdate = "update"
+	opDelete = "delete"
+	opImport = "import"
+)
+
+// NewJSONSyncReporter returns a reporter that writes its document to w when
+// Flush is called. dryRun is recorded in the document.
 func NewJSONSyncReporter(w io.Writer, dryRun bool) *JSONSyncReporter {
 	return &JSONSyncReporter{w: w, out: jsonSyncOutput{DryRun: dryRun, Results: []jsonTaskResult{}}}
 }
@@ -72,7 +85,7 @@ func (r *JSONSyncReporter) ReportPlan(plan *planner.Plan) {
 
 	out := &jsonPlan{
 		Operations: make([]jsonOperation, 0, len(plan.Operations)),
-		Summary:    map[string]int{"create": 0, "update": 0, "delete": 0, "import": 0},
+		Summary:    map[string]int{opCreate: 0, opUpdate: 0, opDelete: 0, opImport: 0},
 	}
 
 	for _, op := range plan.Operations {
@@ -111,9 +124,9 @@ func (r *JSONSyncReporter) SyncCompleted()             {}
 func (r *JSONSyncReporter) TaskStarted(string, string) {}
 
 func (r *JSONSyncReporter) TaskCompleted(taskID string, _ string, err error) {
-	result := jsonTaskResult{URN: taskID, Status: "ok"}
+	result := jsonTaskResult{URN: taskID, Status: resultOK}
 	if err != nil {
-		result.Status = "failed"
+		result.Status = resultFailed
 		result.Error = err.Error()
 	}
 

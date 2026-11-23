@@ -422,3 +422,15 @@ func TestRenderDiff_ImportableDiffs(t *testing.T) {
 		"    - Config: (secret, always re-applied)\n"+
 		"\n", renderDiff(diff))
 }
+
+// "No changes to apply" is reported here, not printed by the syncer, so the
+// message follows the reporter's writer and never lands in machine output.
+func TestPlanReporter_NoChanges(t *testing.T) {
+	var buf bytes.Buffer
+
+	r := &planReporter{}
+	r.SetWriter(&buf)
+	r.ReportPlan(&planner.Plan{Diff: &differ.Diff{}})
+
+	assert.Equal(t, "No changes to apply\n", buf.String())
+}

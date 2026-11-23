@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func operation(t planner.OperationType, urn, kind string) *planner.Operation {
+func operation(opType planner.OperationType, id, kind string) *planner.Operation {
 	return &planner.Operation{
-		Type:     t,
-		Resource: resources.NewResource(urn, kind, nil, nil),
+		Type:     opType,
+		Resource: resources.NewResource(id, kind, nil, nil),
 	}
 }
 
@@ -209,4 +209,25 @@ func TestJSONSyncReporter_ConcurrentTaskResultsAreAllKept(t *testing.T) {
 		}
 	}
 	assert.Equal(t, tasks/2, failed, "a failed operation must not be lost")
+}
+
+// The reporter has no way to prompt a consumer that is parsing stdout, so it
+// declines. If it ever returned true, a plain apply --json would apply changes.
+func TestJSONSyncReporter_AlwaysDeclinesConfirmation(t *testing.T) {
+	confirmed, err := NewJSONSyncReporter(&bytes.Buffer{}, false).AskConfirmation()
+
+	require.NoError(t, err)
+	assert.False(t, confirmed)
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("write failed") }
+
+// A document that cannot be written is reported to the command, which turns it
+// into a failure rather than exiting 0 with nothing on stdout.
+func TestJSONSyncReporter_FlushReportsAWriteFailure(t *testing.T) {
+	err := NewJSONSyncReporter(failingWriter{}, false).Flush(nil)
+
+	assert.ErrorContains(t, err, "write failed")
 }
