@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"os"
 	"os/signal"
@@ -38,6 +39,7 @@ type listenOptions struct {
 	writeKeys  []string
 	allowHosts []string
 	store      bool
+	out        string
 }
 
 func newCmdListen() *cobra.Command {
@@ -62,6 +64,12 @@ func newCmdListen() *cobra.Command {
 			oldest evicted first, and turns on the query API that sources events reads and the review
 			page at ui. The ready line then carries cursor and ui too.
 
+			--out FILE writes the events to FILE instead of stdout. It refuses a file that exists, so two
+			listeners never share one, and each line starts with a _dev object: the listener's serverId,
+			the line's seq from 1, and receivedAt. An event with a _dev of its own gets the listener's
+			last instead, where jq reads it. If an event cannot be written, to stdout or to FILE,
+			the listener stops and exits 1 with output_failed on stderr.
+
 			--port 0 lets the system pick a free port, so parallel runs never collide. A fixed port that
 			is taken fails at start with port_in_use and exit 1. Use --bind 0.0.0.0 only in a
 			container. By default any write key is accepted, a missing one included. --write-key is an
@@ -78,8 +86,10 @@ func newCmdListen() *cobra.Command {
 			# Keep only the Order Completed events
 			$ rudder-cli sources listen --port 4321 | grep '"event":"Order Completed"'
 
-			# Background for an agent or CI job: events to a file, the ready line in the log
-			$ rudder-cli sources listen --port 0 > events.ndjson 2> listen.log &
+			# Background for an agent or CI job, in a fresh folder: events to a new file, the
+			# ready line in the log
+			$ d=$(mktemp -d)
+			$ rudder-cli sources listen --port 0 --out "$d/events" 2> "$d/log" &
 
 			# Keep requests in memory for sources events and the review page
 			$ rudder-cli sources listen --port 4321 --store
@@ -89,7 +99,11 @@ func newCmdListen() *cobra.Command {
 		`),
 		Args: noArgs,
 		RunE: func(cmd *cobra.Command, _ []string) (err error) {
-			if e := opts.validate(); e != nil {
+			e := opts.validate()
+			if e == nil && cmd.Flags().Changed("out") && opts.out == "" {
+				e = &usageError{message: "--out needs a file name", next: `rudder-cli sources listen --out "$(mktemp -d)/events"`}
+			}
+			if e != nil {
 				return fail(cmd, e)
 			}
 			defer func() {
@@ -102,6 +116,11 @@ func newCmdListen() *cobra.Command {
 
 			ctx, release := stopOnSignal(cmd.Context())
 			defer release()
+			// A write to a closed stdout pipe kills the process with SIGPIPE
+			// before it can say why. Notified, the write returns EPIPE instead.
+			pipe := make(chan os.Signal, 1)
+			signal.Notify(pipe, syscall.SIGPIPE)
+			defer signal.Stop(pipe)
 			return runListen(ctx, cmd.OutOrStdout(), cmd.ErrOrStderr(), opts, cmd.Root().Version)
 		},
 	}
@@ -115,6 +134,8 @@ func newCmdListen() *cobra.Command {
 		"Also accept this Host name on the query API, such as a container service name; repeat for more")
 	f.BoolVarP(&opts.store, "store", "s", false,
 		"Keep requests in memory and serve the query API and review page for sources events")
+	f.StringVar(&opts.out, "out", "",
+		"Write the events to this new file instead of stdout, each line with a _dev object; refuses a file that exists")
 	return cmd
 }
 
@@ -154,6 +175,21 @@ func (o listenOptions) validate() *usageError {
 // runListen serves until ctx ends. Stdout carries the accepted events only,
 // so a pipe sees nothing else; the ready line goes to stderr.
 func runListen(ctx context.Context, stdout, stderr io.Writer, opts listenOptions, version string) error {
+	out, outName := stdout, "stdout"
+	if opts.out != "" {
+		// O_EXCL makes a second listener fail at start instead of sharing
+		// the file. The events can hold personal data, so only the owner reads it.
+		f, err := os.OpenFile(opts.out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		switch {
+		case errors.Is(err, fs.ErrExist):
+			return startupError(stderr, "out_exists", fmt.Errorf("--out %s exists; give a new file", opts.out),
+				`rudder-cli sources listen --out "$(mktemp -d)/events"`)
+		case err != nil:
+			return startupError(stderr, "listen_failed", fmt.Errorf("creating --out: %w", err), "rudder-cli sources listen --help")
+		}
+		defer func() { _ = f.Close() }()
+		out, outName = f, opts.out
+	}
 	srv, err := devlisten.Start(devlisten.Config{
 		Port:       opts.port,
 		Bind:       opts.bind,
@@ -161,7 +197,8 @@ func runListen(ctx context.Context, stdout, stderr io.Writer, opts listenOptions
 		AllowHosts: opts.allowHosts,
 		Version:    version,
 		Store:      opts.store,
-		Out:        stdout,
+		Out:        out,
+		Stamp:      opts.out != "",
 		Log:        stderr,
 	})
 	switch {
@@ -187,18 +224,40 @@ func runListen(ctx context.Context, stdout, stderr io.Writer, opts listenOptions
 		}
 	}
 
-	var served error
+	var served, outFailed error
 	select {
 	case <-ctx.Done():
 		log.Info("stopping", "serverId", ready.ServerID, "reason", "signal")
 	case served = <-srv.Done():
 		log.Error("stopping", "serverId", ready.ServerID, "reason", "error", "error", served)
+	case outFailed = <-srv.OutFailed():
+		log.Error("stopping", "serverId", ready.ServerID, "reason", "output failed", "error", outFailed)
 	}
 	closeCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := srv.Close(closeCtx); err != nil {
 		// Close has dropped the connections left, so the stop still succeeded.
 		log.Warn("shutdown deadline exceeded", "serverId", ready.ServerID, "error", err)
+	}
+	if outFailed == nil {
+		// A write can fail while a signal or a serve error stops the
+		// listener, or while Close drains the requests in flight.
+		select {
+		case outFailed = <-srv.OutFailed():
+		default:
+		}
+	}
+	if outFailed != nil {
+		// Counted after Close, so it includes the requests that drained.
+		lost := srv.Lost()
+		events := "events were"
+		if lost == 1 {
+			events = "event was"
+		}
+		return startupError(stderr, "output_failed",
+			fmt.Errorf("writing events to %s: %w; the listener stopped, and %d accepted %s never written",
+				outName, outFailed, lost, events),
+			"rudder-cli sources listen --help")
 	}
 	if served != nil {
 		return startupError(stderr, "listen_failed", fmt.Errorf("serving: %w", served), "rudder-cli sources listen --help")

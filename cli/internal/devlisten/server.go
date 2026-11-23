@@ -55,6 +55,10 @@ type Config struct {
 	Store bool
 	// Out gets each accepted event as one JSON line; nil discards them.
 	Out io.Writer
+	// Stamp adds a _dev object with serverId, seq and receivedAt to each
+	// line on Out, for a file that must say which listener wrote it. It goes
+	// first, or last when the event has a _dev of its own.
+	Stamp bool
 	// Log gets one line per refused ingestion request; nil discards them.
 	Log io.Writer
 
@@ -82,6 +86,7 @@ type Server struct {
 	api    *api.Handler
 	http   *http.Server
 	served chan error
+	stream *streamSink
 
 	beforeServe func(*http.Request)
 
@@ -131,7 +136,12 @@ func Start(cfg Config) (*Server, error) {
 		id.WriteKey, id.WriteKeyPolicy = masked[0], "allowlist"
 	}
 
-	var sink ingest.Sink = newStreamSink(orDiscard(cfg.Out), orDiscard(cfg.Log))
+	stampID := ""
+	if cfg.Stamp {
+		stampID = id.ServerID
+	}
+	stream := newStreamSink(orDiscard(cfg.Out), orDiscard(cfg.Log), stampID)
+	var sink ingest.Sink = stream
 	var st *store.Store
 	var apiHandler *api.Handler
 	if cfg.Store {
@@ -149,6 +159,7 @@ func Start(cfg Config) (*Server, error) {
 		ingest: ingest.New(sink, cfg.WriteKeys, cfg.Version),
 		api:    apiHandler,
 		served: make(chan error, 1),
+		stream: stream,
 		conns:  map[net.Conn]http.ConnState{},
 
 		beforeServe: cfg.beforeServe,
@@ -216,6 +227,17 @@ func orDiscard(w io.Writer) io.Writer {
 // Done receives the error that ended serving, nil after Close.
 func (s *Server) Done() <-chan error {
 	return s.served
+}
+
+// OutFailed receives the first error writing an event to Out. The listener
+// keeps answering after it, so the caller must stop it.
+func (s *Server) OutFailed() <-chan error {
+	return s.stream.failed
+}
+
+// Lost is the number of accepted events that never reached Out.
+func (s *Server) Lost() int {
+	return s.stream.Lost()
 }
 
 // Close drains the server until ctx ends, then drops every connection that

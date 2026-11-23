@@ -25,6 +25,10 @@ var (
 	}
 )
 
+// exampleSetup is the one line an example may run before rudder-cli: making
+// the fresh folder the next line writes into.
+var exampleSetup = regexp.MustCompile(`^\$ [a-z]+=\$\(mktemp -d\)$`)
+
 func walk(c *cobra.Command, visit func(*cobra.Command)) {
 	visit(c)
 	for _, child := range c.Commands() {
@@ -64,7 +68,7 @@ func TestHelpTree(t *testing.T) {
 		require.NotEmpty(t, c.Example, c.CommandPath())
 		for _, line := range strings.Split(c.Example, "\n") {
 			line = strings.TrimSpace(line)
-			if line == "" || strings.HasPrefix(line, "#") {
+			if line == "" || strings.HasPrefix(line, "#") || exampleSetup.MatchString(line) {
 				continue
 			}
 			require.True(t, strings.HasPrefix(line, "$ rudder-cli "), "%s: %q", c.CommandPath(), line)
@@ -186,7 +190,8 @@ func splitShell(line string) []string {
 				word.Reset()
 			}
 		case strings.ContainsRune(shellBreak, r):
-			if inWord {
+			// The 2 of 2> names a file descriptor, not an argument.
+			if inWord && (r != '>' || strings.Trim(word.String(), "0123456789") != "") {
 				words = append(words, word.String())
 			}
 			return words
