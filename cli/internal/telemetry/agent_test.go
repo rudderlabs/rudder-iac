@@ -105,48 +105,31 @@ func TestAgentProps(t *testing.T) {
 }
 
 func TestUserAgent(t *testing.T) {
-	// A real id, at its real length: the header must carry all of it.
-	id := uuid.New().String()
-
 	tests := []struct {
 		name     string
 		env      map[string]string
 		disabled bool
-		id       string
 		want     string
 	}{
 		{
-			name: "agent and telemetry id",
+			name: "agent",
 			env:  map[string]string{"CLAUDECODE": "1"},
-			id:   id,
-			want: "rudder-cli/1.2.3 (agent=claude-code; telemetry-id=" + id + ")",
+			want: "rudder-cli/1.2.3 (agent=claude-code)",
 		},
 		{
-			name: "agent, skill and telemetry id",
+			name: "agent and skill",
 			env:  map[string]string{"CLAUDECODE": "1", skillEnvVar: "rudder-setup"},
-			id:   id,
-			want: "rudder-cli/1.2.3 (agent=claude-code; skill=rudder-setup; telemetry-id=" + id + ")",
+			want: "rudder-cli/1.2.3 (agent=claude-code; skill=rudder-setup)",
 		},
 		{
-			name: "a person, telemetry on",
-			id:   id,
-			want: "rudder-cli/1.2.3 (telemetry-id=" + id + ")",
+			name: "a person sends the version alone",
+			want: "rudder-cli/1.2.3",
 		},
 		{
 			name:     "telemetry off sends the version alone",
 			env:      map[string]string{"CLAUDECODE": "1"},
 			disabled: true,
-			id:       id,
 			want:     "rudder-cli/1.2.3",
-		},
-		{
-			name: "no id yet and no agent",
-			want: "rudder-cli/1.2.3",
-		},
-		{
-			name: "an id that is not a UUID is left out",
-			id:   "x\r\nX-Evil: 1",
-			want: "rudder-cli/1.2.3",
 		},
 	}
 
@@ -156,7 +139,8 @@ func TestUserAgent(t *testing.T) {
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
-			setTelemetry(t, tt.disabled, tt.id)
+			// The id must never reach the header, whatever it holds.
+			setTelemetry(t, tt.disabled, uuid.New().String())
 			assert.Equal(t, tt.want, UserAgent("1.2.3"))
 		})
 	}

@@ -26,14 +26,13 @@ func Ready() bool { return ready.Load() }
 // changes in a way a user should hear about, and every install is told again.
 const noticeVersion = 1
 
-// Notice is printed once per install, before the first event or API call
-// that carries telemetry. Version 1 also reaches installs that had telemetry
-// on before the telemetry id was tied to a workspace.
-const Notice = `rudder-cli sends usage data to RudderStack: the commands you run, their flags,
-whether they fail, and the coding agent that runs them. API calls carry a
-telemetry id, which ties this usage to your workspace.
+// Notice is printed once per install, before the first event is sent.
+// Version 1 also reaches installs that had telemetry on before events named
+// the workspace.
+const Notice = `rudder-cli collects usage data to help RudderStack improve it. When you are
+signed in, usage is associated with your RudderStack workspace.
 Turn it off with 'rudder-cli telemetry disable' or DO_NOT_TRACK=1.
-What is sent: https://github.com/rudderlabs/rudder-iac#telemetry
+Learn more: https://github.com/rudderlabs/rudder-iac#telemetry
 This notice is shown once.
 `
 

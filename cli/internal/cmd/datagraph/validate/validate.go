@@ -111,6 +111,7 @@ func NewCmdValidate() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("fetching workspace information: %w", err)
 			}
+			telemetry.SetWorkspace(workspace)
 
 			var mode validator.Mode
 			if all {

@@ -4,8 +4,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/google/uuid"
-
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 )
 
@@ -99,9 +97,8 @@ func agentName(raw string) string {
 }
 
 // UserAgent is the User-Agent of every API call. With telemetry on it names
-// the agent and the skill and carries the telemetry id, which is the only thing
-// that ties a command event to the workspace the API saw. With telemetry off it is the
-// version alone.
+// the agent and the skill. With telemetry off it is the version alone. It
+// carries no id: command events name the workspace themselves.
 func UserAgent(version string) string {
 	ua := "rudder-cli/" + version
 
@@ -116,12 +113,6 @@ func UserAgent(version string) string {
 	}
 	if skill := Skill(); skill != "" {
 		parts = append(parts, "skill="+skill)
-	}
-	// The id is sent whole, as command events send it, or the two never
-	// match. Initialise writes a UUID; anything else in the config is dropped
-	// instead of being put into a header.
-	if id, err := uuid.Parse(cfg.Telemetry.AnonymousID); err == nil {
-		parts = append(parts, "telemetry-id="+id.String())
 	}
 	if len(parts) == 0 {
 		return ua

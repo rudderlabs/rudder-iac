@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/config"
 	"github.com/rudderlabs/rudder-iac/cli/internal/telemetry"
 )
@@ -95,6 +96,19 @@ var TrackCommand = trackCommand
 // not count a failure twice.
 var reported atomic.Bool
 
+// workspaceID is the workspace the access token reaches, once a command has
+// looked it up. It is the only thing that ties a command event to a workspace.
+var workspaceID atomic.Value
+
+// SetWorkspace records the workspace a command signed in to, so the event the
+// command reports carries its id. A command that never looks the workspace up,
+// such as validate, reports none. A nil workspace records nothing.
+func SetWorkspace(w *client.Workspace) {
+	if w != nil {
+		workspaceID.Store(w.ID)
+	}
+}
+
 // telemetryReady is a variable so tests can stand in for loaded config.
 var telemetryReady = telemetry.Ready
 
@@ -140,6 +154,13 @@ func TrackInvalidInput(root *cobra.Command, args []string, err error, tracked []
 func trackCommand(command string, err error, extras ...KV) {
 	reported.Store(true)
 
+	if err := telemetry.TrackEvent(CommandExecutedEvent, eventProps(command, err, extras...)); err != nil {
+		log.Error("failed to track command", "error", err)
+	}
+}
+
+// eventProps builds the properties of a command event.
+func eventProps(command string, err error, extras ...KV) map[string]interface{} {
 	props := map[string]interface{}{
 		"command": command,
 		"errored": err != nil,
@@ -162,9 +183,11 @@ func trackCommand(command string, err error, extras ...KV) {
 	// Without these a run by a coding agent counts as a run by a person
 	maps.Copy(props, telemetry.AgentProps())
 
-	if err := telemetry.TrackEvent(CommandExecutedEvent, props); err != nil {
-		log.Error("failed to track command", "error", err)
+	if id, _ := workspaceID.Load().(string); id != "" {
+		props["workspace_id"] = id
 	}
+
+	return props
 }
 
 // TrackPreRunFailures reports failures of the PreRunE and PersistentPreRunE

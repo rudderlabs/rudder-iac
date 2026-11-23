@@ -123,43 +123,28 @@ make docker-build
 
 ## Telemetry
 
-`rudder-cli` sends usage data to RudderStack, so we can see which commands are used, where they fail, and how much of that use comes from coding agents. Telemetry is on until you turn it off. The CLI prints a notice the first time it runs with telemetry on.
+`rudder-cli` collects usage data to help us understand how the CLI is used and where it fails. Telemetry is on by default, and the CLI tells you so the first time it runs.
 
-### What is sent
+### What we collect
 
-One event for each command run:
+- The command you run, the flags you pass, and whether the command failed. Some flag values are paths or resource ids, such as the project location.
+- The CLI version and a random installation id, kept in `~/.rudder/config.json`.
+- The CI service the CLI runs in, if any.
+- The coding agent running the CLI, such as Claude Code or Cursor, and the agent skill it follows, if any. API requests also name these two in their `User-Agent` header.
+- Your RudderStack workspace id, on commands that sign in to RudderStack. This associates your CLI usage with your workspace.
 
-| Field | Example |
-| --- | --- |
-| Command | `apply` |
-| Whether it failed, and at which stage | `errored: true`, `stage: pre_run` |
-| The flags the command reports, with their values. A value can be a path, such as the project location, or a resource id | `location: ./rudder`, `dryRun: true` |
-| Experimental features that are on | |
-| CLI version | `1.4.0` |
-| Telemetry id, a random UUID made on this machine and kept in `~/.rudder/config.json` | |
-| CI service, when the CLI runs in one | `github-actions` |
-| Coding agent running the CLI, when one is. Read from `RUDDERSTACK_CLI_AGENT`, `AI_AGENT`, or the variable the agent sets in its shells | `claude-code` |
-| Skill the agent follows, when the skill sets `RUDDERSTACK_CLI_SKILL` | `rudder-setup` |
+### What we don't collect
 
-While telemetry is on, each call to the RudderStack API also carries the agent, the skill and the telemetry id in its `User-Agent` header:
+- The contents of your spec files
+- Your access token
+- The values in your variable files, or any other secret
 
-```
-rudder-cli/1.4.0 (agent=claude-code; skill=rudder-setup; telemetry-id=6b72f5e1-9af8-4544-92b4-67b2b6638582)
-```
-
-The API knows the workspace from your access token, so this ties the events above to your workspace.
-
-### What is never sent
-
-The contents of your spec files, your access token, and the values in your variable files.
-
-### Turn it off
+### Opting out
 
 ```sh
-rudder-cli telemetry disable   # saved in ~/.rudder/config.json
-rudder-cli telemetry status
+rudder-cli telemetry disable
 ```
 
-Or set `RUDDERSTACK_CLI_TELEMETRY_DISABLED=true` or `DO_NOT_TRACK=1` in the environment. With telemetry off, the CLI sends no events and the `User-Agent` is `rudder-cli/<version>`.
+You can also set `RUDDERSTACK_CLI_TELEMETRY_DISABLED=true` or `DO_NOT_TRACK=1` in the environment. Check the current setting with `rudder-cli telemetry status`.
 
-A binary you build from source has no telemetry write key, so it sends no events. Its API calls still carry the `User-Agent` above unless telemetry is off.
+Binaries built from source do not send usage events.

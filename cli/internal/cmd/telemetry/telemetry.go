@@ -19,17 +19,15 @@ var telemetryCmd = &cobra.Command{
 		Manage telemetry settings for the CLI.
 		
 		Telemetry helps us understand how the CLI is being used and helps us improve it.
-		It is on until you turn it off. The CLI sends:
-		- The command, its flags and their values, and whether it failed
-		- The CLI version and a telemetry id made on this machine
-		- The CI service, when the CLI runs in one
-		- The coding agent running the CLI, when one is
-		- The skill the agent follows, when the skill names itself
+		It is on until you turn it off. The data collected includes:
+		- The commands you run, their flags, and whether they fail
+		- The CLI version and a random installation id
+		- The CI service, coding agent or agent skill running the CLI, if any
+		- Your RudderStack workspace, when the command signs in
 
-		While telemetry is enabled, API calls also carry the agent, the skill and
-		the telemetry id in their User-Agent. That ties this usage to your
-		workspace. Spec contents, access tokens and secrets are never sent.
-		The full list: https://github.com/rudderlabs/rudder-iac#telemetry
+		The contents of your spec files, your access token and your secrets
+		are never collected.
+		Learn more: https://github.com/rudderlabs/rudder-iac#telemetry
 		
 		Use 'status' to check current telemetry settings
 		Use 'enable' or 'disable' to modify telemetry collection
