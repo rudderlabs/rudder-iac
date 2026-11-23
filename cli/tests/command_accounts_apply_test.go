@@ -21,7 +21,7 @@ const rawAccountSecret = `{"type":"service_account","project_id":"rudder-cli-e2e
 // accountExternalIDs are the accounts the fixtures manage, one per supported
 // warehouse definition. Each has a testdata/expected/upstream/accounts/<dir>/<id>.json
 // snapshot.
-var accountExternalIDs = []string{"prod-bq", "prod-pg", "prod-sf"}
+var accountExternalIDs = []string{"prod-bq", "prod-pg", "prod-sf", "prod-dbx"}
 
 // fixtureAccountSecrets is every secret value in credentials.vars.yaml. Snowflake
 // carries more than one, so the leak assertion has to cover the whole set. These
@@ -36,6 +36,7 @@ var fixtureAccountSecrets = []string{
 	"dummy-pg-password-12345",
 	"dummy-sf-key-12345",
 	"dummy-sf-phrase-12345", //gitleaks:allow
+	"dummy-dbx-token-12345",
 }
 
 // accountSnapshotIgnore are the volatile upstream fields excluded from the
@@ -45,7 +46,7 @@ var accountSnapshotIgnore = []string{"id", "workspaceId", "createdAt", "updatedA
 
 // TestAccountsApply drives the accounts provider end-to-end against a live stack:
 // apply create → apply update → re-apply is a no-op. It needs a real backend with
-// the SOURCE_BIGQUERY, SOURCE_POSTGRES and SOURCE_SNOWFLAKE account definitions
+// the SOURCE_BIGQUERY, SOURCE_POSTGRES, SOURCE_SNOWFLAKE and SOURCE_DATABRICKS account definitions
 // deployed and a PAT.
 func TestAccountsApply(t *testing.T) {
 	// Accounts are gated behind an experimental flag, and the specs reference
