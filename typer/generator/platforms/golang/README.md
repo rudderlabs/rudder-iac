@@ -29,7 +29,7 @@ user := ruddertyper.Identity{UserID: "user-123"}
 
 - Every method takes an `Identity` first. Set `UserID`, `AnonymousID` or both: the SDK keeps no current user and rejects a call that sets neither ([Generated File Structure][spec]).
 - Payloads are generated types. For a struct payload, track takes a value and page, screen, identify and group take a pointer (`nil` sends no payload); variant and open-map payloads are passed as is. An event whose rule allows no properties has no payload parameter ([Event Types][spec]).
-- Generated names come from the plan: `Track{Event}` takes a `Track{Event}Properties`, custom types are `CustomType{Name}` and variant cases `{Type}Case{Match}`. A name already taken gets a numeric suffix, such as `TrackEventWithNameCamelCase1` for the event `eventWithNameCamelCase` when `$eventWithNameCamelCase$!` has taken `TrackEventWithNameCamelCase` ([Naming Conventions][spec]).
+- Generated names come from the plan: `Track{Event}` takes a `Track{Event}Properties`, custom types are `CustomType{Name}` and variant cases `{Type}Case{Match}`. A name already taken gets a numeric suffix, such as `TrackEventWithNameCamelCase1` for the event `eventWithNameCamelCase` when `$eventWithNameCamelCase$!` has taken `TrackEventWithNameCamelCase` ([Naming Conventions][spec]). An identify or group event with a rule on each identity section gets one method per section and no `Identify` or `Group`: `IdentifyOnTraits` takes an `Identify{Event}Traits` and `IdentifyOnContextTraits` an `Identify{Event}ContextTraits`, and group has `GroupOnTraits` and `GroupOnContextTraits`, taking `Group{Event}Traits` and `Group{Event}ContextTraits`. A lone rule on either section keeps `Identify` and `Identify{Event}Traits`, or `Group` and `Group{Event}Traits`.
 - Required fields hold values, and optional fields pointers (or `nil`-able slices, maps and interfaces). Set an optional scalar with `Ptr`; integer fields need `ruddertyper.Ptr[int64](2)`, because `Ptr(2)` is an `*int` ([Required and Optional Fields][spec]).
 
 ```go
@@ -107,7 +107,7 @@ err = rt.Page(
 - To catch unset required fields at lint time, enable the `exhaustruct` linter for the packages that build payloads ([Required and Optional Fields][spec]).
 - Generated code checks shapes, not values: an enum accepts any value of its type, and so does a variant's `Default` (see Calling). Check untrusted input with the enum's `IsValid()` ([Errors][spec], [Enums][spec]).
 - A value that contains itself fails the call with `ErrInvalidValue`, except for a cycle that runs through your own type's `MarshalJSON` or `MarshalText`. The check cannot see inside those methods, so that cycle overflows the stack and crashes the program ([Serialization Internals][appendix]).
-- Identify traits go where the rule's identity section says, `traits` or `context.traits`, while analytics.js always sends them in `context.traits`. Group traits always go to `traits`, even for a `context.traits` rule: TypeScript does the same, while Kotlin and Swift send them in `context.traits` ([Identity Sections][spec]).
+- Identify traits go where the rule's identity section says, `traits` or `context.traits`, while analytics.js always sends them in `context.traits`. Group traits always go to `traits`, even for a `context.traits` rule: TypeScript does the same, while Kotlin and Swift send them in `context.traits` ([Identity Sections][spec]). So for an event with a rule on each section (see Calling), `IdentifyOnTraits` sends `traits` and `IdentifyOnContextTraits` sends `context.traits`, while `GroupOnTraits` and `GroupOnContextTraits` both send `traits`.
 - Nothing carries over between calls: an event sent after `Identify` has no `context.traits` unless you pass them ([Identify Events][spec]):
 
 ```go
@@ -130,7 +130,7 @@ if err == nil {
 - `testdata/validator/` holds one golden per plan, each in its own package: `ruddertyper/` (reference), `identitysections/`, `emptyidentity/`, `examples/` (`testutils/examples_plan.go`). `go test ./typer/generator/platforms/golang/...` runs the unit tests and diffs the generator's output against the goldens ([Testing][appendix]).
 - `make typer-go-update-testdata` regenerates every golden after a generator or plan change ([Testing][appendix]).
 - `make typer-go-validate` runs vet, gofmt and `go test -race` in the `testdata/validator` module (analytics-go v4.2.2), compiling the goldens and `examples_test.go` ([Testing][appendix]). It also checks that this README's samples are quoted from `examples_test.go`.
-- CI (`.github/workflows/typer-go-validate.yml`) regenerates the goldens and fails when one is stale, then runs `make typer-go-validate` with Go 1.21.0, against v4.2.2 and against the latest analytics-go v4 ([Testing][appendix]).
+- CI (`.github/workflows/typer-go-validate.yml`) regenerates the goldens and fails when one is stale, then runs `make typer-go-validate` with Go 1.21.0 against v4.2.2. A separate, non-blocking job runs it against the latest analytics-go v4, so a breaking SDK release shows there without failing the workflow ([Testing][appendix]).
 
 [spec]: https://app.notion.com/p/3eaf2b415dd081e2b067dac4a180e40d
 [appendix]: https://app.notion.com/p/3ebf2b415dd0812a865df4cefe950692
