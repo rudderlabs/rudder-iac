@@ -135,6 +135,11 @@ func (res *resolver) mergeVariant(s *plan.ObjectSchema, base *objectSchema, vari
 			vc    = &vr.Cases[i]
 			label = "case " + jsonText(vc.Match)
 		)
+		// Such a case would generate no struct and drop its schema silently. The
+		// CLI rejects it locally; a remote plan can still hold one.
+		if len(vc.Match) == 0 {
+			return nil, fmt.Errorf("case at index %d has no match values", i)
+		}
 		schema, err := res.branch(s, &vc.Schema, label, where)
 		if err != nil {
 			return nil, err

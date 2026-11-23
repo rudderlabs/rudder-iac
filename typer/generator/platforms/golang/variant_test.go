@@ -253,6 +253,11 @@ func TestGenerateVariantPlanShapes(t *testing.T) {
 			plan:         variantPlan(typed(onlyString...), withCase(discriminate([]any{"a"}), plan.ObjectSchema{AdditionalProperties: true})),
 			wantWarnings: []string{`generating case ["a"] of the variants of track event "Some Event" closed: its base schema does not allow additional properties`},
 		},
+		{
+			name:    "a case without match values",
+			plan:    variantPlan(typed(onlyString...), discriminate([]any{"a"}, []any{})),
+			wantErr: `mapping the variants of track event "Some Event": case at index 1 has no match values`,
+		},
 	}
 
 	for _, tt := range tests {
