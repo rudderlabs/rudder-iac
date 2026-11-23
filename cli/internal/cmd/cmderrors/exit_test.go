@@ -9,6 +9,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,6 +55,11 @@ func TestExitCode(t *testing.T) {
 			name:     "upstream unavailable",
 			err:      &client.APIError{HTTPStatusCode: http.StatusBadGateway},
 			expected: ExitUpstream,
+		},
+		{
+			name:     "plan not confirmed",
+			err:      fmt.Errorf("syncing resources: %w", syncer.ErrNotConfirmed),
+			expected: ExitDeclined,
 		},
 		{
 			// Anything unclassified keeps the historical code so existing scripts

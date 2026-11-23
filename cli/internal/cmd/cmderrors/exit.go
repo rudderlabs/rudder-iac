@@ -7,6 +7,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/app"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project"
+	"github.com/rudderlabs/rudder-iac/cli/internal/syncer"
 )
 
 // Exit codes. A caller — a CI step, or an agent driving the CLI — needs to know
@@ -21,6 +22,7 @@ const (
 	ExitValidation = 2 // the project's specs are wrong — fix them and retry
 	ExitAuth       = 3 // credentials missing, expired, or lacking permission
 	ExitUpstream   = 4 // the API rejected or could not serve the request
+	ExitDeclined   = 5 // the plan had changes and the confirmation did not approve them
 )
 
 // ExitCode classifies err into one of the codes above.
@@ -35,6 +37,10 @@ func ExitCode(err error) int {
 
 	if errors.Is(err, project.ErrValidationFailed) {
 		return ExitValidation
+	}
+
+	if errors.Is(err, syncer.ErrNotConfirmed) {
+		return ExitDeclined
 	}
 
 	var apiErr *client.APIError

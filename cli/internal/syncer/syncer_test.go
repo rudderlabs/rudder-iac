@@ -232,3 +232,58 @@ func TestSyncerDelete(t *testing.T) {
 		}, "TaskCompleted should contain deletion task for "+urn)
 	}
 }
+
+func TestSyncerDeclinedConfirmationIsAnError(t *testing.T) {
+	event := internalTestutils.NewMockEvent("event1", resources.ResourceData{
+		"name":        "Test Event",
+		"description": "This is a test event",
+	})
+
+	targetGraph := resources.NewGraph()
+	targetGraph.AddResource(event)
+
+	provider := &internalTestutils.DataCatalogProvider{
+		InitialState:       state.EmptyState(),
+		ReconstructedState: state.EmptyState(),
+	}
+
+	mockReporter := testutils.NewMockReporter()
+	mockReporter.ConfirmResponse = false
+
+	s, err := syncer.New(
+		provider,
+		mockWorkspace(),
+		syncer.WithReporter(mockReporter),
+		syncer.WithAskConfirmation(true),
+	)
+	require.NoError(t, err)
+
+	err = s.Sync(context.Background(), targetGraph)
+
+	assert.ErrorIs(t, err, syncer.ErrNotConfirmed)
+	assert.Equal(t, 1, mockReporter.AskConfirmationCalls)
+	assert.Empty(t, provider.OperationLog, "a declined plan must not touch the provider")
+}
+
+func TestSyncerEmptyPlanNeedsNoConfirmation(t *testing.T) {
+	provider := &internalTestutils.DataCatalogProvider{
+		InitialState:       state.EmptyState(),
+		ReconstructedState: state.EmptyState(),
+	}
+
+	mockReporter := testutils.NewMockReporter()
+	mockReporter.ConfirmResponse = false
+
+	s, err := syncer.New(
+		provider,
+		mockWorkspace(),
+		syncer.WithReporter(mockReporter),
+		syncer.WithAskConfirmation(true),
+	)
+	require.NoError(t, err)
+
+	err = s.Sync(context.Background(), resources.NewGraph())
+
+	assert.NoError(t, err, "nothing to apply is not a declined apply")
+	assert.Equal(t, 0, mockReporter.AskConfirmationCalls)
+}
