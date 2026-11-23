@@ -27,11 +27,15 @@ func TestREADMESamplesAreQuotedFromExamples(t *testing.T) {
 		source  = string(examples)
 	)
 	require.NotEmpty(t, samples)
-	// Only ```go fences are checked, so an unlabelled fence would hide a Go
-	// sample from this test. Other languages, such as bash, are allowed.
+	// Only ```go fences are checked, so a Go sample under any other label,
+	// or none, would hide from this test. Other fences must name a language
+	// that is clearly not Go.
+	notGo := map[string]bool{"bash": true, "sh": true, "yaml": true, "json": true, "text": true}
 	require.Zero(t, len(fences)%2, "a README fence is never closed")
 	for i := 0; i < len(fences); i += 2 {
-		assert.NotEmptyf(t, strings.TrimSpace(fences[i][1]), "README fence %d must name its language", i/2+1)
+		label := strings.TrimSpace(fences[i][1])
+		assert.Truef(t, label == "go" || notGo[label],
+			"README fence %d is labelled %q: use go for a Go sample, or one of bash, sh, yaml, json, text", i/2+1, label)
 	}
 	for _, s := range samples {
 		assert.Truef(t, strings.Contains(source, "\n"+s[1]) || strings.Contains(source, "\n"+indent.ReplaceAllString(s[1], "\t$1")),
