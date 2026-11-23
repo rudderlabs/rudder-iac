@@ -134,6 +134,26 @@ func TestSplitIntoWords_EdgeCases(t *testing.T) {
 	}
 }
 
+func TestSanitizeForIdentifier(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"keeps letters, digits and separators", "user_id-v2.name x", "user_id-v2.name x"},
+		{"replaces quotes and symbols", `Product "Premium" $Clicked!`, "Product  Premium   Clicked "},
+		{"keeps unicode letters", "用户名_типы", "用户名_типы"},
+		{"replaces non-decimal digits", "x²", "x "},
+		{"replaces emoji", "🎯", " "},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, core.SanitizeForIdentifier(tt.input))
+		})
+	}
+}
+
 func TestFormattingConsistency(t *testing.T) {
 	// Test that ToPascalCase and ToCamelCase are consistent
 	inputs := []string{
