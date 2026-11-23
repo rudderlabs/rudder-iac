@@ -121,7 +121,11 @@ func (p *Provider) PreviewImports(ctx context.Context, plan *planner.Plan, st *s
 // the API links a destination only to a published one, so the link would fail
 // partway through every apply. Drop this check once transformations are
 // published before their dependents run. See provider.PlanChecker.
-func (p *Provider) CheckPlan(_ context.Context, plan *planner.Plan, _ *state.State) error {
+func (p *Provider) CheckPlan(_ context.Context, plan *planner.Plan, st *state.State) error {
+	if err := checkAdoptedAccountLiterals(plan, st); err != nil {
+		return err
+	}
+
 	newTransformations := make(map[string]bool)
 	for _, op := range plan.Operations {
 		if op.Type == planner.Create && op.Resource.Type() == ttypes.TransformationResourceType {

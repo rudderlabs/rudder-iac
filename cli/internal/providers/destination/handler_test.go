@@ -13,6 +13,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/importmanifest"
 	"github.com/rudderlabs/rudder-iac/cli/internal/project/specs"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/accounts"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/converter"
@@ -170,6 +171,7 @@ func resolvedRef(urn, value string) *resources.PropertyRef {
 // urnResolver is a minimal URNResolver for MapRemoteToState tests.
 type urnResolver struct {
 	transformationURNByID map[string]string // remote ID -> URN
+	accountURNByID        map[string]string // remote ID -> URN
 }
 
 func (r urnResolver) GetURNByID(resourceType string, remoteID string) (string, error) {
@@ -178,6 +180,17 @@ func (r urnResolver) GetURNByID(resourceType string, remoteID string) (string, e
 			return urn, nil
 		}
 		return "", resources.ErrRemoteResourceExternalIdNotFound
+	}
+	if resourceType == accounts.AccountResourceType {
+		if urn, ok := r.accountURNByID[remoteID]; ok {
+			return urn, nil
+		}
+		// The real collection holds only accounts that already carry an
+		// external ID (LoadRemoteResources lists with WithHasExternalID(true)),
+		// so an unadopted account is missing outright rather than present
+		// without one. Answering ErrRemoteResourceExternalIdNotFound here would
+		// hide that the remote mapping has to tolerate both.
+		return "", resources.ErrRemoteResourceNotFound
 	}
 	return "", resources.ErrRemoteResourceExternalIdNotFound
 }
