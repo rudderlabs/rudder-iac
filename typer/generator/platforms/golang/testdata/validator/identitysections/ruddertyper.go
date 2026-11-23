@@ -271,7 +271,7 @@ func (v TrackUserSignedUpProperties) MarshalJSON() ([]byte, error) {
 
 // --- Events ---
 
-// Group sends the group event. traits may be nil, which sends no traits.
+// Group sends the group event. traits may be nil, which sends no traits. The traits are sent as the message's traits.
 //
 // Group association event
 func (r *RudderTyperAnalytics) Group(identity Identity, groupID string, traits *GroupTraits, opts ...Option) error {

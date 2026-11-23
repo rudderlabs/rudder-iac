@@ -1846,7 +1846,7 @@ func (v TrackEventWithNameCamelCaseProperties1) MarshalJSON() ([]byte, error) {
 
 // --- Events ---
 
-// Group sends the group event. traits may be nil, which sends no traits.
+// Group sends the group event. traits may be nil, which sends no traits. The traits are sent as the message's traits; context.traits holds the user's traits, not the group's.
 //
 // Group association event
 func (r *RudderTyperAnalytics) Group(identity Identity, groupID string, traits *GroupTraits, opts ...Option) error {
@@ -1860,7 +1860,7 @@ func (r *RudderTyperAnalytics) Group(identity Identity, groupID string, traits *
 	return r.group(identity, groupID, t, opts)
 }
 
-// Identify sends the identify event. traits may be nil, which sends no traits.
+// Identify sends the identify event. traits may be nil, which sends no traits. The traits are sent as the message's traits.
 //
 // User identification event
 func (r *RudderTyperAnalytics) Identify(identity Identity, traits *IdentifyTraits, opts ...Option) error {

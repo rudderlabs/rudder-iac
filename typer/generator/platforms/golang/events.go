@@ -120,8 +120,8 @@ func eventMethod(packageName string, r eventRule, name string, payload *GoStruct
 		m.Pointer = true
 		notes = append(notes, fmt.Sprintf("%s may be nil, which sends no %s.", m.Param, noun))
 	}
-	if payload != nil && r.rule.Section == plan.IdentitySectionContextTraits && event.EventType == plan.EventTypeIdentify {
-		notes = append(notes, "The traits are sent as context.traits, where they win over the traits WithAnalyticsContext sets.")
+	if payload != nil && noun == "traits" {
+		notes = append(notes, traitsNote(event.EventType, r.rule.Section))
 	}
 	if m.CategoryMode != "" {
 		notes = append(notes, categoryNote(event.EventType, m.CategoryMode, payload))
@@ -144,6 +144,19 @@ func eventMethod(packageName string, r eventRule, name string, payload *GoStruct
 	}
 	m.Doc = withDescription(strings.Join(append([]string{summary + "."}, notes...), " "), event.Description)
 	return m
+}
+
+// traitsNote tells an identify or group method's caller which key of the
+// message its traits are sent in, which the rule's section alone does not
+// tell: group sends the message's traits from either section.
+func traitsNote(t plan.EventType, section plan.IdentitySection) string {
+	switch {
+	case section != plan.IdentitySectionContextTraits:
+		return "The traits are sent as the message's traits."
+	case t == plan.EventTypeIdentify:
+		return "The traits are sent as context.traits, where they win over the traits WithAnalyticsContext sets."
+	}
+	return "The traits are sent as the message's traits; context.traits holds the user's traits, not the group's."
 }
 
 // The categoryMode constants of the generated code.
