@@ -415,8 +415,15 @@ func TestTrackWire(t *testing.T) {
 		}
 	})
 
-	var sent int
+	// Rows find their messages by name, so two rows with one name would share a
+	// message ID and one row's message would stand in for the other's.
+	var (
+		sent  int
+		names = make(map[string]bool, len(tests))
+	)
 	for _, tt := range tests {
+		require.False(t, names[tt.name], "two rows are named %q", tt.name)
+		names[tt.name] = true
 		if tt.want != "" {
 			sent++
 		}
