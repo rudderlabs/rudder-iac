@@ -1,6 +1,9 @@
 package golang_test
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"regexp"
 	"testing"
@@ -78,6 +81,37 @@ func TestGenerateGoldens(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, []*core.File{{Path: "ruddertyper.go", Content: string(want)}}, files, "generated content does not match %s; run 'make typer-go-update-testdata' to update the goldens", golden.Path)
 			assert.Equal(t, wantWarnings[golden.Path], *warnings)
+			// The runtime package's tests cover the generated runtime only
+			// while it is emitted unchanged.
+			assert.Contains(t, files[0].Content, golang.RuntimeSource)
+		})
+	}
+}
+
+// The spec allows no package variables in a generated file but the three
+// sentinels.
+func TestGenerateDeclaresOnlyTheSentinelsAsPackageVariables(t *testing.T) {
+	for _, golden := range testutils.Goldens {
+		t.Run(golden.Path, func(t *testing.T) {
+			captureWarnings(t)
+
+			files, err := (&golang.Generator{}).Generate(golden.Plan(), core.GenerateOptions{}, golden.Options)
+			require.NoError(t, err)
+			require.Len(t, files, 1)
+
+			file, err := parser.ParseFile(token.NewFileSet(), files[0].Path, files[0].Content, 0)
+			require.NoError(t, err)
+			var names []string
+			for _, decl := range file.Decls {
+				if d, ok := decl.(*ast.GenDecl); ok && d.Tok == token.VAR {
+					for _, spec := range d.Specs {
+						for _, name := range spec.(*ast.ValueSpec).Names {
+							names = append(names, name.Name)
+						}
+					}
+				}
+			}
+			assert.Equal(t, []string{"ErrNilPayload", "ErrInvalidValue", "ErrCategoryConflict"}, names)
 		})
 	}
 }

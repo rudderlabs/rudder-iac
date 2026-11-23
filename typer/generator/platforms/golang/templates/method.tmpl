@@ -2,10 +2,8 @@
 func (r *RudderTyperAnalytics) {{ .Name }}(identity Identity{{ with .Payload }}, props {{ .Name }}{{ end }}, opts ...Option) error {
 {{- if not .Payload }}
 	return r.track(identity, {{ quote .Event }}, nil, opts)
-{{- else if .Payload.MapAlias }}
-	return r.track(identity, {{ quote .Event }}, props, opts)
 {{- else }}
-	p, err := props.ToProperties()
+	p, err := {{ if .Payload.MapAlias }}snapshot(props){{ else }}props.ToProperties(){{ end }}
 	if err != nil {
 		return err
 	}
