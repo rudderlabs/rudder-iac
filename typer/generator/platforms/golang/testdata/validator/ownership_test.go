@@ -5,11 +5,13 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"time"
 
 	analytics "github.com/rudderlabs/analytics-go/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang/testdata/validator/examples"
 	"github.com/rudderlabs/rudder-iac/typer/generator/platforms/golang/testdata/validator/ruddertyper"
 )
 
@@ -108,6 +110,59 @@ func TestGeneratedMethodsOwnTheirInputs(t *testing.T) {
 			Context:      context,
 			Integrations: analytics.Integrations{"Amplitude": map[string]any{"key": "v"}},
 		},
+	}, client.messages)
+}
+
+// The SDK fills messageId, originalTimestamp and, except on identify,
+// anonymousId before the wire, so only the message handed to Enqueue shows
+// that the options reach it and that the generated code invents none of them.
+func TestNonTrackMethodsPassOptions(t *testing.T) {
+	var (
+		client       = &fakeClient{}
+		ex           = examples.New(client)
+		id           = examples.Identity{UserID: "user-123"}
+		integrations = analytics.Integrations{"All": false, "Amplitude": true}
+		timestamp    = time.Date(2026, 9, 29, 10, 0, 0, 0, time.UTC)
+		opts         = func(messageID string) []examples.Option {
+			return []examples.Option{
+				examples.WithIntegrations(integrations), examples.WithTimestamp(timestamp), examples.WithMessageID(messageID),
+			}
+		}
+	)
+
+	require.NoError(t, ex.Identify(id, nil))
+	require.NoError(t, ex.Identify(id, nil, opts("identify-1")...))
+	require.NoError(t, ex.Group(id, "g1", nil))
+	require.NoError(t, ex.Group(id, "g1", nil, opts("group-1")...))
+	require.NoError(t, ex.Page(id, "Home", nil))
+	require.NoError(t, ex.Page(id, "Home", nil, opts("page-1")...))
+	require.NoError(t, ex.Screen(id, "Home", nil))
+	require.NoError(t, ex.Screen(id, "Home", nil, opts("screen-1")...))
+
+	// Without WithIntegrations the copy of the nil map is empty, which the SDK
+	// omits from the wire.
+	none := analytics.Integrations{}
+	context := &analytics.Context{Extra: map[string]any{
+		"ruddertyper": map[string]any{
+			"platform":            "go",
+			"rudderCLIVersion":    "1.0.0",
+			"trackingPlanId":      "plan_examples",
+			"trackingPlanVersion": 0,
+		},
+	}}
+	assert.Equal(t, []analytics.Message{
+		analytics.Identify{UserId: "user-123", Context: context, Integrations: none},
+		analytics.Identify{UserId: "user-123", Context: context,
+			Integrations: integrations, OriginalTimestamp: timestamp, MessageId: "identify-1"},
+		analytics.Group{UserId: "user-123", GroupId: "g1", Context: context, Integrations: none},
+		analytics.Group{UserId: "user-123", GroupId: "g1", Context: context,
+			Integrations: integrations, OriginalTimestamp: timestamp, MessageId: "group-1"},
+		analytics.Page{UserId: "user-123", Name: "Home", Context: context, Integrations: none},
+		analytics.Page{UserId: "user-123", Name: "Home", Context: context,
+			Integrations: integrations, OriginalTimestamp: timestamp, MessageId: "page-1"},
+		analytics.Screen{UserId: "user-123", Name: "Home", Context: context, Integrations: none},
+		analytics.Screen{UserId: "user-123", Name: "Home", Context: context,
+			Integrations: integrations, OriginalTimestamp: timestamp, MessageId: "screen-1"},
 	}, client.messages)
 }
 
