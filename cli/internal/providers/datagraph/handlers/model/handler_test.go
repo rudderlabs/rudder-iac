@@ -1,8 +1,10 @@
 package model
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/testutils"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/syncer/differ"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -996,7 +999,7 @@ func TestUpdate_BatchUpsertColumnMetadata(t *testing.T) {
 		}
 
 		h := &HandlerImpl{client: mockClient}
-		newData := buildModelResource(t, nil)
+		newData := buildModelResource(t, []map[string]any{})
 		oldData := buildModelResource(t, []map[string]any{
 			{"name": "email", "display_name": "Email"},
 			{"name": "user_id", "display_name": "User ID"},
@@ -1060,7 +1063,8 @@ func TestMapRemoteToState_PopulatesColumns(t *testing.T) {
 	urnResolver := testutils.NewMockURNResolver()
 	urnResolver.AddMapping("data-graph", "dg-remote-1", "data-graph:my-dg")
 
-	h := &HandlerImpl{client: &testutils.MockDataGraphClient{}}
+	h := NewHandler(&testutils.MockDataGraphClient{})
+	require.NoError(t, h.AddResource("user", buildModelResource(t, []map[string]any{{"name": "email"}})))
 
 	t.Run("rows are lifted into Columns and updatedAt is dropped", func(t *testing.T) {
 		remote := &model.RemoteModel{
@@ -1079,7 +1083,7 @@ func TestMapRemoteToState_PopulatesColumns(t *testing.T) {
 			},
 		}
 
-		resource, _, err := h.MapRemoteToState(remote, urnResolver)
+		resource, _, err := h.Impl.MapRemoteToState(remote, urnResolver)
 		require.NoError(t, err)
 		assert.Equal(t, []map[string]any{
 			{"name": "email", "display_name": "Email", "description": "", "pii_mask": false},
@@ -1100,7 +1104,7 @@ func TestMapRemoteToState_PopulatesColumns(t *testing.T) {
 			},
 		}
 
-		resource, _, err := h.MapRemoteToState(remote, urnResolver)
+		resource, _, err := h.Impl.MapRemoteToState(remote, urnResolver)
 		require.NoError(t, err)
 		assert.Nil(t, resource.Columns)
 	})
@@ -1185,10 +1189,13 @@ func TestLoadRemoteResources_PopulatesColumns(t *testing.T) {
 		}
 
 		h := &HandlerImpl{client: mockClient}
+		var output bytes.Buffer
+		defer ui.SetErrorWriter(&output)()
 		remotes, err := h.LoadRemoteResources(context.Background())
 		require.NoError(t, err)
 		require.Len(t, remotes, 1)
 		assert.Nil(t, remotes[0].Columns)
+		assert.Empty(t, output.String())
 	})
 
 	t.Run("non-404 errors propagate and abort the load", func(t *testing.T) {
@@ -1210,17 +1217,230 @@ func TestLoadRemoteResources_PopulatesColumns(t *testing.T) {
 			},
 		}
 
-		h := &HandlerImpl{client: mockClient}
-		remotes, err := h.LoadRemoteResources(context.Background())
+		h := NewHandler(mockClient)
+		require.NoError(t, h.AddResource("user", buildModelResource(t, []map[string]any{{"name": "id"}})))
+		remotes, err := h.Impl.LoadRemoteResources(context.Background())
 		require.Error(t, err)
 		assert.ErrorIs(t, err, serverErr)
+		assert.ErrorContains(t, err, "loading column metadata for data graph dg-1: listing column metadata for model em-1")
 		assert.Nil(t, remotes)
 	})
 }
 
-// TestLoadImportableResources_PopulatesColumns mirrors the test above for the
-// unmanaged-DG path used by `rudder-cli import workspace`. The yaml emitted
-// downstream depends on Columns being attached here.
+func TestMapRemoteToState_ExplicitEmptyColumnsCompareRemoteRows(t *testing.T) {
+	h := NewHandler(&testutils.MockDataGraphClient{})
+	require.NoError(t, h.AddResource("user", buildModelResource(t, []map[string]any{})))
+	resolver := testutils.NewMockURNResolver()
+	resolver.AddMapping("data-graph", "dg-remote-123", "data-graph:my-dg")
+	remote := &model.RemoteModel{Model: &dgClient.Model{ID: "em-1", ExternalID: "user", DataGraphID: "dg-remote-123"},
+		Columns: []dgClient.ColumnMetadataRow{{Name: "email", PiiMask: true}}}
+
+	resource, _, err := h.Impl.MapRemoteToState(remote, resolver)
+	require.NoError(t, err)
+	assert.Equal(t, []map[string]any{{"name": "email", "display_name": "", "description": "", "pii_mask": true}}, resource.Columns)
+}
+
+func TestMapRemoteToState_OmittedLocalColumnsIgnoreRemoteColumns(t *testing.T) {
+	h := NewHandler(&testutils.MockDataGraphClient{})
+	require.NoError(t, h.AddResource("user", buildModelResource(t, nil)))
+	resolver := testutils.NewMockURNResolver()
+	resolver.AddMapping("data-graph", "dg-remote-123", "data-graph:my-dg")
+	remote := &model.RemoteModel{Model: &dgClient.Model{ID: "em-1", ExternalID: "user", DataGraphID: "dg-remote-123"},
+		Columns: []dgClient.ColumnMetadataRow{{Name: "email", PiiMask: true}}}
+
+	resource, _, err := h.Impl.MapRemoteToState(remote, resolver)
+	require.NoError(t, err)
+	assert.Nil(t, resource.Columns)
+}
+
+func TestUpdate_OmittedColumnsDoNotDeleteRemoteMetadata(t *testing.T) {
+	calls := 0
+	mockClient := &testutils.MockDataGraphClient{
+		UpdateModelFunc: func(_ context.Context, req *dgClient.UpdateModelRequest) (*dgClient.Model, error) {
+			return &dgClient.Model{ID: req.ModelID, Type: req.Type}, nil
+		},
+		BatchUpsertColumnMetadataFunc: func(context.Context, string, string, dgClient.BatchUpsertColumnMetadataRequest) (*dgClient.ColumnMetadataListResponse, error) {
+			calls++
+			return &dgClient.ColumnMetadataListResponse{}, nil
+		},
+	}
+	oldData := buildModelResource(t, []map[string]any{{"name": "email", "pii_mask": true}})
+	newData := buildModelResource(t, nil)
+	newData.DisplayName = "Changed"
+	_, err := (&HandlerImpl{client: mockClient}).Update(context.Background(), newData, oldData, &model.ModelState{ID: "em-1"})
+	require.NoError(t, err)
+	assert.Zero(t, calls)
+}
+
+func TestLoadRemoteResources_MetadataWarningUsesDiagnosticWriter(t *testing.T) {
+	mockClient := &testutils.MockDataGraphClient{
+		ListDataGraphsFunc: func(context.Context, *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			return &dgClient.ListDataGraphsResponse{Data: []dgClient.DataGraph{{ID: "dg-1", ExternalID: "my-dg"}}}, nil
+		},
+		ListModelsFunc: func(context.Context, *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error) {
+			return &dgClient.ListModelsResponse{Data: []dgClient.Model{{ID: "em-1", ExternalID: "user"}}}, nil
+		},
+		ListColumnMetadataFunc: func(context.Context, string, string) (*dgClient.ColumnMetadataListResponse, error) {
+			return nil, &client.APIError{HTTPStatusCode: 500}
+		},
+	}
+	var stdout, stderr bytes.Buffer
+	ui.SetWriter(&stdout)
+	defer ui.RestoreWriter()
+	defer ui.SetErrorWriter(&stderr)()
+	_, err := NewHandler(mockClient).Impl.LoadRemoteResources(context.Background())
+	require.NoError(t, err)
+	assert.Empty(t, stdout.String(), "warnings must not corrupt machine-readable stdout")
+	assert.Contains(t, stderr.String(), "Warning:")
+}
+
+func TestLoadRemoteResources_ExplicitEmptyColumnsRequireRead(t *testing.T) {
+	mockClient := &testutils.MockDataGraphClient{
+		ListDataGraphsFunc: func(context.Context, *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			return &dgClient.ListDataGraphsResponse{Data: []dgClient.DataGraph{{ID: "dg-remote-123", ExternalID: "my-dg"}}}, nil
+		},
+		ListModelsFunc: func(context.Context, *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error) {
+			return &dgClient.ListModelsResponse{Data: []dgClient.Model{{ID: "em-1", ExternalID: "user"}}}, nil
+		},
+		ListColumnMetadataFunc: func(context.Context, string, string) (*dgClient.ColumnMetadataListResponse, error) {
+			return nil, &client.APIError{HTTPStatusCode: 500}
+		},
+	}
+	h := NewHandler(mockClient)
+	require.NoError(t, h.AddResource("user", buildModelResource(t, []map[string]any{})))
+	_, err := h.Impl.LoadRemoteResources(context.Background())
+	assert.ErrorContains(t, err, "listing column metadata for model em-1")
+}
+
+func TestLoadRemoteResources_CancelledMetadataReadPropagates(t *testing.T) {
+	mockClient := &testutils.MockDataGraphClient{
+		ListDataGraphsFunc: func(context.Context, *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			return &dgClient.ListDataGraphsResponse{Data: []dgClient.DataGraph{{ID: "dg-1", ExternalID: "my-dg"}}}, nil
+		},
+		ListModelsFunc: func(context.Context, *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error) {
+			return &dgClient.ListModelsResponse{Data: []dgClient.Model{{ID: "em-1", ExternalID: "user"}}}, nil
+		},
+		ListColumnMetadataFunc: func(context.Context, string, string) (*dgClient.ColumnMetadataListResponse, error) {
+			return nil, fmt.Errorf("request failed: %w", context.Canceled)
+		},
+	}
+	h := NewHandler(mockClient)
+	require.NoError(t, h.AddResource("user", buildModelResource(t, nil)))
+	_, err := h.Impl.LoadRemoteResources(context.Background())
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestLoadRemoteResources_ColumnMetadataFailureWithoutLocalColumnsWarns(t *testing.T) {
+	mockClient := &testutils.MockDataGraphClient{
+		ListDataGraphsFunc: func(context.Context, *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			return &dgClient.ListDataGraphsResponse{Data: []dgClient.DataGraph{{ID: "dg-remote-123", ExternalID: "my-dg"}}}, nil
+		},
+		ListModelsFunc: func(context.Context, *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error) {
+			return &dgClient.ListModelsResponse{Data: []dgClient.Model{{ID: "em-1", ExternalID: "user", DataGraphID: "dg-remote-123"}}}, nil
+		},
+		ListColumnMetadataFunc: func(context.Context, string, string) (*dgClient.ColumnMetadataListResponse, error) {
+			return nil, &client.APIError{HTTPStatusCode: 500, Message: "boom"}
+		},
+	}
+	h := NewHandler(mockClient)
+	require.NoError(t, h.AddResource("user", buildModelResource(t, nil)))
+	var output bytes.Buffer
+	defer ui.SetErrorWriter(&output)()
+
+	remotes, err := h.Impl.LoadRemoteResources(context.Background())
+	require.NoError(t, err)
+	require.Len(t, remotes, 1)
+	assert.Nil(t, remotes[0].Columns)
+	assert.Contains(t, output.String(), "Warning:")
+	assert.Contains(t, output.String(), "dg-remote-123")
+	assert.Contains(t, output.String(), "em-1")
+	assert.Contains(t, output.String(), "boom")
+}
+
+func TestLoadRemoteResources_ColumnFailureDoesNotConfuseModelsInOtherGraphs(t *testing.T) {
+	mockClient := &testutils.MockDataGraphClient{
+		ListDataGraphsFunc: func(context.Context, *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			return &dgClient.ListDataGraphsResponse{Data: []dgClient.DataGraph{{ID: "dg-other", ExternalID: "other-dg"}}}, nil
+		},
+		ListModelsFunc: func(context.Context, *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error) {
+			return &dgClient.ListModelsResponse{Data: []dgClient.Model{{ID: "em-1", ExternalID: "user", DataGraphID: "dg-other"}}}, nil
+		},
+		ListColumnMetadataFunc: func(context.Context, string, string) (*dgClient.ColumnMetadataListResponse, error) {
+			return nil, &client.APIError{HTTPStatusCode: 500}
+		},
+	}
+	h := NewHandler(mockClient)
+	require.NoError(t, h.AddResource("user", buildModelResource(t, []map[string]any{{"name": "id"}})))
+	var output bytes.Buffer
+	defer ui.SetErrorWriter(&output)()
+
+	remotes, err := h.Impl.LoadRemoteResources(context.Background())
+	require.NoError(t, err)
+	require.Len(t, remotes, 1)
+	assert.Nil(t, remotes[0].Columns)
+	assert.Contains(t, output.String(), "dg-other")
+}
+
+func TestLoadRemoteResources_ImportPreflightSkipsUnreadColumns(t *testing.T) {
+	mockClient := &testutils.MockDataGraphClient{
+		ListDataGraphsFunc: func(context.Context, *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			return &dgClient.ListDataGraphsResponse{Data: []dgClient.DataGraph{{ID: "dg-remote-123", ExternalID: "my-dg"}}}, nil
+		},
+		ListModelsFunc: func(context.Context, *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error) {
+			return &dgClient.ListModelsResponse{Data: []dgClient.Model{{ID: "em-1", ExternalID: "user", DataGraphID: "dg-remote-123"}}}, nil
+		},
+		ListColumnMetadataFunc: func(context.Context, string, string) (*dgClient.ColumnMetadataListResponse, error) {
+			return nil, &client.APIError{HTTPStatusCode: 500}
+		},
+	}
+	h := NewHandler(mockClient)
+	require.NoError(t, h.AddResource("user", buildModelResource(t, []map[string]any{{"name": "id"}})))
+	var output bytes.Buffer
+	defer ui.SetErrorWriter(&output)()
+	var unread []string
+	ctx := WithImportColumnMetadataFallback(context.Background(), func(urn string) { unread = append(unread, urn) })
+
+	remotes, err := h.Impl.LoadRemoteResources(ctx)
+	require.NoError(t, err)
+	require.Len(t, remotes, 1)
+	assert.Nil(t, remotes[0].Columns)
+	assert.Equal(t, []string{"data-graph-model:user"}, unread)
+	assert.Contains(t, output.String(), "dg-remote-123")
+	assert.Contains(t, output.String(), "em-1")
+}
+
+func TestLoadImportableResources_ColumnMetadataFailureWarnsAndContinues(t *testing.T) {
+	serverErr := &client.APIError{HTTPStatusCode: http.StatusInternalServerError, Message: "boom"}
+	mockClient := &testutils.MockDataGraphClient{
+		ListDataGraphsFunc: func(context.Context, *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
+			return &dgClient.ListDataGraphsResponse{Data: []dgClient.DataGraph{{ID: "dg-1"}}}, nil
+		},
+		ListModelsFunc: func(context.Context, *dgClient.ListModelsRequest) (*dgClient.ListModelsResponse, error) {
+			return &dgClient.ListModelsResponse{Data: []dgClient.Model{{ID: "em-1", DataGraphID: "dg-1"}, {ID: "em-2", DataGraphID: "dg-1"}}}, nil
+		},
+		ListColumnMetadataFunc: func(_ context.Context, _, id string) (*dgClient.ColumnMetadataListResponse, error) {
+			if id == "em-1" {
+				return nil, serverErr
+			}
+			return &dgClient.ColumnMetadataListResponse{Columns: []dgClient.ColumnMetadataRow{{Name: "id"}}}, nil
+		},
+	}
+	var output bytes.Buffer
+	defer ui.SetErrorWriter(&output)()
+
+	remotes, err := NewHandler(mockClient).Impl.LoadImportableResources(context.Background())
+	require.NoError(t, err)
+	require.Len(t, remotes, 2)
+	assert.Nil(t, remotes[0].Columns)
+	assert.Equal(t, []dgClient.ColumnMetadataRow{{Name: "id"}}, remotes[1].Columns)
+	assert.Contains(t, output.String(), "Warning:")
+	assert.Contains(t, output.String(), "dg-1")
+	assert.Contains(t, output.String(), "em-1")
+	assert.Contains(t, output.String(), "boom")
+}
+
+// TestLoadImportableResources_PopulatesColumns mirrors the managed load for the
+// unmanaged-DG path used by `rudder-cli import workspace`.
 func TestLoadImportableResources_PopulatesColumns(t *testing.T) {
 	mockClient := &testutils.MockDataGraphClient{
 		ListDataGraphsFunc: func(_ context.Context, req *dgClient.ListDataGraphsRequest) (*dgClient.ListDataGraphsResponse, error) {
@@ -1277,7 +1497,8 @@ func TestRoundTrip_ColumnsIdempotent(t *testing.T) {
 	// 2. Server returns the same two rows in a different order (sorted by Name
 	//    on the server side). MapRemoteToState must normalise this into the
 	//    same shape as the local resource.
-	h := &HandlerImpl{client: &testutils.MockDataGraphClient{}}
+	h := NewHandler(&testutils.MockDataGraphClient{})
+	require.NoError(t, h.AddResource("user", localResource))
 	remote := &model.RemoteModel{
 		Model: &dgClient.Model{
 			ID:          "em-1",
@@ -1294,7 +1515,7 @@ func TestRoundTrip_ColumnsIdempotent(t *testing.T) {
 			{Name: "id", DisplayName: "User ID"},
 		},
 	}
-	remoteResource, _, err := h.MapRemoteToState(remote, urnResolver)
+	remoteResource, _, err := h.Impl.MapRemoteToState(remote, urnResolver)
 	require.NoError(t, err)
 
 	// Local yaml mirrors the server's sort order — the spec author conventionally

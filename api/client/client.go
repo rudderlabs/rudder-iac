@@ -91,13 +91,14 @@ func (c *Client) Do(ctx context.Context, method, path string, body io.Reader) ([
 
 	// check if response has an error status code and parse API error accordingly
 	if res.StatusCode < 200 || res.StatusCode > 299 {
-		apiError := &APIError{HTTPStatusCode: res.StatusCode}
+		apiError := &APIError{}
 		if len(data) > 0 {
 			err := json.Unmarshal(data, apiError)
 			if err != nil {
-				return nil, fmt.Errorf("could not parse error response from API: %w", err)
+				apiError.Message = "non-JSON API response: " + strconv.QuoteToASCII(string(data[:min(len(data), 200)]))
 			}
 		}
+		apiError.HTTPStatusCode = res.StatusCode
 
 		return nil, apiError
 	}

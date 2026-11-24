@@ -18,9 +18,18 @@ import (
 	dgModel "github.com/rudderlabs/rudder-iac/cli/internal/providers/datagraph/model"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
+	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
 
 type ModelHandler = handler.BaseHandler[struct{}, dgModel.ModelResource, dgModel.ModelState, dgModel.RemoteModel]
+
+type importColumnFallbackKey struct{}
+
+// WithImportColumnMetadataFallback allows workspace import's managed-state preflight
+// to continue after an unread column response and record the affected model URNs.
+func WithImportColumnMetadataFallback(ctx context.Context, record func(string)) context.Context {
+	return context.WithValue(ctx, importColumnFallbackKey{}, record)
+}
 
 var HandlerMetadata = handler.HandlerMetadata{
 	ResourceType:     "data-graph-model",
@@ -33,12 +42,15 @@ var HandlerMetadata = handler.HandlerMetadata{
 // The provider handles all spec parsing and resource extraction
 type HandlerImpl struct {
 	client dgClient.DataGraphClient
+	local  *ModelHandler
 }
 
 // NewHandler creates a new BaseHandler for model resources
 func NewHandler(client dgClient.DataGraphClient) *ModelHandler {
 	h := &HandlerImpl{client: client}
-	return handler.NewHandler(h)
+	base := handler.NewHandler(h)
+	h.local = base
+	return base
 }
 
 func (h *HandlerImpl) Metadata() handler.HandlerMetadata {
@@ -98,7 +110,9 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*dgModel.Remot
 		if err != nil {
 			return nil, fmt.Errorf("loading models for data graph %s: %w", dg.ID, err)
 		}
-		if err := h.populateColumnMetadata(ctx, dg.ID, models); err != nil {
+		if err := h.populateColumnMetadata(ctx, dg.ID, models, func(m *dgModel.RemoteModel) bool {
+			return h.managesColumns(m.ExternalID, resources.URN(dg.ExternalID, datagraph.HandlerMetadata.ResourceType))
+		}); err != nil {
 			return nil, fmt.Errorf("loading column metadata for data graph %s: %w", dg.ID, err)
 		}
 		allModels = append(allModels, models...)
@@ -123,7 +137,7 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*dgModel.R
 		if err != nil {
 			return nil, fmt.Errorf("loading importable models for data graph %s: %w", dg.ID, err)
 		}
-		if err := h.populateColumnMetadata(ctx, dg.ID, models); err != nil {
+		if err := h.populateColumnMetadata(ctx, dg.ID, models, nil); err != nil {
 			return nil, fmt.Errorf("loading column metadata for data graph %s: %w", dg.ID, err)
 		}
 		allModels = append(allModels, models...)
@@ -147,10 +161,9 @@ func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*dgModel.R
 //     endpoint exists for the model but holds no entries, or the model was
 //     just created in a transient race). The model is left with empty
 //     Columns.
-//   - Any other error — including 5xx and transport failures — fails the
-//     load so a real infrastructure issue isn't silently masked as a clean
-//     remote state and then mis-diagnosed as a stale-yaml diff.
-func (h *HandlerImpl) populateColumnMetadata(ctx context.Context, dataGraphID string, models []*dgModel.RemoteModel) error {
+//   - Other failures warn when columns are unmanaged or during import preflight;
+//     declared columns fail closed outside import. Cancellation always propagates.
+func (h *HandlerImpl) populateColumnMetadata(ctx context.Context, dataGraphID string, models []*dgModel.RemoteModel, requiresColumns func(*dgModel.RemoteModel) bool) error {
 	for _, m := range models {
 		resp, err := h.client.ListColumnMetadata(ctx, dataGraphID, m.ID)
 		if err != nil {
@@ -158,7 +171,19 @@ func (h *HandlerImpl) populateColumnMetadata(ctx context.Context, dataGraphID st
 				m.Columns = nil
 				continue
 			}
-			return fmt.Errorf("listing column metadata for model %s: %w", m.ID, err)
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+				return fmt.Errorf("listing column metadata for model %s: %w", m.ID, err)
+			}
+			if requiresColumns != nil && requiresColumns(m) {
+				record, ok := ctx.Value(importColumnFallbackKey{}).(func(string))
+				if !ok {
+					return fmt.Errorf("listing column metadata for model %s: %w", m.ID, err)
+				}
+				record(resources.URN(m.ExternalID, HandlerMetadata.ResourceType))
+			}
+			m.Columns = nil
+			ui.PrintDiagnosticWarning(fmt.Sprintf("Could not load column metadata for data graph %s model %s: %v", dataGraphID, m.ID, err))
+			continue
 		}
 
 		if len(resp.Columns) == 0 {
@@ -177,8 +202,7 @@ func (h *HandlerImpl) populateColumnMetadata(ctx context.Context, dataGraphID st
 }
 
 // isNotFound reports whether err wraps a 404 response from the API client.
-// Used to distinguish "no rows for this model" (treat as empty) from any
-// other failure (which must propagate).
+// Only this status is treated as an empty response without a warning.
 func isNotFound(err error) bool {
 	var apiErr *client.APIError
 	if !errors.As(err, &apiErr) {
@@ -218,6 +242,14 @@ func (h *HandlerImpl) listAllDataGraphs(ctx context.Context, hasExternalID *bool
 	return allDataGraphs, nil
 }
 
+func (h *HandlerImpl) managesColumns(modelID, dataGraphURN string) bool {
+	if h.local == nil {
+		return false
+	}
+	local, ok := h.local.Resource(modelID)
+	return ok && local != nil && local.DataGraphRef != nil && local.DataGraphRef.URN == dataGraphURN && local.Columns != nil
+}
+
 func (h *HandlerImpl) MapRemoteToState(remote *dgModel.RemoteModel, urnResolver handler.URNResolver) (*dgModel.ModelResource, *dgModel.ModelState, error) {
 	// Skip resources without external IDs
 	if remote.ExternalID == "" {
@@ -233,6 +265,12 @@ func (h *HandlerImpl) MapRemoteToState(remote *dgModel.RemoteModel, urnResolver 
 	// Create PropertyRef to the data graph using the resolved URN
 	dataGraphRef := datagraph.CreateDataGraphReference(dataGraphURN)
 
+	// Do not invent an authoritative empty column set in state for a model
+	// whose spec never opted into managing column metadata.
+	var columns []map[string]any
+	if h.managesColumns(remote.ExternalID, dataGraphURN) {
+		columns = columnsFromRemote(remote.Columns)
+	}
 	resource := &dgModel.ModelResource{
 		ID:           remote.ExternalID,
 		DisplayName:  remote.Name,
@@ -243,7 +281,7 @@ func (h *HandlerImpl) MapRemoteToState(remote *dgModel.RemoteModel, urnResolver 
 		PrimaryID:    remote.PrimaryID,
 		Root:         remote.Root,
 		Timestamp:    remote.Timestamp,
-		Columns:      columnsFromRemote(remote.Columns),
+		Columns:      columns,
 	}
 
 	state := &dgModel.ModelState{
@@ -253,11 +291,10 @@ func (h *HandlerImpl) MapRemoteToState(remote *dgModel.RemoteModel, urnResolver 
 	return resource, state, nil
 }
 
-// columnsFromRemote lifts the server's column-metadata rows into the
-// resource's diff-friendly map slice. The server's UpdatedAt is intentionally
-// omitted: it's an authoring-visible artifact that would surface as a spurious
-// diff against the local yaml on every apply. Returns nil for empty input so
-// the resulting resource matches the "no columns:" yaml shape exactly.
+// columnsFromRemote lifts server rows into a diff-friendly map slice.
+// UpdatedAt is omitted because it would produce spurious diffs on every apply.
+// An empty successful response must remain distinguishable from an explicit
+// empty local list during comparison.
 func columnsFromRemote(rows []dgClient.ColumnMetadataRow) []map[string]any {
 	if len(rows) == 0 {
 		return nil
@@ -312,10 +349,11 @@ func (h *HandlerImpl) Create(ctx context.Context, data *dgModel.ModelResource) (
 		return nil, fmt.Errorf("creating %s model: %w", data.Type, err)
 	}
 
-	// Create has no remote state, so no removals to compute — nil remoteColumns
-	// short-circuits the diff and only upserts the local entries.
-	if err := h.applyColumnMetadata(ctx, dataGraphRemoteID, remote.ID, data.Columns, nil); err != nil {
-		return nil, err
+	// Create has no remote columns to remove; an omitted block needs no write.
+	if data.Columns != nil {
+		if err := h.applyColumnMetadata(ctx, dataGraphRemoteID, remote.ID, data.Columns, nil); err != nil {
+			return nil, err
+		}
 	}
 
 	return &dgModel.ModelState{
@@ -361,12 +399,12 @@ func (h *HandlerImpl) Update(ctx context.Context, newData *dgModel.ModelResource
 		return nil, fmt.Errorf("updating %s model: %w", newData.Type, err)
 	}
 
-	// Update threads oldData.Columns through as the pre-apply remote state so
-	// the handler can compute removals (names present remotely but no longer
-	// in yaml) and send them in the same PATCH as the upserts. MapRemoteToState
-	// is the seam that populates oldData.Columns from the server's rows.
-	if err := h.applyColumnMetadata(ctx, dataGraphRemoteID, remote.ID, newData.Columns, oldData.Columns); err != nil {
-		return nil, err
+	// Omitted columns are unmanaged, even when other model fields change.
+	// Explicit columns (including an empty list) reconcile against read remote rows.
+	if newData.Columns != nil {
+		if err := h.applyColumnMetadata(ctx, dataGraphRemoteID, remote.ID, newData.Columns, oldData.Columns); err != nil {
+			return nil, err
+		}
 	}
 
 	return &dgModel.ModelState{

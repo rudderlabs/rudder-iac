@@ -352,3 +352,8 @@
 ## DEX-1079 — Destination Spec Dereference Relies On The Syntax Gate
 <!-- ticket:DEX-1079 -->
 - `HandlerImpl.ExtractResourcesFromSpec` (`cli/internal/providers/destination/handler.go`) dereferences `*spec.DefinitionVersion` without a nil check. That is safe only because `project.handleValidation` runs `ValidateSyntax`, where `destination/spec-syntax-valid` enforces `required`, before any `loadSpec`, and destination `Provider.LoadLegacySpec` rejects legacy specs, so `BaseProvider.LoadLegacySpec`'s fallback to `LoadSpec` cannot deliver a spec the V1-only rule never saw. A new path that calls `LoadSpec` without the syntax phase must validate first or nil-check.
+
+## DEX-1149 — Workspace Import Preflight for Unread Data Graph Columns
+
+- `WorkspaceImport` in `cli/internal/project/importer/importer.go` loads managed remote resources before importables and normally requires the local and remote graphs to match before importing. For a Data Graph model whose column-metadata read failed during this managed-state preflight, it drops only that model's unread `columns` property from the sync diff; unrelated resource or model-property drift still blocks import.
+- A context-scoped callback from the model handler records failed model URNs for this preflight, rather than extending the provider interface for a single-domain exception. The exception belongs to workspace import only: ordinary plan/apply must still reject a failed column read when the local model declares columns. Ref: `cli/internal/project/importer/importer.go`, `cli/internal/providers/datagraph/handlers/model/handler.go`.

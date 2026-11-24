@@ -70,6 +70,12 @@ func (h *BaseHandler[Spec, Res, State, Remote]) AddResource(id string, resource 
 	return nil
 }
 
+// Resource returns a registered local resource by ID without exposing the collection.
+func (h *BaseHandler[Spec, Res, State, Remote]) Resource(id string) (*Res, bool) {
+	r, ok := h.resources[id]
+	return r, ok
+}
+
 func (h *BaseHandler[Spec, Res, State, Remote]) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	collection := resources.NewRemoteResources()
 
