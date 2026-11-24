@@ -484,19 +484,19 @@ func TestOAuthAccountCommandsNeedTheExperimentalFlag(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "RUDDERSTACK_CLI_EXPERIMENTAL=true")
 	assert.Contains(t, err.Error(), "RUDDERSTACK_X_OAUTH_ACCOUNTS=true")
-	assert.Contains(t, err.Error(), "not released yet")
+	assert.Contains(t, err.Error(), "enable-cli-account-handoff")
 
 	_, err = execReauthorize(t, "#account:google-ads-prod", "--no-browser", "--timeout", "2s")
 	assert.ErrorContains(t, err, "RUDDERSTACK_X_OAUTH_ACCOUNTS=true")
 }
 
-// The help says what the flag is and that the API behind it is not released,
-// so the state of the feature is visible without reading the code.
-func TestOAuthAccountCommandHelpNamesTheFlagAndTheMissingAPI(t *testing.T) {
+// The help says what the flag is and that the consent page needs a webapp flag
+// of its own, so the state of the feature is visible without reading the code.
+func TestOAuthAccountCommandHelpNamesTheFlagAndTheWebappGate(t *testing.T) {
 	for _, cmd := range []string{newCmdCreateAccount().Long, newCmdReauthorizeAccount().Long} {
 		assert.Contains(t, cmd, "RUDDERSTACK_X_OAUTH_ACCOUNTS=true")
 		assert.Contains(t, cmd, "RUDDERSTACK_CLI_EXPERIMENTAL=true")
-		assert.Contains(t, cmd, "cannot work against production")
+		assert.Contains(t, cmd, "EXPERIMENTAL")
 		assert.Contains(t, cmd, "docs/oauth-account-handoff.md")
 		// The consent page is behind a webapp flag of its own, which no CLI
 		// setting turns on.

@@ -18,7 +18,7 @@ func NewCmdAccounts() *cobra.Command {
 	cmd.AddCommand(newCmdListAccounts())
 
 	// Both browser-handoff commands are hidden until the experimental flag is
-	// on, like the sources group: they cannot work against production yet.
+	// on, like the sources group: the surface is still experimental.
 	oauthAccountCmds = []*cobra.Command{newCmdCreateAccount(), newCmdReauthorizeAccount()}
 	for _, c := range oauthAccountCmds {
 		cmd.AddCommand(c)

@@ -11,11 +11,10 @@
 // the browser runs the whole consent exchange under the user's dashboard
 // session and the CLI watches a session the server holds.
 //
-// The server half is not released yet: rudder-control-plane#2806 and
-// rudder-webapp#10426 have merged, and rudder-config-backend#6972, which holds
-// the session, is still open. docs/oauth-account-handoff.md is the contract;
-// the types and verbs here match it exactly, and handofftest serves it for
-// tests.
+// The server half is released: rudder-control-plane#2806, rudder-webapp#10426
+// and rudder-config-backend#6972 have all merged and are live in production.
+// docs/oauth-account-handoff.md is the contract; the types and verbs here match
+// it exactly, and handofftest serves it for tests.
 package oauthhandoff
 
 import (

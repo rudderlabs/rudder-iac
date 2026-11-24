@@ -3,12 +3,13 @@
 This document is the contract between `rudder-cli` and the control plane for
 creating and re-authorizing an OAuth integration account. The CLI half is
 built (`cli/internal/oauthhandoff`, `rudder-cli workspace accounts create`,
-`rudder-cli workspace accounts reauthorize`). **The server half is not released
-yet.** rudder-control-plane#2806 and rudder-webapp#10426 have merged;
-rudder-config-backend#6972, which holds the session itself, is still open. Until
-all three ship, both commands fail against production, which is why they sit
-behind an experimental flag. The consent page is also behind the webapp's own
-`enable-cli-account-handoff` flag, which no CLI setting turns on.
+`rudder-cli workspace accounts reauthorize`). **Both halves are released.**
+rudder-control-plane#2806, rudder-webapp#10426 and rudder-config-backend#6972
+have all merged and are live in production (config-backend 2.100.0, rudder-api
+v0.48.0). The commands still sit behind an experimental flag, and the consent
+page is behind the webapp's own `enable-cli-account-handoff` flag, which no CLI
+setting turns on: with that flag off for a workspace the page refuses, and the
+refusal comes back to the waiting terminal.
 
 Read this as the specification to implement. Every request, response, status
 value and timeout the CLI depends on is stated here. Nothing in it requires
@@ -310,11 +311,13 @@ the webapp's calls are reused as they are: the re-auth branch of `callBackV1`
 already updates an existing account's secret in place and returns the same
 account id, so re-authorize is a payload difference rather than a new mechanism.
 
-What is not yet proven is the chain end to end against a real consent screen.
-Each half is covered by its own tests and by this document's test double, and
-earlier heads of the CLI have been run against a local stack, but no run has
-gone CLI to rudder-api to config backend at this head, because #6972 is not in
-any environment yet. That is the first thing to do once it merges.
+The chain is proven end to end against a real consent screen. On 2026-11-24,
+with rudder-cli 1.4.0 against production, a create handoff reached `complete`
+and created an account, `apply` adopted it (`externalId` went from null to the
+spec id), a second `apply` reported no changes, and `reauthorize` replaced the
+secret in place: same account id, same `externalId`, `createdAt` unchanged and
+only `updatedAt` moved. The re-authorize claim that no spec and no destination
+needs editing held.
 
 ### The poll does not have to wake on an event
 

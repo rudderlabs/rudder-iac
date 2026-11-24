@@ -11,7 +11,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/resources"
 	"github.com/rudderlabs/rudder-iac/cli/internal/ui"
 )
- 
+
 const noResourcesFoundMsg = "No resources found"
 
 type model struct {
@@ -131,6 +131,15 @@ func printTableWithDetails(rs []resources.ResourceData, columnWidths map[string]
 		Background(lipgloss.Color("57")).
 		Bold(false)
 	t.SetStyles(s)
+
+	// The interactive table opens /dev/tty, which a pipe, a CI job or any
+	// other non-interactive shell does not have. Render the rows once and
+	// return instead of failing with "could not open a new TTY".
+	if !ui.IsTerminal() {
+		t.Blur()
+		ui.Println(t.View())
+		return nil
+	}
 
 	m := model{
 		table:     t,
