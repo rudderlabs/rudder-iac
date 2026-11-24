@@ -2,6 +2,8 @@ package rules
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/rules/funcs"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/localcatalog"
@@ -46,6 +48,20 @@ const (
 	displayNameRegexTag     = "display_name"
 	displayNameErrorMessage = "must start with a letter or underscore, followed by 2-64 alphanumeric, space, comma, period, or hyphen characters, and cannot end with a space"
 )
+
+var displayNameRegex = regexp.MustCompile(displayNameRegexPattern)
+
+// ValidTrackingPlanName uses the same display-name rules as other catalog names.
+// The API's NAME_STRING_REGEX rejects ampersands, even on updates.
+func ValidTrackingPlanName(name string) bool {
+	return displayNameRegex.MatchString(name)
+}
+
+// LegacyTrackingPlanName is deliberately narrower than a relaxed display-name
+// regex: only an otherwise valid name containing '&' can be grandfathered.
+func LegacyTrackingPlanName(name string) bool {
+	return strings.Contains(name, "&") && ValidTrackingPlanName(strings.ReplaceAll(name, "&", "a"))
+}
 
 var (
 	CustomTypeLegacyReferenceRegex = fmt.Sprintf(

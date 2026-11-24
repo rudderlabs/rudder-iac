@@ -1,4 +1,7 @@
 rule_id: "datacatalog/tracking-plans/semantic-valid"
+# An imported legacy display_name containing '&' requires an import identity
+# attached to this tracking plan in the active workspace. CheckPlan then fetches
+# the remote plan and verifies the workspace, ID and unchanged name before apply.
 match_behavior:
   # Legacy spec versions (rudder/0.1 and rudder/v0.1) use kind "tp" and share the same
   # semantic validation path.

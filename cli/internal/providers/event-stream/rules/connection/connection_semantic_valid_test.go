@@ -57,8 +57,7 @@ type multiModeTestConfig struct {
 //   - "mode-aware" has both blocks, so either can satisfy the settings check.
 //     ios lists connection_mode as a required key.
 //   - "multimode" mirrors intercom: a web source needs api_key in cloud mode
-//     and app_id in device mode, so required keys cannot be resolved from the
-//     source type alone.
+//     and app_id in device mode. Android is device-only.
 func newTestRegistry(t *testing.T) *definitions.Registry {
 	t.Helper()
 
@@ -124,10 +123,10 @@ func newTestRegistry(t *testing.T) *definitions.Registry {
 		Version:         1,
 		NewConfig:       func() any { return &multiModeTestConfig{} },
 		SourceTypes:     []string{"web", "android"},
-		ConnectionModes: map[string][]string{"web": {"cloud", "device"}, "android": {"cloud"}},
+		ConnectionModes: map[string][]string{"web": {"cloud", "device"}, "android": {"device"}},
 		ConnectionRequiredKeys: map[string]map[string][]string{
 			"web":     {"cloud": {"api_key"}, "device": {"app_id"}},
-			"android": {"cloud": {"api_key"}},
+			"android": {"device": {"app_id"}},
 		},
 	}))
 	return registry
@@ -493,9 +492,9 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 		assert.Contains(t, results[0].Message, "api_key")
 	})
 
-	// Without a declared mode there are no required keys to look up, so V-C5
-	// stays silent; the settings check reports the absent declaration.
-	t.Run("undeclared connection_mode on a multi-mode source type is not checked", func(t *testing.T) {
+	// Cloud is implied for web even with device offered. V-C5 checks cloud
+	// requirements, and V-C8 does not demand a connection_mode entry.
+	t.Run("undeclared connection_mode on a cloud-capable multi-mode source checks cloud keys", func(t *testing.T) {
 		t.Parallel()
 
 		graph := resources.NewGraph()
@@ -512,13 +511,11 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 
 		results := validateConnectionsSemantic(registry, spec, graph)
 		require.Len(t, results, 1)
-		assert.Contains(t, results[0].Message, "has no 'connection_mode' entry for source type 'web'")
+		assert.Contains(t, results[0].Message, "missing fields required to connect a 'web' source: api_key")
 	})
 
-	// A source type the definition offers exactly one mode for is no exception:
-	// ConnectionModes says what the destination supports, not what this
-	// connection does, so the mode is still undeclared.
-	t.Run("undeclared connection_mode on a single-mode source type is not checked", func(t *testing.T) {
+	// A device-only source cannot be processed without an explicit mode.
+	t.Run("undeclared connection_mode on a device-only source is reported", func(t *testing.T) {
 		t.Parallel()
 
 		graph := resources.NewGraph()
@@ -539,10 +536,10 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 		assert.Contains(t, results[0].Message, "has no 'connection_mode' entry for source type 'android'")
 	})
 
-	// V-C5 can never report connection_mode missing: the absence that would
-	// make it missing is the same one that leaves the mode undeclared. The
-	// settings check reports it instead.
-	t.Run("connection_mode as a required key is reported by the settings check", func(t *testing.T) {
+	// A cloud-capable type may still explicitly require connection_mode in
+	// its schema. V-C5 reports that entry even though the processing mode is
+	// implied, rather than silencing the schema's requirement.
+	t.Run("connection_mode as a required cloud key is reported by V-C5", func(t *testing.T) {
 		t.Parallel()
 
 		graph := resources.NewGraph()
@@ -561,8 +558,7 @@ func TestConnectionSemanticValid_SourceTypeCompatibility(t *testing.T) {
 
 		results := validateConnectionsSemantic(registry, spec, graph)
 		require.Len(t, results, 1)
-		assert.NotContains(t, results[0].Message, "missing fields required")
-		assert.Contains(t, results[0].Message, "has no 'connection_mode' entry for source type 'android'")
+		assert.Contains(t, results[0].Message, "missing fields required to connect a 'android' source: connection_mode.android")
 	})
 
 	t.Run("connection_mode names the source type", func(t *testing.T) {
@@ -656,10 +652,7 @@ func TestConnectionSemanticValid_SourceTypeSettings(t *testing.T) {
 		graph := modeAwareGraph("javascript", map[string]any{"endpoint": "https://example.com"})
 
 		results := validateConnectionsSemantic(registry, spec, graph)
-		assert.Equal(t, []rules.ValidationResult{{
-			Reference: "/connections/0/destination",
-			Message:   "destination 'dest-1' config has no 'connection_mode' entry for source type 'web'",
-		}}, results)
+		assert.Empty(t, results)
 	})
 
 	t.Run("connection_mode set for another source type", func(t *testing.T) {
@@ -670,10 +663,7 @@ func TestConnectionSemanticValid_SourceTypeSettings(t *testing.T) {
 		})
 
 		results := validateConnectionsSemantic(registry, spec, graph)
-		assert.Equal(t, []rules.ValidationResult{{
-			Reference: "/connections/0/destination",
-			Message:   "destination 'dest-1' config has no 'connection_mode' entry for source type 'web'",
-		}}, results)
+		assert.Empty(t, results)
 	})
 
 	t.Run("connection_mode entry present for the source type", func(t *testing.T) {
@@ -702,10 +692,7 @@ func TestConnectionSemanticValid_SourceTypeSettings(t *testing.T) {
 		})
 
 		results := validateConnectionsSemantic(registry, spec, graph)
-		assert.Equal(t, []rules.ValidationResult{{
-			Reference: "/connections/0/destination",
-			Message:   "destination 'dest-1' config has no 'connection_mode' entry for source type 'web'",
-		}}, results)
+		assert.Empty(t, results)
 	})
 
 	t.Run("a destination declaring neither block asks for nothing", func(t *testing.T) {
@@ -731,15 +718,11 @@ func TestConnectionSemanticValid_SourceTypeSettings(t *testing.T) {
 		graph := modeAwareGraph("python", map[string]any{})
 
 		results := validateConnectionsSemantic(registry, spec, graph)
-		assert.Equal(t, []rules.ValidationResult{{
-			Reference: "/connections/0/destination",
-			Message:   "destination 'dest-1' config has no 'connection_mode' entry for source type 'cloud'",
-		}}, results)
+		assert.Empty(t, results)
 	})
 
-	// Deferring to V-C5 cannot help when the required key is connection_mode:
-	// V-C5 resolves the mode from the very entry whose absence is at issue, so
-	// there is nothing to defer to.
+	// V-C5 reports an explicitly required connection_mode entry in cloud
+	// mode; V-C8 must not duplicate that diagnostic.
 	t.Run("a connection_mode required key does not silence this check", func(t *testing.T) {
 		t.Parallel()
 
@@ -748,7 +731,7 @@ func TestConnectionSemanticValid_SourceTypeSettings(t *testing.T) {
 		results := validateConnectionsSemantic(registry, spec, graph)
 		assert.Equal(t, []rules.ValidationResult{{
 			Reference: "/connections/0/destination",
-			Message:   "destination 'dest-1' config has no 'connection_mode' entry for source type 'ios'",
+			Message:   "destination 'dest-1' config is missing fields required to connect a 'ios' source: connection_mode.ios",
 		}}, results)
 	})
 }

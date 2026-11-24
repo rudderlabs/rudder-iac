@@ -115,7 +115,7 @@ func WithIgnoreUnknownKinds() ProjectOption {
 // WithWorkspaceID sets the resolved workspace ID for the project. This scopes
 // workspace-aware operations (e.g. import-manifest broadcast) to only the
 // entries belonging to the active workspace.
-// When empty, workspace-aware operations fall back to unscoped behavior.
+// When empty, validation uses an unambiguous declared workspace if one exists.
 func WithWorkspaceID(id string) ProjectOption {
 	return func(p *project) {
 		p.workspaceID = id
@@ -211,6 +211,18 @@ func (p *project) recordFailure(carried validation.Diagnostics, cause error) err
 	return reported{cause: cause}
 }
 
+func (p *project) forEachProvider(visit func(provider.Provider)) {
+	if _, ok := p.provider.(interface{ SetWorkspaceID(string) }); ok {
+		visit(p.provider)
+		return
+	}
+	if composite, ok := p.provider.(*provider.CompositeProvider); ok {
+		for _, child := range composite.Providers {
+			visit(child)
+		}
+	}
+}
+
 // Load loads the project specifications from the given location using the
 // configured SpecLoader, runs the rules that read specs as written, runs
 // variable substitution if a substitutor is configured, then runs the specs
@@ -218,6 +230,13 @@ func (p *project) recordFailure(carried validation.Diagnostics, cause error) err
 // RuleProvider).
 func (p *project) Load(location string) error {
 	p.location = location
+	// Workspace-aware providers must scope inline import declarations before
+	// building their graph (central manifests are broadcast below).
+	p.forEachProvider(func(child provider.Provider) {
+		if scoped, ok := child.(interface{ SetWorkspaceID(string) }); ok {
+			scoped.SetWorkspaceID(p.workspaceID)
+		}
+	})
 
 	ui.StartSpinner("Loading project ...")
 	defer ui.StopSpinner()
@@ -311,16 +330,48 @@ func (p *project) handleValidation(engine validation.ValidationEngine, rawSpecs 
 		}
 	}
 
-	// Broadcast the active workspace's import-manifest into the resource provider
-	// tree before graph construction, so handlers attach ImportMetadata from the
-	// same maps that inline metadata.import populates. Inline metadata is loaded
-	// during the loadSpec loop above; this runs after, so the manifest wins on URN
-	// overlap (last writer).
-	//
-	// Scoping to a single workspace is done here (not in the provider) so a URN
-	// maps to at most one remote ID per handler.
-	for _, ws := range p.importManifestProvider.ImportManifest() {
-		if ws.WorkspaceID != p.workspaceID {
+	// Broadcast only a workspace selected by the caller, or (offline) the
+	// project's sole declared workspace across central and inline imports.
+	// Never pick one from ambiguous declarations. Inline imports were loaded
+	// above; the manifest wins on overlap.
+	manifest := p.importManifestProvider.ImportManifest()
+	validationWorkspaceID := p.workspaceID
+	if validationWorkspaceID == "" {
+		workspaces := make(map[string]struct{})
+		for _, ws := range manifest {
+			workspaces[ws.WorkspaceID] = struct{}{}
+		}
+		for _, raw := range parsedRawSpecs {
+			if classify(raw.Parsed()) == ProjectSpec {
+				continue
+			}
+			metadata, err := raw.Parsed().CommonMetadata()
+			if err != nil {
+				return fail(fmt.Errorf("reading inline import metadata: %w", err))
+			}
+			if metadata.Import != nil {
+				for _, ws := range metadata.Import.Workspaces {
+					workspaces[ws.WorkspaceID] = struct{}{}
+				}
+			}
+		}
+		if len(workspaces) == 1 {
+			for id := range workspaces {
+				validationWorkspaceID = id
+			}
+		}
+	}
+	// Inline imports may already be loaded, but an ambiguous project must not
+	// attach any of those identities to the graph during offline validation.
+	if p.workspaceID == "" {
+		p.forEachProvider(func(child provider.Provider) {
+			if scoped, ok := child.(interface{ SetValidationWorkspaceID(string) }); ok {
+				scoped.SetValidationWorkspaceID(validationWorkspaceID)
+			}
+		})
+	}
+	for _, ws := range manifest {
+		if ws.WorkspaceID != validationWorkspaceID || validationWorkspaceID == "" {
 			continue
 		}
 		if err := p.provider.LoadImportManifest(&ws); err != nil {
@@ -342,7 +393,7 @@ func (p *project) handleValidation(engine validation.ValidationEngine, rawSpecs 
 	}
 
 	// Specs which were parsed will now be validated against semantic rules.
-	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph, p.workspaceID)
+	semanticDiags, err := engine.ValidateSemantic(ctx, parsedRawSpecs, graph, validationWorkspaceID)
 	if err != nil {
 		return fail(fmt.Errorf("semantic validation: %w", err))
 	}

@@ -52,6 +52,9 @@ type HandlerImpl struct {
 	// connects a warehouse (Reverse ETL) source to, set by Provider before it
 	// exports; see Provider.FormatForExport.
 	warehouseConnected map[string]bool
+	// eventStreamSourceTypes records source-type tokens by remote destination
+	// ID for importable event-stream links (including --merge matches).
+	eventStreamSourceTypes map[string]map[string]bool
 }
 
 // NewHandler builds a *DestinationHandler wired to the given client and registry.
@@ -494,10 +497,17 @@ func (h *HandlerImpl) toExportSpecMap(externalID string, remote *RemoteDestinati
 	// Secrets the API never returns are told apart from ones it returns empty
 	// before pruning: only the absent ones can get a reference below.
 	absent := absentSecretKeys(registered, localConfig)
+	// Determine the mode before pruning. A written but empty/invalid mode
+	// must not become an omitted mode (and thus imply cloud) merely because
+	// the exporter drops empty config values.
+	connectConfig := map[string]any{}
+	if mode, present := localConfig["connection_mode"]; present {
+		connectConfig["connection_mode"] = mode
+	}
 
 	pruneEmptyValues(localConfig, registered.SelectedKeyRoots(apiConfig)...)
 
-	for _, key := range requiredSecretKeys(registered, localConfig, absent, h.warehouseConnected[remote.ID]) {
+	for _, key := range requiredSecretKeys(registered, localConfig, connectConfig, absent, h.warehouseConnected[remote.ID], h.eventStreamSourceTypes[remote.ID]) {
 		localConfig[key] = ""
 	}
 

@@ -3,7 +3,13 @@ match_behavior:
   # Cross-resource checks over the project graph: both endpoint refs must
   # resolve to project resources (V-C1), a source-destination pair can only be
   # connected once (V-C3), a destination cannot receive from both event stream
-  # and rETL sources (V-E1) nor from two different rETL sources (V-R1), the
+  # and rETL sources (V-E1). V-R1 errors on two different rETL sources unless
+  # every connection at the destination declares its own nonempty, distinct
+  # remote connection import ID in the active workspace; that inherited group
+  # gets a separate warning. Adding a source to its fan-in is refused at plan
+  # time, while a replacement that does not introduce fan-in and whose target
+  # source-destination pair is unoccupied is allowed. Missing,
+  # duplicate, wrong-workspace or unknown-workspace IDs fail closed. The
   # destination must accept warehouse sources (V-C4) and carry the config that
   # source type needs to connect (V-C5) in cloud mode unless the destination
   # names another (no connection_mode.warehouse entry is required: V-C8 does not
@@ -23,7 +29,8 @@ match_behavior:
   # because no destination that supports object mapping carries a hyphen in its
   # type or API type. Known limitation: these checks see only
   # project-managed connections; a connection that exists remotely but is not in
-  # the project is invisible at validate time.
+  # the project is invisible at validate time. CheckPlan reads remote connections
+  # and endpoint catalogs before apply or dry run, including unmanaged rows.
   - applies_to:
       - kind: "retl-connections"
         version: "rudder/v1"

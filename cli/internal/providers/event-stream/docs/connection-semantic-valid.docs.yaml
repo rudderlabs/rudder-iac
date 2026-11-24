@@ -4,12 +4,11 @@ match_behavior:
   # resolve to project resources (V-C1), a source-destination pair can only be
   # connected once (V-C3), the destination definition must support the
   # source's mapped type (V-C4), its config must carry the fields that type
-  # requires to connect in the connection_mode it declares for it (V-C5 —
-  # skipped where no mode is declared, since which fields are required
-  # depends on it) and, in connection_mode, an
-  # entry for that type (V-C8 — skipped where the config surface has neither
-  # block, or cannot name that source type in one), and a destination cannot
-  # receive from both event stream and rETL sources (V-E1 — the edge scan
+  # requires to connect in its declared mode, or cloud when omitted for a
+  # cloud-capable source type (V-C5), and a connection_mode entry when no mode
+  # can be implied (V-C8 — device-only types cannot omit their mode). Explicit
+  # invalid modes are rejected by the destination config rule. A destination
+  # cannot receive from both event stream and rETL sources (V-E1 — the edge scan)
   # covers both connection kinds, so the clash is reported from whichever side
   # declares it). Known limitation: these checks see only project-managed
   # connections; a connection that exists remotely but is not in the project is
@@ -18,6 +17,44 @@ match_behavior:
       - kind: "event-stream-connections"
         version: "rudder/v1"
     valid:
+      - example_id: "es-connection-semantic-cloud-mode-omitted"
+        title: "Cloud-capable web source with connection mode omitted"
+        description: "Cloud is implied for a web source whose destination offers cloud delivery; no connection_mode.web entry is needed. Connect-time cloud required keys still apply."
+        files:
+          source.yaml: |
+            version: rudder/v1
+            kind: event-stream-source
+            metadata:
+              name: my-js-source
+            spec:
+              id: my-js-source
+              name: My JavaScript Source
+              type: javascript
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-s3-destination
+            spec:
+              id: my-s3-destination
+              display_name: Production S3
+              type: s3
+              enabled: true
+              definition_version: 1
+              config:
+                bucket_name: my-bucket
+                role_based_auth: true
+                iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
+          connections.yaml: |
+            version: rudder/v1
+            kind: event-stream-connections
+            metadata:
+              name: my-connections
+            spec:
+              connections:
+                - id: js-to-s3
+                  source: "#event-stream-source:my-js-source"
+                  destination: "#destination:my-s3-destination"
       - example_id: "es-connection-semantic-valid-full-project"
         title: "Connection whose source and destination exist and are compatible"
         files:
@@ -212,8 +249,9 @@ match_behavior:
             reference: "/spec/connections/0/destination"
             severity: "error"
             message_contains: "does not support source 'my-python-source'"
-      - example_id: "es-connection-semantic-missing-connection-mode"
-        title: "Destination declaring no settings for the source's type"
+      - example_id: "es-connection-semantic-cloud-required-key"
+        title: "Omitted mode still checks cloud connect-time keys"
+        description: "Intercom offers cloud and device for web; without connection_mode.web it runs in cloud mode and requires api_key."
         files:
           source.yaml: |
             version: rudder/v1
@@ -228,19 +266,14 @@ match_behavior:
             version: rudder/v1
             kind: destination
             metadata:
-              name: my-s3-destination
+              name: my-intercom-destination
             spec:
-              id: my-s3-destination
-              display_name: Production S3
-              type: s3
+              id: my-intercom-destination
+              display_name: Production Intercom
+              type: intercom
               enabled: true
               definition_version: 1
-              config:
-                bucket_name: my-bucket
-                role_based_auth: true
-                iam_role_arn: "arn:aws:iam::123456789012:role/rudder"
-                connection_mode:
-                  android: cloud
+              config: {}
           connections.yaml: |
             version: rudder/v1
             kind: event-stream-connections
@@ -248,9 +281,50 @@ match_behavior:
               name: my-connections
             spec:
               connections:
-                - id: js-to-s3
+                - id: js-to-intercom
                   source: "#event-stream-source:my-js-source"
-                  destination: "#destination:my-s3-destination"
+                  destination: "#destination:my-intercom-destination"
+        expected_diagnostics:
+          - file: "connections.yaml"
+            reference: "/spec/connections/0/destination"
+            severity: "error"
+            message_contains: "config is missing fields required to connect a 'web' source: api_key"
+      - example_id: "es-connection-semantic-missing-connection-mode"
+        title: "A device-only source cannot omit its connection mode"
+        description: "When cloud is not offered, omission cannot imply cloud; the destination must declare a mode for that source type."
+        files:
+          source.yaml: |
+            version: rudder/v1
+            kind: event-stream-source
+            metadata:
+              name: my-js-source
+            spec:
+              id: my-js-source
+              name: My JavaScript Source
+              type: javascript
+          destination.yaml: |
+            version: rudder/v1
+            kind: destination
+            metadata:
+              name: my-linkedin-destination
+            spec:
+              id: my-linkedin-destination
+              display_name: LinkedIn Insight Tag
+              type: linkedin_insight_tag
+              enabled: true
+              definition_version: 1
+              config:
+                partner_id: "12345"
+          connections.yaml: |
+            version: rudder/v1
+            kind: event-stream-connections
+            metadata:
+              name: my-connections
+            spec:
+              connections:
+                - id: js-to-linkedin
+                  source: "#event-stream-source:my-js-source"
+                  destination: "#destination:my-linkedin-destination"
         expected_diagnostics:
           - file: "connections.yaml"
             reference: "/spec/connections/0/destination"

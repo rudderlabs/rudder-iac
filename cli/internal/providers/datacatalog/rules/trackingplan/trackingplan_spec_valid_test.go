@@ -15,6 +15,41 @@ import (
 	_ "github.com/rudderlabs/rudder-iac/cli/internal/providers/datacatalog/rules"
 )
 
+func TestTrackingPlanLegacyNameSyntax(t *testing.T) {
+	for _, version := range []string{specs.SpecVersionV0_1, specs.SpecVersionV0_1Variant, specs.SpecVersionV1} {
+		t.Run(version, func(t *testing.T) {
+			for _, tc := range []struct {
+				name, displayName string
+				metadata          map[string]any
+				wantValid         bool
+			}{
+				{name: "strict new name", displayName: "Valid Plan", wantValid: true},
+				{name: "central manifest deferred to semantic validation", displayName: "Sales & Marketing", wantValid: true},
+				{name: "inline declaration deferred to semantic validation", displayName: "Sales & Marketing", metadata: map[string]any{"import": map[string]any{"workspaces": []any{map[string]any{"workspace_id": "ws-b", "resources": []any{map[string]any{"urn": "tracking-plan:tp-1", "remote_id": "remote-1"}}}}}}, wantValid: true},
+				{name: "declared local id", displayName: "Sales & Marketing", metadata: map[string]any{"import": map[string]any{"workspaces": []any{map[string]any{"workspace_id": "ws-a", "resources": []any{map[string]any{"local_id": "tp-1", "remote_id": "remote-1"}}}}}}, wantValid: true},
+				{name: "declared urn", displayName: "Sales & Marketing", metadata: map[string]any{"import": map[string]any{"workspaces": []any{map[string]any{"workspace_id": "ws-a", "resources": []any{map[string]any{"urn": "tracking-plan:tp-1", "remote_id": "remote-1"}}}}}}, wantValid: true},
+				{name: "wrong urn type deferred to semantic validation", displayName: "Sales & Marketing", metadata: map[string]any{"import": map[string]any{"workspaces": []any{map[string]any{"workspace_id": "ws-a", "resources": []any{map[string]any{"urn": "event:tp-1", "remote_id": "remote-1"}}}}}}, wantValid: true},
+				{name: "malformed name despite import", displayName: "1 & Plan", metadata: map[string]any{"import": map[string]any{"workspaces": []any{map[string]any{"workspace_id": "ws-a", "resources": []any{map[string]any{"urn": "tracking-plan:tp-1", "remote_id": "remote-1"}}}}}}},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					var results []rules.ValidationResult
+					if version == specs.SpecVersionV1 {
+						results = validateTrackingPlanSpecV1("", version, tc.metadata, localcatalog.TrackingPlanV1{LocalID: "tp-1", Name: tc.displayName})
+					} else {
+						results = validateTrackingPlanSpec("", version, tc.metadata, localcatalog.TrackingPlan{LocalID: "tp-1", Name: tc.displayName})
+					}
+					if tc.wantValid {
+						assert.Empty(t, results)
+					} else {
+						assert.NotEmpty(t, results)
+						assert.Equal(t, "/display_name", results[0].Reference)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestTrackingPlanSpecSyntaxValidRule_Metadata(t *testing.T) {
 	rule := NewTrackingPlanSpecSyntaxValidRule(false)
 

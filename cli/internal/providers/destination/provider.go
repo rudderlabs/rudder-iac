@@ -14,6 +14,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/provider/handler"
 	prules "github.com/rudderlabs/rudder-iac/cli/internal/provider/rules"
 	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions"
+	"github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/definitions/common"
 	destdocs "github.com/rudderlabs/rudder-iac/cli/internal/providers/destination/docs"
 	ttypes "github.com/rudderlabs/rudder-iac/cli/internal/providers/transformations/types"
 	"github.com/rudderlabs/rudder-iac/cli/internal/resolver"
@@ -63,10 +64,20 @@ type warehouseConnection interface {
 	WarehouseDestinationID() string
 }
 
-// FormatForExport exports importable destinations. Which secrets a destination
-// needs at connect time depends on the sources it connects to, so the
-// destinations the same import connects a warehouse source to are noted first
-// (see requiredSecretKeys).
+// eventStreamImportLink is implemented by importable event-stream connections.
+// The destination package cannot import that connection package (it imports
+// destination), so the endpoints and source type cross this boundary via a
+// small interface instead.
+type eventStreamImportLink interface {
+	ImportLink() (sourceID, sourceExternalID, destinationID, destinationExternalID, sourceType string)
+}
+
+// EventStreamConnectionResourceType matches event-stream/connection's resource
+// type; importing that package here would introduce a cycle.
+const EventStreamConnectionResourceType = "event-stream-connection"
+
+// FormatForExport exports importable destinations. Only connections the import
+// can express (including --merge matches) contribute connect-time secret needs.
 func (p *Provider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,
@@ -79,7 +90,42 @@ func (p *Provider) FormatForExport(
 		}
 	}
 	p.handler.warehouseConnected = connected
+	p.handler.eventStreamSourceTypes = map[string]map[string]bool{}
+	for _, res := range collection.GetAll(EventStreamConnectionResourceType) {
+		link, ok := res.Data.(eventStreamImportLink)
+		if !ok {
+			continue
+		}
+		sourceID, sourceExternalID, destinationID, destinationExternalID, sourceType := link.ImportLink()
+		if sourceID == "" || destinationID == "" || sourceType == "" {
+			continue
+		}
+		// The connection exporter skips unresolved endpoints. Follow the same
+		// rule so a link it cannot import cannot demand a secret. A --merge
+		// match adopts an existing spec and needs no newly resolved refs.
+		if res.MatchedWith == nil {
+			if !resolvableImportEndpoint(inputResolver, "event-stream-source", sourceID, sourceExternalID) ||
+				!resolvableImportEndpoint(inputResolver, DestinationResourceType, destinationID, destinationExternalID) {
+				continue
+			}
+		}
+		if p.handler.eventStreamSourceTypes[destinationID] == nil {
+			p.handler.eventStreamSourceTypes[destinationID] = map[string]bool{}
+		}
+		p.handler.eventStreamSourceTypes[destinationID][common.SourceTypeToken(sourceType, "")] = true
+	}
 	return p.BaseProvider.FormatForExport(collection, idNamer, inputResolver)
+}
+
+// resolvableImportEndpoint mirrors event-stream/connection.EndpointRef's
+// success condition without depending on the connection package. A managed
+// endpoint has an external ID even when the resolver cannot find its file.
+func resolvableImportEndpoint(r resolver.ReferenceResolver, resourceType, remoteID, externalID string) bool {
+	if externalID != "" {
+		return true
+	}
+	_, err := r.ResolveToReference(resourceType, remoteID)
+	return err == nil
 }
 
 // PreviewImports reports, per destination the plan imports, the config the

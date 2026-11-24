@@ -68,6 +68,22 @@ spec:
           remote_id: "remote-ws-2"
 `)
 
+	importedPlanDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(importedPlanDir, "plan.yaml"), []byte(`version: rudder/v1
+kind: tracking-plan
+metadata:
+  name: plan
+spec:
+  id: plan
+  display_name: 'Sales & Marketing'
+  rules: []
+`), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(importedPlanDir, "import-manifest.yaml"), []byte(manifestHeader+`    - workspace_id: ws-1
+      resources:
+        - urn: tracking-plan:plan
+          remote_id: remote-plan
+`), 0o600))
+
 	// Apply rejects an entry with both urn and local_id when it broadcasts the
 	// manifest, and validate never broadcasts, so validate must reject it too.
 	urnAndLocalIDDir := projectWithManifest(t, `    - workspace_id: "ws-1"
@@ -83,6 +99,7 @@ spec:
 		wantErr  string
 	}{
 		{name: "no token, valid project", location: "testdata/valid"},
+		{name: "no token, imported legacy name", location: importedPlanDir},
 		{name: "no token, invalid project fails locally", location: invalidDir, wantErr: "syntax validation failed"},
 		{name: "no token, orphan in another workspace block", location: orphanDir, wantErr: "semantic validation failed"},
 		{name: "no token, urn with local_id", location: urnAndLocalIDDir, wantErr: "syntax validation failed"},

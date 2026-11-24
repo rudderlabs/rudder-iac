@@ -1215,6 +1215,129 @@ func TestProviderWithoutConnectionSupport(t *testing.T) {
 	assert.ErrorContains(t, p.LoadSpec("connections.yaml", connectionsSpec()), "unsupported kind")
 }
 
+func TestConnectionImportMetadataScopedToActiveWorkspace(t *testing.T) {
+	t.Parallel()
+
+	urn := resources.URN("users-to-webhook", connection.ResourceType)
+	workspace := func(id, remoteID string) map[string]any {
+		return map[string]any{
+			"workspace_id": id,
+			"resources":    []any{map[string]any{"urn": urn, "remote_id": remoteID}},
+		}
+	}
+
+	tests := []struct {
+		name         string
+		workspaces   []any
+		manifest     *specs.WorkspaceImportMetadata
+		wantRemoteID string
+	}{
+		{
+			name:         "active workspace first in inline metadata",
+			workspaces:   []any{workspace("ws-1", "active-inline"), workspace("ws-2", "foreign-inline")},
+			wantRemoteID: "active-inline",
+		},
+		{
+			name:         "active workspace last in inline metadata",
+			workspaces:   []any{workspace("ws-2", "foreign-inline"), workspace("ws-1", "active-inline")},
+			wantRemoteID: "active-inline",
+		},
+		{
+			name:       "central manifest overrides active inline metadata",
+			workspaces: []any{workspace("ws-1", "active-inline"), workspace("ws-2", "foreign-inline")},
+			manifest: &specs.WorkspaceImportMetadata{
+				WorkspaceID: "ws-1",
+				Resources:   []specs.ImportIds{{URN: urn, RemoteID: "active-central"}},
+			},
+			wantRemoteID: "active-central",
+		},
+		{
+			name:       "foreign central metadata cannot override active inline metadata",
+			workspaces: []any{workspace("ws-1", "active-inline")},
+			manifest: &specs.WorkspaceImportMetadata{
+				WorkspaceID: "ws-2",
+				Resources:   []specs.ImportIds{{URN: urn, RemoteID: "foreign-central"}},
+			},
+			wantRemoteID: "active-inline",
+		},
+		{
+			name:       "foreign inline and central metadata are ignored",
+			workspaces: []any{workspace("ws-2", "foreign-inline")},
+			manifest: &specs.WorkspaceImportMetadata{
+				WorkspaceID: "ws-2",
+				Resources:   []specs.ImportIds{{URN: urn, RemoteID: "foreign-central"}},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := retl.New(newDefaultMockClient(), retl.WithConnectionSupport(definitions.NewRegistry()))
+			p.SetWorkspaceID("ws-1")
+			spec := connectionsSpec()
+			spec.Metadata = map[string]any{
+				"name":   connection.MetadataName,
+				"import": map[string]any{"workspaces": test.workspaces},
+			}
+			require.NoError(t, p.LoadSpec("connections.yaml", spec))
+			if test.manifest != nil {
+				require.NoError(t, p.LoadImportManifest(test.manifest))
+			}
+
+			graph, err := p.ResourceGraph()
+			require.NoError(t, err)
+			r, ok := graph.GetResource(urn)
+			require.True(t, ok)
+			if test.wantRemoteID == "" {
+				assert.Nil(t, r.ImportMetadata())
+				assert.Equal(t, "#retl-connections:users-to-webhook", r.FileMetadata().MetadataRef)
+				return
+			}
+			require.NotNil(t, r.ImportMetadata())
+			assert.Equal(t, test.wantRemoteID, r.ImportMetadata().RemoteId)
+			assert.Equal(t, "ws-1", r.ImportMetadata().WorkspaceId)
+		})
+	}
+}
+
+func TestConnectionOfflineImportIdentity(t *testing.T) {
+	urn := resources.URN("users-to-webhook", connection.ResourceType)
+	ws := func(id string) map[string]any {
+		return map[string]any{"workspace_id": id, "resources": []any{map[string]any{"urn": urn, "remote_id": "remote-" + id}}}
+	}
+	for _, tc := range []struct {
+		name         string
+		workspaces   []any
+		validationID string
+		wantID       string
+	}{
+		{name: "single inline", workspaces: []any{ws("ws-a")}, validationID: "ws-a", wantID: "remote-ws-a"},
+		{name: "multiple inline", workspaces: []any{ws("ws-a"), ws("ws-b")}},
+		{name: "wrong validation workspace", workspaces: []any{ws("ws-a")}, validationID: "ws-other"},
+		{name: "other project workspace", workspaces: []any{ws("ws-a")}, validationID: ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := retl.New(newDefaultMockClient(), retl.WithConnectionSupport(definitions.NewRegistry()))
+			spec := connectionsSpec()
+			spec.Metadata = map[string]any{"import": map[string]any{"workspaces": tc.workspaces}}
+			require.NoError(t, p.LoadSpec("connections.yaml", spec))
+			p.SetValidationWorkspaceID(tc.validationID)
+			graph, err := p.ResourceGraph()
+			require.NoError(t, err)
+			resource, ok := graph.GetResource(urn)
+			require.True(t, ok)
+			if tc.wantID == "" {
+				assert.Nil(t, resource.ImportMetadata())
+			} else {
+				require.NotNil(t, resource.ImportMetadata())
+				assert.Equal(t, tc.wantID, resource.ImportMetadata().RemoteId)
+				assert.Equal(t, tc.validationID, resource.ImportMetadata().WorkspaceId)
+			}
+		})
+	}
+}
+
 func TestProviderWithConnectionSupport(t *testing.T) {
 	t.Parallel()
 
@@ -1237,6 +1360,7 @@ func TestProviderWithConnectionSupport(t *testing.T) {
 	assert.Equal(t, []string{
 		"retl/sqlmodel/semantic-valid",
 		"retl/connection/semantic-valid",
+		"retl/connection/inherited-fan-in",
 		"retl/connection/enabled-endpoints-valid",
 	}, ruleIDs(p.SemanticRules()))
 
