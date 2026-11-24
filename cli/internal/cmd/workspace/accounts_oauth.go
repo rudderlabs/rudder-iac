@@ -45,12 +45,13 @@ const defaultHandoffTimeout = 5 * time.Minute
 // is here so a huge or endless file in that directory cannot stall the command.
 const maxSpecBytes = 1 << 20
 
-// experimentalNotice is on both commands' help, because neither can work until
-// the control plane grows the handoff API that docs/oauth-account-handoff.md
-// specifies. It is not a flag that merely hides a finished feature.
-const experimentalNotice = `This command is EXPERIMENTAL and cannot work against production yet: the
-browser handoff API it calls is not released, and the consent page is behind
-the webapp's own 'enable-cli-account-handoff' flag. See
+// experimentalNotice is on both commands' help. The handoff API it needs is
+// released, so the flag now keeps a still-experimental surface out of the way
+// rather than hiding one that cannot work.
+const experimentalNotice = `This command is EXPERIMENTAL. The browser handoff API it calls is released,
+but the consent page is behind the webapp's own 'enable-cli-account-handoff'
+flag, which no CLI setting turns on: with that flag off for the workspace the
+page refuses and the refusal comes back here. See
 docs/oauth-account-handoff.md for the contract it is built against.
 
 To enable it, set both:
@@ -63,7 +64,7 @@ own.`
 const experimentalDisabledMessage = "this command is experimental: set RUDDERSTACK_CLI_EXPERIMENTAL=true and " +
 	"RUDDERSTACK_X_OAUTH_ACCOUNTS=true, or run 'rudder-cli experimental enable oauthAccounts' with " +
 	"RUDDERSTACK_CLI_EXPERIMENTAL=true.\n" +
-	"  Note that the control-plane handoff API this needs is not released yet, so it cannot work against production."
+	"  The consent page also needs the webapp's 'enable-cli-account-handoff' flag for your workspace."
 
 // adoptHint is what to run to bring a new account into a project. It is the
 // ordinary import path, and it is what create prints whenever it has not
