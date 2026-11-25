@@ -380,7 +380,8 @@ func (p *CompositeProvider) LoadResourcesFromRemote(ctx context.Context) (*resou
 }
 
 // LoadManaged loads managed resources from every provider that implements
-// ManagedExportLoader and returns the names of the providers that do not.
+// ManagedExportLoader and returns the resource types of the providers that do
+// not, so a caller can name what it cannot write.
 // ponytail: sequential, unlike LoadImportable; run them as tasks if export time matters.
 func (p *CompositeProvider) LoadManaged(ctx context.Context) (*resources.RemoteResources, []string, error) {
 	collection := resources.NewRemoteResources()
@@ -388,7 +389,7 @@ func (p *CompositeProvider) LoadManaged(ctx context.Context) (*resources.RemoteR
 	for name, provider := range p.Providers {
 		m, ok := provider.(ManagedExportLoader)
 		if !ok {
-			skipped = append(skipped, name)
+			skipped = append(skipped, provider.SupportedTypes()...)
 			continue
 		}
 		c, err := m.LoadManaged(ctx)

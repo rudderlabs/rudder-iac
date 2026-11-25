@@ -283,6 +283,46 @@ rudder-cli import workspace --managed --skip-existing --location ./my-project
 
 ---
 
+## Reseeding a whole workspace
+
+`import workspace --managed` writes one half of a workspace and a plain
+`import workspace` the other, so recovering a whole workspace takes two runs in
+a project that must already be in the right state for each.
+
+`rudder-cli reseed` does both halves in one run, into a directory that holds no
+project YAML:
+
+```bash
+rudder-cli reseed --location ./rebuilt
+rudder-cli apply --dry-run --location ./rebuilt   # reports no changes
+```
+
+Managed resources get specs keyed by their externalId, so apply matches them.
+Unmanaged ones get specs plus an `import-manifest.yaml`, so apply adopts them.
+A workspace holding both reseeds correctly in one pass.
+
+The empty-directory rule is the whole point: with nothing local to lose and
+nothing to reconcile, reseed runs none of the divergence checks that make
+`import workspace` refuse on a project that has drifted. That is the state a
+half-finished apply leaves behind, and it is exactly the state import rejects.
+There is no force flag. Reseed refuses a directory with project YAML in it and
+tells you to use an empty one.
+
+Reseed refuses outright if the workspace holds a resource type no provider can
+export, naming the type, rather than writing a project whose next apply would
+delete it.
+
+It recovers what the specs say, not how they were written: file layout,
+comments and `{{ .VAR }}` substitutions are lost, and secret values come back
+as placeholders in the generated var file for you to fill in.
+
+> **Status: experimental.** `reseed` needs experimental mode with both
+> `importManaged` and `importMerge`. It needs `importMerge` because that is what
+> makes the `import-manifest` kind load, without which a reseeded project
+> holding one fails to load at all.
+
+---
+
 ## Limitations
 
 - **Pending deletions still block a merge import.** If you have deleted a spec

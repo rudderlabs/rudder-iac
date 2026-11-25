@@ -79,9 +79,13 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteB
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteBook, error) {
 	remoteBooks := h.backend.AllBooks()
 
-	// Return all resources for import
+	// Only the unmanaged ones, as a real provider's list call does with its
+	// hasExternalId=false filter. A managed book already has a spec.
 	result := make([]*model.RemoteBook, 0, len(remoteBooks))
 	for _, b := range remoteBooks {
+		if b.ExternalID != "" {
+			continue
+		}
 		result = append(result, &model.RemoteBook{RemoteBook: b})
 	}
 	return result, nil

@@ -678,13 +678,15 @@ func TestCompositeProvider_LoadManaged(t *testing.T) {
 	managed.Set("typeA", map[string]*resources.RemoteResource{"r1": {ID: "r1", ExternalID: "a-1"}})
 	cp, err := provider.NewCompositeProvider(map[string]provider.Provider{
 		"a": &managedMockProvider{MockProvider: testutils.NewMockProvider([]string{"kindA"}, nil), managed: managed},
-		"b": testutils.NewMockProvider([]string{"kindB"}, nil),
+		"b": testutils.NewMockProvider([]string{"kindB"}, []string{"typeB", "typeB2"}),
 	})
 	require.NoError(t, err)
 
 	got, skipped, err := cp.(*provider.CompositeProvider).LoadManaged(t.Context())
 	require.NoError(t, err)
-	assert.Equal(t, []string{"b"}, skipped)
+	// The types of the provider that cannot export, so a caller can name what
+	// it is unable to write.
+	assert.Equal(t, []string{"typeB", "typeB2"}, skipped)
 	r, ok := got.GetByID("typeA", "r1")
 	require.True(t, ok)
 	assert.Equal(t, "a-1", r.ExternalID)

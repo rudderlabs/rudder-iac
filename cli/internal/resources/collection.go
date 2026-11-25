@@ -48,6 +48,15 @@ func (rc *RemoteResources) Len() int {
 	return count
 }
 
+// Types returns the resource types the collection holds entries for.
+func (rc *RemoteResources) Types() []string {
+	types := make([]string, 0, len(rc.resources))
+	for resourceType := range rc.resources {
+		types = append(types, resourceType)
+	}
+	return types
+}
+
 // Without returns a copy that leaves out the resources drop reports true for.
 func (rc *RemoteResources) Without(drop func(resourceType string, r *RemoteResource) bool) *RemoteResources {
 	out := NewRemoteResources()

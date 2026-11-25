@@ -52,7 +52,7 @@ func ManagedExport(ctx context.Context, project Project, p ManagedExportProvider
 	}
 	managed = managed.Without(func(_ string, r *resources.RemoteResource) bool { return r.ExternalID == "" })
 	if len(skipped) > 0 {
-		ui.PrintWarning("Managed resources of these providers are not exported: " + strings.Join(skipped, ", "))
+		ui.PrintWarning("Managed resources of these types are not exported: " + strings.Join(skipped, ", "))
 	}
 	if managed.Len() == 0 {
 		fmt.Println("No managed resources to export")
