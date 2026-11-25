@@ -67,11 +67,13 @@ func (h *HandlerImpl) LoadRemoteResources(ctx context.Context) ([]*model.RemoteW
 func (h *HandlerImpl) LoadImportableResources(ctx context.Context) ([]*model.RemoteWriter, error) {
 	remoteWriters := h.backend.AllWriters()
 
-	fmt.Println("Loading importable resources for writers")
-
-	// Return all resources for import
+	// Only the unmanaged ones, as a real provider's list call does with its
+	// hasExternalId=false filter. A managed writer already has a spec.
 	result := make([]*model.RemoteWriter, 0, len(remoteWriters))
 	for _, w := range remoteWriters {
+		if w.ExternalID != "" {
+			continue
+		}
 		result = append(result, &model.RemoteWriter{RemoteWriter: w})
 	}
 	return result, nil

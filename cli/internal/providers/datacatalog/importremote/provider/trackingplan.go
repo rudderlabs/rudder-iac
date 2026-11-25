@@ -44,17 +44,28 @@ func NewTrackingPlanImportProvider(client catalog.DataCatalog, log logger.Logger
 }
 
 func (p *TrackingPlanImportProvider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	return p.load(ctx, false, idNamer)
+}
+
+// LoadManaged loads the managed tracking plans keyed by their real externalId.
+func (p *TrackingPlanImportProvider) LoadManaged(ctx context.Context) (*resources.RemoteResources, error) {
+	return p.load(ctx, true, nil)
+}
+
+// load lists tracking plans with or without an externalId. A nil idNamer keeps
+// each one's externalId instead of naming it.
+func (p *TrackingPlanImportProvider) load(ctx context.Context, managed bool, idNamer namer.Namer) (*resources.RemoteResources, error) {
 	p.log.Debug("loading importable tracking plans from remote catalog")
 	collection := resources.NewRemoteResources()
 
-	trackingPlans, err := p.client.GetTrackingPlansWithIdentifiers(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(false)})
+	trackingPlans, err := p.client.GetTrackingPlansWithIdentifiers(ctx, catalog.ListOptions{HasExternalID: lo.ToPtr(managed)})
 	if err != nil {
 		return nil, fmt.Errorf("getting tracking plans from remote catalog: %w", err)
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource)
 	for _, trackingPlan := range trackingPlans {
-		if trackingPlan.ExternalID != "" {
+		if (trackingPlan.ExternalID != "") != managed {
 			continue
 		}
 		resourceMap[trackingPlan.ID] = &resources.RemoteResource{
@@ -88,11 +99,15 @@ func (p *TrackingPlanImportProvider) idResources(
 			return fmt.Errorf("unable to cast remote resource to catalog tracking plan")
 		}
 
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  data.Name,
-			Scope: types.TrackingPlanResourceType})
-		if err != nil {
-			return fmt.Errorf("generating externalID for tracking plan %s: %w", data.Name, err)
+		externalID := data.ExternalID
+		if idNamer != nil {
+			var err error
+			externalID, err = idNamer.Name(namer.ScopeName{
+				Name:  data.Name,
+				Scope: types.TrackingPlanResourceType})
+			if err != nil {
+				return fmt.Errorf("generating externalID for tracking plan %s: %w", data.Name, err)
+			}
 		}
 
 		tp.ExternalID = externalID

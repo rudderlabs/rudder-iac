@@ -238,11 +238,88 @@ rudder-cli import workspace [flags]
 | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--location`, `-l` | Path to the project directory (default `.`).                                                                                                                                      |
 | `--merge`          | Link workspace resources that match existing local resources instead of writing duplicates, and allow import on a diverged project. Requires the `importMerge` experimental flag. |
+| `--managed`        | Write the resources the CLI already manages (those with an externalId) under `managed/` instead of importing unmanaged ones. Requires the `importManaged` experimental flag. See [Exporting managed resources](#exporting-managed-resources). |
+| `--skip-existing`  | With `--managed`, allow a project that already has specs and write only the managed resources it does not have yet. |
 | `--var-file`       | Variable file (`.vars.yaml`/`.vars.yml`) resolving `{{ .VAR }}` references while the project is read. Repeatable; later files win. Pass the same files you pass to `apply`, or a templated field reads as divergence. |
 
 Import writes into an `imported/` subdirectory of the project and **fails if that
 directory already exists** — move or remove a previous `imported/` before
 re-running.
+
+---
+
+## Exporting managed resources
+
+> **Status: experimental.** `--managed` needs experimental mode and the
+> `importManaged` flag, set the same ways as `importMerge` (for example
+> `RUDDERSTACK_X_IMPORT_MANAGED=true`). Without it, `--managed` is rejected.
+
+A plain import writes only resources that have no externalId, and it refuses to
+run when the workspace has managed resources your project lacks. So it cannot
+recover a project that something else manages, such as a teammate's repository.
+
+`import workspace --managed` writes the managed resources under `managed/`, each
+spec keyed by the resource's externalId, so `apply --dry-run` on the result
+reports no changes. It recovers what the specs say, not how they were written:
+file layout, comments, `{{ .VAR }}` substitutions and secrets are lost.
+
+```bash
+rudder-cli import workspace --managed --location ./acme   # managed resources, into managed/
+rudder-cli import workspace --location ./acme             # then the unmanaged ones, into imported/
+```
+
+Without `--skip-existing`, the project must have no specs, because they would
+collide with the externalIds the export writes. With `--skip-existing`, the
+project may already hold some of the managed resources: the export leaves those
+out and writes only the rest. References to a resource the project already has
+point at its existing spec.
+
+```bash
+rudder-cli import workspace --managed --skip-existing --location ./my-project
+```
+
+`--managed` fails if `managed/` already exists, and it cannot be combined with
+`--merge`.
+
+---
+
+## Reseeding a whole workspace
+
+`import workspace --managed` writes one half of a workspace and a plain
+`import workspace` the other, so recovering a whole workspace takes two runs in
+a project that must already be in the right state for each.
+
+`rudder-cli reseed` does both halves in one run, into a directory that holds no
+project YAML:
+
+```bash
+rudder-cli reseed --location ./rebuilt
+rudder-cli apply --dry-run --location ./rebuilt   # reports no changes
+```
+
+Managed resources get specs keyed by their externalId, so apply matches them.
+Unmanaged ones get specs plus an `import-manifest.yaml`, so apply adopts them.
+A workspace holding both reseeds correctly in one pass.
+
+The empty-directory rule is the whole point: with nothing local to lose and
+nothing to reconcile, reseed runs none of the divergence checks that make
+`import workspace` refuse on a project that has drifted. That is the state a
+half-finished apply leaves behind, and it is exactly the state import rejects.
+There is no force flag. Reseed refuses a directory with project YAML in it and
+tells you to use an empty one.
+
+Reseed refuses outright if the workspace holds a resource type no provider can
+export, naming the type, rather than writing a project whose next apply would
+delete it.
+
+It recovers what the specs say, not how they were written: file layout,
+comments and `{{ .VAR }}` substitutions are lost, and secret values come back
+as placeholders in the generated var file for you to fill in.
+
+> **Status: experimental.** `reseed` needs experimental mode with both
+> `importManaged` and `importMerge`. It needs `importMerge` because that is what
+> makes the `import-manifest` kind load, without which a reseeded project
+> holding one fails to load at all.
 
 ---
 

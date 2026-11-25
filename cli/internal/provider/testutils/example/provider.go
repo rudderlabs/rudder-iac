@@ -9,9 +9,12 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/validation/rules"
 )
 
-// Provider wraps the base provider to provide a concrete type for dependency injection
+// Provider wraps the base provider to provide a concrete type for dependency injection.
+// It embeds *BaseProvider, not the Provider interface, so the optional
+// capabilities the interface does not declare (managed export, for one) stay
+// reachable. A real provider is a concrete type and has them all.
 type Provider struct {
-	provider.Provider
+	*provider.BaseProvider
 }
 
 // NewProvider creates a new example provider with all resource handlers
@@ -22,7 +25,7 @@ func NewProvider(backend *backend.Backend) *Provider {
 	}
 
 	return &Provider{
-		Provider: provider.NewBaseProvider(handlers),
+		BaseProvider: provider.NewBaseProvider(handlers),
 	}
 }
 

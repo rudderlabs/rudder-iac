@@ -297,6 +297,26 @@ func (p *Provider) LoadImportable(ctx context.Context, idNamer namer.Namer) (*re
 	return collection, nil
 }
 
+// LoadManaged loads the managed resources of every handler, keyed by their
+// real externalId.
+func (p *Provider) LoadManaged(ctx context.Context) (*resources.RemoteResources, error) {
+	collection := resources.NewRemoteResources()
+	for _, h := range p.handlers {
+		m, ok := h.(provider.ManagedExportLoader)
+		if !ok {
+			return nil, fmt.Errorf("handler %T cannot export managed resources", h)
+		}
+		c, err := m.LoadManaged(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("loading managed resources from handler: %w", err)
+		}
+		if collection, err = collection.Merge(c); err != nil {
+			return nil, fmt.Errorf("merging managed resource collection: %w", err)
+		}
+	}
+	return collection, nil
+}
+
 func (p *Provider) FormatForExport(
 	collection *resources.RemoteResources,
 	idNamer namer.Namer,

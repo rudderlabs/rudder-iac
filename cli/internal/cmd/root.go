@@ -20,6 +20,7 @@ import (
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/destroy"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/migrate"
 	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/project/validate"
+	"github.com/rudderlabs/rudder-iac/cli/internal/cmd/reseed"
 	retlsource "github.com/rudderlabs/rudder-iac/cli/internal/cmd/retl-sources"
 	sourcescmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/sources"
 	telemetryCmd "github.com/rudderlabs/rudder-iac/cli/internal/cmd/telemetry"
@@ -94,6 +95,7 @@ func init() {
 	rootCmd.AddCommand(validate.NewCmdValidate())
 	rootCmd.AddCommand(destroy.NewCmdDestroy())
 	rootCmd.AddCommand(migrate.NewCmdMigrate())
+	rootCmd.AddCommand(reseed.NewCmdReseed())
 
 	debugCmd = d.NewCmdDebug()
 	experimentalCmd = experimental.NewCmdExperimental()
@@ -169,6 +171,7 @@ var trackedCommands = []string{
 	"import retl-sources",
 	"import workspace",
 	"migrate",
+	"reseed",
 	"retl-sources preview",
 	"retl-sources validate",
 	"transformations show-default-events",

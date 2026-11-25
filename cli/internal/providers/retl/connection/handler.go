@@ -773,19 +773,33 @@ func resolveSourceURN(collection *resources.RemoteResources, sourceID string) (s
 // each after its endpoints, e.g. "users-to-webhook". Both endpoints are known
 // to exist: a row missing either is not importable in the first place.
 func (h *Handler) LoadImportable(ctx context.Context, idNamer namer.Namer) (*resources.RemoteResources, error) {
-	remotes, err := h.eligible(ctx, lo.ToPtr(false))
+	return h.loadExportable(ctx, false, idNamer)
+}
+
+// LoadManaged loads the managed connections keyed by their real externalId.
+func (h *Handler) LoadManaged(ctx context.Context) (*resources.RemoteResources, error) {
+	return h.loadExportable(ctx, true, nil)
+}
+
+// loadExportable lists connections with or without an externalId. Unmanaged
+// ones take an id from idNamer; managed ones keep their externalId.
+func (h *Handler) loadExportable(ctx context.Context, managed bool, idNamer namer.Namer) (*resources.RemoteResources, error) {
+	remotes, err := h.eligible(ctx, lo.ToPtr(managed))
 	if err != nil {
 		return nil, err
 	}
 
 	resourceMap := make(map[string]*resources.RemoteResource, len(remotes))
 	for _, remote := range remotes {
-		externalID, err := idNamer.Name(namer.ScopeName{
-			Name:  fmt.Sprintf("%s-to-%s", remote.SourceName, remote.DestinationName),
-			Scope: ResourceType,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("generating externalID for connection %s: %w", remote.ID, err)
+		externalID := remote.ExternalID
+		if !managed {
+			externalID, err = idNamer.Name(namer.ScopeName{
+				Name:  fmt.Sprintf("%s-to-%s", remote.SourceName, remote.DestinationName),
+				Scope: ResourceType,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("generating externalID for connection %s: %w", remote.ID, err)
+			}
 		}
 		resourceMap[remote.ID] = &resources.RemoteResource{
 			ID:         remote.ID,
