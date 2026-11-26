@@ -125,9 +125,13 @@ make docker-build
 
 `rudder-cli` collects usage data to help us understand how the CLI is used and where it fails. Telemetry is on by default, and the CLI tells you so the first time it runs.
 
+The installation id stays the same until you delete `~/.rudder/config.json`, so it links your runs together. With the workspace id, the data is not anonymous.
+
 ### What we collect
 
-- The command you run, the flags you pass, and whether the command failed. Some flag values are paths or resource ids, such as the project location.
+- The command you run, the flags you pass, and whether the command failed.
+- The project location, exactly as you typed it, on `apply`, `validate`, `datagraph validate`, `transformations test`, `migrate` and `import retl-sources`. An absolute path can contain your username and folder names. `import retl-sources` also sends the local id, the remote id and the SQL file path.
+- The IP address of your machine. Every event reaches RudderStack with it, and RudderStack stores it.
 - The CLI version and a random installation id, kept in `~/.rudder/config.json`.
 - The CI service the CLI runs in, if any.
 - The coding agent running the CLI, such as Claude Code or Cursor, and the agent skill it follows, if any. API requests also name these two in their `User-Agent` header.
@@ -147,4 +151,4 @@ rudder-cli telemetry disable
 
 You can also set `RUDDERSTACK_CLI_TELEMETRY_DISABLED=true` or [`DO_NOT_TRACK=1`](https://donottrack.sh/) in the environment. Check the current setting with `rudder-cli telemetry status`.
 
-Binaries built from source do not send usage events.
+Binaries built without a telemetry write key, which includes builds from source, send no usage events and do not show the first-run notice.
