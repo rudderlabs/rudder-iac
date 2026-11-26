@@ -90,7 +90,7 @@ func InitConfig(cfgFile string) {
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
 	viper.BindEnv("telemetry.writeKey", "RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY")
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
-	// DO_NOT_TRACK is the opt-out several tools share (consoledonottrack.com).
+	// DO_NOT_TRACK is the opt-out several tools share (https://donottrack.sh/).
 	// Ours is read first, so it can turn telemetry back on for one tool.
 	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED", "DO_NOT_TRACK")
 	viper.BindEnv("debug", "RUDDERSTACK_CLI_DEBUG")

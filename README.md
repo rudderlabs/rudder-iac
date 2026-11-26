@@ -145,6 +145,6 @@ make docker-build
 rudder-cli telemetry disable
 ```
 
-You can also set `RUDDERSTACK_CLI_TELEMETRY_DISABLED=true` or `DO_NOT_TRACK=1` in the environment. Check the current setting with `rudder-cli telemetry status`.
+You can also set `RUDDERSTACK_CLI_TELEMETRY_DISABLED=true` or [`DO_NOT_TRACK=1`](https://donottrack.sh/) in the environment. Check the current setting with `rudder-cli telemetry status`.
 
 Binaries built from source do not send usage events.

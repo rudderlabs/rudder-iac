@@ -31,7 +31,7 @@ const noticeVersion = 1
 // the workspace.
 const Notice = `rudder-cli collects usage data to help RudderStack improve it. When you are
 signed in, usage is associated with your RudderStack workspace.
-Turn it off with 'rudder-cli telemetry disable' or DO_NOT_TRACK=1.
+Turn it off with 'rudder-cli telemetry disable' or DO_NOT_TRACK=1 (https://donottrack.sh/).
 Learn more: https://github.com/rudderlabs/rudder-iac#telemetry
 This notice is shown once.
 `
