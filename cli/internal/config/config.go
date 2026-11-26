@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/rudderlabs/rudder-iac/api/client"
 	"github.com/rudderlabs/rudder-iac/cli/internal/logger"
@@ -90,9 +91,9 @@ func InitConfig(cfgFile string) {
 	viper.BindEnv("apiURL", "RUDDERSTACK_API_URL")
 	viper.BindEnv("telemetry.writeKey", "RUDDERSTACK_CLI_TELEMETRY_WRITE_KEY")
 	viper.BindEnv("telemetry.dataplaneURL", "RUDDERSTACK_CLI_TELEMETRY_DATAPLANE_URL")
-	// DO_NOT_TRACK is the opt-out several tools share (https://donottrack.sh/).
-	// Ours is read first, so it can turn telemetry back on for one tool.
-	viper.BindEnv("telemetry.disabled", "RUDDERSTACK_CLI_TELEMETRY_DISABLED", "DO_NOT_TRACK")
+	// telemetry.disabled is not bound to an environment variable. Viper would
+	// parse the value as a strict bool and fail every command on "yes", so
+	// GetConfig resolves both variables with telemetryDisabled instead.
 	viper.BindEnv("debug", "RUDDERSTACK_CLI_DEBUG")
 	viper.BindEnv("experimental", ExperimentalEnvVar)
 	viper.BindEnv("concurrency.syncer", "RUDDERSTACK_CLI_CONCURRENCY_SYNCER")
@@ -189,6 +190,8 @@ func GetConfig() Config {
 	err := viper.Unmarshal(&config)
 	cobra.CheckErr(err)
 
+	config.Telemetry.Disabled = telemetryDisabled(config.Telemetry.Disabled)
+
 	if !viper.GetBool("experimental") {
 		config.ExperimentalFlags = ExperimentalConfig{}
 	}
@@ -208,4 +211,35 @@ func GetConfig() Config {
 
 func GetConfigDir() string {
 	return filepath.Dir(viper.ConfigFileUsed())
+}
+
+// parseFlag reads an on/off environment value. The second result is false for
+// an empty or unknown value, which callers treat as not set.
+func parseFlag(value string) (on, ok bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on":
+		return true, true
+	case "0", "false", "no", "off":
+		return false, true
+	}
+	return false, false
+}
+
+// telemetryDisabled applies the environment to the saved setting.
+// RUDDERSTACK_CLI_TELEMETRY_DISABLED is the tool's own variable and can set
+// either value, so it can re-enable telemetry for one run even over
+// DO_NOT_TRACK=1. That precedence is an open design choice.
+// DO_NOT_TRACK (https://donottrack.sh/) can only disable: an off value changes
+// nothing, so it never overrides a saved "telemetry disable".
+// An unknown value of either variable is ignored rather than failing the CLI.
+func telemetryDisabled(saved bool) bool {
+	if on, ok := parseFlag(os.Getenv("RUDDERSTACK_CLI_TELEMETRY_DISABLED")); ok {
+		return on
+	}
+
+	if on, ok := parseFlag(os.Getenv("DO_NOT_TRACK")); ok && on {
+		return true
+	}
+
+	return saved
 }
