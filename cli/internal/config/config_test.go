@@ -69,3 +69,84 @@ func TestInitConfig_SourcesListenBindsEnv(t *testing.T) {
 
 	require.True(t, GetConfig().ExperimentalFlags.SourcesListen)
 }
+
+// initTelemetryConfig loads a config file with the given saved setting.
+// A file, not viper.Set, so the setting does not leak into later tests.
+func initTelemetryConfig(t *testing.T, savedDisabled bool) {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "config.json")
+	body := fmt.Sprintf(`{"telemetry": {"disabled": %t}}`, savedDisabled)
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+
+	InitConfig(path)
+}
+
+func TestGetConfig_DoNotTrack(t *testing.T) {
+	cases := []struct {
+		value string
+		saved bool
+		want  bool
+	}{
+		{"1", false, true},
+		{"true", false, true},
+		{"TRUE", false, true},
+		{"yes", false, true},
+		{"Yes", false, true},
+		{"on", false, true},
+		{"ON", false, true},
+		// Off values change nothing, so a saved opt-out survives.
+		{"0", true, true},
+		{"false", true, true},
+		{"no", true, true},
+		{"off", true, true},
+		{"", true, true},
+		{"0", false, false},
+		{"false", false, false},
+		{"no", false, false},
+		{"off", false, false},
+		{"", false, false},
+		// An unknown value never crashes and changes nothing.
+		{"maybe", false, false},
+		{"maybe", true, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%q saved=%t", tc.value, tc.saved), func(t *testing.T) {
+			t.Setenv("RUDDERSTACK_CLI_TELEMETRY_DISABLED", "")
+			t.Setenv("DO_NOT_TRACK", tc.value)
+			initTelemetryConfig(t, tc.saved)
+
+			assert.Equal(t, tc.want, GetConfig().Telemetry.Disabled)
+		})
+	}
+}
+
+func TestGetConfig_ToolVariable(t *testing.T) {
+	cases := []struct {
+		name  string
+		tool  string
+		dnt   string
+		saved bool
+		want  bool
+	}{
+		{"true disables", "true", "", false, true},
+		{"yes disables", "yes", "", false, true},
+		{"false enables over a saved opt-out", "false", "", true, false},
+		// Open design choice: the tool variable beats DO_NOT_TRACK.
+		{"false beats DO_NOT_TRACK=1", "false", "1", false, false},
+		{"unknown value is ignored", "maybe", "", false, false},
+		{"unknown value leaves DO_NOT_TRACK in force", "maybe", "1", false, true},
+		{"unknown value leaves a saved opt-out", "maybe", "", true, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("RUDDERSTACK_CLI_TELEMETRY_DISABLED", tc.tool)
+			t.Setenv("DO_NOT_TRACK", tc.dnt)
+			initTelemetryConfig(t, tc.saved)
+
+			assert.Equal(t, tc.want, GetConfig().Telemetry.Disabled)
+		})
+	}
+}

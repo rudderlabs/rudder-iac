@@ -31,7 +31,7 @@ var telemetryCmd = &cobra.Command{
 		
 		Use 'status' to check current telemetry settings
 		Use 'enable' or 'disable' to modify telemetry collection
-		RUDDERSTACK_CLI_TELEMETRY_DISABLED=true or DO_NOT_TRACK=1 also turns it off
+		RUDDERSTACK_CLI_TELEMETRY_DISABLED=true or DO_NOT_TRACK=1 (https://donottrack.sh/) also turns it off
 	`),
 }
 
