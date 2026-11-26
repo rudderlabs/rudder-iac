@@ -41,25 +41,33 @@ This notice is shown once.
 var noticeOut io.Writer = os.Stderr
 
 func Initialise(version string) {
-	once.Do(func() {
+	once.Do(func() { initialise(version) })
+}
 
-		if config.GetConfig().Telemetry.Disabled {
-			return
-		}
+func initialise(version string) {
+	if config.GetConfig().Telemetry.Disabled {
+		return
+	}
 
-		if config.GetConfig().Telemetry.Notice < noticeVersion {
-			fmt.Fprint(noticeOut, Notice)
-			config.SetTelemetryNotice(noticeVersion)
-		}
+	// A build from source has no write key. The analytics client would fall
+	// back to its default endpoint, so nothing is sent and the notice, which
+	// promises collection, is not shown.
+	if config.GetConfig().Telemetry.WriteKey == "" {
+		return
+	}
 
-		v = version
-		ready.Store(true)
+	if config.GetConfig().Telemetry.Notice < noticeVersion {
+		fmt.Fprint(noticeOut, Notice)
+		config.SetTelemetryNotice(noticeVersion)
+	}
 
-		if config.GetConfig().Telemetry.AnonymousID == "" {
-			anonymousID := uuid.New().String()
-			config.SetTelemetryAnonymousID(anonymousID)
-		}
-	})
+	v = version
+	ready.Store(true)
+
+	if config.GetConfig().Telemetry.AnonymousID == "" {
+		anonymousID := uuid.New().String()
+		config.SetTelemetryAnonymousID(anonymousID)
+	}
 }
 
 func DisableTelemetry() {
@@ -71,15 +79,17 @@ func EnableTelemetry() {
 }
 
 func track(event string, properties analytics.Properties) error {
-	if config.GetConfig().Telemetry.Disabled {
+	var (
+		cfg          = config.GetConfig().Telemetry
+		anonymousID  = cfg.AnonymousID
+		writeKey     = cfg.WriteKey
+		dataplaneURL = cfg.DataplaneURL
+	)
+
+	// Without a write key the client would fall back to its default endpoint.
+	if cfg.Disabled || writeKey == "" {
 		return nil
 	}
-
-	var (
-		anonymousID  = config.GetConfig().Telemetry.AnonymousID
-		writeKey     = config.GetConfig().Telemetry.WriteKey
-		dataplaneURL = config.GetConfig().Telemetry.DataplaneURL
-	)
 
 	client, err := analytics.NewWithConfig(writeKey, analytics.Config{
 		DataPlaneUrl: dataplaneURL,
